@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity <6.0 >=0.4.24;
 
 import "../ownership/Ownable.sol";
 import "../lifecycle/Pausable.sol";
@@ -6,6 +6,8 @@ import "../math/SafeMath.sol";
 import "./Safe.sol";
 
 contract TransferValidator is Ownable {
+    using SafeMath for uint256;
+
     event Settled(
         address token,
         uint indexed index,
@@ -22,7 +24,6 @@ contract TransferValidator is Ownable {
     struct Vote {
         address voter;
         uint256 blockNumber;
-        bytes signature;
     }
 
     struct Transfer {
@@ -65,7 +66,7 @@ contract TransferValidator is Ownable {
         }
     }
 
-    function addWhitelistedTokens(address[] _tokens, address[] _safes) public onlyOwner returns (bool success_) {
+    function addWhitelistedTokens(address[] memory _tokens, address[] memory _safes) public onlyOwner returns (bool success_) {
         require(_tokens.length == _safes.length, "tokens and safes do not match");
         for (uint256 i = 0; i < _tokens.length; i++) {
             if (addWhitelistedToken(_tokens[i], _safes[i])) {
@@ -92,7 +93,7 @@ contract TransferValidator is Ownable {
         }
     }
 
-    function addWhitelistedVoters(address[] voters) public onlyOwner returns (bool success_) {
+    function addWhitelistedVoters(address[] memory voters) public onlyOwner returns (bool success_) {
         for (uint256 i = 0; i < voters.length; i++) {
             if (addWhitelistedVoter(voters[i])) {
                 success_ = true;
@@ -113,16 +114,13 @@ contract TransferValidator is Ownable {
         return keccak256(abi.encodePacked(tokenAddr, index, from, to, amount));
     }
 
-    function generateMessageHash(bytes32 key) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked("\x1cTransfer Validator Message:\n32", key));
-    }
-
     function settled(bytes32 key) public view returns(bool) {
         return transfers[key].settleHeight > 0;
     }
 
-    function vote(address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes sig) public {
-        require(whitelistedVoters[msg.sender] && whitelistedTokens[tokenAddr].flag, "not whitelisted tokens/voters");
+    function vote(address tokenAddr, uint256 index, address from, address to, uint256 amount) public {
+        require(whitelistedVoters[msg.sender], "not whitelisted voters");
+        require(whitelistedTokens[tokenAddr].flag, "not whitelisted tokens");
         bytes32 key = generateKey(tokenAddr, index, from, to, amount);
         if (settled(key)) {
             return;
@@ -130,14 +128,15 @@ contract TransferValidator is Ownable {
         if (!transfers[key].flag) {
             transfers[key] = Transfer(tokenAddr, index, from, to, amount, 0, true);
         }
-        require(recover(generateMessageHash(key), sig) == msg.sender, "invalid signature");
         uint256 l = votes[key].length;
         uint256 numOfValidVoters = 0;
         uint256 i;
+        bool isUpdate = false;
         address[] memory voters = new address[](numOfWhitelistedVoters);
         for (i = 0; i < l; i++) {
             if (votes[key][i].voter == msg.sender) {
                 votes[key][i].blockNumber = block.number;
+                isUpdate = true;
             }
             // vote's block number is always less or equal to block.number
             if ((expireHeight >= block.number - votes[key][i].blockNumber) && whitelistedVoters[votes[key][i].voter]) {
@@ -145,8 +144,8 @@ contract TransferValidator is Ownable {
                 numOfValidVoters++;
             }
         }
-        if (i == l) {
-            votes[key].push(Vote(msg.sender, block.number, sig));
+        if (!isUpdate) {
+            votes[key].push(Vote(msg.sender, block.number));
             voters[numOfValidVoters] = msg.sender;
             numOfValidVoters++;
         }
@@ -160,36 +159,4 @@ contract TransferValidator is Ownable {
             emit Settled(tokenAddr, index, from, to, amount, block.number, trimmedVoters);
         }
     }
-
-    function recover(bytes32 hash, bytes signature) internal pure returns (address) {
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-        // Check the signature length
-        if (signature.length != 65) {
-            return (address(0));
-        }
-        // Divide the signature in r, s and v variables with inline assembly.
-        // solium-disable-next-line security/no-inline-assembly
-        assembly {
-            r := mload(add(signature, 0x20))
-            s := mload(add(signature, 0x40))
-            v := byte(0, mload(add(signature, 0x60)))
-        }
-        // Version of signature should be 27 or 28, but 0 and 1 are also possible versions
-        if (v < 27) {
-            v += 27;
-        }
-        // If the version is correct return the signer address
-        if (v != 27 && v != 28) {
-            return (address(0));
-        }
-        return ecrecover(hash, v, r, s);
-    }
-
-    /*
-    function report(uint256 index, address from, address to, uint256 amount, string sig) public {
-
-    }
-    */
 }

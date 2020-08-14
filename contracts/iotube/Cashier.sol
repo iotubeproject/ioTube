@@ -1,9 +1,8 @@
-pragma solidity ^0.4.24;
+pragma solidity <6.0 >=0.4.21;
 
 import "../ownership/Ownable.sol";
 
 contract Cashier is Ownable {
-    address public safe;
     uint256 public depositFee;
     uint256 public minAmount;
     uint256 public maxAmount;
@@ -15,32 +14,25 @@ contract Cashier is Ownable {
 
     event Receipt(address indexed customer, address indexed receiver, uint256 amount, uint256 fee);
 
-    constructor(address _safe, uint256 _fee, uint256 _minAmount, uint256 _maxAmount) public {
-        require(_minAmount > 0);
-        require(_maxAmount >= _minAmount);
-        safe = _safe;
-        depositFee = _fee;
-        minAmount = _minAmount;
-        maxAmount = _maxAmount;
-    }
-
-    function setDepositFee(uint256 _fee) external onlyOwner {
+    function setDepositFee(uint256 _fee) public onlyOwner {
         depositFee = _fee;
     }
 
-    function setSafe(address _safe) external onlyOwner {
-        safe = _safe;
-    }
-
-    function setMinAmount(uint256 _minAmount) external onlyOwner {
+    function setMinAmount(uint256 _minAmount) public onlyOwner {
         require(maxAmount >= _minAmount);
         require(_minAmount > 0);
         minAmount = _minAmount;
     }
 
-    function setMaxAmount(uint256 _maxAmount) external onlyOwner {
+    function setMaxAmount(uint256 _maxAmount) public onlyOwner {
         require(_maxAmount >= minAmount);
         maxAmount = _maxAmount;
+    }
+
+    function depositTo(address _to, uint256 _amount) public payable;
+
+    function deposit(uint256 _amount) public payable {
+        depositTo(msg.sender, _amount);
     }
 
     function count() public view returns (uint256) {

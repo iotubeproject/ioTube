@@ -1,11 +1,11 @@
-pragma solidity ^0.4.24;
+pragma solidity <6.0 >=0.4.24;
 
 import "../token/ERC20.sol";
 import "./Safe.sol";
 
 contract TokenSafe is Safe {
     ERC20 public token;
-    address validator;
+    address public validator;
 
     constructor(address tokenAddr, address validatorAddr) public {
         token = ERC20(tokenAddr);

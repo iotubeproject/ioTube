@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity <6.0 >=0.4.21;
 
 interface Safe {
     event Withdrew(address to, uint256 amount);

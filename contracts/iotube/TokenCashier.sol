@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity <6.0 >=0.4.24;
 
 import "./Cashier.sol";
 import "../token/ERC20.sol";
@@ -10,6 +10,7 @@ interface BurnableToken {
 
 contract TokenCashier is Pausable, Cashier {
     ERC20 public token;
+    address public safe;
     BurnableToken private burner;
 
     constructor(
@@ -18,19 +19,19 @@ contract TokenCashier is Pausable, Cashier {
         uint256 _fee,
         uint256 _minAmount,
         uint256 _maxAmount
-    ) Cashier(_safe, _fee, _minAmount, _maxAmount) public {
+    ) public {
         token = ERC20(_tokenAddr);
         if (_safe == address(0)) {
             burner = BurnableToken(_tokenAddr);
         }
+        safe = _safe;
+        setDepositFee(_fee);
+        setMaxAmount(_maxAmount);
+        setMinAmount(_minAmount);
     }
 
-    function () external payable {
+    function() external {
         revert();
-    }
-
-    function deposit(uint256 _amount) public payable {
-        depositTo(msg.sender, _amount);
     }
 
     function depositTo(address _to, uint256 _amount) public whenNotPaused payable {
@@ -41,7 +42,7 @@ contract TokenCashier is Pausable, Cashier {
         if (safe != address(0)) {
             require(token.transferFrom(msg.sender, safe, _amount), "put into safe required");
         } else {
-            require(token.transferFrom(msg.sender, address(this), _amount), "tranfer token to cashier");
+            require(token.transferFrom(msg.sender, address(this), _amount), "transfer token to cashier");
             require(burner.burn(_amount), "burn tokens");
         }
         customers.push(msg.sender);
