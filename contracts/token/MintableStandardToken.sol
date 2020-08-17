@@ -17,18 +17,9 @@ contract MintableStandardToken is StandardToken, MintableToken, Pausable {
 
     mapping (address => bool) public minters;
 
-    function addMinter(address _minter) public onlyOwner {
-        if (!minters[_minter]) {
-            minters[_minter] = true;
-            emit MinterAdded(_minter);
-        }
-    }
-
-    function removeMinter(address _minter) public onlyOwner {
-        if (minters[_minter]) {
-            minters[_minter] = false;
-            emit MinterRemoved(_minter);
-        }
+    constructor(address minter) public {
+        minters[minter] = true;
+        emit MinterAdded(minter);
     }
 
     function mint(address _to, uint256 _amount) public onlyMinter whenNotPaused returns (bool) {
