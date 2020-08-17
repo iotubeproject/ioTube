@@ -1,21 +1,18 @@
 pragma solidity <6.0 >=0.4.24;
 
-import "../token/ERC20.sol";
-import "./Safe.sol";
+import "../ownership/Ownable.sol";
 
-contract TokenSafe is Safe {
-    ERC20 public token;
-    address public validator;
+interface ERC20Token {
+    function transfer(address to, uint256 value) external returns (bool);
+}
 
-    constructor(address tokenAddr, address validatorAddr) public {
-        token = ERC20(tokenAddr);
-        validator = validatorAddr;
+contract TokenSafe is Ownable {
+    constructor(address _owner) public {
+        owner = _owner;
     }
 
-    function withdraw(address _to, uint256 _amount) public returns (bool) {
-        require(msg.sender == validator, "only validator could withdraw from safe");
-        require(token.transfer(_to, _amount), "transfer failed");
-        emit Withdrew(_to, _amount);
+    function withdrawToken(address _token, address _to, uint256 _amount) public onlyOwner returns (bool) {
+        require(ERC20Token(_token).transfer(_to, _amount), "failed to transfer token");
         return true;
     }
 }
