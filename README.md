@@ -35,6 +35,13 @@
 * Transfer ownership of `ts` to the TransferValidatorWithTokenSafe
 * Add voters to `vl`
 
-## Build a tube for an ERC20 token
+## Usage
+
+### Transfer assets between IoTeX and Ethereum
+TBD
+
+### Add a ERC20 token to ioTube
 * Add this token to `tl` on Ethereum
 * Deploy a ShadowToken and add it to `tl` on IoTeX
+
+
