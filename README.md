@@ -49,3 +49,14 @@ TBD
 * Deploy a ShadowToken and add it to `tl` on IoTeX
 
 
+## Security
+- Each witnesses (voters) needs to be registered to `VoterList` contract on both chains based on PoA (Proof-of-Authority). Once enough number of witnesses (voters) joined, ioTube will be switched to use PoS (Proof-of-Stake) with slash policies. 
+- Each transferring of assets from one chain to another needs the endorsement from more than 2/3 of the registered witnesses (voters); otherwise it will not be successful.
+- IoTeX has instant finality, meaning, to a witness, one confirmed block indicates finalization of a `burn` event, while on the Ethereum side, a witness needs to wai 12 blocks before making any endorsement.
+- To launch ioTube in a safe way, we have limit the min/max of the asset that can be move around. These limits can be lifted up once ioTube gets more stress validated.
+
+## Gas Costs
+Gas fees on IoTeX are negligible, both for bridge maintenance and for asset transfer. The estimated gas fees on Ethereum side are:
+- To transfer token from Ethereum to IoTeX: ~XXX gas to set allowance and ~XXX to lock it;
+- To transfer token back from IoTeX to ETH: ~XXX gas to unlock the token.
+
