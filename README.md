@@ -12,8 +12,8 @@ A decentralized bridge between Ethereum and IoTeX for exchanging native coins an
 * Deploy a TokenList `tl`
 * Deploy a VoterList `vl`
 * Deploy a BurnableTokenCashier with `tl`
-* Deploy a TokenValidatorWithMinterPool with `mp`, `tl`, `vl`
-* Transfer ownership of `mp` to the TokenValidatorWithMinterPool
+* Deploy a TransferValidatorWithMinterPool with `mp`, `tl`, `vl`
+* Transfer ownership of `mp` to the TransferValidatorWithMinterPool
 * Add voters to `vl`
 
 ## Deploy on Ethereum
@@ -21,8 +21,8 @@ A decentralized bridge between Ethereum and IoTeX for exchanging native coins an
 * Deploy a TokenList `tl`
 * Deploy a VoterList `vl`
 * Deploy a TokenCashierWithSafe with `tl` and `ts`
-* Deploy a TokenValidatorWithTokenSafe with `ts`, `tl`, and `vl`
-* Transfer ownership of `ts` to the TokenValidatorWithTokenSafe
+* Deploy a TransferValidatorWithTokenSafe with `ts`, `tl`, and `vl`
+* Transfer ownership of `ts` to the TransferValidatorWithTokenSafe
 * Add voters to `vl`
 
 ## Build a tube for an ERC20 token
