@@ -3,8 +3,8 @@ pragma solidity <6.0 >=0.4.24;
 import "../ownership/Ownable.sol";
 
 contract VoterList is Ownable {
-    event VoterAdded(address voter);
-    event VoterRemoved(address voter);
+    event VoterAdded(address indexed voter);
+    event VoterRemoved(address indexed voter);
     struct Setting {
         bool active;
         bool flag;

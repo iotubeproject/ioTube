@@ -27,6 +27,7 @@ contract TokenList is Ownable {
             if (!settings[_token].flag) {
                 tokens.push(_token);
             }
+            require(_min > 0 && _max > _min, "invalid parameters");
             settings[_token] = Setting(_min, _max, true, true);
             num++;
             emit TokenAdded(_token, _min, _max);
