@@ -1,0 +1,27 @@
+{
+  "name": "iotex-emerald-contract",
+  "version": "1.0.0",
+  "description": "The IoTeX Emerald token contract is an ERC20-compatible token that is designed to be “pausable”, which means that we can pause transfers in case of a major security vulnerability or attack.",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "remixd -s .  --remix-ide https://remix.ethereum.org",
+    "test": "truffle test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iotexproject/IOTX-token-contracts.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/iotexproject/IOTX-token-contracts/issues"
+  },
+  "homepage": "https://github.com/iotexproject/IOTX-token-contracts#readme",
+  "dependencies": {
+    "truffle": "^5.0.22",
+    "web3-utils": "^1.0.0-beta.55"
+  }
+}

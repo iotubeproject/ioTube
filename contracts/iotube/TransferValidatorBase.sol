@@ -11,9 +11,9 @@ interface Allowlist {
 contract TransferValidatorBase is Ownable, Pausable {
     event Settled(
         address indexed token,
-        uint indexed index,
+        uint256 indexed index,
         address indexed from,
-        address indexed to,
+        address to,
         uint256 amount,
         uint256 blockNumber,
         address[] voters);

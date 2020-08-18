@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity <0.6 >=0.4.24;
 
 import "./MintableToken.sol";
 import "./StandardToken.sol";
@@ -11,15 +11,15 @@ contract ShadowToken is StandardToken, MintableToken, Pausable {
     event MinterRemoved(address indexed minter);
 
     modifier onlyMinter() {
-        require(minters[msg.sender], "not a minter");
+        require(minter == msg.sender, "not the minter");
         _;
     }
 
     address public coToken;
-    mapping (address => bool) public minters;
+    address public minter;
 
     constructor(address _minter, address _coToken) public {
-        minters[_minter] = true;
+        minter = _minter;
         coToken = _coToken;
         emit MinterAdded(_minter);
     }
