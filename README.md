@@ -35,7 +35,7 @@
 * Transfer ownership of `ts` to the TransferValidatorWithTokenSafe
 * Add voters to `vl`
 
-### Join as a Witeness (Voter)
+### Join as a Witness (Voter)
 
 TBD
 
