@@ -2,12 +2,22 @@
   <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px">
 </p>
 
+<p>
+  <strong>A fully decentralized and bidirectional bridge for exchanging ERC20/XRC20 tokens between Ethereum and IoTeX</strong>
+</p>
+
+<h3>
+      <a href="https://github.com/iotexproject/ioTube#deployement">Deployement</a>
+      <span> | </span>
+      <a href="https://github.com/iotexproject/ioTube#usage">Usage</a>
+      <span> | </span>
+      <a href="https://github.com/iotexproject/ioTube/tree/master/docs">Documentation</a>
+</h3>
+
 &nbsp;
 
-# ioTube
-A decentralized bridge between Ethereum and IoTeX for exchanging native coins and ERC20/XRC20 tokens
-
-## Deploy on IoTeX
+## Deployement
+### Deploy on IoTeX
 * Deploy a MinterPool `mp`
 * Deploy a TokenList `tl`
 * Deploy a VoterList `vl`
@@ -16,7 +26,7 @@ A decentralized bridge between Ethereum and IoTeX for exchanging native coins an
 * Transfer ownership of `mp` to the TransferValidatorWithMinterPool
 * Add voters to `vl`
 
-## Deploy on Ethereum
+### Deploy on Ethereum
 * Deploy a TokenSafe `ts`
 * Deploy a TokenList `tl`
 * Deploy a VoterList `vl`
