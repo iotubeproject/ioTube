@@ -17,7 +17,7 @@
 &nbsp;
 
 ## Deployement
-### Deploy on IoTeX
+### Deploy Contracts on IoTeX
 * Deploy a MinterPool `mp`
 * Deploy a TokenList `tl`
 * Deploy a VoterList `vl`
@@ -26,7 +26,7 @@
 * Transfer ownership of `mp` to the TransferValidatorWithMinterPool
 * Add voters to `vl`
 
-### Deploy on Ethereum
+### Deploy Contracts on Ethereum
 * Deploy a TokenSafe `ts`
 * Deploy a TokenList `tl`
 * Deploy a VoterList `vl`
@@ -34,6 +34,10 @@
 * Deploy a TransferValidatorWithTokenSafe with `ts`, `tl`, and `vl`
 * Transfer ownership of `ts` to the TransferValidatorWithTokenSafe
 * Add voters to `vl`
+
+### Join as a Witeness (Voter)
+
+TBD
 
 ## Usage
 
