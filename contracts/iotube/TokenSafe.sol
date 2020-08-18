@@ -7,10 +7,6 @@ interface ERC20Token {
 }
 
 contract TokenSafe is Ownable {
-    constructor(address _owner) public {
-        owner = _owner;
-    }
-
     function withdrawToken(address _token, address _to, uint256 _amount) public onlyOwner returns (bool) {
         require(ERC20Token(_token).transfer(_to, _amount), "failed to transfer token");
         return true;

@@ -4,7 +4,7 @@ import "./MintableToken.sol";
 import "./StandardToken.sol";
 import "../lifecycle/Pausable.sol";
 
-contract MintableStandardToken is StandardToken, MintableToken, Pausable {
+contract ShadowToken is StandardToken, MintableToken, Pausable {
     event Minted(address indexed to, uint256 amount);
     event Burned(address indexed from, uint256 amount);
     event MinterAdded(address indexed minter);
@@ -15,11 +15,13 @@ contract MintableStandardToken is StandardToken, MintableToken, Pausable {
         _;
     }
 
+    address public coToken;
     mapping (address => bool) public minters;
 
-    constructor(address minter) public {
-        minters[minter] = true;
-        emit MinterAdded(minter);
+    constructor(address _minter, address _coToken) public {
+        minters[_minter] = true;
+        coToken = _coToken;
+        emit MinterAdded(_minter);
     }
 
     function mint(address _to, uint256 _amount) public onlyMinter whenNotPaused returns (bool) {
