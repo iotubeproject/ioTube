@@ -17,6 +17,10 @@
 &nbsp;
 
 ## Deployement
+Different from traditional bridges, ioTube comes with two components:
+- **a golang service** witnessing what has happened on both changes and relay the finalized information
+- **a set of smart contracts** pre-deployed on both chains letting the legitimate witnesses relay information back and forth to facilitate cross-chain transferring of assets
+
 ### Deploy Contracts on IoTeX
 * Deploy a MinterPool `mp`
 * Deploy a TokenList `tl`
