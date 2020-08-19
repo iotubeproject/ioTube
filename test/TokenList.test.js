@@ -26,11 +26,13 @@ contract('TokenList', function([owner, minter, stranger, fakeTokenAddress1, fake
         await this.tokenList.addToken(this.shadowToken1.address, 9, 100);
         assert.equal(await this.tokenList.isAllowed(this.shadowToken1.address), true);
         assert.equal(await this.tokenList.numOfAllowed(), 1);
+        assert.equal(await this.tokenList.tokens(0), this.shadowToken1.address);
         assert.equal(await this.tokenList.minAmount(this.shadowToken1.address), 9);
         assert.equal(await this.tokenList.maxAmount(this.shadowToken1.address), 100);
         await this.tokenList.addToken(this.shadowToken2.address, 99, 101);
         assert.equal(await this.tokenList.isAllowed(this.shadowToken2.address), true);
         assert.equal(await this.tokenList.numOfAllowed(), 2);
+        assert.equal(await this.tokenList.tokens(1), this.shadowToken2.address);
         assert.equal(await this.tokenList.minAmount(this.shadowToken2.address), 99);
         assert.equal(await this.tokenList.maxAmount(this.shadowToken2.address), 101);
         await this.tokenList.removeToken(this.shadowToken2.address);
