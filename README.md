@@ -3,7 +3,7 @@
 </p>
 
 <p>
-  <strong>A fully decentralized and bidirectional bridge for exchanging ERC20/XRC20 tokens between Ethereum and IoTeX</strong>
+  <strong>A multi-assets, fully decentralized and bidirectional bridge for exchanging ERC20/XRC20 tokens between Ethereum and IoTeX</strong>
 </p>
 
 <h3>
