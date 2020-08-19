@@ -3,7 +3,9 @@
 </p>
 
 <p>
-  <strong>A multi-assets, fully decentralized and bidirectional bridge for exchanging ERC20/XRC20 tokens between Ethereum and IoTeX</strong>
+  <strong>A multi-assets, fully decentralized and bidirectional bridge for exchanging ERC20/XRC20 tokens between Ethereum and IoTeX.</strong>
+  
+ioTube is a decentralized cross-chain bridge that enables the bidirectional exchange of digital assets (e.g., tokens, stable coins) between IoTeX and other blockchain networks. The first version of ioTube was built by core-dev around 2019 June to facilitate the swap of IOTX-ERC20 and IOTX until now, and this released version generalizes the original ioTube by making it more decentralized and supports multiple assets on Ethereum & IoTeX blockchains. In the future, we plan to add support for more blockchain networks to increase the reach and impact of ioTube.
 </p>
 
 <h3>
@@ -16,7 +18,7 @@
 
 &nbsp;
 
-## Deployement
+## Deployment
 Different from traditional bridges, ioTube comes with two components:
 - **a golang service** witnessing what has happened on both changes and relay the finalized information
 - **a set of smart contracts** pre-deployed on both chains letting the legitimate witnesses relay information back and forth to facilitate cross-chain transferring of assets
@@ -54,7 +56,7 @@ TBD
 
 
 ## Security
-- Each witness (voter) needs to be registered to `VoterList` contract on both chains based on PoA (Proof-of-Authority). Once enough number of witnesses (voters) joined, ioTube will be switched to use PoS (Proof-of-Stake) with slash policies. 
+- Each witness (voter) needs to be registered to `VoterList` contract on both chains based on PoA (Proof-of-Authority).
 - Each transferring of assets from one chain to another needs the endorsement from more than 2/3 of the registered witnesses (voters); otherwise, it will not be successful.
 - IoTeX has instant finality, meaning, to a witness, one confirmed block indicates finalization of a `burn` event, while on the Ethereum side, a witness needs to wai 12 blocks before making any endorsement.
 - To launch ioTube reliably, we have limited the min/max of the asset that can be moved around. These limits can be lifted once ioTube gets more stress validated.
