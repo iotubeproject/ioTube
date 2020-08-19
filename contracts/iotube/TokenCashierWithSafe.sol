@@ -15,7 +15,7 @@ contract TokenCashierWithSafe is TokenCashierBase {
         safe = _safe;
     }
 
-    function transferToSafe(address _token, uint256 _amount) internal onlyOwner returns (bool) {
+    function transferToSafe(address _token, uint256 _amount) internal returns (bool) {
         ERC20Token token = ERC20Token(_token);
         require(token.transferFrom(msg.sender, safe, _amount), "fail to transfer token to safe");
         return true;

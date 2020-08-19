@@ -50,31 +50,31 @@ contract TokenCashierBase is Pausable {
         return cashiers[_token].customers.length;
     }
 
-    function getRecords(address _token, uint256 _offset, uint256 _limit) public view returns(address[] memory _customers, address[] memory _receivers, uint256[] memory _amounts, uint256[] memory _fees) {
+    function getRecords(address _token, uint256 _offset, uint256 _limit) public view returns(address[] memory customers_, address[] memory receivers_, uint256[] memory amounts_, uint256[] memory fees_) {
         require(_limit < 200);
         require(tokenList.isAllowed(_token), "token not in list");
         Cashier storage cashier = cashiers[_token];
         if (_offset >= cashier.customers.length) {
-            return (_customers, _receivers, _amounts, _fees);
+            return (customers_, receivers_, amounts_, fees_);
         }
         uint256 l = _limit;
         if (_limit > cashier.customers.length - _offset) {
             l = cashier.customers.length - _offset;
         }
         if (l == 0) {
-            return (_customers, _receivers, _amounts, _fees);
+            return (customers_, receivers_, amounts_, fees_);
         }
-        _customers = new address[](l);
-        _receivers = new address[](l);
-        _amounts = new uint256[](l);
-        _fees = new uint256[](l);
+        customers_ = new address[](l);
+        receivers_ = new address[](l);
+        amounts_ = new uint256[](l);
+        fees_ = new uint256[](l);
         for (uint256 i = 0; i < l; i++) {
-            _customers[i] = cashier.customers[_offset + i];
-            _receivers[i] = cashier.receivers[_offset + i];
-            _amounts[i] = cashier.amounts[_offset + i];
-            _fees[i] = cashier.fees[_offset + i];
+            customers_[i] = cashier.customers[_offset + i];
+            receivers_[i] = cashier.receivers[_offset + i];
+            amounts_[i] = cashier.amounts[_offset + i];
+            fees_[i] = cashier.fees[_offset + i];
         }
 
-        return (_customers, _receivers, _amounts, _fees);
+        return (customers_, receivers_, amounts_, fees_);
     }
 }
