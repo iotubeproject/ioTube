@@ -7,7 +7,7 @@ contract('MinterPool', function([owner, stranger, fakeTokenAddress]) {
         this.minterPool = await MinterPool.new();
         this.shadowToken = await ShadowToken.new(this.minterPool.address, fakeTokenAddress);
     });
-    it('is owner', async function() {
+    it('check minter', async function() {
         assert.equal(await this.shadowToken.minter(), this.minterPool.address);
     });
     it('is owner', async function() {
