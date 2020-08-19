@@ -14,7 +14,7 @@ contract BurnableTokenCashier is TokenCashierBase {
         tokenList = TokenList(_tokenList);
     }
 
-    function transferToSafe(address _token, uint256 _amount) internal onlyOwner returns (bool) {
+    function transferToSafe(address _token, uint256 _amount) internal returns (bool) {
         BurnableToken token = BurnableToken(_token);
         require(token.transferFrom(msg.sender, address(this), _amount), "fail to transfer token to cashier");
         require(token.burn(_amount), "fail to burn token");
