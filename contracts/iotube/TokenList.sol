@@ -11,19 +11,18 @@ contract TokenList is Ownable, UniqueAppendOnlyAddressList {
     struct Setting {
         uint256 minAmount;
         uint256 maxAmount;
-        bool active;
     }
 
     mapping(address => Setting) private settings;
 
     function isAllowed(address _token) public view returns (bool) {
-        return settings[_token].active;
+        return isActive(_token);
     }
 
     function addToken(address _token, uint256 _min, uint256 _max) public onlyOwner returns (bool success_) {
         if (activateItem(_token)) {
             require(_min > 0 && _max > _min, "invalid parameters");
-            settings[_token] = Setting(_min, _max, true);
+            settings[_token] = Setting(_min, _max);
             emit TokenAdded(_token, _min, _max);
             success_ = true;
         }

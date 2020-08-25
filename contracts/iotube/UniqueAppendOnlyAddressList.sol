@@ -15,7 +15,7 @@ contract UniqueAppendOnlyAddressList is Ownable {
         return items.length;
     }
 
-    function numOfActived() public view returns (uint256) {
+    function numOfActive() public view returns (uint256) {
         return num;
     }
 
@@ -49,7 +49,7 @@ contract UniqueAppendOnlyAddressList is Ownable {
     }
 
     function getActiveItems(uint256 offset, uint8 limit) public view returns (uint256 count_, address[] memory items_) {
-        require(offset < items.length && limit == 0);
+        require(offset < items.length && limit != 0);
         items_ = new address[](limit);
         for (uint256 i = 0; i < limit; i++) {
             if (offset + i >= items.length) {

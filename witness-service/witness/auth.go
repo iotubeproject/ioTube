@@ -104,7 +104,7 @@ func (auth *Auth) loadAddressListOnEthereum(contractAddr common.Address) ([]comm
 func (auth *Auth) loadAddressListOnIoTeX(c iotex.Contract) ([]address.Address, error) {
 	response, err := c.Read("count").Call(context.Background())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to call vote list contract")
+		return nil, errors.Wrap(err, "failed to call witness list contract")
 	}
 	var count *big.Int
 	if err := response.Unmarshal(&count); err != nil {
@@ -116,7 +116,7 @@ func (auth *Auth) loadAddressListOnIoTeX(c iotex.Contract) ([]address.Address, e
 	for offset.Cmp(count) < 0 {
 		response, err := c.Read("getActiveItems", offset, limit).Call(context.Background())
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to call vote list contract")
+			return nil, errors.Wrap(err, "failed to call witness list contract")
 		}
 		result := struct {
 			Count *big.Int
@@ -135,6 +135,13 @@ func (auth *Auth) loadAddressListOnIoTeX(c iotex.Contract) ([]address.Address, e
 		offset.Add(offset, big.NewInt(int64(limit)))
 	}
 	return fullList, nil
+}
+
+// LastUpdateTime returns the last update time of the component
+func (auth *Auth) LastUpdateTime() time.Time {
+	auth.mu.RLock()
+	defer auth.mu.RUnlock()
+	return auth.lastUpdateTime
 }
 
 // Refresh refreshes the data stored

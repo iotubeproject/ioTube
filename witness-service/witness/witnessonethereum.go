@@ -90,7 +90,7 @@ func (w *witnessOnEthereum) FetchRecords(token string, startID *big.Int, limit u
 	return records, nil
 }
 
-func (w *witnessOnEthereum) Vote(tx *TxRecord) (txhash string, err error) {
+func (w *witnessOnEthereum) Submit(tx *TxRecord) (txhash string, err error) {
 	auth := bind.NewKeyedTransactor(w.witnessPrivateKey)
 	auth.Value = big.NewInt(0)
 	auth.GasLimit = uint64(2000000)
@@ -122,7 +122,7 @@ func (w *witnessOnEthereum) Vote(tx *TxRecord) (txhash string, err error) {
 			return errors.Wrapf(err, "failed to create validator caller")
 		}
 
-		tx, err := validator.Vote(
+		tx, err := validator.Submit(
 			auth,
 			common.HexToAddress(tx.token),
 			tx.id,
@@ -131,14 +131,14 @@ func (w *witnessOnEthereum) Vote(tx *TxRecord) (txhash string, err error) {
 			tx.amount,
 		)
 		if err != nil {
-			return errors.Wrapf(ErrAfterSendingTx, "failed to vote on %s with error %s", w.validatorAddress, err)
+			return errors.Wrapf(ErrAfterSendingTx, "failed to submit witness on %s with error %s", w.validatorAddress, err)
 		}
 		txhash = tx.Hash().String()
 		return nil
 	}); err != nil {
 		err = errors.Wrapf(
 			err,
-			"failed to vote for recipient 0x%x, %s of token %s",
+			"failed to submit witness for recipient 0x%x, %s of token %s",
 			tx.recipient,
 			tx.amount.String(),
 			tx.token,
@@ -148,7 +148,7 @@ func (w *witnessOnEthereum) Vote(tx *TxRecord) (txhash string, err error) {
 	return
 }
 
-func (w *witnessOnEthereum) CheckTx(tx *TxRecord) (err error) {
+func (w *witnessOnEthereum) Check(tx *TxRecord) (err error) {
 	if err = w.auth.EthereumClientPool().Execute(func(client *ethclient.Client) error {
 		_, err := client.TransactionReceipt(context.Background(), common.HexToHash(tx.txhash))
 		return err

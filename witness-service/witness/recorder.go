@@ -44,8 +44,8 @@ type (
 	Queries struct {
 		// CreateRecord is a query to create a new record with id, customer, and amount
 		CreateRecord string
-		// MarkRecordAsVoted is a query to set status to VOTED
-		MarkRecordAsVoted string
+		// MarkRecordAsSubmitted is a query to set status to VOTED
+		MarkRecordAsSubmitted string
 		// UpdateRecordStatus is a query to update status
 		UpdateRecordStatus string
 		// MaxIDs is the query to fetch the max ids of all tokens
@@ -75,11 +75,11 @@ const (
 	Invalid RecordStatus = iota
 	// New stands for a newly created record
 	New
-	// Voting stands for a record is in voting status
-	Voting
-	// Voted stands for a record of which the vote action has been taken
-	Voted
-	// Confirmed stands for a record whose vote has been confirmed
+	// Submitting stands for a record is in submitting status
+	Submitting
+	// Submitted stands for a record of which the submit action has been taken
+	Submitted
+	// Confirmed stands for a record whose submission has been confirmed
 	Confirmed
 	// Failed stands for a failure status
 	Failed
@@ -91,7 +91,7 @@ func NewRecorder(store *db.SQLStore, recordTableName string) *Recorder {
 		store: store,
 		queries: Queries{
 			CreateRecord:                       fmt.Sprintf("INSERT INTO %s (token, id, sender, recipient, amount) VALUES (?, ?, ?, ?)", recordTableName),
-			MarkRecordAsVoted:                  fmt.Sprintf("UPDATE %s SET status=%d,txHash=? WHERE id=? AND status=%d", recordTableName, Voted, Voting),
+			MarkRecordAsSubmitted:              fmt.Sprintf("UPDATE %s SET status=%d,txHash=? WHERE id=? AND status=%d", recordTableName, Submitted, Submitting),
 			UpdateRecordStatus:                 fmt.Sprintf("UPDATE %s SET status=? WHERE id=? AND status=?", recordTableName),
 			MaxIDs:                             fmt.Sprintf("SELECT token, MAX(id) AS max_id FROM %s GROUP BY token", recordTableName),
 			PullRecordsByStatus:                fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY id", recordTableName, "%d"),
@@ -158,33 +158,33 @@ func (recorder *Recorder) Create(tx *TxRecord) error {
 func (recorder *Recorder) Reset(tx *TxRecord) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	return recorder.UpdateRecordStatus(New, tx)
+	return recorder.updateRecordStatus(New, tx)
 }
 
-// StartVote marks a record as transferring
-func (recorder *Recorder) StartVote(tx *TxRecord) error {
+// StartProcess marks a record as submitting
+func (recorder *Recorder) StartProcess(tx *TxRecord) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	return recorder.UpdateRecordStatus(Voting, tx)
+	return recorder.updateRecordStatus(Submitting, tx)
 }
 
-// MarkAsVoted marks a record as voted
-func (recorder *Recorder) MarkAsVoted(tx *TxRecord, txhash string) error {
+// MarkAsSubmitted marks a record as submitted
+func (recorder *Recorder) MarkAsSubmitted(tx *TxRecord, txhash string) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 
-	smst, err := recorder.store.DB().Prepare(recorder.queries.MarkRecordAsVoted)
+	smst, err := recorder.store.DB().Prepare(recorder.queries.MarkRecordAsSubmitted)
 	if err != nil {
 		return err
 	}
 	defer smst.Close()
-	recorder.metric("voted", tx.amount)
+	recorder.metric("submitted", tx.amount)
 	res, err := smst.Exec(txhash, tx.id.Uint64())
 	if err != nil {
 		return err
 	}
 	if err = recorder.validateResult(res); err == nil {
-		log.Printf("record %d marked as voted\n", tx.id)
+		log.Printf("record %d marked as submitted\n", tx.id)
 	}
 
 	return err
@@ -201,11 +201,10 @@ func (recorder *Recorder) Confirm(tx *TxRecord) error {
 func (recorder *Recorder) Fail(tx *TxRecord) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	return recorder.UpdateRecordStatus(Failed, tx)
+	return recorder.updateRecordStatus(Failed, tx)
 }
 
-// UpdateRecordStatus updates record to new status
-func (recorder *Recorder) UpdateRecordStatus(newStatus RecordStatus, record *TxRecord) error {
+func (recorder *Recorder) updateRecordStatus(newStatus RecordStatus, record *TxRecord) error {
 	smst, err := recorder.store.DB().Prepare(recorder.queries.UpdateRecordStatus)
 	if err != nil {
 		return err
@@ -215,19 +214,19 @@ func (recorder *Recorder) UpdateRecordStatus(newStatus RecordStatus, record *TxR
 	var metricLabel string
 	switch newStatus {
 	case New:
-		oldStatus = Voting
+		oldStatus = Submitting
 		metricLabel = "new"
-	case Voting:
+	case Submitting:
 		oldStatus = New
 		metricLabel = "transfer"
-	case Voted:
-		oldStatus = Voting
+	case Submitted:
+		oldStatus = Submitting
 		metricLabel = "transferred"
 	case Confirmed:
-		oldStatus = Voted
+		oldStatus = Submitted
 		metricLabel = "confirmed"
 	case Failed:
-		oldStatus = Voted
+		oldStatus = Submitted
 		metricLabel = "failed"
 	default:
 		return errors.Errorf("New status %d is invalid", newStatus)
@@ -271,8 +270,8 @@ func (recorder *Recorder) NextIDsToFetch() (map[string]*big.Int, error) {
 	return retval, nil
 }
 
-// RecordsToVote returns the list of records to transfer
-func (recorder *Recorder) RecordsToVote(limit uint) ([]*TxRecord, error) {
+// NewRecords returns the list of records to witness
+func (recorder *Recorder) NewRecords(limit uint) ([]*TxRecord, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 
@@ -284,7 +283,7 @@ func (recorder *Recorder) RecordsToConfirm(secondsAgo int, limit uint) ([]*TxRec
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 
-	return recorder.records(Voted, secondsAgo, limit)
+	return recorder.records(Submitted, secondsAgo, limit)
 }
 
 /////////////////////////////////

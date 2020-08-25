@@ -6,10 +6,10 @@ import "./TransferValidatorBase.sol";
 contract TransferValidatorWithMinterPool is TransferValidatorBase {
     MinterPool public pool;
 
-    constructor(uint256 _expireHeight, address _minterPool, address _tokenList, address _voterList) public {
+    constructor(uint256 _expireHeight, address _minterPool, address _tokenList, address _witnessList) public {
         pool = MinterPool(_minterPool);
         whitelistedTokens = Allowlist(_tokenList);
-        whitelistedVoters = Allowlist(_voterList);
+        whitelistedWitnesss = Allowlist(_witnessList);
         setExpireHeight(_expireHeight);
     }
 

@@ -1,3 +1,4 @@
+refreshInterval: 60m
 ethGasPriceLimit: "20000000000"
 slackWebHook: ""
 httpPort: 8080
@@ -8,23 +9,23 @@ iotex:
   client: "api.testnet.iotex.one:443"
   threshold: "20000000000000000000000"
   tokenListContract: ""
-  voterListContract: ""
+  witnessListContract: ""
   cashierContract: ""
   validatorContract: ""
   privateKey: ""
   dbTableName: "erc2xrc"
   pullInterval: 1m
-  voteInterval: 1m
+  submitInterval: 1m
   checkInterval: 10m
 ethereum:
   client: "https://ropsten.infura.io/v3/"
   threshold: "20000000000000000000000"
   tokenListContract: ""
-  voterListContract: ""
+  witnessListContract: ""
   cashierContract: ""
   validatorContract: ""
   privateKey: ""
   dbTableName: "erc2xrc"
   pullInterval: 1m
-  voteInterval: 1m
+  submitInterval: 1m
   checkInterval: 10m

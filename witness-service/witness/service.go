@@ -36,8 +36,8 @@ type (
 	// Witness is an interface defines the behavior of a witness
 	Witness interface {
 		FetchRecords(token string, startID *big.Int, limit uint8) ([]*TxRecord, error)
-		Vote(*TxRecord) (string, error)
-		CheckTx(*TxRecord) error
+		Submit(*TxRecord) (string, error)
+		Check(*TxRecord) error
 	}
 )
 
@@ -63,11 +63,11 @@ func NewService(
 	if err != nil {
 		return nil, errors.New("failed to create collector")
 	}
-	swapper, err := dispatcher.NewRunner(transferInterval, s.voteForRecords)
+	swapper, err := dispatcher.NewRunner(transferInterval, s.submitWitnesses)
 	if err != nil {
 		return nil, errors.New("failed to create swapper")
 	}
-	checker, err := dispatcher.NewRunner(checkInterval, s.checkVoteResult)
+	checker, err := dispatcher.NewRunner(checkInterval, s.checkSubmission)
 	if err != nil {
 		return nil, errors.New("failed to create checker")
 	}
@@ -123,18 +123,18 @@ func (s *service) collectNewRecords() error {
 	return nil
 }
 
-func (s *service) voteForRecords() error {
-	records, err := s.recorder.RecordsToVote(1)
+func (s *service) submitWitnesses() error {
+	records, err := s.recorder.NewRecords(1)
 	if err != nil {
 		return err
 	}
 	for _, record := range records {
-		if err := s.recorder.StartVote(record); err != nil {
+		if err := s.recorder.StartProcess(record); err != nil {
 			return err
 		}
-		txhash, err := s.witness.Vote(record)
+		txhash, err := s.witness.Submit(record)
 		if err != nil {
-			log.Println("vote failed", err)
+			log.Println("submit witness failed", err)
 			util.LogErr(err)
 			if ErrAfterSendingTx != errors.Cause(err) {
 				// tx not sent yet, change statue back to new
@@ -142,21 +142,21 @@ func (s *service) voteForRecords() error {
 			}
 			return s.recorder.Fail(record)
 		}
-		log.Printf("vote %+v: %s\n", record, txhash)
-		if err := s.recorder.MarkAsVoted(record, txhash); err != nil {
+		log.Printf("submit witness %+v: %s\n", record, txhash)
+		if err := s.recorder.MarkAsSubmitted(record, txhash); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *service) checkVoteResult() error {
+func (s *service) checkSubmission() error {
 	records, err := s.recorder.RecordsToConfirm(10*60, 20)
 	if err != nil {
 		return err
 	}
 	for _, record := range records {
-		if err := s.witness.CheckTx(record); err != nil {
+		if err := s.witness.Check(record); err != nil {
 			util.LogErr(err)
 			if err := s.recorder.Fail(record); err != nil {
 				return err

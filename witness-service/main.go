@@ -29,12 +29,14 @@ import (
 	uconfig "go.uber.org/config"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
+	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/iotexproject/ioTube/witness-service/witness"
 )
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
+	RefreshInterval  time.Duration `json:"refreshInterval" yaml:"refreshInterval"`
 	IoTeX            WitnessConfig `json:"iotex" yaml:"iotex"`
 	Ethereum         WitnessConfig `json:"ethereum" yaml:"ethereum"`
 	EthGasPriceLimit string        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
@@ -45,17 +47,17 @@ type Configuration struct {
 
 // WitnessConfig defines the config of a witness on one chain
 type WitnessConfig struct {
-	Client            string        `json:"client" yaml:"client"`
-	TokenListContract string        `json:"tokenListContract" yaml:"tokenListContract"`
-	VoterListContract string        `json:"voterListContract" yaml:"voterListContract"`
-	CashierContract   string        `json:"cashierContract" yaml:"cashierContract"`
-	ValidatorContract string        `json:"validatorContract" yaml:"validatorContract"`
-	PrivateKey        string        `json:"privateKey" yaml:"privateKey"`
-	DBTableName       string        `json:"dbTableName" yaml:"dbTableName"`
-	Threshold         string        `json:"threshold" yaml:"threshold"`
-	PullInterval      time.Duration `json:"pullInterval" yaml:"pullInterval"`
-	VoteInterval      time.Duration `json:"voteInterval" yaml:"voteInterval"`
-	CheckInterval     time.Duration `json:"checkInterval" yaml:"checkInterval"`
+	Client              string        `json:"client" yaml:"client"`
+	TokenListContract   string        `json:"tokenListContract" yaml:"tokenListContract"`
+	WitnessListContract string        `json:"witnessListContract" yaml:"witnessListContract"`
+	CashierContract     string        `json:"cashierContract" yaml:"cashierContract"`
+	ValidatorContract   string        `json:"validatorContract" yaml:"validatorContract"`
+	PrivateKey          string        `json:"privateKey" yaml:"privateKey"`
+	DBTableName         string        `json:"dbTableName" yaml:"dbTableName"`
+	Threshold           string        `json:"threshold" yaml:"threshold"`
+	PullInterval        time.Duration `json:"pullInterval" yaml:"pullInterval"`
+	SubmitInterval      time.Duration `json:"submitInterval" yaml:"submitInterval"`
+	CheckInterval       time.Duration `json:"checkInterval" yaml:"checkInterval"`
 }
 
 // DBConfig defines the config of database
@@ -80,48 +82,48 @@ func mustFetchNonEmptyParam(key string) string {
 	return str
 }
 
-func createWitnessServices(cfg Configuration) (witness.Service, witness.Service, error) {
+func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, witness.Service, error) {
 	store := db.NewStore(cfg.DB.DriverName, cfg.DB.URL)
 	ecp := witness.NewEthClientPool(cfg.Ethereum.Client)
 	witnessPrivateKeyOnIoTeX, err := crypto.HexStringToPrivateKey(cfg.IoTeX.PrivateKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	witnessAccountOnIoTeX, err := account.PrivateKeyToAccount(witnessPrivateKeyOnIoTeX)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	iotexConn, err := iotex.NewDefaultGRPCConn(cfg.IoTeX.Client)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	ic := iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(iotexConn), witnessAccountOnIoTeX)
-	voterListContractAddressOnIoTeX, err := address.FromString(cfg.IoTeX.VoterListContract)
+	witnessListContractAddressOnIoTeX, err := address.FromString(cfg.IoTeX.WitnessListContract)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	tokenListContractAddressOnIoTeX, err := address.FromString(cfg.IoTeX.TokenListContract)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	auth, err := witness.NewAuth(
 		ecp,
 		ic,
-		common.HexToAddress(cfg.Ethereum.VoterListContract),
-		voterListContractAddressOnIoTeX,
+		common.HexToAddress(cfg.Ethereum.WitnessListContract),
+		witnessListContractAddressOnIoTeX,
 		common.HexToAddress(cfg.Ethereum.TokenListContract),
 		tokenListContractAddressOnIoTeX,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	validatorContractAddressOnIoTeX, err := address.FromString(cfg.IoTeX.ValidatorContract)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	thresholdOnIoTeX, ok := new(big.Int).SetString(cfg.IoTeX.Threshold, 10)
 	if !ok {
-		return nil, nil, errors.Errorf("failed to parse threshold %s", cfg.IoTeX.Threshold)
+		return nil, nil, nil, errors.Errorf("failed to parse threshold %s", cfg.IoTeX.Threshold)
 	}
 	witnessOnIoTeX, err := witness.NewWitnessOnIoTeX(
 		auth,
@@ -131,29 +133,29 @@ func createWitnessServices(cfg Configuration) (witness.Service, witness.Service,
 		thresholdOnIoTeX,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	witnessServiceOnIoTeX, err := witness.NewService(
 		witnessOnIoTeX,
 		witness.NewRecorder(store, cfg.IoTeX.DBTableName),
 		cfg.IoTeX.PullInterval,
-		cfg.IoTeX.VoteInterval,
+		cfg.IoTeX.SubmitInterval,
 		cfg.IoTeX.CheckInterval,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	cashierContractAddressOnIoTeX, err := address.FromString(cfg.IoTeX.CashierContract)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	thresholdOnEthereum, ok := new(big.Int).SetString(cfg.Ethereum.Threshold, 10)
 	if !ok {
-		return nil, nil, errors.Errorf("failed to parse threshold %s", cfg.Ethereum.Threshold)
+		return nil, nil, nil, errors.Errorf("failed to parse threshold %s", cfg.Ethereum.Threshold)
 	}
 	ethGasPriceLimit, ok := new(big.Int).SetString(cfg.EthGasPriceLimit, 10)
 	if !ok {
-		return nil, nil, errors.Errorf("failed to parse threshold %s", cfg.EthGasPriceLimit)
+		return nil, nil, nil, errors.Errorf("failed to parse threshold %s", cfg.EthGasPriceLimit)
 	}
 	witnessOnEthereum, err := witness.NewWitnessOnEthereum(
 		auth,
@@ -164,19 +166,19 @@ func createWitnessServices(cfg Configuration) (witness.Service, witness.Service,
 		thresholdOnEthereum,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	witnessServiceOnEthereum, err := witness.NewService(
 		witnessOnEthereum,
 		witness.NewRecorder(store, cfg.Ethereum.DBTableName),
 		cfg.Ethereum.PullInterval,
-		cfg.Ethereum.VoteInterval,
+		cfg.Ethereum.SubmitInterval,
 		cfg.Ethereum.CheckInterval,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return witnessServiceOnIoTeX, witnessServiceOnEthereum, nil
+	return auth, witnessServiceOnIoTeX, witnessServiceOnEthereum, nil
 }
 
 // main performs the main routine of the application:
@@ -206,18 +208,33 @@ func main() {
 	}
 	// TODO: check configuration
 	util.SetSlackURL(cfg.SlackWebHook)
-	witnessOnIoTeX, witnessOnEthereum, err := createWitnessServices(cfg)
+	auth, witnessOnIoTeX, witnessOnEthereum, err := createWitnessServices(cfg)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	log.Println("Starting fetching auth data")
+	refresher, err := dispatcher.NewRunner(cfg.RefreshInterval, auth.Refresh)
+	if err := refresher.Start(); err != nil {
+		log.Fatalln(err)
+	}
+	defer refresher.Close()
+	for {
+		if auth.LastUpdatetime().After(time.Time{}) {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	log.Println("Starting IoTeX witness service")
 	if err := witnessOnIoTeX.Start(context.Background()); err != nil {
 		log.Fatalln(err)
 	}
 	defer witnessOnIoTeX.Stop(context.Background())
+	log.Println("Starting Ethereum witness service")
 	if err := witnessOnEthereum.Start(context.Background()); err != nil {
 		log.Fatalln(err)
 	}
 	defer witnessOnEthereum.Stop(context.Background())
+	log.Println("Starting metrics service")
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	metricsServer := httputil.Server(fmt.Sprintf(":%d", cfg.HTTPPort), mux)
@@ -230,5 +247,6 @@ func main() {
 	if err := metricsServer.Serve(ln); err != nil {
 		log.Panicf("Probe server stopped: %v\n", err)
 	}
+	log.Println("Service is up")
 	select {}
 }

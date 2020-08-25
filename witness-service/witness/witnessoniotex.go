@@ -84,7 +84,7 @@ func (w *witnessOnIoTeX) FetchRecords(token string, startID *big.Int, limit uint
 	return
 }
 
-func (w *witnessOnIoTeX) Vote(tx *TxRecord) (string, error) {
+func (w *witnessOnIoTeX) Submit(tx *TxRecord) (string, error) {
 	ctx := context.Background()
 	res, err := w.auth.IoTeXClient().API().GetAccount(ctx, &iotexapi.GetAccountRequest{Address: w.witnessAddress.String()})
 	if err != nil {
@@ -110,7 +110,7 @@ func (w *witnessOnIoTeX) Vote(tx *TxRecord) (string, error) {
 	to := common.HexToAddress(tx.recipient)
 
 	actionHash, err := w.validatorContract.
-		Execute("vote", common.HexToAddress(tx.token), tx.id, from, to, tx.amount).
+		Execute("submit", common.HexToAddress(tx.token), tx.id, from, to, tx.amount).
 		SetGasPrice(big.NewInt(int64(1 * unit.Qev))).SetGasLimit(2000000).Call(ctx)
 	if err != nil {
 		return "", errors.Wrap(ErrAfterSendingTx, err.Error())
@@ -118,7 +118,7 @@ func (w *witnessOnIoTeX) Vote(tx *TxRecord) (string, error) {
 	return hex.EncodeToString(actionHash[:]), nil
 }
 
-func (w *witnessOnIoTeX) CheckTx(tx *TxRecord) error {
+func (w *witnessOnIoTeX) Check(tx *TxRecord) error {
 	h, err := hash.HexStringToHash256(tx.txhash)
 	if err != nil {
 		return errors.Wrapf(err, "failed to pass transaction hash %s", tx.txhash)
