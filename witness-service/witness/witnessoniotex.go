@@ -28,12 +28,11 @@ import (
 )
 
 type witnessOnIoTeX struct {
-	auth               *Auth
-	cashierAddress     common.Address
-	witnessAddress     address.Address
-	lowerBound         *big.Int
-	validatorContract  iotex.Contract
-	isQualifiedWitness bool
+	auth              *Auth
+	cashierAddress    common.Address
+	witnessAddress    address.Address
+	lowerBound        *big.Int
+	validatorContract iotex.Contract
 }
 
 // NewWitnessOnIoTeX creates a witness on IoTeX
@@ -56,13 +55,34 @@ func NewWitnessOnIoTeX(
 	}, nil
 }
 
+func (w *witnessOnIoTeX) IsQualifiedWitness() bool {
+	return w.auth.IsActiveWitnessOnIoTeX(w.witnessAddress)
+}
+
+func (w *witnessOnIoTeX) TokensToWatch() []string {
+	tokens := []string{}
+	for _, token := range w.auth.Erc20Tokens() {
+		tokens = append(tokens, token.String())
+	}
+	return tokens
+}
+
 func (w *witnessOnIoTeX) FetchRecords(token string, startID *big.Int, limit uint8) (records []*TxRecord, err error) {
+	confirmHeight := big.NewInt(12)
 	if err := w.auth.EthereumClientPool().Execute(func(client *ethclient.Client) error {
+		tipBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
+		if err != nil {
+			return err
+		}
+		blockNumber := new(big.Int).Sub(tipBlockHeader.Number, EthConfirmBlockNumber)
+		if blockNumber.Cmp(big.NewInt(0)) <= 0 {
+			return nil
+		}
 		caller, err := contract.NewTokenCashierCaller(w.cashierAddress, client)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create caller of contract %s", w.cashierAddress)
 		}
-		result, err := caller.GetRecords(&bind.CallOpts{}, common.HexToAddress(token), startID, big.NewInt(int64(limit)))
+		result, err := caller.GetRecords(&bind.CallOpts{BlockNumber: blockNumber}, common.HexToAddress(token), startID, big.NewInt(int64(limit)))
 		if err != nil {
 			return errors.Wrapf(err, "failed to query token %s", token)
 		}

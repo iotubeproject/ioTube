@@ -219,7 +219,7 @@ func main() {
 	}
 	defer refresher.Close()
 	for {
-		if auth.LastUpdatetime().After(time.Time{}) {
+		if auth.LastUpdateTime().After(time.Time{}) {
 			break
 		}
 		time.Sleep(time.Second)
@@ -234,6 +234,7 @@ func main() {
 		log.Fatalln(err)
 	}
 	defer witnessOnEthereum.Stop(context.Background())
+	log.Println("Service is up")
 	log.Println("Starting metrics service")
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
@@ -247,6 +248,5 @@ func main() {
 	if err := metricsServer.Serve(ln); err != nil {
 		log.Panicf("Probe server stopped: %v\n", err)
 	}
-	log.Println("Service is up")
 	select {}
 }

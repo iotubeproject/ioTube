@@ -61,6 +61,18 @@ func NewWitnessOnEthereum(
 	}, nil
 }
 
+func (w *witnessOnEthereum) IsQualifiedWitness() bool {
+	return w.auth.IsActiveWitnessOnEthereum(w.witnessAddress)
+}
+
+func (w *witnessOnEthereum) TokensToWatch() []string {
+	tokens := []string{}
+	for _, token := range w.auth.Xrc20Tokens() {
+		tokens = append(tokens, token.String())
+	}
+	return tokens
+}
+
 func (w *witnessOnEthereum) FetchRecords(token string, startID *big.Int, limit uint8) ([]*TxRecord, error) {
 	response, err := w.cashierContract.Read("getRecords", token, startID, big.NewInt(int64(limit))).Call(context.Background())
 	if err != nil {
@@ -150,8 +162,18 @@ func (w *witnessOnEthereum) Submit(tx *TxRecord) (txhash string, err error) {
 
 func (w *witnessOnEthereum) Check(tx *TxRecord) (err error) {
 	if err = w.auth.EthereumClientPool().Execute(func(client *ethclient.Client) error {
-		_, err := client.TransactionReceipt(context.Background(), common.HexToHash(tx.txhash))
-		return err
+		receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(tx.txhash))
+		if err != nil {
+			return err
+		}
+		tipBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
+		if err != nil {
+			return err
+		}
+		if new(big.Int).Sub(tipBlockHeader.Number, receipt.BlockNumber).Cmp(EthConfirmBlockNumber) <= 0 {
+			return errors.Errorf("transaction %s has not been confirm yet", tx.txhash)
+		}
+		return nil
 	}); err != nil {
 		return errors.Wrapf(err, "failed to get receipt of pending transaction %s", tx.txhash)
 	}

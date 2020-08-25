@@ -8,6 +8,7 @@ package witness
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -35,6 +36,8 @@ type (
 
 	// Witness is an interface defines the behavior of a witness
 	Witness interface {
+		IsQualifiedWitness() bool
+		TokensToWatch() []string
 		FetchRecords(token string, startID *big.Int, limit uint8) ([]*TxRecord, error)
 		Submit(*TxRecord) (string, error)
 		Check(*TxRecord) error
@@ -98,13 +101,17 @@ func (s *service) Stop(ctx context.Context) error {
 }
 
 func (s *service) collectNewRecords() error {
+	if !s.witness.IsQualifiedWitness() {
+		return nil
+	}
 	ids, err := s.recorder.NextIDsToFetch()
 	if err != nil {
 		return err
 	}
 	var ok bool
 	var index *big.Int
-	for _, token := range []string{} { // tokens {
+	for _, token := range s.witness.TokensToWatch() {
+		fmt.Println("Fetch records of token", token)
 		if index, ok = ids[token]; !ok {
 			index = big.NewInt(0)
 		}
@@ -124,6 +131,9 @@ func (s *service) collectNewRecords() error {
 }
 
 func (s *service) submitWitnesses() error {
+	if !s.witness.IsQualifiedWitness() {
+		return nil
+	}
 	records, err := s.recorder.NewRecords(1)
 	if err != nil {
 		return err
@@ -151,6 +161,9 @@ func (s *service) submitWitnesses() error {
 }
 
 func (s *service) checkSubmission() error {
+	if !s.witness.IsQualifiedWitness() {
+		return nil
+	}
 	records, err := s.recorder.RecordsToConfirm(10*60, 20)
 	if err != nil {
 		return err

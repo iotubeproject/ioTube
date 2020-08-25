@@ -15,6 +15,9 @@ import (
 	"math/big"
 	"sync"
 
+	// mute lint error
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -94,10 +97,10 @@ func NewRecorder(store *db.SQLStore, recordTableName string) *Recorder {
 			MarkRecordAsSubmitted:              fmt.Sprintf("UPDATE %s SET status=%d,txHash=? WHERE id=? AND status=%d", recordTableName, Submitted, Submitting),
 			UpdateRecordStatus:                 fmt.Sprintf("UPDATE %s SET status=? WHERE id=? AND status=?", recordTableName),
 			MaxIDs:                             fmt.Sprintf("SELECT token, MAX(id) AS max_id FROM %s GROUP BY token", recordTableName),
-			PullRecordsByStatus:                fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY id", recordTableName, "%d"),
-			PullRecordsByStatusWithLimit:       fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY id LIMIT %s", recordTableName, "%d", "%d"),
-			SQLitePullRecordsByStatus:          fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= DATETIME('now', '-%s seconds') ORDER BY id", recordTableName, "%d"),
-			SQLitePullRecordsByStatusWithLimit: fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= DATETIME('now', '-%s seconds') ORDER BY id LIMIT %s", recordTableName, "%d", "%d"),
+			PullRecordsByStatus:                fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY createTime", recordTableName, "%d"),
+			PullRecordsByStatusWithLimit:       fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY createTime LIMIT %s", recordTableName, "%d", "%d"),
+			SQLitePullRecordsByStatus:          fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= DATETIME('now', '-%s seconds') ORDER BY createTime", recordTableName, "%d"),
+			SQLitePullRecordsByStatusWithLimit: fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= DATETIME('now', '-%s seconds') ORDER BY createTime LIMIT %s", recordTableName, "%d", "%d"),
 		},
 	}
 }
@@ -194,7 +197,7 @@ func (recorder *Recorder) MarkAsSubmitted(tx *TxRecord, txhash string) error {
 func (recorder *Recorder) Confirm(tx *TxRecord) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	return recorder.UpdateRecordStatus(Confirmed, tx)
+	return recorder.updateRecordStatus(Confirmed, tx)
 }
 
 // Fail marks a record as fail

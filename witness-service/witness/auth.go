@@ -8,6 +8,7 @@ package witness
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strings"
 	"sync"
@@ -23,6 +24,9 @@ import (
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
 )
+
+// EthConfirmBlockNumber defines the number of blocks which is considerred as confirmed
+var EthConfirmBlockNumber = big.NewInt(12)
 
 // Auth maintains the list of witnesses and tokens
 type Auth struct {
@@ -61,6 +65,8 @@ func NewAuth(
 		witnessListContractOnEthereum: witnessListContractOnEthereum,
 		xrc20TokenListContract:        iotexClient.Contract(xrc20TokenListContract, addressListABI),
 		witnessListContractOnIoTeX:    iotexClient.Contract(witnessListContractOnIoTeX, addressListABI),
+		witnessesOnIoTeX:              make(map[address.Address]bool),
+		witnessesOnEthereum:           make(map[common.Address]bool),
 	}, nil
 }
 
@@ -74,19 +80,49 @@ func (auth *Auth) EthereumClientPool() *EthClientPool {
 	return auth.ethClientPool
 }
 
+// Erc20Tokens reutrns the erc20 tokens in whitelist
+func (auth *Auth) Erc20Tokens() []common.Address {
+	auth.mu.RLock()
+	defer auth.mu.RUnlock()
+	tokens := []common.Address{}
+	for token, _ := range auth.erc20ToXrc20 {
+		tokens = append(tokens, token)
+	}
+	return tokens
+}
+
+// Xrc20Tokens reutrns the xrc20 tokens in whitelist
+func (auth *Auth) Xrc20Tokens() []address.Address {
+	auth.mu.RLock()
+	defer auth.mu.RUnlock()
+	tokens := []address.Address{}
+	for token := range auth.xrc20ToErc20 {
+		tokens = append(tokens, token)
+	}
+	return tokens
+}
+
 func (auth *Auth) loadAddressListOnEthereum(contractAddr common.Address) ([]common.Address, error) {
 	var retval []common.Address
 	if err := auth.ethClientPool.Execute(func(client *ethclient.Client) error {
+		tipBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
+		if err != nil {
+			return err
+		}
+		blockNumber := new(big.Int).Sub(tipBlockHeader.Number, EthConfirmBlockNumber)
+		if blockNumber.Cmp(big.NewInt(0)) <= 0 {
+			return nil
+		}
 		list, err := contract.NewAddressListCaller(contractAddr, client)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create caller")
 		}
-		count, err := list.Count(&bind.CallOpts{})
+		count, err := list.Count(&bind.CallOpts{BlockNumber: blockNumber})
 		offset := big.NewInt(0)
 		limit := uint8(10)
 		retval = []common.Address{}
 		for offset.Cmp(count) < 0 {
-			result, err := list.GetActiveItems(&bind.CallOpts{}, offset, limit)
+			result, err := list.GetActiveItems(&bind.CallOpts{BlockNumber: blockNumber}, offset, limit)
 			if err != nil {
 				return errors.Wrap(err, "failed to query list")
 			}
@@ -203,15 +239,23 @@ func (auth *Auth) Refresh() error {
 	auth.mu.Lock()
 	defer auth.mu.Unlock()
 	auth.lastUpdateTime = time.Now()
+	fmt.Println("auth data refreshed at", auth.lastUpdateTime)
+	fmt.Println("  Witnesses on IoTeX")
 	for _, w := range witnessesOnIoTeX {
+		fmt.Println("    ", w.String())
 		auth.witnessesOnIoTeX[w] = true
 	}
+	fmt.Println("  Witnesses on Ethereum")
 	for _, w := range witnessesOnEth {
+		fmt.Println("    ", w.String())
 		auth.witnessesOnEthereum[w] = true
 	}
 	auth.erc20ToXrc20 = newErc20ToXrc20
 	auth.xrc20ToErc20 = newXrc20ToErc20
-
+	fmt.Println("  Token pairs")
+	for key, value := range auth.erc20ToXrc20 {
+		fmt.Println("    ", key.String(), "<=>", value.String())
+	}
 	return nil
 }
 
