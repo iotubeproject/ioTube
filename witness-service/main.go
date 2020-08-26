@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/go-pkgs/crypto"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/account"
@@ -36,13 +37,14 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	RefreshInterval  time.Duration `json:"refreshInterval" yaml:"refreshInterval"`
-	IoTeX            WitnessConfig `json:"iotex" yaml:"iotex"`
-	Ethereum         WitnessConfig `json:"ethereum" yaml:"ethereum"`
-	EthGasPriceLimit string        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
-	SlackWebHook     string        `json:"slackWebHook" yaml:"slackWebHook"`
-	HTTPPort         int           `json:"httpPort" yaml:"httpPort"`
-	DB               DBConfig      `json:"db" yaml:"db"`
+	RefreshInterval       time.Duration `json:"refreshInterval" yaml:"refreshInterval"`
+	IoTeX                 WitnessConfig `json:"iotex" yaml:"iotex"`
+	Ethereum              WitnessConfig `json:"ethereum" yaml:"ethereum"`
+	EthConfirmBlockNumber uint8         `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+	EthGasPriceLimit      string        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
+	HTTPPort              int           `json:"httpPort" yaml:"httpPort"`
+	DB                    DBConfig      `json:"db" yaml:"db"`
 }
 
 // WitnessConfig defines the config of a witness on one chain
@@ -56,8 +58,12 @@ type WitnessConfig struct {
 	DBTableName         string        `json:"dbTableName" yaml:"dbTableName"`
 	Threshold           string        `json:"threshold" yaml:"threshold"`
 	PullInterval        time.Duration `json:"pullInterval" yaml:"pullInterval"`
+	PullBatchSize       uint8         `json:"pullBatchSize" yaml:"pullBatchSize"`
 	SubmitInterval      time.Duration `json:"submitInterval" yaml:"submitInterval"`
+	SubmitBatchSize     uint8         `json:"submitBatchSize" yaml:"submitBatchSize"`
 	CheckInterval       time.Duration `json:"checkInterval" yaml:"checkInterval"`
+	CheckDelay          time.Duration `json:"checkDelay" yaml:"checkDelay"`
+	CheckBatchSize      uint8         `json:"checkBatchSize" yaml:"checkBatchSize"`
 }
 
 // DBConfig defines the config of database
@@ -84,7 +90,10 @@ func mustFetchNonEmptyParam(key string) string {
 
 func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, witness.Service, error) {
 	store := db.NewStore(cfg.DB.DriverName, cfg.DB.URL)
-	ecp := witness.NewEthClientPool(cfg.Ethereum.Client)
+	ethClient, err := ethclient.Dial(cfg.Ethereum.Client)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	witnessPrivateKeyOnIoTeX, err := crypto.HexStringToPrivateKey(cfg.IoTeX.PrivateKey)
 	if err != nil {
 		return nil, nil, nil, err
@@ -107,8 +116,9 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 		return nil, nil, nil, err
 	}
 	auth, err := witness.NewAuth(
-		ecp,
+		ethClient,
 		ic,
+		cfg.EthConfirmBlockNumber,
 		common.HexToAddress(cfg.Ethereum.WitnessListContract),
 		witnessListContractAddressOnIoTeX,
 		common.HexToAddress(cfg.Ethereum.TokenListContract),
@@ -139,8 +149,12 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 		witnessOnIoTeX,
 		witness.NewRecorder(store, cfg.IoTeX.DBTableName),
 		cfg.IoTeX.PullInterval,
+		cfg.IoTeX.PullBatchSize,
 		cfg.IoTeX.SubmitInterval,
+		cfg.IoTeX.SubmitBatchSize,
 		cfg.IoTeX.CheckInterval,
+		cfg.IoTeX.CheckDelay,
+		cfg.IoTeX.CheckBatchSize,
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -172,8 +186,12 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 		witnessOnEthereum,
 		witness.NewRecorder(store, cfg.Ethereum.DBTableName),
 		cfg.Ethereum.PullInterval,
+		cfg.Ethereum.PullBatchSize,
 		cfg.Ethereum.SubmitInterval,
+		cfg.Ethereum.SubmitBatchSize,
 		cfg.Ethereum.CheckInterval,
+		cfg.Ethereum.CheckDelay,
+		cfg.Ethereum.CheckBatchSize,
 	)
 	if err != nil {
 		return nil, nil, nil, err

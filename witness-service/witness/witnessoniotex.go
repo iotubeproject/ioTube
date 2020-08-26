@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/go-pkgs/hash"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
@@ -49,6 +48,7 @@ func NewWitnessOnIoTeX(
 	}
 	return &witnessOnIoTeX{
 		witnessAddress:    witnessAddress,
+		cashierAddress:    cashierAddress,
 		auth:              auth,
 		validatorContract: auth.IoTeXClient().Contract(validatorContractOnIoTeX, validatorABI),
 		lowerBound:        lowerBound,
@@ -67,41 +67,36 @@ func (w *witnessOnIoTeX) TokensToWatch() []string {
 	return tokens
 }
 
-func (w *witnessOnIoTeX) FetchRecords(token string, startID *big.Int, limit uint8) (records []*TxRecord, err error) {
-	confirmHeight := big.NewInt(12)
-	if err := w.auth.EthereumClientPool().Execute(func(client *ethclient.Client) error {
-		tipBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
-		if err != nil {
-			return err
-		}
-		blockNumber := new(big.Int).Sub(tipBlockHeader.Number, EthConfirmBlockNumber)
-		if blockNumber.Cmp(big.NewInt(0)) <= 0 {
-			return nil
-		}
-		caller, err := contract.NewTokenCashierCaller(w.cashierAddress, client)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create caller of contract %s", w.cashierAddress)
-		}
-		result, err := caller.GetRecords(&bind.CallOpts{BlockNumber: blockNumber}, common.HexToAddress(token), startID, big.NewInt(int64(limit)))
-		if err != nil {
-			return errors.Wrapf(err, "failed to query token %s", token)
-		}
-		l := len(result.Receivers)
-		records = make([]*TxRecord, l)
-		for i := 0; i < l; i++ {
-			records[i] = &TxRecord{
-				token:     token,
-				id:        new(big.Int).Add(startID, big.NewInt(int64(i))),
-				sender:    result.Customers[i].String(),
-				recipient: result.Receivers[i].String(),
-				amount:    result.Amounts[i],
-			}
-		}
-		return nil
-	}); err != nil {
-		err = errors.Wrapf(err, "failed to fetch records for %s", token)
+func (w *witnessOnIoTeX) FetchRecords(token string, startID *big.Int, limit uint8) ([]*TxRecord, error) {
+	client := w.auth.EthereumClient()
+	tipBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
+	if err != nil {
+		return nil, err
 	}
-	return
+	blockNumber := new(big.Int).Sub(tipBlockHeader.Number, w.auth.EthConfirmBlockNumber())
+	if blockNumber.Cmp(big.NewInt(0)) <= 0 {
+		return nil, nil
+	}
+	caller, err := contract.NewTokenCashierCaller(w.cashierAddress, client)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create caller of contract %s", w.cashierAddress)
+	}
+	result, err := caller.GetRecords(&bind.CallOpts{BlockNumber: blockNumber}, common.HexToAddress(token), startID, big.NewInt(int64(limit)))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query token %s", token)
+	}
+	l := len(result.Receivers)
+	records := make([]*TxRecord, l)
+	for i := 0; i < l; i++ {
+		records[i] = &TxRecord{
+			token:     token,
+			id:        new(big.Int).Add(startID, big.NewInt(int64(i))),
+			sender:    result.Customers[i].String(),
+			recipient: result.Receivers[i].String(),
+			amount:    result.Amounts[i],
+		}
+	}
+	return records, nil
 }
 
 func (w *witnessOnIoTeX) Submit(tx *TxRecord) (string, error) {
@@ -128,9 +123,13 @@ func (w *witnessOnIoTeX) Submit(tx *TxRecord) (string, error) {
 
 	from := common.HexToAddress(tx.sender)
 	to := common.HexToAddress(tx.recipient)
+	xrc20Token, err := w.auth.CorrespondingXrc20Token(common.HexToAddress(tx.token))
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get corresponding xrc20 token of %s", tx.token)
+	}
 
 	actionHash, err := w.validatorContract.
-		Execute("submit", common.HexToAddress(tx.token), tx.id, from, to, tx.amount).
+		Execute("submit", xrc20Token, tx.id, from, to, tx.amount).
 		SetGasPrice(big.NewInt(int64(1 * unit.Qev))).SetGasLimit(2000000).Call(ctx)
 	if err != nil {
 		return "", errors.Wrap(ErrAfterSendingTx, err.Error())
@@ -138,11 +137,23 @@ func (w *witnessOnIoTeX) Submit(tx *TxRecord) (string, error) {
 	return hex.EncodeToString(actionHash[:]), nil
 }
 
-func (w *witnessOnIoTeX) Check(tx *TxRecord) error {
+func (w *witnessOnIoTeX) Check(tx *TxRecord) (bool, error) {
 	h, err := hash.HexStringToHash256(tx.txhash)
 	if err != nil {
-		return errors.Wrapf(err, "failed to pass transaction hash %s", tx.txhash)
+		return false, errors.Wrapf(err, "failed to pass transaction hash %s", tx.txhash)
 	}
-	_, err = w.auth.IoTeXClient().GetReceipt(h).Call(context.Background())
-	return errors.Wrapf(err, "failed to get receipt")
+	response, err := w.auth.IoTeXClient().GetReceipt(h).Call(context.Background())
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get receipt of transaction %s", tx.txhash)
+	}
+	receiptInfo := response.GetReceiptInfo()
+	if receiptInfo == nil {
+		return false, errors.Wrapf(err, "failed to get receipt info from response of %s", tx.txhash)
+	}
+	receipt := receiptInfo.GetReceipt()
+	if receipt == nil {
+		return false, errors.Wrapf(err, "failed to get receipt from receipt info of %s", tx.txhash)
+	}
+
+	return receipt.Status == 1, nil
 }

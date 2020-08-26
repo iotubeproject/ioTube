@@ -17,10 +17,15 @@ contract ShadowToken is StandardToken, MintableToken, Pausable {
 
     address public coToken;
     address public minter;
+    string public name;
+    string public symbol;
+    uint8 public constant decimals = 18;
 
-    constructor(address _minter, address _coToken) public {
+    constructor(address _minter, address _coToken, string memory _name, string memory _symbol) public {
         minter = _minter;
         coToken = _coToken;
+        name = _name;
+        symbol = _symbol;
         emit MinterAdded(_minter);
     }
 

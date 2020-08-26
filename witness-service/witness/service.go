@@ -8,7 +8,6 @@ package witness
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -19,8 +18,12 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
-// ErrAfterSendingTx is an error after sending a transaction
-var ErrAfterSendingTx = errors.New("something goes wrong after sending transaction")
+var (
+	// ErrAfterSendingTx is an error after sending a transaction
+	ErrAfterSendingTx = errors.New("something goes wrong after sending transaction")
+	// ErrNotConfirmYet is an error that the block has not been confirmed
+	ErrNotConfirmYet = errors.New("block has not been confirmed yet")
+)
 
 // DefaultPrivateKey is a private key used when not specified
 const DefaultPrivateKey = "a000000000000000000000000000000000000000000000000000000000000000"
@@ -40,14 +43,18 @@ type (
 		TokensToWatch() []string
 		FetchRecords(token string, startID *big.Int, limit uint8) ([]*TxRecord, error)
 		Submit(*TxRecord) (string, error)
-		Check(*TxRecord) error
+		Check(*TxRecord) (bool, error)
 	}
 )
 
 type service struct {
-	witness  Witness
-	recorder *Recorder
-	runners  []dispatcher.Runner
+	witness         Witness
+	recorder        *Recorder
+	runners         []dispatcher.Runner
+	pullBatchSize   uint8
+	submitBatchSize uint8
+	checkBatchSize  uint8
+	checkDelay      time.Duration
 }
 
 // NewService creates a new witness service
@@ -55,18 +62,26 @@ func NewService(
 	witness Witness,
 	recorder *Recorder,
 	pullInterval time.Duration,
-	transferInterval time.Duration,
+	pullBatchSize uint8,
+	submitInterval time.Duration,
+	submitBatchSize uint8,
 	checkInterval time.Duration,
+	checkDelay time.Duration,
+	checkBatchSize uint8,
 ) (Service, error) {
 	s := &service{
-		witness:  witness,
-		recorder: recorder,
+		witness:         witness,
+		recorder:        recorder,
+		pullBatchSize:   pullBatchSize,
+		submitBatchSize: submitBatchSize,
+		checkBatchSize:  checkBatchSize,
+		checkDelay:      checkDelay,
 	}
 	collector, err := dispatcher.NewRunner(pullInterval, s.collectNewRecords)
 	if err != nil {
 		return nil, errors.New("failed to create collector")
 	}
-	swapper, err := dispatcher.NewRunner(transferInterval, s.submitWitnesses)
+	swapper, err := dispatcher.NewRunner(submitInterval, s.submitWitnesses)
 	if err != nil {
 		return nil, errors.New("failed to create swapper")
 	}
@@ -111,14 +126,16 @@ func (s *service) collectNewRecords() error {
 	var ok bool
 	var index *big.Int
 	for _, token := range s.witness.TokensToWatch() {
-		fmt.Println("Fetch records of token", token)
 		if index, ok = ids[token]; !ok {
 			index = big.NewInt(0)
 		}
-		records, err := s.witness.FetchRecords(token, index, 100)
+		records, err := s.witness.FetchRecords(token, index, s.pullBatchSize)
 		if err != nil {
 			log.Println("failed to fetch records for token", token, err)
 			continue
+		}
+		if len(records) > 0 {
+			log.Printf("fetching %d records of token %s from %d\n", len(records), token, index)
 		}
 		for _, record := range records {
 			if err := s.recorder.Create(record); err != nil {
@@ -134,11 +151,12 @@ func (s *service) submitWitnesses() error {
 	if !s.witness.IsQualifiedWitness() {
 		return nil
 	}
-	records, err := s.recorder.NewRecords(1)
+	records, err := s.recorder.NewRecords(uint(s.submitBatchSize))
 	if err != nil {
 		return err
 	}
 	for _, record := range records {
+		log.Printf("submitting witness of token %s id %d\n", record.token, record.id)
 		if err := s.recorder.StartProcess(record); err != nil {
 			return err
 		}
@@ -164,19 +182,28 @@ func (s *service) checkSubmission() error {
 	if !s.witness.IsQualifiedWitness() {
 		return nil
 	}
-	records, err := s.recorder.RecordsToConfirm(10*60, 20)
+	records, err := s.recorder.RecordsToConfirm(int(s.checkDelay/time.Second), uint(s.checkBatchSize))
 	if err != nil {
 		return err
 	}
 	for _, record := range records {
-		if err := s.witness.Check(record); err != nil {
+		log.Printf("check submission of token %s id %d\n", record.token, record.id)
+		success, err := s.witness.Check(record)
+		switch {
+		case errors.Cause(err) == ErrNotConfirmYet:
+			// ignore
+		case err != nil:
 			util.LogErr(err)
-			if err := s.recorder.Fail(record); err != nil {
-				return err
-			}
-		} else {
-			if err := s.recorder.Confirm(record); err != nil {
-				return err
+			return err
+		default:
+			if success {
+				if err := s.recorder.Confirm(record); err != nil {
+					return err
+				}
+			} else {
+				if err := s.recorder.Fail(record); err != nil {
+					return err
+				}
 			}
 		}
 	}

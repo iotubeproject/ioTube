@@ -93,14 +93,14 @@ func NewRecorder(store *db.SQLStore, recordTableName string) *Recorder {
 	return &Recorder{
 		store: store,
 		queries: Queries{
-			CreateRecord:                       fmt.Sprintf("INSERT INTO %s (token, id, sender, recipient, amount) VALUES (?, ?, ?, ?)", recordTableName),
+			CreateRecord:                       fmt.Sprintf("INSERT INTO %s (token, id, sender, recipient, amount) VALUES (?, ?, ?, ?, ?)", recordTableName),
 			MarkRecordAsSubmitted:              fmt.Sprintf("UPDATE %s SET status=%d,txHash=? WHERE id=? AND status=%d", recordTableName, Submitted, Submitting),
 			UpdateRecordStatus:                 fmt.Sprintf("UPDATE %s SET status=? WHERE id=? AND status=?", recordTableName),
 			MaxIDs:                             fmt.Sprintf("SELECT token, MAX(id) AS max_id FROM %s GROUP BY token", recordTableName),
-			PullRecordsByStatus:                fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY createTime", recordTableName, "%d"),
-			PullRecordsByStatusWithLimit:       fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY createTime LIMIT %s", recordTableName, "%d", "%d"),
-			SQLitePullRecordsByStatus:          fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= DATETIME('now', '-%s seconds') ORDER BY createTime", recordTableName, "%d"),
-			SQLitePullRecordsByStatusWithLimit: fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= DATETIME('now', '-%s seconds') ORDER BY createTime LIMIT %s", recordTableName, "%d", "%d"),
+			PullRecordsByStatus:                fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY creationTime", recordTableName, "%d"),
+			PullRecordsByStatusWithLimit:       fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY creationTime LIMIT %s", recordTableName, "%d", "%d"),
+			SQLitePullRecordsByStatus:          fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= DATETIME('now', '-%s seconds') ORDER BY creationTime", recordTableName, "%d"),
+			SQLitePullRecordsByStatusWithLimit: fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= DATETIME('now', '-%s seconds') ORDER BY creationTime LIMIT %s", recordTableName, "%d", "%d"),
 		},
 	}
 }
@@ -255,9 +255,6 @@ func (recorder *Recorder) NextIDsToFetch() (map[string]*big.Int, error) {
 		return nil, err
 	}
 	defer res.Close()
-	if !res.Next() {
-		return nil, nil
-	}
 	retval := map[string]*big.Int{}
 	var id sql.NullInt64
 	var token string
