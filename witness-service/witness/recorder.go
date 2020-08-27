@@ -84,6 +84,8 @@ const (
 	Submitted
 	// Confirmed stands for a record whose submission has been confirmed
 	Confirmed
+	// Settled stands for a record who has been settled
+	Settled
 	// Failed stands for a failure status
 	Failed
 )
@@ -94,7 +96,7 @@ func NewRecorder(store *db.SQLStore, recordTableName string) *Recorder {
 		store: store,
 		queries: Queries{
 			CreateRecord:                       fmt.Sprintf("INSERT INTO %s (token, id, sender, recipient, amount) VALUES (?, ?, ?, ?, ?)", recordTableName),
-			MarkRecordAsSubmitted:              fmt.Sprintf("UPDATE %s SET status=%d,txHash=? WHERE id=? AND status=%d", recordTableName, Submitted, Submitting),
+			MarkRecordAsSubmitted:              fmt.Sprintf("UPDATE %s SET status=%d, txHash=? WHERE id=? AND status=%d", recordTableName, Submitted, Submitting),
 			UpdateRecordStatus:                 fmt.Sprintf("UPDATE %s SET status=? WHERE id=? AND status=?", recordTableName),
 			MaxIDs:                             fmt.Sprintf("SELECT token, MAX(id) AS max_id FROM %s GROUP BY token", recordTableName),
 			PullRecordsByStatus:                fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash FROM %s WHERE status=? AND updateTime <= NOW() - INTERVAL %s SECOND ORDER BY creationTime", recordTableName, "%d"),
@@ -193,6 +195,13 @@ func (recorder *Recorder) MarkAsSubmitted(tx *TxRecord, txhash string) error {
 	return err
 }
 
+// MarkAsSettled marks a record as settled
+func (recorder *Recorder) MarkAsSettled(tx *TxRecord) error {
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
+	return recorder.updateRecordStatus(Settled, tx)
+}
+
 // Confirm marks a record as confirmed
 func (recorder *Recorder) Confirm(tx *TxRecord) error {
 	recorder.mutex.Lock()
@@ -228,6 +237,9 @@ func (recorder *Recorder) updateRecordStatus(newStatus RecordStatus, record *TxR
 	case Confirmed:
 		oldStatus = Submitted
 		metricLabel = "confirmed"
+	case Settled:
+		oldStatus = Submitting
+		metricLabel = "settled"
 	case Failed:
 		oldStatus = Submitted
 		metricLabel = "failed"

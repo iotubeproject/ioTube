@@ -8,7 +8,7 @@ contract('TokenCashierWithSafe', function([owner, minter, sender, receiver, fake
     beforeEach(async function() {
         this.tokenSafe = await TokenSafe.new();
         // use shadow token as standard erc20 token
-        this.shadowToken = await ShadowToken.new(minter, fakeTokenAddress1);
+        this.shadowToken = await ShadowToken.new(minter, fakeTokenAddress1, "name", "symbol");
         await this.shadowToken.mint(sender, 10000000000, {from: minter});
         assert.equal(await this.shadowToken.balanceOf(sender), 10000000000);
         this.tokenList = await TokenList.new();

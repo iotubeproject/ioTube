@@ -8,7 +8,7 @@ contract TransferValidatorWithTokenSafe is TransferValidatorBase {
     constructor(uint256 _expireHeight, address _safe, address _tokenList, address _witnessList) public {
         safe = TokenSafe(_safe);
         whitelistedTokens = Allowlist(_tokenList);
-        whitelistedWitnesss = Allowlist(_witnessList);
+        whitelistedWitnesses = Allowlist(_witnessList);
         setExpireHeight(_expireHeight);
     }
 

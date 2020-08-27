@@ -5,7 +5,7 @@ const {assertAsyncThrows} = require('./assert-async-throws');
 contract('MinterPool', function([owner, stranger, fakeTokenAddress]) {
     beforeEach(async function() {
         this.minterPool = await MinterPool.new();
-        this.shadowToken = await ShadowToken.new(this.minterPool.address, fakeTokenAddress);
+        this.shadowToken = await ShadowToken.new(this.minterPool.address, fakeTokenAddress, "name", "symbol");
     });
     it('check minter', async function() {
         assert.equal(await this.shadowToken.minter(), this.minterPool.address);

@@ -8,6 +8,7 @@ package witness
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -23,6 +24,8 @@ var (
 	ErrAfterSendingTx = errors.New("something goes wrong after sending transaction")
 	// ErrNotConfirmYet is an error that the block has not been confirmed
 	ErrNotConfirmYet = errors.New("block has not been confirmed yet")
+	// ErrAlreadySettled is an error when the record to process has been settled
+	ErrAlreadySettled = errors.New("record has been settled")
 )
 
 // DefaultPrivateKey is a private key used when not specified
@@ -135,7 +138,7 @@ func (s *service) collectNewRecords() error {
 			continue
 		}
 		if len(records) > 0 {
-			log.Printf("fetching %d records of token %s from %d\n", len(records), token, index)
+			fmt.Printf("fetching %d records of token %s from %d\n", len(records), token, index)
 		}
 		for _, record := range records {
 			if err := s.recorder.Create(record); err != nil {
@@ -151,28 +154,38 @@ func (s *service) submitWitnesses() error {
 	if !s.witness.IsQualifiedWitness() {
 		return nil
 	}
-	records, err := s.recorder.NewRecords(uint(s.submitBatchSize))
-	if err != nil {
-		return err
-	}
-	for _, record := range records {
-		log.Printf("submitting witness of token %s id %d\n", record.token, record.id)
-		if err := s.recorder.StartProcess(record); err != nil {
-			return err
-		}
-		txhash, err := s.witness.Submit(record)
+	remainingCnt := uint(s.submitBatchSize)
+	for remainingCnt > 0 {
+		records, err := s.recorder.NewRecords(remainingCnt)
 		if err != nil {
-			log.Println("submit witness failed", err)
-			util.LogErr(err)
-			if ErrAfterSendingTx != errors.Cause(err) {
-				// tx not sent yet, change statue back to new
-				return s.recorder.Reset(record)
-			}
-			return s.recorder.Fail(record)
-		}
-		log.Printf("submit witness %+v: %s\n", record, txhash)
-		if err := s.recorder.MarkAsSubmitted(record, txhash); err != nil {
 			return err
+		}
+		remainingCnt = uint(len(records))
+		for _, record := range records {
+			fmt.Printf("submitting witness {token: %s, id %d}\n", record.token, record.id)
+			if err := s.recorder.StartProcess(record); err != nil {
+				return err
+			}
+
+			txhash, err := s.witness.Submit(record)
+			switch {
+			case errors.Cause(err) == ErrAlreadySettled:
+				s.recorder.MarkAsSettled(record)
+				continue
+			case err != nil:
+				log.Printf("failed to submit witness {token: %s, id: %d}\n", record.token, record.id)
+				util.LogErr(err)
+				if ErrAfterSendingTx != errors.Cause(err) {
+					// tx not sent yet, change statue back to new
+					return s.recorder.Reset(record)
+				}
+				return s.recorder.Fail(record)
+			}
+			remainingCnt--
+			fmt.Printf("witness submitted {token: %s, id: %d}: %s\n", record.token, record.id, txhash)
+			if err := s.recorder.MarkAsSubmitted(record, txhash); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -187,7 +200,7 @@ func (s *service) checkSubmission() error {
 		return err
 	}
 	for _, record := range records {
-		log.Printf("check submission of token %s id %d\n", record.token, record.id)
+		fmt.Printf("check submission of token %s id %d\n", record.token, record.id)
 		success, err := s.witness.Check(record)
 		switch {
 		case errors.Cause(err) == ErrNotConfirmYet:

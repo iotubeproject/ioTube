@@ -5,8 +5,8 @@ const {assertAsyncThrows} = require('./assert-async-throws');
 contract('TokenList', function([owner, minter, stranger, fakeTokenAddress1, fakeTokenAddress2]) {
     beforeEach(async function() {
         this.tokenList = await TokenList.new();
-        this.shadowToken1 = await ShadowToken.new(minter, fakeTokenAddress1);
-        this.shadowToken2 = await ShadowToken.new(minter, fakeTokenAddress2);
+        this.shadowToken1 = await ShadowToken.new(minter, fakeTokenAddress1, "name", "symbol");
+        this.shadowToken2 = await ShadowToken.new(minter, fakeTokenAddress2, "name", "symbol");
         assert.equal(await this.tokenList.numOfActive(), 0);
     });
     it('token not in list', async function() {

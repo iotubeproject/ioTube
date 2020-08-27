@@ -48,8 +48,12 @@ contract TransferValidatorBase is Ownable, Pausable {
         return keccak256(abi.encodePacked(tokenAddr, index, from, to, amount));
     }
 
-    function settled(bytes32 key) public view returns(bool) {
+    function _settled(bytes32 key) internal view returns(bool) {
         return transfers[key].settleHeight > 0;
+    }
+
+    function settled(address tokenAddr, uint256 index, address from, address to, uint256 amount) public view returns (bool) {
+         return _settled(generateKey(tokenAddr, index, from, to, amount));
     }
 
     function withdrawToken(address _token, address _to, uint256 _amount) internal returns(bool);
@@ -58,7 +62,7 @@ contract TransferValidatorBase is Ownable, Pausable {
         require(whitelistedWitnesses.isAllowed(msg.sender), "not whitelisted witnesses");
         require(whitelistedTokens.isAllowed(tokenAddr), "not whitelisted tokens");
         bytes32 key = generateKey(tokenAddr, index, from, to, amount);
-        if (settled(key)) {
+        if (_settled(key)) {
             return;
         }
         if (!transfers[key].flag) {

@@ -103,11 +103,29 @@ func (w *witnessOnEthereum) FetchRecords(token string, startID *big.Int, limit u
 }
 
 func (w *witnessOnEthereum) Submit(tx *TxRecord) (string, error) {
-	var err error
+	client := w.auth.EthereumClient()
+	xrc20, err := address.FromString(tx.token)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to parse xrc20 token %s", tx.token)
+	}
+	erc20, err := w.auth.CorrespondingErc20Token(xrc20)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get corresponding erc20 token of %s", xrc20)
+	}
+	validator, err := contract.NewTransferValidator(w.validatorAddress, client)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to create validator caller")
+	}
+	settled, err := validator.Settled(&bind.CallOpts{}, erc20, tx.id, common.HexToAddress(tx.sender), common.HexToAddress(tx.recipient), tx.amount)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to check record status")
+	}
+	if settled {
+		return "", errors.Wrapf(ErrAlreadySettled, "record (%s, %d) has been settled", tx.token, tx.id)
+	}
 	auth := bind.NewKeyedTransactor(w.witnessPrivateKey)
 	auth.Value = big.NewInt(0)
 	auth.GasLimit = uint64(2000000)
-	client := w.auth.EthereumClient()
 	if auth.GasPrice, err = client.SuggestGasPrice(context.Background()); err != nil {
 		return "", errors.Wrapf(err, "failed to get suggested gas price")
 	}
@@ -129,18 +147,6 @@ func (w *witnessOnEthereum) Submit(tx *TxRecord) (string, error) {
 		return "", errors.Wrapf(err, "failed to fetch pending nonce for %s", w.witnessAddress)
 	}
 	auth.Nonce = new(big.Int).SetUint64(nonce)
-	validator, err := contract.NewTransferValidator(w.validatorAddress, client)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to create validator caller")
-	}
-	xrc20, err := address.FromString(tx.token)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse xrc20 token %s", tx.token)
-	}
-	erc20, err := w.auth.CorrespondingErc20Token(xrc20)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to get corresponding erc20 token of %s", xrc20)
-	}
 
 	transaction, err := validator.Submit(
 		auth,

@@ -6,7 +6,7 @@ const {assertAsyncThrows} = require('./assert-async-throws');
 contract('BurnableTokenCashier', function([owner, minter, sender, receiver, fakeTokenAddress1, fakeTokenAddress2]) {
     beforeEach(async function() {
         // use shadow token as burnable erc20 token
-        this.shadowToken = await ShadowToken.new(minter, fakeTokenAddress1);
+        this.shadowToken = await ShadowToken.new(minter, fakeTokenAddress1, "name", "symbol");
         await this.shadowToken.mint(sender, 10000000000, {from: minter});
         assert.equal(await this.shadowToken.balanceOf(sender), 10000000000);
         this.tokenList = await TokenList.new();

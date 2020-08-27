@@ -3,7 +3,7 @@ const {assertAsyncThrows} = require('./assert-async-throws');
 
 contract('ShadowToken', function([owner, minter, stranger, fakeTokenAddress]) {
     beforeEach(async function() {
-        this.shadowToken = await ShadowToken.new(minter, fakeTokenAddress);
+        this.shadowToken = await ShadowToken.new(minter, fakeTokenAddress, "name", "symbol");
     });
     it('check coToken address', async function() {
         assert.equal(await this.shadowToken.coToken(), fakeTokenAddress);

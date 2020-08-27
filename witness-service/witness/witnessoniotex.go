@@ -101,6 +101,24 @@ func (w *witnessOnIoTeX) FetchRecords(token string, startID *big.Int, limit uint
 
 func (w *witnessOnIoTeX) Submit(tx *TxRecord) (string, error) {
 	ctx := context.Background()
+	xrc20Token, err := w.auth.CorrespondingXrc20Token(common.HexToAddress(tx.token))
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get corresponding xrc20 token of %s", tx.token)
+	}
+	from := common.HexToAddress(tx.sender)
+	to := common.HexToAddress(tx.recipient)
+
+	response, err := w.validatorContract.Read("settled", xrc20Token, tx.id, from, to, tx.amount).Call(ctx)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to read settled")
+	}
+	var settled bool
+	if err := response.Unmarshal(&settled); err != nil {
+		return "", errors.Wrap(err, "failed to unmarshal settled")
+	}
+	if settled {
+		return "", errors.Wrapf(ErrAlreadySettled, "record (%s, %d) has been settled", xrc20Token, tx.id)
+	}
 	res, err := w.auth.IoTeXClient().API().GetAccount(ctx, &iotexapi.GetAccountRequest{Address: w.witnessAddress.String()})
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get account of %s", w.witnessAddress)
@@ -119,13 +137,6 @@ func (w *witnessOnIoTeX) Submit(tx *TxRecord) (string, error) {
 	}
 	if _, err = address.FromBytes(pkhash); err != nil {
 		return "", errors.Wrapf(err, "failed to convert recipient address %s", tx.recipient)
-	}
-
-	from := common.HexToAddress(tx.sender)
-	to := common.HexToAddress(tx.recipient)
-	xrc20Token, err := w.auth.CorrespondingXrc20Token(common.HexToAddress(tx.token))
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to get corresponding xrc20 token of %s", tx.token)
 	}
 
 	actionHash, err := w.validatorContract.

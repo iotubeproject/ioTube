@@ -17,7 +17,7 @@ install:
 	$(GOCMD) install -v
 
 docker:
-	$(DOCKERCMD) build -t $(USER)/iotube-witness:latest .
+	$(DOCKERCMD) build -t iotex$(USER)/iotube-witness:latest .
 
 abi:
 	@echo "Creating contracts' golang file"
