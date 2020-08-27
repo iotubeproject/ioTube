@@ -16,10 +16,32 @@ Click [IoTeX Tube docs](https://github.com/iotexproject/iotex-bootstrap/blob/mas
 |----------|-------------|-------------|
 | [Golang](https://golang.org) | &ge; 1.11.5 | Go programming language |
 
-## Running the service
+## Running the service with docker
 
-```make run```
+### Prepare docker image
 
+```make docker```
+
+### Prepare config file
+
+Copy `service.yaml` to current directory, and fill in the following fields:
+* db.url
+* iotex.privateKey
+* ethereum.client
+* ethereum.privateKey
+
+### Run service in docker
+
+```
+docker run -d --restart on-failure -name witness \
+         -p 8080:8080 \
+         -v=service.yaml:/etc/iotube-witness/service.yaml:ro \
+         iotex/iotube-witness:v0.1 \
+         iotube-witness \
+         -config=/etc/iotube-witness/service.yaml
+```
+
+## Run service in Heroku (not ready yet)
 The service is currently deployed on Heroku, with the following env variables:
 
 | Variable | Description |
@@ -37,6 +59,3 @@ The service is currently deployed on Heroku, with the following env variables:
 | IO_MAINNET_PK | private key of wallet sending out IoTeX mainnet token |
 | TABLE_NAME | MySql table name of swap record |
 | TRANSFER_DATABASE_URL | MySql table URL |
-
-
-
