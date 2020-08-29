@@ -12,7 +12,7 @@ contract('TransferValidatorWithMinterPool', function([owner, minter, sender, rec
         this.shadowToken = await ShadowToken.new(this.minterPool.address, fakeTokenAddress, "name", "symbol");
         this.tokenList = await TokenList.new();
         this.witnessList = await WitnessList.new();
-        this.validator = await TransferValidatorWithMinterPool.new(10, this.minterPool.address, this.tokenList.address, this.witnessList.address);
+        this.validator = await TransferValidatorWithMinterPool.new(this.minterPool.address, this.tokenList.address, this.witnessList.address);
         await this.minterPool.transferOwnership(this.validator.address);
     });
     it('witness not in list', async function() {
@@ -25,49 +25,79 @@ contract('TransferValidatorWithMinterPool', function([owner, minter, sender, rec
     it('one witness', async function() {
         await this.witnessList.addWitness(witness1);
         await this.tokenList.addToken(this.shadowToken.address, 1, 100000);
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), false);
+        let status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
         await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness1});
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), true);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.notEqual(status[0], 0);
         assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
     });
-    it('two witnesss', async function() {
+    it('two witnesses', async function() {
         await this.witnessList.addWitness(witness1);
         await this.witnessList.addWitness(witness2);
         await this.tokenList.addToken(this.shadowToken.address, 1, 100000);
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), false);
+        let status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
         await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness1});
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), false);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
         await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness2});
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), true);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.notEqual(status[0], 0);
         assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
     });
-    it('three witnesss', async function() {
+    it('decrease two witnesses to one witness', async function() {
+        await this.witnessList.addWitness(witness1);
+        await this.witnessList.addWitness(witness2);
+        await this.tokenList.addToken(this.shadowToken.address, 1, 100000);
+        let status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
+        await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness1});
+        await this.witnessList.removeWitness(witness2);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
+        assert.equal(status[1], 1);
+        assert.equal(status[2], 1);
+        await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness1});
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.notEqual(status[0], 0);
+        assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
+    });
+    it('three witnesses', async function() {
         await this.witnessList.addWitness(witness1);
         await this.witnessList.addWitness(witness2);
         await this.witnessList.addWitness(witness3);
         await this.tokenList.addToken(this.shadowToken.address, 1, 100000);
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), false);
+        let status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
         await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness1});
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), false);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
         await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness2});
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), false);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
         await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness3});
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), true);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.notEqual(status[0], 0);
         assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
     });
-    it('four witnesss', async function() {
+    it('four witnesses', async function() {
         await this.witnessList.addWitness(witness1);
         await this.witnessList.addWitness(witness2);
         await this.witnessList.addWitness(witness3);
         await this.witnessList.addWitness(witness4);
         await this.tokenList.addToken(this.shadowToken.address, 1, 100000);
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), false);
+        let status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
         await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness1});
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), false);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
         await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness2});
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), false);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.equal(status[0], 0);
         await this.validator.submit(this.shadowToken.address, 0, sender, receiver, 12345, {from: witness3});
-        assert.equal(await this.validator.settled(this.shadowToken.address, 0, sender, receiver, 12345), true);
+        status = await this.validator.getStatus(this.shadowToken.address, 0, sender, receiver, 12345);
+        assert.notEqual(status[0], 0);
         assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
     });
     it('upgrade', async function() {

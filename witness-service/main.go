@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/go-pkgs/crypto"
 	"github.com/iotexproject/iotex-address/address"
@@ -56,14 +57,11 @@ type WitnessConfig struct {
 	ValidatorContract   string        `json:"validatorContract" yaml:"validatorContract"`
 	PrivateKey          string        `json:"privateKey" yaml:"privateKey"`
 	DBTableName         string        `json:"dbTableName" yaml:"dbTableName"`
-	Threshold           string        `json:"threshold" yaml:"threshold"`
 	PullInterval        time.Duration `json:"pullInterval" yaml:"pullInterval"`
 	PullBatchSize       uint8         `json:"pullBatchSize" yaml:"pullBatchSize"`
-	SubmitInterval      time.Duration `json:"submitInterval" yaml:"submitInterval"`
-	SubmitBatchSize     uint8         `json:"submitBatchSize" yaml:"submitBatchSize"`
-	CheckInterval       time.Duration `json:"checkInterval" yaml:"checkInterval"`
-	CheckDelay          time.Duration `json:"checkDelay" yaml:"checkDelay"`
-	CheckBatchSize      uint8         `json:"checkBatchSize" yaml:"checkBatchSize"`
+	ProcessInterval     time.Duration `json:"processInterval" yaml:"processInterval"`
+	ProcessBatchSize    uint8         `json:"processBatchSize" yaml:"processBatchSize"`
+	RetryDuration       time.Duration `json:"retryDuration" yaml:"retryDuration"`
 }
 
 // DBConfig defines the config of database
@@ -115,10 +113,22 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	privateKeyOnEthereum, err := ethcrypto.HexToECDSA(cfg.Ethereum.PrivateKey)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	ethGasPriceLimit, ok := new(big.Int).SetString(cfg.EthGasPriceLimit, 10)
+	if !ok {
+		return nil, nil, nil, errors.Errorf("failed to parse gas price limit %s", cfg.EthGasPriceLimit)
+	}
+
 	auth, err := witness.NewAuth(
 		ethClient,
 		ic,
+		privateKeyOnEthereum,
+		witnessAccountOnIoTeX.Address(),
 		cfg.EthConfirmBlockNumber,
+		ethGasPriceLimit,
 		common.HexToAddress(cfg.Ethereum.WitnessListContract),
 		witnessListContractAddressOnIoTeX,
 		common.HexToAddress(cfg.Ethereum.TokenListContract),
@@ -131,16 +141,11 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	thresholdOnIoTeX, ok := new(big.Int).SetString(cfg.IoTeX.Threshold, 10)
-	if !ok {
-		return nil, nil, nil, errors.Errorf("failed to parse threshold %s", cfg.IoTeX.Threshold)
-	}
 	witnessOnIoTeX, err := witness.NewWitnessOnIoTeX(
 		auth,
 		witnessAccountOnIoTeX.Address(),
 		common.HexToAddress(cfg.Ethereum.CashierContract),
 		validatorContractAddressOnIoTeX,
-		thresholdOnIoTeX,
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -150,11 +155,9 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 		witness.NewRecorder(store, cfg.IoTeX.DBTableName),
 		cfg.IoTeX.PullInterval,
 		cfg.IoTeX.PullBatchSize,
-		cfg.IoTeX.SubmitInterval,
-		cfg.IoTeX.SubmitBatchSize,
-		cfg.IoTeX.CheckInterval,
-		cfg.IoTeX.CheckDelay,
-		cfg.IoTeX.CheckBatchSize,
+		cfg.IoTeX.ProcessInterval,
+		cfg.IoTeX.ProcessBatchSize,
+		cfg.IoTeX.RetryDuration,
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -163,21 +166,10 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	thresholdOnEthereum, ok := new(big.Int).SetString(cfg.Ethereum.Threshold, 10)
-	if !ok {
-		return nil, nil, nil, errors.Errorf("failed to parse threshold %s", cfg.Ethereum.Threshold)
-	}
-	ethGasPriceLimit, ok := new(big.Int).SetString(cfg.EthGasPriceLimit, 10)
-	if !ok {
-		return nil, nil, nil, errors.Errorf("failed to parse threshold %s", cfg.EthGasPriceLimit)
-	}
 	witnessOnEthereum, err := witness.NewWitnessOnEthereum(
 		auth,
 		cashierContractAddressOnIoTeX,
 		common.HexToAddress(cfg.Ethereum.ValidatorContract),
-		cfg.Ethereum.PrivateKey,
-		ethGasPriceLimit,
-		thresholdOnEthereum,
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -187,11 +179,9 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 		witness.NewRecorder(store, cfg.Ethereum.DBTableName),
 		cfg.Ethereum.PullInterval,
 		cfg.Ethereum.PullBatchSize,
-		cfg.Ethereum.SubmitInterval,
-		cfg.Ethereum.SubmitBatchSize,
-		cfg.Ethereum.CheckInterval,
-		cfg.Ethereum.CheckDelay,
-		cfg.Ethereum.CheckBatchSize,
+		cfg.Ethereum.ProcessInterval,
+		cfg.Ethereum.ProcessBatchSize,
+		cfg.Ethereum.RetryDuration,
 	)
 	if err != nil {
 		return nil, nil, nil, err

@@ -8,6 +8,7 @@ package witness
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"strings"
@@ -17,25 +18,36 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
+	"github.com/iotexproject/iotex-core/pkg/unit"
+	"github.com/iotexproject/iotex-proto/golang/iotexapi"
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 // Auth maintains the list of witnesses and tokens
 type Auth struct {
-	mu                            sync.RWMutex
-	ethConfirmBlockNumber         uint8
-	iotexClient                   iotex.AuthedClient
-	ethClient                     *ethclient.Client
+	mu                      sync.RWMutex
+	lastUpdateTime          time.Time
+	ethConfirmBlockNumber   uint8
+	gasPriceLimitOnEthereum *big.Int
+
+	witnessAddressOnIoTeX    address.Address
+	witnessPKOnEthereum      *ecdsa.PrivateKey
+	witnessAddressOnEthereum common.Address
+
+	iotexClient iotex.AuthedClient
+	ethClient   *ethclient.Client
+
 	erc20TokenListContract        common.Address
 	xrc20TokenListContract        iotex.Contract
 	witnessListContractOnEthereum common.Address
 	witnessListContractOnIoTeX    iotex.Contract
-	lastUpdateTime                time.Time
 	witnessesOnEthereum           map[string]bool
 	witnessesOnIoTeX              map[string]bool
 	erc20ToXrc20                  map[string]address.Address
@@ -46,7 +58,10 @@ type Auth struct {
 func NewAuth(
 	ethClient *ethclient.Client,
 	iotexClient iotex.AuthedClient,
+	witnessPKOnEthereum *ecdsa.PrivateKey,
+	witnessAddressOnIoTeX address.Address,
 	ethConfirmBlockNumber uint8,
+	gasPriceLimitOnEthereum *big.Int,
 	witnessListContractOnEthereum common.Address,
 	witnessListContractOnIoTeX address.Address,
 	erc20TokenListContract common.Address,
@@ -58,14 +73,22 @@ func NewAuth(
 	}
 
 	return &Auth{
-		ethClient:                     ethClient,
-		iotexClient:                   iotexClient,
+		ethConfirmBlockNumber:   ethConfirmBlockNumber,
+		gasPriceLimitOnEthereum: gasPriceLimitOnEthereum,
+
+		witnessAddressOnIoTeX:    witnessAddressOnIoTeX,
+		witnessPKOnEthereum:      witnessPKOnEthereum,
+		witnessAddressOnEthereum: crypto.PubkeyToAddress(witnessPKOnEthereum.PublicKey),
+
+		ethClient:   ethClient,
+		iotexClient: iotexClient,
+
 		erc20TokenListContract:        erc20TokenListContract,
-		witnessListContractOnEthereum: witnessListContractOnEthereum,
 		xrc20TokenListContract:        iotexClient.Contract(xrc20TokenListContract, addressListABI),
+		witnessListContractOnEthereum: witnessListContractOnEthereum,
 		witnessListContractOnIoTeX:    iotexClient.Contract(witnessListContractOnIoTeX, addressListABI),
-		witnessesOnIoTeX:              make(map[string]bool),
 		witnessesOnEthereum:           make(map[string]bool),
+		witnessesOnIoTeX:              make(map[string]bool),
 	}, nil
 }
 
@@ -95,7 +118,7 @@ func (auth *Auth) Erc20Tokens() []common.Address {
 	return tokens
 }
 
-// Xrc20Tokens reutrns the xrc20 tokens in whitelist
+// Xrc20Tokens returns the xrc20 tokens in whitelist
 func (auth *Auth) Xrc20Tokens() []address.Address {
 	auth.mu.RLock()
 	defer auth.mu.RUnlock()
@@ -106,26 +129,101 @@ func (auth *Auth) Xrc20Tokens() []address.Address {
 	return tokens
 }
 
-func (auth *Auth) loadAddressListOnEthereum(contractAddr common.Address) ([]common.Address, error) {
-	var retval []common.Address
+// NewTransactionOpts prepares the transaction opts
+func (auth *Auth) NewTransactionOpts(value *big.Int, gasLimit uint64) (*bind.TransactOpts, error) {
+	opts := bind.NewKeyedTransactor(auth.witnessPKOnEthereum)
+	opts.Value = value
+	opts.GasLimit = gasLimit
+	gasPrice, err := auth.ethClient.SuggestGasPrice(context.Background())
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get suggested gas price")
+	}
+	// Slightly higher than suggested gas price
+	opts.GasPrice = gasPrice.Add(gasPrice, big.NewInt(1000000000))
+	if opts.GasPrice.Cmp(auth.gasPriceLimitOnEthereum) >= 0 {
+		return nil, errors.Errorf("suggested gas price is higher than limit %d", auth.gasPriceLimitOnEthereum)
+	}
+	balance, err := auth.ethClient.BalanceAt(context.Background(), auth.witnessAddressOnEthereum, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get balance of operator account")
+	}
+	gasFee := new(big.Int).Mul(new(big.Int).SetUint64(opts.GasLimit), opts.GasPrice)
+	if gasFee.Cmp(balance) > 0 {
+		return nil, errors.Errorf("insuffient balance for gas fee on Ethereum")
+	}
+	nonce, err := auth.ethClient.PendingNonceAt(context.Background(), auth.witnessAddressOnEthereum)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to fetch pending nonce for %s", auth.witnessAddressOnEthereum)
+	}
+	opts.Nonce = new(big.Int).SetUint64(nonce)
+
+	return opts, nil
+}
+
+// CallOnIoTeX fills the parameters and call
+func (auth *Auth) CallOnIoTeX(
+	caller iotex.ExecuteContractCaller,
+	gasLimit uint64,
+) ([]byte, error) {
+	gasPrice := big.NewInt(unit.Qev)
+	res, err := auth.iotexClient.API().GetAccount(
+		context.Background(),
+		&iotexapi.GetAccountRequest{Address: auth.witnessAddressOnIoTeX.String()},
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get account of %s", auth.witnessAddressOnIoTeX)
+	}
+	balance, ok := big.NewInt(0).SetString(res.AccountMeta.Balance, 10)
+	if !ok {
+		return nil, errors.Wrapf(err, "failed to convert balance %s of account %s", res.AccountMeta.Balance, auth.witnessAddressOnIoTeX)
+	}
+	if balance.Cmp(new(big.Int).Mul(gasPrice, big.NewInt(int64(gasLimit)))) < 0 {
+		util.Alert("IOTX native balance has dropped to " + balance.String() + ", please refill account for gas " + auth.witnessAddressOnIoTeX.String())
+	}
+
+	actionHash, err := caller.
+		SetGasPrice(gasPrice).
+		SetGasLimit(gasLimit).
+		Call(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return actionHash[:], nil
+}
+
+// CallOptsOnEthereum returns call opts of confirmed height on ethereum
+func (auth *Auth) CallOptsOnEthereum() (*bind.CallOpts, error) {
 	tipBlockHeader, err := auth.ethClient.HeaderByNumber(context.Background(), nil)
 	if err != nil {
 		return nil, err
 	}
 	blockNumber := new(big.Int).Sub(tipBlockHeader.Number, big.NewInt(int64(auth.ethConfirmBlockNumber)))
 	if blockNumber.Cmp(big.NewInt(0)) <= 0 {
-		return nil, nil
+		return nil, errors.Errorf("Ethereum height %d is smaller than confirm height %d", tipBlockHeader.Number, auth.ethConfirmBlockNumber)
+	}
+
+	return &bind.CallOpts{BlockNumber: blockNumber}, nil
+}
+
+func (auth *Auth) loadAddressListOnEthereum(contractAddr common.Address) ([]common.Address, error) {
+	var retval []common.Address
+	callOpts, err := auth.CallOptsOnEthereum()
+	if err != nil {
+		return nil, err
 	}
 	list, err := contract.NewAddressListCaller(contractAddr, auth.ethClient)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create caller")
+		return nil, errors.Wrapf(err, "failed to create caller for %s", contractAddr.String())
 	}
-	count, err := list.Count(&bind.CallOpts{BlockNumber: blockNumber})
+	count, err := list.Count(callOpts)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to call address list on %s", contractAddr.String())
+	}
 	offset := big.NewInt(0)
 	limit := uint8(10)
 	retval = []common.Address{}
 	for offset.Cmp(count) < 0 {
-		result, err := list.GetActiveItems(&bind.CallOpts{BlockNumber: blockNumber}, offset, limit)
+		result, err := list.GetActiveItems(callOpts, offset, limit)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to query list")
 		}
@@ -267,11 +365,11 @@ func (auth *Auth) IsActiveWitnessOnIoTeX(witness address.Address) bool {
 }
 
 // IsActiveWitnessOnEthereum returns true if the input address is an active witness on Ethereum
-func (auth *Auth) IsActiveWitnessOnEthereum(witness common.Address) bool {
+func (auth *Auth) IsActiveWitnessOnEthereum() bool {
 	auth.mu.RLock()
 	defer auth.mu.RUnlock()
 
-	return auth.witnessesOnEthereum[witness.String()]
+	return auth.witnessesOnEthereum[auth.witnessAddressOnEthereum.String()]
 }
 
 // CorrespondingXrc20Token returns the corresponding Xrc20 token address on IoTeX

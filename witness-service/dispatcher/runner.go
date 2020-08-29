@@ -39,6 +39,7 @@ type (
 	}
 )
 
+// NewRunner creates a new runner with a duration and a callback function
 func NewRunner(wait time.Duration, run RunFunc) (Runner, error) {
 	if wait < 0 {
 		return nil, ErrNegTime
@@ -61,12 +62,10 @@ func NewRunner(wait time.Duration, run RunFunc) (Runner, error) {
 				return
 			default:
 				// run the runner
-				err := r.run()
-				time.Sleep(r.wait)
-				if err == nil {
-					continue
+				if err := r.run(); err != nil {
+					util.LogErr(err)
 				}
-				util.LogErr(err)
+				time.Sleep(r.wait)
 			}
 		}
 	}()

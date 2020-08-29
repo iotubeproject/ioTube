@@ -7,23 +7,17 @@ package witness
 
 import (
 	"context"
-	"encoding/hex"
 	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/iotexproject/go-pkgs/hash"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
-	"github.com/iotexproject/iotex-core/pkg/unit"
-	"github.com/iotexproject/iotex-proto/golang/iotexapi"
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
-	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type witnessOnIoTeX struct {
@@ -40,7 +34,6 @@ func NewWitnessOnIoTeX(
 	witnessAddress address.Address,
 	cashierAddress common.Address,
 	validatorContractOnIoTeX address.Address,
-	lowerBound *big.Int,
 ) (Witness, error) {
 	validatorABI, err := abi.JSON(strings.NewReader(contract.TransferValidatorABI))
 	if err != nil {
@@ -51,7 +44,6 @@ func NewWitnessOnIoTeX(
 		cashierAddress:    cashierAddress,
 		auth:              auth,
 		validatorContract: auth.IoTeXClient().Contract(validatorContractOnIoTeX, validatorABI),
-		lowerBound:        lowerBound,
 	}, nil
 }
 
@@ -68,20 +60,15 @@ func (w *witnessOnIoTeX) TokensToWatch() []string {
 }
 
 func (w *witnessOnIoTeX) FetchRecords(token string, startID *big.Int, limit uint8) ([]*TxRecord, error) {
-	client := w.auth.EthereumClient()
-	tipBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
+	callOpts, err := w.auth.CallOptsOnEthereum()
 	if err != nil {
 		return nil, err
 	}
-	blockNumber := new(big.Int).Sub(tipBlockHeader.Number, w.auth.EthConfirmBlockNumber())
-	if blockNumber.Cmp(big.NewInt(0)) <= 0 {
-		return nil, nil
-	}
-	caller, err := contract.NewTokenCashierCaller(w.cashierAddress, client)
+	caller, err := contract.NewTokenCashierCaller(w.cashierAddress, w.auth.EthereumClient())
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create caller of contract %s", w.cashierAddress)
 	}
-	result, err := caller.GetRecords(&bind.CallOpts{BlockNumber: blockNumber}, common.HexToAddress(token), startID, big.NewInt(int64(limit)))
+	result, err := caller.GetRecords(callOpts, common.HexToAddress(token), startID, big.NewInt(int64(limit)))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query token %s", token)
 	}
@@ -99,72 +86,104 @@ func (w *witnessOnIoTeX) FetchRecords(token string, startID *big.Int, limit uint
 	return records, nil
 }
 
-func (w *witnessOnIoTeX) Submit(tx *TxRecord) (string, error) {
-	ctx := context.Background()
-	xrc20Token, err := w.auth.CorrespondingXrc20Token(common.HexToAddress(tx.token))
+func (w *witnessOnIoTeX) statusOfRecord(
+	token address.Address,
+	id *big.Int,
+	from address.Address,
+	to address.Address,
+	amount *big.Int,
+) (settleHeight *big.Int, numOfWhitelisted *big.Int, numOfValid *big.Int, witnesses []address.Address, submitted bool, err error) {
+	response, err := w.validatorContract.Read("getStatus", token, id, from, to, amount).Call(context.Background())
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get corresponding xrc20 token of %s", tx.token)
+		return
 	}
-	from := common.HexToAddress(tx.sender)
-	to := common.HexToAddress(tx.recipient)
-
-	response, err := w.validatorContract.Read("settled", xrc20Token, tx.id, from, to, tx.amount).Call(ctx)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to read settled")
+	data := struct {
+		SettleHeight              *big.Int
+		NumOfWhitelistedWitnesses *big.Int
+		NumOfValidWitnesses       *big.Int
+		Witnesses                 []common.Address
+		IncludingMsgSender        bool
+	}{}
+	/*struct {
+		settleHeight_              *big.Int
+		numOfWhitelistedWitnesses_ *big.Int
+		numOfValidWitnesses_       *big.Int
+		witnesses_                 []common.Address
+		includingMsgSender_                  bool
+	}{}*/
+	if err = response.Unmarshal(&data); err != nil {
+		return
 	}
-	var settled bool
-	if err := response.Unmarshal(&settled); err != nil {
-		return "", errors.Wrap(err, "failed to unmarshal settled")
-	}
-	if settled {
-		return "", errors.Wrapf(ErrAlreadySettled, "record (%s, %d) has been settled", xrc20Token, tx.id)
-	}
-	res, err := w.auth.IoTeXClient().API().GetAccount(ctx, &iotexapi.GetAccountRequest{Address: w.witnessAddress.String()})
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to get account of %s", w.witnessAddress)
-	}
-	balance, ok := big.NewInt(0).SetString(res.AccountMeta.Balance, 10)
-	if !ok {
-		return "", errors.Wrapf(err, "failed to convert balance %s of account %s", res.AccountMeta.Balance, w.witnessAddress.String())
-	}
-	if balance.Cmp(w.lowerBound) <= 0 {
-		util.Alert("IOTX native balance has dropped to " + balance.String() + ", please refill account for gas " + w.witnessAddress.String())
-	}
-	// convert to IoTeX address
-	pkhash, err := hexutil.Decode(tx.recipient)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse recipient address %s", tx.recipient)
-	}
-	if _, err = address.FromBytes(pkhash); err != nil {
-		return "", errors.Wrapf(err, "failed to convert recipient address %s", tx.recipient)
+	for i := int64(0); i < data.NumOfValidWitnesses.Int64(); i++ {
+		var witness address.Address
+		witness, err = address.FromBytes(data.Witnesses[i].Bytes())
+		if err != nil {
+			return
+		}
+		witnesses = append(witnesses, witness)
 	}
 
-	actionHash, err := w.validatorContract.
-		Execute("submit", xrc20Token, tx.id, from, to, tx.amount).
-		SetGasPrice(big.NewInt(int64(1 * unit.Qev))).SetGasLimit(2000000).Call(ctx)
-	if err != nil {
-		return "", errors.Wrap(ErrAfterSendingTx, err.Error())
-	}
-	return hex.EncodeToString(actionHash[:]), nil
+	return data.SettleHeight, data.NumOfWhitelistedWitnesses, data.NumOfValidWitnesses, witnesses, data.IncludingMsgSender, nil
 }
 
-func (w *witnessOnIoTeX) Check(tx *TxRecord) (bool, error) {
-	h, err := hash.HexStringToHash256(tx.txhash)
-	if err != nil {
-		return false, errors.Wrapf(err, "failed to pass transaction hash %s", tx.txhash)
-	}
-	response, err := w.auth.IoTeXClient().GetReceipt(h).Call(context.Background())
-	if err != nil {
-		return false, errors.Wrapf(err, "failed to get receipt of transaction %s", tx.txhash)
-	}
-	receiptInfo := response.GetReceiptInfo()
-	if receiptInfo == nil {
-		return false, errors.Wrapf(err, "failed to get receipt info from response of %s", tx.txhash)
-	}
-	receipt := receiptInfo.GetReceipt()
-	if receipt == nil {
-		return false, errors.Wrapf(err, "failed to get receipt from receipt info of %s", tx.txhash)
+func (w *witnessOnIoTeX) StatusOnChain(tx *TxRecord) (StatusOnChain, error) {
+	if tx.txhash != "" {
+		h, err := hash.HexStringToHash256(tx.txhash)
+		if err != nil {
+			return WitnessNotFoundOnChain, errors.Wrapf(err, "failed to pass transaction hash %x", tx.txhash)
+		}
+		response, err := w.auth.IoTeXClient().GetReceipt(h).Call(context.Background())
+		if err != nil {
+			return WitnessNotFoundOnChain, errors.Wrapf(err, "failed to get receipt of transaction %x", tx.txhash)
+		}
+		receiptInfo := response.GetReceiptInfo()
+		if receiptInfo != nil {
+			receipt := receiptInfo.GetReceipt()
+			if receipt != nil && receipt.Status != 1 { // leave status == 1 case to statusOfRecord
+				return WitnessSubmissionRejected, nil
+			}
+		}
 	}
 
-	return receipt.Status == 1, nil
+	xrc20Token, err := w.auth.CorrespondingXrc20Token(common.HexToAddress(tx.token))
+	if err != nil {
+		return WitnessNotFoundOnChain, errors.Wrapf(err, "failed to get corresponding xrc20 token of %s", tx.token)
+	}
+
+	settleHeight, numOfWhitelisted, numOfValid, witnesses, witnessed, err := w.statusOfRecord(
+		xrc20Token,
+		tx.id,
+		common.HexToAddress(tx.sender),
+		common.HexToAddress(tx.recipient),
+		tx.amount,
+	)
+	switch {
+	case err != nil:
+		return WitnessNotFoundOnChain, errors.Wrapf(err, "failed to get status of record (%s, %d)", tx.token, tx.id)
+	case settleHeight.Cmp(big.NewInt(0)) > 0:
+		return SettledOnChain, nil
+	case witnessed:
+		if numOfWhitelisted.Cmp(numOfValid) > 0 || witnesses[0].String() != w.witnessAddress.String() {
+			return WitnessConfirmedOnChain, nil
+		}
+	}
+	return WitnessNotFoundOnChain, nil
+}
+
+func (w *witnessOnIoTeX) SubmitWitness(tx *TxRecord) ([]byte, error) {
+	xrc20Token, err := w.auth.CorrespondingXrc20Token(common.HexToAddress(tx.token))
+	if err != nil {
+		return nil, err
+	}
+	return w.auth.CallOnIoTeX(
+		w.validatorContract.Execute(
+			"submit",
+			xrc20Token,
+			tx.id,
+			common.HexToAddress(tx.sender),
+			common.HexToAddress(tx.recipient),
+			tx.amount,
+		),
+		2000000,
+	)
 }

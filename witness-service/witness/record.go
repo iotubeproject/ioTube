@@ -6,14 +6,18 @@
 
 package witness
 
-import "math/big"
+import (
+	"math/big"
+	"time"
+)
 
 // TxRecord defines a record
 type TxRecord struct {
-	id        *big.Int // primary key for SQL query
-	token     string
-	sender    string
-	recipient string
-	amount    *big.Int
-	txhash    string
+	id         *big.Int // primary key for SQL query
+	token      string
+	sender     string
+	recipient  string
+	amount     *big.Int
+	updateTime time.Time
+	txhash     string
 }

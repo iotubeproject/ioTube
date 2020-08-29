@@ -9,19 +9,21 @@ interface Allowlist {
 }
 
 contract TransferValidatorBase is Ownable, Pausable {
+    event WitnessSubmitted (
+        address indexed token,
+        uint256 indexed index,
+        address indexed witness,
+        address from,
+        address to,
+        uint256 amount);
+
     event Settled(
         address indexed token,
         uint256 indexed index,
-        address indexed from,
+        address from,
         address to,
         uint256 amount,
-        uint256 blockNumber,
         address[] witnesses);
-
-    struct Submission {
-        address witness;
-        uint256 blockNumber;
-    }
 
     struct Transfer {
         address tokenAddr;
@@ -30,30 +32,35 @@ contract TransferValidatorBase is Ownable, Pausable {
         address to;
         uint256 amount;
         uint256 settleHeight;
-        bool flag;
     }
 
     mapping(bytes32 => Transfer) public transfers;
-    mapping(bytes32 => Submission[]) public submissions;
+    mapping(bytes32 => mapping(address => uint256)) public witnessMap;
+    mapping(bytes32 => address[]) public witnessList;
 
     Allowlist public whitelistedTokens;
     Allowlist public whitelistedWitnesses;
-    uint256 public expireHeight;
     
-    function setExpireHeight(uint256 _expireHeight) public onlyOwner {
-        expireHeight = _expireHeight;
-    }
-
     function generateKey(address tokenAddr, uint256 index, address from, address to, uint256 amount) public pure returns(bytes32) {
         return keccak256(abi.encodePacked(tokenAddr, index, from, to, amount));
     }
 
-    function _settled(bytes32 key) internal view returns(bool) {
-        return transfers[key].settleHeight > 0;
+    function getStatusInternal(bytes32 key) internal view returns(uint256 settleHeight_, uint256 numOfWhitelistedWitnesses_, uint256 numOfValidWitnesses_, address[] memory witnesses_, bool includingMsgSender_) {
+        settleHeight_ = transfers[key].settleHeight;
+        numOfWhitelistedWitnesses_ = whitelistedWitnesses.numOfActive();
+        witnesses_ = new address[](numOfWhitelistedWitnesses_);
+        for (uint256 i = 0; i < witnessList[key].length; i++) {
+            if (whitelistedWitnesses.isAllowed(witnessList[key][i])) {
+                witnesses_[numOfValidWitnesses_++] = witnessList[key][i];
+                if (witnessList[key][i] == msg.sender) {
+                    includingMsgSender_ = true;
+                }
+            }
+        }
     }
 
-    function settled(address tokenAddr, uint256 index, address from, address to, uint256 amount) public view returns (bool) {
-         return _settled(generateKey(tokenAddr, index, from, to, amount));
+    function getStatus(address tokenAddr, uint256 index, address from, address to, uint256 amount) public view returns (uint256 settleHeight_, uint256 numOfWhitelistedWitnesses_, uint256 numOfValidWitnesses_, address[] memory witnesses_, bool includingMsgSender_) {
+        return getStatusInternal(generateKey(tokenAddr, index, from, to, amount));
     }
 
     function withdrawToken(address _token, address _to, uint256 _amount) internal returns(bool);
@@ -61,42 +68,25 @@ contract TransferValidatorBase is Ownable, Pausable {
     function submit(address tokenAddr, uint256 index, address from, address to, uint256 amount) public whenNotPaused {
         require(whitelistedWitnesses.isAllowed(msg.sender), "not whitelisted witnesses");
         require(whitelistedTokens.isAllowed(tokenAddr), "not whitelisted tokens");
+        require(amount != 0, "amount cannot be zero");
         bytes32 key = generateKey(tokenAddr, index, from, to, amount);
-        if (_settled(key)) {
+        if (transfers[key].amount == 0) {
+            transfers[key] = Transfer(tokenAddr, index, from, to, amount, 0);
+        }
+        (uint256 settleHeight, uint256 numOfWhitelisted, uint256 numOfValid, address[] memory witnesses, bool submitted) = getStatusInternal(key);
+        if (settleHeight != 0) {
             return;
         }
-        if (!transfers[key].flag) {
-            transfers[key] = Transfer(tokenAddr, index, from, to, amount, 0, true);
+        if (!submitted) {
+            witnessMap[key][msg.sender] = block.number;
+            witnessList[key].push(msg.sender);
+            witnesses[numOfValid++] = msg.sender;
+            emit WitnessSubmitted(tokenAddr, index, msg.sender, from, to, amount);
         }
-        uint256 l = submissions[key].length;
-        uint256 numOfValidWitnesses = 0;
-        uint256 i;
-        bool isUpdate = false;
-        address[] memory witnesses = new address[](whitelistedWitnesses.numOfActive());
-        for (i = 0; i < l; i++) {
-            if (submissions[key][i].witness == msg.sender) {
-                submissions[key][i].blockNumber = block.number;
-                isUpdate = true;
-            }
-            // block number is always less or equal to block.number
-            if ((expireHeight >= block.number - submissions[key][i].blockNumber) && whitelistedWitnesses.isAllowed(submissions[key][i].witness)) {
-                witnesses[numOfValidWitnesses] = submissions[key][i].witness;
-                numOfValidWitnesses++;
-            }
-        }
-        if (!isUpdate) {
-            submissions[key].push(Submission(msg.sender, block.number));
-            witnesses[numOfValidWitnesses] = msg.sender;
-            numOfValidWitnesses++;
-        }
-        if (numOfValidWitnesses * 3 > whitelistedWitnesses.numOfActive() * 2) {
+        if (numOfValid * 3 > numOfWhitelisted * 2) {
             transfers[key].settleHeight = block.number;
-            address[] memory trimmedWitnesses = new address[](numOfValidWitnesses);
-            for (i = 0; i < numOfValidWitnesses; i++) {
-                trimmedWitnesses[i] = witnesses[i];
-            }
             require(withdrawToken(tokenAddr, to, amount), "withdraw success");
-            emit Settled(tokenAddr, index, from, to, amount, block.number, trimmedWitnesses);
+            emit Settled(tokenAddr, index, from, to, amount, witnesses);
         }
     }
 }

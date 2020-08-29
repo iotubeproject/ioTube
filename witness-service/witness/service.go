@@ -8,6 +8,7 @@ package witness
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
@@ -16,48 +17,16 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
-	"github.com/iotexproject/ioTube/witness-service/util"
-)
-
-var (
-	// ErrAfterSendingTx is an error after sending a transaction
-	ErrAfterSendingTx = errors.New("something goes wrong after sending transaction")
-	// ErrNotConfirmYet is an error that the block has not been confirmed
-	ErrNotConfirmYet = errors.New("block has not been confirmed yet")
-	// ErrAlreadySettled is an error when the record to process has been settled
-	ErrAlreadySettled = errors.New("record has been settled")
-)
-
-// DefaultPrivateKey is a private key used when not specified
-const DefaultPrivateKey = "a000000000000000000000000000000000000000000000000000000000000000"
-
-type (
-	// Service manages to exchange iotex coin to ERC20 token on ethereum
-	Service interface {
-		// Start starts the service
-		Start(context.Context) error
-		// Stop stops the service
-		Stop(context.Context) error
-	}
-
-	// Witness is an interface defines the behavior of a witness
-	Witness interface {
-		IsQualifiedWitness() bool
-		TokensToWatch() []string
-		FetchRecords(token string, startID *big.Int, limit uint8) ([]*TxRecord, error)
-		Submit(*TxRecord) (string, error)
-		Check(*TxRecord) (bool, error)
-	}
 )
 
 type service struct {
-	witness         Witness
-	recorder        *Recorder
-	runners         []dispatcher.Runner
-	pullBatchSize   uint8
-	submitBatchSize uint8
-	checkBatchSize  uint8
-	checkDelay      time.Duration
+	witness          Witness
+	recorder         *Recorder
+	runners          []dispatcher.Runner
+	pullBatchSize    uint8
+	processBatchSize uint8
+	checkBatchSize   uint8
+	retryDuration    time.Duration
 }
 
 // NewService creates a new witness service
@@ -66,33 +35,26 @@ func NewService(
 	recorder *Recorder,
 	pullInterval time.Duration,
 	pullBatchSize uint8,
-	submitInterval time.Duration,
-	submitBatchSize uint8,
-	checkInterval time.Duration,
-	checkDelay time.Duration,
-	checkBatchSize uint8,
+	processInterval time.Duration,
+	processBatchSize uint8,
+	retryDuration time.Duration,
 ) (Service, error) {
 	s := &service{
-		witness:         witness,
-		recorder:        recorder,
-		pullBatchSize:   pullBatchSize,
-		submitBatchSize: submitBatchSize,
-		checkBatchSize:  checkBatchSize,
-		checkDelay:      checkDelay,
+		witness:          witness,
+		recorder:         recorder,
+		pullBatchSize:    pullBatchSize,
+		processBatchSize: processBatchSize,
+		retryDuration:    retryDuration,
 	}
-	collector, err := dispatcher.NewRunner(pullInterval, s.collectNewRecords)
+	producer, err := dispatcher.NewRunner(pullInterval, s.collect)
 	if err != nil {
 		return nil, errors.New("failed to create collector")
 	}
-	swapper, err := dispatcher.NewRunner(submitInterval, s.submitWitnesses)
+	consumer, err := dispatcher.NewRunner(processInterval, s.process)
 	if err != nil {
 		return nil, errors.New("failed to create swapper")
 	}
-	checker, err := dispatcher.NewRunner(checkInterval, s.checkSubmission)
-	if err != nil {
-		return nil, errors.New("failed to create checker")
-	}
-	s.runners = []dispatcher.Runner{collector, swapper, checker}
+	s.runners = []dispatcher.Runner{producer, consumer}
 
 	return s, nil
 }
@@ -118,7 +80,7 @@ func (s *service) Stop(ctx context.Context) error {
 	return s.recorder.Stop(ctx)
 }
 
-func (s *service) collectNewRecords() error {
+func (s *service) collect() error {
 	if !s.witness.IsQualifiedWitness() {
 		return nil
 	}
@@ -150,72 +112,60 @@ func (s *service) collectNewRecords() error {
 	return nil
 }
 
-func (s *service) submitWitnesses() error {
+func (s *service) process() error {
 	if !s.witness.IsQualifiedWitness() {
 		return nil
 	}
-	remainingCnt := uint(s.submitBatchSize)
-	for remainingCnt > 0 {
-		records, err := s.recorder.NewRecords(remainingCnt)
-		if err != nil {
-			return err
-		}
-		remainingCnt = uint(len(records))
-		for _, record := range records {
-			fmt.Printf("submitting witness {token: %s, id %d}\n", record.token, record.id)
-			if err := s.recorder.StartProcess(record); err != nil {
-				return err
-			}
-
-			txhash, err := s.witness.Submit(record)
-			switch {
-			case errors.Cause(err) == ErrAlreadySettled:
-				s.recorder.MarkAsSettled(record)
-				continue
-			case err != nil:
-				log.Printf("failed to submit witness {token: %s, id: %d}\n", record.token, record.id)
-				util.LogErr(err)
-				if ErrAfterSendingTx != errors.Cause(err) {
-					// tx not sent yet, change statue back to new
-					return s.recorder.Reset(record)
-				}
-				return s.recorder.Fail(record)
-			}
-			remainingCnt--
-			fmt.Printf("witness submitted {token: %s, id: %d}: %s\n", record.token, record.id, txhash)
-			if err := s.recorder.MarkAsSubmitted(record, txhash); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (s *service) checkSubmission() error {
-	if !s.witness.IsQualifiedWitness() {
-		return nil
-	}
-	records, err := s.recorder.RecordsToConfirm(int(s.checkDelay/time.Second), uint(s.checkBatchSize))
+	recordsToSubmit, err := s.recorder.RecordsToSubmit(s.processBatchSize)
 	if err != nil {
 		return err
 	}
+	if err := s.processRecords(recordsToSubmit, true); err != nil {
+		return err
+	}
+	recordsToCheck, err := s.recorder.RecordsToCheck(s.processBatchSize)
+	if err != nil {
+		return err
+	}
+
+	return s.processRecords(recordsToCheck, false)
+}
+
+func (s *service) processRecords(records []*TxRecord, submitIfNotFound bool) error {
 	for _, record := range records {
-		fmt.Printf("check submission of token %s id %d\n", record.token, record.id)
-		success, err := s.witness.Check(record)
-		switch {
-		case errors.Cause(err) == ErrNotConfirmYet:
-			// ignore
-		case err != nil:
-			util.LogErr(err)
-			return err
-		default:
-			if success {
-				if err := s.recorder.Confirm(record); err != nil {
+		fmt.Printf("Processing witness {%s, %d}\n", record.token, record.id)
+		status, err := s.witness.StatusOnChain(record)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get status of {%s, %d}", record.token, record.id)
+		}
+		switch status {
+		case SettledOnChain:
+			if err := s.recorder.MarkAsSettled(record); err != nil {
+				return err
+			}
+		case WitnessConfirmedOnChain:
+			if err := s.recorder.MarkAsConfirmed(record); err != nil {
+				return err
+			}
+		case WitnessSubmissionRejected:
+			if err := s.recorder.Fail(record); err != nil {
+				return err
+			}
+		case WitnessNotFoundOnChain:
+			if submitIfNotFound {
+				txhash, err := s.witness.SubmitWitness(record)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("witness submitted {%s, %d}: %x\n", record.token, record.id, txhash)
+				if err := s.recorder.MarkAsSubmitted(record, hex.EncodeToString(txhash)); err != nil {
 					return err
 				}
 			} else {
-				if err := s.recorder.Fail(record); err != nil {
-					return err
+				if record.updateTime.Add(s.retryDuration).Before(time.Now()) {
+					if err := s.recorder.Reset(record); err != nil {
+						return err
+					}
 				}
 			}
 		}

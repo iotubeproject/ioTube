@@ -8,33 +8,27 @@ db:
   driverName: "mysql"
 iotex:
   client: "api.testnet.iotex.one:443"
-  threshold: "20000000000000000000"
   tokenListContract: "io13jj245s0st3fulygnx9dqgnx2uzv2ar4ueh3n0"
   witnessListContract: "io1u95pfnmfazadmquruau62jwu6th5chpc9hqwne"
   cashierContract: "io1056lkra2st2yfy256s5ms8c29e0r3wek2u99wv"
-  validatorContract: "io10tyfdywjthf5pv609tdap8ff9hqp3hedk7ugya"
+  validatorContract: "io15gk02svc640s4500drm8utsn6s3gzuhw8wwp5z"
   privateKey: ""
   dbTableName: "erc2xrc"
   pullInterval: 1m
   pullBatchSize: 100
-  submitInterval: 1m
-  submitBatchSize: 1
-  checkInterval: 10m
-  checkDelay: 10s
-  checkBatchSize: 20
+  processInterval: 1m
+  processBatchSize: 1
+  retryDuration: 60s
 ethereum:
   client: ""
-  threshold: "2000000000000000000"
-  tokenListContract: "0x0bcf446db694f440b37f7b4d5cbf70a203f754b4"
-  witnessListContract: "0x42189cb1db5a74ea89db0298345ded43c8030b40"
-  cashierContract: "0x1f03bc73e7a67801b47e7e2035590439358547a2"
-  validatorContract: "0x0005DFA52B5E576212e4aef54837923D55d15D07"
+  tokenListContract: "0x9f05ff0cbf3bf15dc1584781c86e70060dcae86f"
+  witnessListContract: "0xa68970a2067cd2f23997c24ac85fddb7dd7a3ded"
+  cashierContract: "0x3cb88d3e4e9d6df7de96896697f7f726adcf8cee"
+  validatorContract: "0x6fe47c1deec9a888fe014b3de7b41b4b79b67359"
   privateKey: ""
   dbTableName: "xrc2erc"
   pullInterval: 1m
   pullBatchSize: 100
-  submitInterval: 1m
-  submitBatchSize: 1
-  checkInterval: 10m
-  checkDelay: 6m
-  checkBatchSize: 20
+  processInterval: 1m
+  processBatchSize: 1
+  retryDuration: 30m
