@@ -16,29 +16,19 @@ Click [IoTeX Tube docs](https://github.com/iotexproject/iotex-bootstrap/blob/mas
 |----------|-------------|-------------|
 | [Golang](https://golang.org) | &ge; 1.11.5 | Go programming language |
 
-## Running the service with docker
-
-### Prepare docker image
-
-```make docker```
+## Running the service with docker-compose
 
 ### Prepare config file
 
 Copy `service.yaml` to current directory, and fill in the following fields:
-* db.url
 * iotex.privateKey
 * ethereum.client
 * ethereum.privateKey
 
-### Run service in docker
+### Run service in docker-compose
 
 ```
-docker run -d --restart on-failure -name witness \
-         -p 8080:8080 \
-         -v=service.yaml:/etc/iotube-witness/service.yaml:ro \
-         iotex/iotube-witness:v0.1 \
-         iotube-witness \
-         -config=/etc/iotube-witness/service.yaml
+./start.sh
 ```
 
 ## Run service in Heroku (not ready yet)

@@ -1,0 +1,46 @@
+version: '2'
+
+services:
+  database:
+    container_name: witness-db
+    image: mysql:8
+    restart: always
+    ports:
+      - 3306:3306
+      - 33060:33060
+    volumes:
+      - $IOTEX_WITNESS/data/mysql:/var/lib/mysql:rw
+    environment:
+       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+
+  app:
+    container_name: witness
+    image: witness:latest
+    restart: on-failure
+    ports:
+      - 8080:8080
+    volumes:
+      - $IOTEX_WITNESS/etc/service.yaml:/etc/iotube-witness/service.yaml:ro
+    links:
+      - database
+    command: witness-service -config=/etc/iotube-witness/service.yaml
+
+  cron:
+    image: schnitzler/mysqldump
+    restart: always
+    volumes:
+      - $IOTEX_WITNESS/etc/crontab:/var/spool/cron/crontabs/root
+      - $IOTEX_WITNESS/etc/backup:/usr/local/bin/backup
+    volumes_from:
+      - backup
+    command: ["-l", "8", "-d", "8"]
+    environment:
+      MYSQL_HOST: database
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: witness
+
+  backup:
+    image: busybox
+    volumes:
+      - $IOTEX_WITNESS/data/backup:/backup
