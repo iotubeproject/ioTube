@@ -18,18 +18,19 @@ Click [IoTeX Tube docs](https://github.com/iotexproject/iotex-bootstrap/blob/mas
 
 ## Running the service with docker-compose
 
-### Prepare config file
+### Prepare Config
 
 Copy `service.yaml` to current directory, and fill in the following fields:
 * iotex.privateKey
 * ethereum.client
 * ethereum.privateKey
 
-### Run service in docker-compose
+### Run Service using Dockers
 
 ```
 ./start.sh
 ```
+
 
 ## Run service in Heroku (not ready yet)
 The service is currently deployed on Heroku, with the following env variables:
