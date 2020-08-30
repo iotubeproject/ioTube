@@ -1,21 +1,3 @@
-# iotex-tube
-
-[![CircleCI](https://circleci.com/gh/iotexproject/iotex-antenna-go.svg?style=svg)](https://circleci.com/gh/iotexproject/iotex-tube)
-[![Go version](https://img.shields.io/badge/go-1.11.5-blue.svg)](https://github.com/moovweb/gvm)
-[![LICENSE](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-
-Tube is a bi-directional service that allows our users to swap the IoTeX mainnet native token to the [IoTeX Network ERC20 token](https://etherscan.io/token/0x6fb3e0a217407efff7ca062d46c26e5d60a14d69), or vice versa.
-
-Click [IoTeX Tube docs](https://github.com/iotexproject/iotex-bootstrap/blob/master/tube/tube.md) for detailed documentation of the tube service.
-
-## Getting started
-
-### Minimum requirements
-
-| Components | Version | Description |
-|----------|-------------|-------------|
-| [Golang](https://golang.org) | &ge; 1.11.5 | Go programming language |
-
 ## Running the service with docker-compose
 
 ### Prepare Config
