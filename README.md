@@ -43,7 +43,7 @@ Different from traditional bridges, ioTube comes with two components:
 
 ### Join as a Witness
 
-TBD
+Follow instructions [here](https://github.com/iotexproject/ioTube/blob/master/witness-service/README.md)
 
 ## Usage
 
