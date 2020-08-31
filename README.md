@@ -43,14 +43,20 @@ Different from traditional bridges, ioTube comes with two components:
 
 ### Join as a Witness
 
-1. Prepare config by copying `witness-service/service.yaml` to current directory, and fill in the following fields:
+1. Edit `witness-service/service.yaml` to fill in the following fields:
 * iotex.privateKey
 * ethereum.privateKey
 * ethereum.client
 
 2. start containers
 ```
+cd witness-service
 ./start.sh
+```
+
+3. Clean up everything by running
+```
+./clean-all.sh
 ```
 
 ### Transfer assets between IoTeX and Ethereum
