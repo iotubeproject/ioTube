@@ -55,7 +55,7 @@ Different from traditional bridges, ioTube comes with two components:
 
 ### Transfer assets between IoTeX and Ethereum
 
-Please use dApp ioTube https://tube.iotex.io.
+Please use dApp ioTube https://tube.iotex.io. Please note that the service is still in beta mode.  
 
 #### From ERC20 to XRC20
 
@@ -64,7 +64,7 @@ Please use dApp ioTube https://tube.iotex.io.
 3. Enter the amount. 
 4. Click `Approve` button to approve ERC20 token transfer and sign on metamask.
 5. Click `Convert` button and sign on metamask.
-6. After `12` confirmations of Ethereum network and 2/3 + 1 confirmations from witnesses, the XRC20 tokens will be minted and sent to your IoTeX address.
+6. After `12` confirmations of Ethereum network and `2/3 + 1` confirmations from witnesses, the XRC20 tokens will be minted and sent to your IoTeX address.
 7. You can add the token to your <a href="http://iopay.iotex.io/">ioPay</a> to see and use them.
 
 #### From XRC20 to ERC20
@@ -74,14 +74,14 @@ Please use dApp ioTube https://tube.iotex.io.
 3. Enter the amount.
 4. Click `Approve` button to approve XRC20 token transfer and sign on ioPay.
 5. Click `Convert` button and sign on ioPay.
-6. After 1 confirmation of IoTeX network and 2/3 + 1 confirmations from witnesses, the XRC20 token will be burnt and ERC20 token will be sent to your ETH wallet.
+6. After `1` confirmation of IoTeX network and `2/3 + 1` confirmations from witnesses, the XRC20 token will be burnt and ERC20 token will be sent to your ETH wallet.
 
 #### Fees
-Tube fees: 0. 
+Tube fees: `0`
 Network fees: 
 
-1. from ERC20 to XRC20: 0.
-2. from XRC20 to ERC20: 4000 IOTX (to cover the high ETH gas fee for witnesses)
+1. from ERC20 to XRC20: `0`
+2. from XRC20 to ERC20: `4000 IOTX` (to cover the high ETH gas fee for witnesses)
 
 
 ### Add an ERC20 token to ioTube
