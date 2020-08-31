@@ -9,5 +9,4 @@ This documents the design and the flows of ioTube.
 ![e2i](E2I_flow.png)
 
 ## Flow: Asset from IoTeX to Ethereum
-
-
+Exactly the opposite of the above flow.
