@@ -9,7 +9,7 @@ package witness
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
+	"log"
 	"math/big"
 	"strings"
 	"sync"
@@ -336,23 +336,23 @@ func (auth *Auth) Refresh() error {
 	auth.mu.Lock()
 	defer auth.mu.Unlock()
 	auth.lastUpdateTime = time.Now()
-	fmt.Println("auth data refreshed at", auth.lastUpdateTime)
-	fmt.Println("  Witnesses on IoTeX")
+	str := "auth data refreshed\n  Witnesses on IoTeX"
 	for _, w := range witnessesOnIoTeX {
-		fmt.Println("    ", w.String())
+		str += "\n    " + w.String()
 		auth.witnessesOnIoTeX[w.String()] = true
 	}
-	fmt.Println("  Witnesses on Ethereum")
+	str += "\n  Witnesses on Ethereum"
 	for _, w := range witnessesOnEth {
-		fmt.Println("    ", w.String())
+		str += "\n    " + w.String()
 		auth.witnessesOnEthereum[w.String()] = true
 	}
 	auth.erc20ToXrc20 = newErc20ToXrc20
 	auth.xrc20ToErc20 = newXrc20ToErc20
-	fmt.Println("  Token pairs")
+	str += "\n  Token pairs"
 	for key, value := range auth.erc20ToXrc20 {
-		fmt.Println("    ", key, "<=>", value.String())
+		str += "\n    " + key + "<=>" + value.String()
 	}
+	log.Println(str)
 	return nil
 }
 

@@ -1,6 +1,6 @@
 refreshInterval: 60m
-ethConfirmBlockNumber: 2
-ethGasPriceLimit: 20000000000
+ethConfirmBlockNumber: 12
+ethGasPriceLimit: 300000000000
 slackWebHook: ""
 httpPort: 8080
 db:

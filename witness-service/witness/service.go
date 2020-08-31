@@ -9,7 +9,6 @@ package witness
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -100,7 +99,7 @@ func (s *service) collect() error {
 			continue
 		}
 		if len(records) > 0 {
-			fmt.Printf("fetching %d records of token %s from %d\n", len(records), token, index)
+			log.Printf("fetching %d records of token %s from index %d\n", len(records), token, index)
 		}
 		for _, record := range records {
 			if err := s.recorder.Create(record); err != nil {
@@ -133,7 +132,7 @@ func (s *service) process() error {
 
 func (s *service) processRecords(records []*TxRecord, submitIfNotFound bool) error {
 	for _, record := range records {
-		fmt.Printf("Processing witness {%s, %d}\n", record.token, record.id)
+		log.Printf("Processing witness of {%s, %d}\n", record.token, record.id)
 		status, err := s.witness.StatusOnChain(record)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get status of {%s, %d}", record.token, record.id)
@@ -157,7 +156,6 @@ func (s *service) processRecords(records []*TxRecord, submitIfNotFound bool) err
 				if err != nil {
 					return err
 				}
-				fmt.Printf("witness submitted {%s, %d}: %x\n", record.token, record.id, txhash)
 				if err := s.recorder.MarkAsSubmitted(record, hex.EncodeToString(txhash)); err != nil {
 					return err
 				}
@@ -166,6 +164,8 @@ func (s *service) processRecords(records []*TxRecord, submitIfNotFound bool) err
 					if err := s.recorder.Reset(record); err != nil {
 						return err
 					}
+				} else {
+					log.Printf("record {%s, %d} not found on chain\n", record.token, record.id)
 				}
 			}
 		}

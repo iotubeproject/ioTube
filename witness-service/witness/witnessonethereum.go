@@ -90,12 +90,12 @@ func (w *witnessOnEthereum) StatusOnChain(tx *TxRecord) (StatusOnChain, error) {
 	if tx.txhash != "" {
 		receipt, err := client.TransactionReceipt(context.Background(), common.HexToHash(tx.txhash))
 		if err != nil {
-			return WitnessNotFoundOnChain, err
+			return WitnessNotFoundOnChain, errors.Wrap(err, "failed to get transactionreceipt")
 		}
 		if receipt != nil {
 			tipBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
 			if err != nil {
-				return WitnessNotFoundOnChain, err
+				return WitnessNotFoundOnChain, errors.Wrap(err, "failed to read tip block header")
 			}
 			if new(big.Int).Sub(tipBlockHeader.Number, receipt.BlockNumber).Cmp(w.auth.EthConfirmBlockNumber()) > 0 && receipt.Status != types.ReceiptStatusSuccessful {
 				return WitnessSubmissionRejected, nil
@@ -112,11 +112,11 @@ func (w *witnessOnEthereum) StatusOnChain(tx *TxRecord) (StatusOnChain, error) {
 	}
 	validator, err := contract.NewTransferValidator(w.validatorAddress, client)
 	if err != nil {
-		return WitnessNotFoundOnChain, errors.Wrapf(err, "failed to create validator caller")
+		return WitnessNotFoundOnChain, errors.Wrap(err, "failed to create validator caller")
 	}
 	callOpts, err := w.auth.CallOptsOnEthereum()
 	if err != nil {
-		return WitnessNotFoundOnChain, err
+		return WitnessNotFoundOnChain, errors.Wrap(err, "failed to create call opts on ethereum")
 	}
 	status, err := validator.GetStatus(
 		callOpts,
@@ -132,9 +132,13 @@ func (w *witnessOnEthereum) StatusOnChain(tx *TxRecord) (StatusOnChain, error) {
 	case status.SettleHeight.Cmp(big.NewInt(0)) != 0:
 		return SettledOnChain, nil
 	case status.IncludingMsgSender:
-		if status.NumOfWhitelistedWitnesses.Cmp(status.NumOfValidWitnesses) > 0 || status.Witnesses[0].String() != w.witnessAddress.String() {
+		if status.NumOfWhitelistedWitnesses.Cmp(status.NumOfValidWitnesses) > 0 {
 			return WitnessConfirmedOnChain, nil
 		}
+		if len(status.Witnesses) > 1 && status.Witnesses[1].String() != w.witnessAddress.String() {
+			return WitnessConfirmedOnChain, nil
+		}
+		// fallback to retry
 	}
 	return WitnessNotFoundOnChain, nil
 }

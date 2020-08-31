@@ -156,6 +156,7 @@ func (recorder *Recorder) Create(tx *TxRecord) error {
 func (recorder *Recorder) Reset(tx *TxRecord) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
+	log.Printf("reset record (%s, %d) status\n", tx.token, tx.id)
 
 	return recorder.updateRecordStatus(recorder.queries.ResetRecord, tx, "reset")
 }

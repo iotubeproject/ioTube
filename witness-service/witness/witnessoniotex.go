@@ -104,13 +104,6 @@ func (w *witnessOnIoTeX) statusOfRecord(
 		Witnesses                 []common.Address
 		IncludingMsgSender        bool
 	}{}
-	/*struct {
-		settleHeight_              *big.Int
-		numOfWhitelistedWitnesses_ *big.Int
-		numOfValidWitnesses_       *big.Int
-		witnesses_                 []common.Address
-		includingMsgSender_                  bool
-	}{}*/
 	if err = response.Unmarshal(&data); err != nil {
 		return
 	}
@@ -163,9 +156,13 @@ func (w *witnessOnIoTeX) StatusOnChain(tx *TxRecord) (StatusOnChain, error) {
 	case settleHeight.Cmp(big.NewInt(0)) > 0:
 		return SettledOnChain, nil
 	case witnessed:
-		if numOfWhitelisted.Cmp(numOfValid) > 0 || witnesses[0].String() != w.witnessAddress.String() {
+		if numOfWhitelisted.Cmp(numOfValid) > 0 {
 			return WitnessConfirmedOnChain, nil
 		}
+		if len(witnesses) > 1 && witnesses[1].String() != w.witnessAddress.String() {
+			return WitnessConfirmedOnChain, nil
+		}
+		// fallback to retry
 	}
 	return WitnessNotFoundOnChain, nil
 }
