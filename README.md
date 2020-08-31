@@ -78,6 +78,7 @@ Please use dApp ioTube https://tube.iotex.io. Please note that the service is st
 
 #### Fees
 Tube fees: `0`
+
 Network fees: 
 
 1. from ERC20 to XRC20: `0`
