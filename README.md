@@ -60,7 +60,7 @@ Please use dApp ioTube https://tube.iotex.io.
 #### From ERC20 to XRC20
 
 1. open https://tube.iotex.io/eth in a metamask installed browser. (eg. Firefox/Chrome/Brave + metamask) 
-2. Chooese supported ERC20 token from the list.
+2. Choose supported ERC20 token from the list.
 3. Enter the amount. 
 4. Click `Approve` button to approve ERC20 token transfer and sign on metamask.
 5. Click `Convert` button and sign on metamask.
