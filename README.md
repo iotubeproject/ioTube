@@ -5,7 +5,7 @@
 <p>
   <strong>A multi-assets, fully decentralized and bidirectional bridge for exchanging ERC20/XRC20 tokens between Ethereum and IoTeX.</strong>
   
-ioTube is a decentralized cross-chain bridge that enables the bidirectional exchange of digital assets (e.g., tokens, stable coins) between IoTeX and other blockchain networks. The first version of ioTube was built by core-dev around 2019 June to facilitate the swap of IOTX-ERC20 and IOTX until now, and this released version generalizes the original ioTube by making it more decentralized and supports multiple assets on Ethereum & IoTeX blockchains. In the future, we plan to add support for more blockchain networks to increase the reach and impact of ioTube.
+ioTube is a decentralized cross-chain bridge that enables the bidirectional exchange of digital assets (e.g., tokens, stable coins) between IoTeX and other blockchain networks. The <a href="https://member.iotex.io/tools/iotex">first version</a> of ioTube was built by core-dev around 2019 June to facilitate the swap of IOTX-ERC20 and IOTX until now, and this released version generalizes the original ioTube to support multiple assets on Ethereum & IoTeX blockchains. In the future, we plan to add support more blockchain networks to increase the reach and impact of ioTube.
 </p>
 
 <h3>
@@ -43,7 +43,7 @@ Different from traditional bridges, ioTube comes with two components:
 
 ### Join as a Witness
 
-1. Prepare config by copying `service.yaml` to current directory, and fill in the following fields:
+1. Prepare config by copying `witness-service/service.yaml` to current directory, and fill in the following fields:
 * iotex.privateKey
 * ethereum.privateKey
 * ethereum.client
@@ -54,7 +54,35 @@ Different from traditional bridges, ioTube comes with two components:
 ```
 
 ### Transfer assets between IoTeX and Ethereum
-TBD
+
+Please use dApp ioTube https://tube.iotex.io.
+
+#### From ERC20 to XRC20
+
+1. open https://tube.iotex.io/eth in a metamask installed browser. (eg. Firefox/Chrome/Brave + metamask) 
+2. Chooese supported ERC20 token from the list.
+3. Enter the amount. 
+4. Click `Approve` button to approve ERC20 token transfer and sign on metamask.
+5. Click `Convert` button and sign on metamask.
+6. After `12` confirmations of Ethereum network and 2/3 + 1 confirmations from witnesses, the XRC20 tokens will be minted and sent to your IoTeX address.
+7. You can add the token to your <a href="http://iopay.iotex.io/">ioPay</a> to see and use them.
+
+#### From XRC20 to ERC20
+
+1. open https://tube.iotex.io/iotx in ioPay desktop supported broswers (eg. Chrome/Firefox/Brave with ioPay desktop installed) or ioPay Android/iOS.
+2. Choose supported XRC20 token from the list.
+3. Enter the amount.
+4. Click `Approve` button to approve XRC20 token transfer and sign on ioPay.
+5. Click `Convert` button and sign on ioPay.
+6. After 1 confirmation of IoTeX network and 2/3 + 1 confirmations from witnesses, the XRC20 token will be burnt and ERC20 token will be sent to your ETH wallet.
+
+#### Fees
+Tube fees: 0. 
+Network fees: 
+
+1. from ERC20 to XRC20: 0.
+2. from XRC20 to ERC20: 4000 IOTX (to cover the high ETH gas fee for witnesses)
+
 
 ### Add an ERC20 token to ioTube
 * Add this token to `tl` on Ethereum
