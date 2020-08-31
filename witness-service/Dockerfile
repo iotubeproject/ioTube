@@ -19,6 +19,5 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates
 RUN mkdir -p /etc/iotube/
 COPY --from=build /go/apps/iotube-witness/bin/witness-service /usr/local/bin/witness-service
-COPY --from=build /go/apps/iotube-witness/service.yaml .
 
 CMD [ "witness-service" ]

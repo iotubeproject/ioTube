@@ -120,11 +120,11 @@ func (s *service) process() error {
 	if err != nil {
 		return err
 	}
-	if err := s.processRecords(recordsToSubmit, true); err != nil {
-		return err
-	}
 	recordsToCheck, err := s.recorder.RecordsToCheck(s.processBatchSize)
 	if err != nil {
+		return err
+	}
+	if err := s.processRecords(recordsToSubmit, true); err != nil {
 		return err
 	}
 

@@ -26,7 +26,6 @@ import (
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-core/pkg/util/httputil"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	uconfig "go.uber.org/config"
 
@@ -42,7 +41,7 @@ type Configuration struct {
 	IoTeX                 WitnessConfig `json:"iotex" yaml:"iotex"`
 	Ethereum              WitnessConfig `json:"ethereum" yaml:"ethereum"`
 	EthConfirmBlockNumber uint8         `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
-	EthGasPriceLimit      string        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+	EthGasPriceLimit      uint64        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
 	HTTPPort              int           `json:"httpPort" yaml:"httpPort"`
 	DB                    DBConfig      `json:"db" yaml:"db"`
@@ -70,20 +69,32 @@ type DBConfig struct {
 	DriverName string `json:"driverName" yaml:"driverName"`
 }
 
-// cliArgs defines the configuration that the CLI expects. By using a struct we can very easily
-// aggregate them into an object and check what are the expected types.
-type cliArgs struct {
-	CfgFile string `arg:"-f,help:config.yml of client"`
-}
-
-var args cliArgs
-
-func mustFetchNonEmptyParam(key string) string {
-	str := os.Getenv(key)
-	if len(str) == 0 {
-		log.Fatalf("%s is not defined in env\n", key)
-	}
-	return str
+var defaultConfig = Configuration{
+	RefreshInterval:       time.Hour,
+	EthConfirmBlockNumber: 20,
+	EthGasPriceLimit:      120000000000,
+	SlackWebHook:          "",
+	HTTPPort:              8080,
+	DB: DBConfig{
+		URL:        "",
+		DriverName: "mysql",
+	},
+	Ethereum: WitnessConfig{
+		DBTableName:      "xrc2erc",
+		PullInterval:     time.Minute,
+		PullBatchSize:    20,
+		ProcessInterval:  time.Minute,
+		ProcessBatchSize: 1,
+		RetryDuration:    30 * time.Minute,
+	},
+	IoTeX: WitnessConfig{
+		DBTableName:      "erc2xrc",
+		PullInterval:     time.Minute,
+		PullBatchSize:    20,
+		ProcessInterval:  time.Minute,
+		ProcessBatchSize: 1,
+		RetryDuration:    time.Minute,
+	},
 }
 
 func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, witness.Service, error) {
@@ -117,10 +128,6 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	ethGasPriceLimit, ok := new(big.Int).SetString(cfg.EthGasPriceLimit, 10)
-	if !ok {
-		return nil, nil, nil, errors.Errorf("failed to parse gas price limit %s", cfg.EthGasPriceLimit)
-	}
 
 	auth, err := witness.NewAuth(
 		ethClient,
@@ -128,7 +135,7 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 		privateKeyOnEthereum,
 		witnessAccountOnIoTeX.Address(),
 		cfg.EthConfirmBlockNumber,
-		ethGasPriceLimit,
+		new(big.Int).SetUint64(cfg.EthGasPriceLimit),
 		common.HexToAddress(cfg.Ethereum.WitnessListContract),
 		witnessListContractAddressOnIoTeX,
 		common.HexToAddress(cfg.Ethereum.TokenListContract),
@@ -189,6 +196,13 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 	return auth, witnessServiceOnIoTeX, witnessServiceOnEthereum, nil
 }
 
+var configFile string
+
+func init() {
+	flag.StringVar(&configFile, "config", "", "path of server config file")
+	flag.Parse()
+}
+
 // main performs the main routine of the application:
 //	1.	parses the args;
 //	2.	analyzes the declaration of the API
@@ -196,16 +210,14 @@ func createWitnessServices(cfg Configuration) (*witness.Auth, witness.Service, w
 //	4.	listens on the port we want
 func main() {
 	opts := make([]uconfig.YAMLOption, 0)
-	var configFile string
-	flag.StringVar(&configFile, "config", "service.yaml", "path of server config file")
-	flag.Parse()
+	opts = append(opts, uconfig.Static(defaultConfig))
+	opts = append(opts, uconfig.Expand(os.LookupEnv))
 	if configFile != "" {
 		opts = append(opts, uconfig.File(configFile))
-	} else {
-		rawCfg := mustFetchNonEmptyParam("TUBE_CONFIG")
-		opts = append(opts, uconfig.Source(strings.NewReader(rawCfg)))
 	}
-
+	if envConfig, ok := os.LookupEnv("WITNESS_CONFIG"); ok {
+		opts = append(opts, uconfig.RawSource(strings.NewReader(envConfig)))
+	}
 	yaml, err := uconfig.NewYAML(opts...)
 	if err != nil {
 		log.Fatalln(err)
@@ -214,7 +226,18 @@ func main() {
 	if err := yaml.Get(uconfig.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	// TODO: check configuration
+	if url, ok := os.LookupEnv("WITNESS_DB_URL"); ok {
+		cfg.DB.URL = url
+	}
+	if client, ok := os.LookupEnv("WITNESS_ETH_CLIENT"); ok {
+		cfg.Ethereum.Client = client
+	}
+	if pk, ok := os.LookupEnv("WITNESS_ETH_PRIVATE_KEY"); ok {
+		cfg.Ethereum.PrivateKey = pk
+	}
+	if pk, ok := os.LookupEnv("WITNESS_IOTEX_PRIVATE_KEY"); ok {
+		cfg.IoTeX.PrivateKey = pk
+	}
 	util.SetSlackURL(cfg.SlackWebHook)
 	auth, witnessOnIoTeX, witnessOnEthereum, err := createWitnessServices(cfg)
 	if err != nil {
