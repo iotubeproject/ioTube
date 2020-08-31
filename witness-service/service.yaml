@@ -10,7 +10,7 @@ iotex:
   client: "api.iotex.one:443"
   tokenListContract: "io12fpehpj76ydgjyuzrlcgeys5w3s45p86p4h695"
   witnessListContract: "io1m69g89xkfduplvkzh67vxenmeswqz3kdywjaew"
-  cashierContract: "io1jprlm94psjmzx4x6zu5pqsfyla9ufnyahxgffm"
+  cashierContract: "io10jn0kf7te225hv7uzfc7sza5hwlgqhmljdyudj"
   validatorContract: "io1k0ncs42tj67cyt0lysgkzfges2ktj9vslkstjh"
   privateKey: ""
   dbTableName: "tube.erc2xrc"
