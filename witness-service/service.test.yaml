@@ -4,7 +4,7 @@ ethGasPriceLimit: 20000000000
 slackWebHook: ""
 httpPort: 8080
 db:
-  url: "root:kdfjjrU64fjK58H@tcp(127.0.0.1:3306)/"
+  url: "root:kdfjjrU64fjK58H@tcp(database:3306)/"
   driverName: "mysql"
 iotex:
   client: "api.testnet.iotex.one:443"
