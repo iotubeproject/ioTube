@@ -104,8 +104,8 @@ Network fees:
 
 ## Gas Costs
 Gas fees on IoTeX are negligible, both for bridge maintenance and for asset transfer. The estimated gas fees on Ethereum side are:
-- To transfer token from Ethereum to IoTeX: ~XXX gas to set allowance and ~XXX to lock it;
-- To transfer token back from IoTeX to ETH: ~XXX gas to unlock the token.
+- To transfer token from Ethereum to IoTeX: ~43,952 gas to set allowance and ~151,122 to lock it;
+- To transfer token back from IoTeX to ETH: ~422,525 gas to unlock the token.
 
 
 ## Current Supported Tokens
