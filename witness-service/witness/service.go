@@ -61,11 +61,11 @@ func NewService(
 
 func (s *service) Start(ctx context.Context) error {
 	if err := s.recorder.Start(ctx); err != nil {
-		return err
+		return errors.Wrap(err, "failed to start recorder")
 	}
 	for _, d := range s.runners {
 		if err := d.Start(); err != nil {
-			return err
+			return errors.Wrap(err, "failed to start runner")
 		}
 	}
 	return nil

@@ -24,27 +24,13 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/db"
 )
 
-/*
-// MySQLTableCreation is the sql query to create exchange logger table
-       MySQLTableCreation = fmt.Sprintf(`CREATE TABLE IF NOT EXISTS records (
-			   token VARCHAR(42) NOT NULL,
-			   id BIGINT NOT NULL,
-			   sender VARCHAR(42) NOT NULL,
-               recipient VARCHAR(42) NOT NULL,
-               amount VARCHAR(78) NOT NULL,
-               creationTime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-               updateTime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-               status TINYINT NOT NULL DEFAULT %d,
-               txHash VARCHAR(66) NULL,
-               notes VARCHAR(45) NULL,
-               PRIMARY KEY (id, token))`,
-               New,
-       )
-*/
+var _CreateSchema = "CREATE DATABASE IF NOT EXISTS `tube`"
 
 type (
 	// Queries are the sql queries for recorder
 	Queries struct {
+		// CreateTable is a query to create a new table if not exist
+		CreateTable string
 		// CreateRecord is a query to create a new record with id, customer, and amount
 		CreateRecord string
 		// MarkRecordAsSettled is a query to set status to Settled
@@ -77,6 +63,22 @@ func NewRecorder(store *db.SQLStore, recordTableName string) *Recorder {
 	return &Recorder{
 		store: store,
 		queries: Queries{
+			CreateTable: fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
+				token varchar(42) NOT NULL,
+				id bigint(20) NOT NULL,
+				sender varchar(42) NOT NULL,
+				recipient varchar(42) NOT NULL,
+				amount varchar(78) NOT NULL,
+				creationTime timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updateTime timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				status tinyint(4) NOT NULL DEFAULT '%d',
+				txHash varchar(66) DEFAULT NULL,
+				notes varchar(45) DEFAULT NULL,
+				PRIMARY KEY (id, token)
+			  ) ENGINE=InnoDB DEFAULT CHARSET=latin1;`,
+				recordTableName,
+				New,
+			),
 			CreateRecord:          fmt.Sprintf("INSERT INTO %s (token, id, sender, recipient, amount) VALUES (?, ?, ?, ?, ?)", recordTableName),
 			MarkRecordAsSettled:   fmt.Sprintf("UPDATE %s SET status=%d WHERE token=? AND id=? AND status in (%d, %d, %d)", recordTableName, Settled, New, Submitted, Confirmed),
 			MarkRecordAsConfirmed: fmt.Sprintf("UPDATE %s SET status=%d WHERE token=? AND id=? AND status in (%d, %d)", recordTableName, Confirmed, New, Submitted),
@@ -103,11 +105,19 @@ func init() {
 }
 
 // Start starts the recorder
-func (recorder *Recorder) Start(ctx context.Context) (err error) {
+func (recorder *Recorder) Start(ctx context.Context) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 
-	return recorder.store.Start(ctx)
+	if err := recorder.store.Start(ctx); err != nil {
+		return err
+	}
+	if _, err := recorder.store.DB().Exec(_CreateSchema); err != nil {
+		return err
+	}
+	_, err := recorder.store.DB().Exec(recorder.queries.CreateTable)
+
+	return err
 }
 
 // Stop stops the recorder
