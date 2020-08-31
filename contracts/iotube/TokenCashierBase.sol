@@ -77,4 +77,8 @@ contract TokenCashierBase is Pausable {
 
         return (customers_, receivers_, amounts_, fees_);
     }
+
+    function withdraw() external onlyOwner {
+        msg.sender.transfer(address(this).balance);
+    }
 }
