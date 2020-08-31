@@ -107,3 +107,9 @@ Gas fees on IoTeX are negligible, both for bridge maintenance and for asset tran
 - To transfer token from Ethereum to IoTeX: ~XXX gas to set allowance and ~XXX to lock it;
 - To transfer token back from IoTeX to ETH: ~XXX gas to unlock the token.
 
+
+## current supported Tokens
+1. WETH (0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2) - min=0.1 max=1000 
+
+2. PAXG (0x45804880de22913dafe09f4980848ece6ecbaf78) - min=0.01 max=200
+
