@@ -110,14 +110,14 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 	defer recorder.mutex.Unlock()
 
 	if err := recorder.store.Start(ctx); err != nil {
-		return err
+		return errors.Wrap(err, "failed to start db")
 	}
 	if _, err := recorder.store.DB().Exec(_CreateSchema); err != nil {
-		return err
+		return errors.Wrap(err, "failed to create database")
 	}
 	_, err := recorder.store.DB().Exec(recorder.queries.CreateTable)
 
-	return err
+	return errors.Wrap(err, "failed to create table")
 }
 
 // Stop stops the recorder
@@ -213,7 +213,7 @@ func (recorder *Recorder) NextIDsToFetch() (map[string]*big.Int, error) {
 	defer recorder.mutex.RUnlock()
 	res, err := recorder.store.DB().Query(recorder.queries.MaxIDs)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to query ids to fetch")
 	}
 	defer res.Close()
 	retval := map[string]*big.Int{}
@@ -221,7 +221,7 @@ func (recorder *Recorder) NextIDsToFetch() (map[string]*big.Int, error) {
 	var token string
 	for res.Next() {
 		if err := res.Scan(&token, &id); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan result for NextIDsToFetch")
 		}
 		if !id.Valid {
 			return nil, errors.New("failed to query ids to fetch next")

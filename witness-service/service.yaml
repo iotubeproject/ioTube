@@ -4,7 +4,7 @@ ethGasPriceLimit: 20000000000
 slackWebHook: ""
 httpPort: 8080
 db:
-  url: "root:kdfjjrU64fjK58H@tcp(127.0.0.1:3306)/tube?parseTime=true"
+  url: "root:kdfjjrU64fjK58H@tcp(database:3306)/?parseTime=true"
   driverName: "mysql"
 iotex:
   client: "api.iotex.one:443"
@@ -13,7 +13,7 @@ iotex:
   cashierContract: "io1jprlm94psjmzx4x6zu5pqsfyla9ufnyahxgffm"
   validatorContract: "io1k0ncs42tj67cyt0lysgkzfges2ktj9vslkstjh"
   privateKey: ""
-  dbTableName: "erc2xrc"
+  dbTableName: "tube.erc2xrc"
   pullInterval: 1m
   pullBatchSize: 100
   processInterval: 1m
@@ -26,7 +26,7 @@ ethereum:
   cashierContract: "0x62ee799b09c2b12f3350a73a54d07434023ebcca"
   validatorContract: "0xf70BDF9D3eEdD1b243A03B45d1EFC7B5e3f701ab"
   privateKey: ""
-  dbTableName: "xrc2erc"
+  dbTableName: "tube.xrc2erc"
   pullInterval: 1m
   pullBatchSize: 100
   processInterval: 1m
