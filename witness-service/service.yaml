@@ -9,7 +9,7 @@ db:
 iotex:
   client: "api.iotex.one:443"
   tokenListContract: "io12fpehpj76ydgjyuzrlcgeys5w3s45p86p4h695"
-  witnessListContract: "io1qv63k3rpezs7pqkn5ppsgytqjltp5jg5dkn62c"
+  witnessListContract: "io1m69g89xkfduplvkzh67vxenmeswqz3kdywjaew"
   cashierContract: "io1jprlm94psjmzx4x6zu5pqsfyla9ufnyahxgffm"
   validatorContract: "io1k0ncs42tj67cyt0lysgkzfges2ktj9vslkstjh"
   privateKey: ""
