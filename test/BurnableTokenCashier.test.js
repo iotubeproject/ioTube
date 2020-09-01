@@ -66,6 +66,6 @@ contract('BurnableTokenCashier', function([owner, minter, sender, receiver, fake
         const initBalance = await web3.eth.getBalance(owner);
         await this.cashier.withdraw();
         const newBalance = await web3.eth.getBalance(owner);
-        console.log({newBalance, initBalance});
+        assert.equal(web3.utils.toBN(initBalance).sub(web3.utils.toBN(newBalance)).toNumber() + 1234, 593020000000000);
     });
 });
