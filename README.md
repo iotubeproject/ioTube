@@ -117,3 +117,8 @@ ioETH contract (io1qfvgvmk6lpxkpqwlzanqx4atyzs86ryqjnfuad)
 
 ioPAXG contract (io19fsq8e9krrlng4ay5gyq6q5tqfym28yq9ly0fz)
 
+3. BUSD (0x4Fabb145d64652a948d72533023f6E7A623C7C53) - min=1 max=400000
+
+ioBUSD contract (io14nhfkywdfvl40evgsqnh43ev33q6he8yez8c8a)
+
+
