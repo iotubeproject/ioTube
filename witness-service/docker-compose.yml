@@ -5,9 +5,6 @@ services:
     container_name: witness-db
     image: mysql:8
     restart: always
-    ports:
-      - 3306:3306
-      - 33060:33060
     volumes:
       - $IOTEX_WITNESS/data/mysql:/var/lib/mysql:rw
     environment:
