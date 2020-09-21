@@ -111,16 +111,27 @@ Gas fees on IoTeX are negligible, both for bridge maintenance and for asset tran
 
 
 ## Current Supported Tokens
-1. WETH (0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2) - min=0.1 max=1000 
+0. WETH (0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2) - min=0.1 max=1000 
 
 ioETH contract (io1qfvgvmk6lpxkpqwlzanqx4atyzs86ryqjnfuad)
 
-2. PAXG (0x45804880de22913dafe09f4980848ece6ecbaf78) - min=0.01 max=200
+1. PAXG (0x45804880de22913dafe09f4980848ece6ecbaf78) - min=0.01 max=200
 
 ioPAXG contract (io19fsq8e9krrlng4ay5gyq6q5tqfym28yq9ly0fz)
 
-3. BUSD (0x4Fabb145d64652a948d72533023f6E7A623C7C53) - min=1 max=400000
+2. BUSD (0x4Fabb145d64652a948d72533023f6E7A623C7C53) - min=1 max=400000
 
 ioBUSD contract (io14nhfkywdfvl40evgsqnh43ev33q6he8yez8c8a)
 
+3. UNISWAP (0x1f9840a85d5af5bf1d1762f925bdaddc4201f984) - min=0.1 max=80000
+
+ioUNI contract (io1ahh04jn2zkqlug6feh7rpq75a75p3rj42hp4ch)
+
+4. LINK (0x514910771af9ca656af840dff83e8264ecf986ca) -  min=0.1 max=8000
+
+ioLINK contract (io1acu830g37t6ktzgh762lz8ff3xg39r0tv4enge)
+
+5. WBTC (0x2260fac5e5542a773aa44fbcfedf7c193bc2c599) - min=0.0001  max=40
+
+ioWBTC contract (io1fygqrjj7n8sy9lr2jdlky6cam7v7p0mx8s7mmh)
 
