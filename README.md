@@ -1,3 +1,5 @@
+![tests](https://github.com/iotexproject/ioTube/workflows/tests/badge.svg)
+
 <p align="center">
   <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px">
 </p>
