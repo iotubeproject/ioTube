@@ -1,4 +1,4 @@
-![tests](https://github.com/iotexproject/ioTube/workflows/tests/badge.svg)
+[![tests](https://github.com/iotexproject/ioTube/workflows/tests/badge.svg)](https://github.com/iotexproject/ioTube/actions?query=workflow%3Atests)
 
 <p align="center">
   <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px">
