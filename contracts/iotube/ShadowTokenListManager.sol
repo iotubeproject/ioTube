@@ -10,8 +10,8 @@ contract ShadowTokenListManager is Ownable {
         tokenList = TokenList(_addr);
     }
 
-    function addShadowToken(address _minter, address _coToken, string memory _name, string memory _symbol, uint256 _min, uint256 _max) public onlyOwner returns (bool success_) {
-        ShadowToken st = new ShadowToken(_minter, _coToken, _name, _symbol);
+    function addShadowToken(address _minter, address _coToken, string memory _name, string memory _symbol, uint8 _decimals, uint256 _min, uint256 _max) public onlyOwner returns (bool success_) {
+        ShadowToken st = new ShadowToken(_minter, _coToken, _name, _symbol, _decimals);
         return tokenList.addToken(address(st), _min, _max);
     }
 
