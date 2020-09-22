@@ -5,7 +5,7 @@ const {assertAsyncThrows} = require('./assert-async-throws');
 contract('TokenSafe', function([owner, miner, stranger, fakeTokenAddress]) {
     beforeEach(async function() {
         this.tokenSafe = await TokenSafe.new();
-        this.shadowToken = await ShadowToken.new(miner, fakeTokenAddress, "name", "symbol");
+        this.shadowToken = await ShadowToken.new(miner, fakeTokenAddress, "name", "symbol", 18);
         await this.shadowToken.mint(this.tokenSafe.address, 10000000000, {from: miner});
         assert.equal(await this.shadowToken.balanceOf(this.tokenSafe.address), 10000000000);
     });

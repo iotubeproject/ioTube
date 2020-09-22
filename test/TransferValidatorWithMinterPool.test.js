@@ -9,7 +9,7 @@ contract('TransferValidatorWithMinterPool', function([owner, minter, sender, rec
     beforeEach(async function() {
         this.minterPool = await MinterPool.new();
         // use shadow token as mintable erc20 token
-        this.shadowToken = await ShadowToken.new(this.minterPool.address, fakeTokenAddress, "name", "symbol");
+        this.shadowToken = await ShadowToken.new(this.minterPool.address, fakeTokenAddress, "name", "symbol", 18);
         this.tokenList = await TokenList.new();
         this.witnessList = await WitnessList.new();
         this.validator = await TransferValidatorWithMinterPool.new(this.minterPool.address, this.tokenList.address, this.witnessList.address);

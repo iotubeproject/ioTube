@@ -9,7 +9,7 @@ contract('TransferValidatorWithTokenSafe', function([owner, minter, sender, rece
     beforeEach(async function() {
         this.tokenSafe = await TokenSafe.new();
         // use shadow token as standard erc20 token
-        this.shadowToken = await ShadowToken.new(minter, fakeTokenAddress, "name", "symbol");
+        this.shadowToken = await ShadowToken.new(minter, fakeTokenAddress, "name", "symbol", 18);
         await this.shadowToken.mint(this.tokenSafe.address, 100000000, {from: minter});
         this.tokenList = await TokenList.new();
         this.witnessList = await WitnessList.new();
