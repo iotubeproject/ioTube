@@ -127,11 +127,4 @@ ioBUSD contract (io14nhfkywdfvl40evgsqnh43ev33q6he8yez8c8a)
 
 ioUNI contract (io1ahh04jn2zkqlug6feh7rpq75a75p3rj42hp4ch)
 
-4. LINK (0x514910771af9ca656af840dff83e8264ecf986ca) -  min=0.1 max=80000
-
-ioLINK contract (io1acu830g37t6ktzgh762lz8ff3xg39r0tv4enge)
-
-5. WBTC (0x2260fac5e5542a773aa44fbcfedf7c193bc2c599) - min=0.0001  max=40
-
-ioWBTC contract (io1fygqrjj7n8sy9lr2jdlky6cam7v7p0mx8s7mmh)
 
