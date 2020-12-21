@@ -83,7 +83,7 @@ func NewRecorder(store *db.SQLStore, recordTableName string) *Recorder {
 			MarkRecordAsSettled:   fmt.Sprintf("UPDATE %s SET status=%d WHERE token=? AND id=? AND status in (%d, %d, %d)", recordTableName, Settled, New, Submitted, Confirmed),
 			MarkRecordAsConfirmed: fmt.Sprintf("UPDATE %s SET status=%d WHERE token=? AND id=? AND status in (%d, %d)", recordTableName, Confirmed, New, Submitted),
 			MarkRecordAsSubmitted: fmt.Sprintf("UPDATE %s SET status=%d, txHash=? WHERE token=? AND id=? AND status=%d", recordTableName, Submitted, New),
-			MarkRecordAsFailed:    fmt.Sprintf("UPDATE %s SET status=%d WHERE token=? AND id=? AND status=%d", recordTableName, Failed, Submitted),
+			MarkRecordAsFailed:    fmt.Sprintf("UPDATE %s SET status=%d, txHash=? WHERE token=? AND id=? AND status=%d", recordTableName, Failed, Submitted),
 			ResetRecord:           fmt.Sprintf("UPDATE %s SET status=%d, txHash='' WHERE token=? AND id=? AND status in (%d, %d)", recordTableName, New, Submitted, Confirmed),
 			MaxIDs:                fmt.Sprintf("SELECT token, MAX(id) AS max_id FROM %s GROUP BY token", recordTableName),
 			PullRecordsToCheck:    fmt.Sprintf("SELECT token, id, sender, recipient, amount, txHash, updateTime FROM %s WHERE status in (%d, %d) ORDER BY creationTime", recordTableName, Submitted, Confirmed),
