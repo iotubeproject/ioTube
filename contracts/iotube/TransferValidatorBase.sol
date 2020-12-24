@@ -9,7 +9,7 @@ interface Allowlist {
 }
 
 contract TransferValidatorBase is Ownable, Pausable {
-    event WitnessSubmitted (
+    event WitnessSubmitted(
         address indexed token,
         uint256 indexed index,
         address indexed witness,
