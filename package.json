@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/iotexproject/IOTX-token-contracts#readme",
   "dependencies": {
+    "eth-lib": "^0.1.29",
     "truffle": "^5.0.22",
     "web3-utils": "^1.0.0-beta.55"
   }
