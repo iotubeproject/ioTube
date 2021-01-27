@@ -19,7 +19,7 @@ contract TransferValidatorWithTokenSafeV2 is TransferValidatorBaseV2 {
         return safe.withdrawToken(_token, _to, _amount);
     }
 
-    function upgrade(address _newValidator) public onlyOwner {
+    function upgrade(address _newValidator) external onlyOwner {
         safe.transferOwnership(_newValidator);
     }
 }

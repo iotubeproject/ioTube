@@ -1,12 +1,17 @@
 pragma solidity <6.0 >=0.4.24;
 
-import "./TokenList.sol";
 import "../lifecycle/Pausable.sol";
+
+interface ITokenList {
+    function isAllowed(address) external returns (bool);
+    function maxAmount(address) external returns (uint256);
+    function minAmount(address) external returns (uint256);
+}
 
 contract TokenCashierBaseV2 is Pausable {
     event Receipt(uint256 indexed id, address indexed token, address indexed receiver, address sender, uint256 amount, uint256 fee);
 
-    TokenList public tokenList;
+    ITokenList public tokenList;
     mapping(address => uint256) public counts;
     uint256 public depositFee;
 

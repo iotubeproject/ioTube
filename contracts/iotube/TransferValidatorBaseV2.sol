@@ -8,30 +8,26 @@ interface Allowlist {
 }
 
 contract TransferValidatorBaseV2 is Pausable {
-    event Settled(
-        address indexed token,
-        uint256 indexed index,
-        address from,
-        address to,
-        uint256 amount,
-        address[] witnesses);
+    event Settled(bytes32 indexed key, address[] witnesses);
 
     mapping(bytes32 => uint256) public settles;
 
     Allowlist public whitelistedTokens;
     Allowlist public whitelistedWitnesses;
     
-    function generateKey(address tokenAddr, uint256 index, address from, address to, uint256 amount) public view returns(bytes32) {
-        return keccak256(abi.encodePacked(address(this), tokenAddr, index, from, to, amount));
+    function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount) public view returns(bytes32) {
+        return keccak256(abi.encodePacked(address(this), cashier, tokenAddr, index, from, to, amount));
     }
 
     function withdrawToken(address _token, address _to, uint256 _amount) internal returns(bool);
 
-    function submit(address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory signatures) public whenNotPaused {
+    function upgrade(address _newValidator) external;
+
+    function submit(address tokenAddr, address cashier, uint256 index, address from, address to, uint256 amount, bytes memory signatures) public whenNotPaused {
         require(whitelistedTokens.isAllowed(tokenAddr), "not whitelisted tokens");
         require(amount != 0, "amount cannot be zero");
         require(signatures.length % 65 == 0, "invalid signature length");
-        bytes32 key = generateKey(tokenAddr, index, from, to, amount);
+        bytes32 key = generateKey(tokenAddr, cashier, index, from, to, amount);
         require(settles[key] == 0, "transfer has been settled");
         uint256 numOfSignatures = signatures.length / 65;
         address[] memory witnesses = new address[](numOfSignatures);
@@ -46,7 +42,7 @@ contract TransferValidatorBaseV2 is Pausable {
         require(numOfSignatures * 3 > whitelistedWitnesses.numOfActive() * 2, "insufficient witnesses");
         settles[key] = block.number;
         require(withdrawToken(tokenAddr, to, amount), "failed to withdraw");
-        emit Settled(tokenAddr, index, from, to, amount, witnesses);
+        emit Settled(key, witnesses);
     }
 
     /**

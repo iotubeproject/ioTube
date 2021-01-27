@@ -20,7 +20,7 @@ contract TransferValidatorWithMinterPoolV2 is TransferValidatorBaseV2 {
         return pool.mint(_token, _to, _amount);
     }
 
-    function upgrade(address _newValidator) public onlyOwner {
+    function upgrade(address _newValidator) external onlyOwner {
         pool.transferOwnership(_newValidator);
     }
 }

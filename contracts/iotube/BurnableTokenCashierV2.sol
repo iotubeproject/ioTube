@@ -11,7 +11,7 @@ interface BurnableToken {
 
 contract BurnableTokenCashierV2 is TokenCashierBaseV2 {
     constructor(address _tokenList) public {
-        tokenList = TokenList(_tokenList);
+        tokenList = ITokenList(_tokenList);
     }
 
     function transferToSafe(address _token, uint256 _amount) internal returns (bool) {

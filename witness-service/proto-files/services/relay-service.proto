@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package services;
+
+option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/services";
+
+import "witness-service/proto-files/types/witness.proto";
+
+service RelayService {
+    rpc Submit(types.Witness) returns (WitnessSubmissionResponse);
+    rpc Check(CheckTransferStatusRequest) returns (types.TransferStatus);
+}
+
+message CheckTransferStatusRequest {
+    bytes key = 1;
+}
+
+message WitnessSubmissionResponse {
+    bytes key = 1;
+    string statusCode = 2;
+}
