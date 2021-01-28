@@ -17,8 +17,8 @@ import (
 )
 
 type (
-	// TransferStatus type of transfer status
-	TransferStatus string
+	// ValidationStatus type of transfer validation status
+	ValidationStatus string
 	// Transfer defines a transfer structure
 	Transfer struct {
 		cashier    common.Address
@@ -31,7 +31,7 @@ type (
 		txHash     common.Hash
 		nonce      uint64
 		updateTime time.Time
-		status     TransferStatus
+		status     ValidationStatus
 	}
 	// Witness defines a witness structure
 	Witness struct {
@@ -42,21 +42,14 @@ type (
 
 const (
 	// TransferNew stands for a transfer which needs more valid witnesses
-	TransferNew TransferStatus = "new"
+	TransferNew ValidationStatus = "new"
 	// ValidationSubmitted stands for a transfer with validation submitted
 	ValidationSubmitted = "validated"
 	// TransferSettled stands for a transfer which has been settled
 	TransferSettled = "settled"
+	// ValidationFailed stands for the validation of a transfer failed
+	ValidationFailed = "failed"
 )
-
-// IsValid returns an error if the value is invalid
-func (ts TransferStatus) IsValid() error {
-	switch ts {
-	case TransferNew, ValidationSubmitted, TransferSettled:
-		return nil
-	}
-	return errors.New("Invalid transfer status")
-}
 
 // UnmarshalTransferProto unmarshals a transfer proto
 func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transfer) (*Transfer, error) {

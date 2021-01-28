@@ -44,10 +44,10 @@ type (
 const (
 	// TransferNew stands for a new transfer
 	TransferNew TransferStatus = "new"
-	// TransferWitnessed stands for a witnessed transfer
-	TransferWitnessed = "witnessed"
-	// WitnessConfirmed stands for a confirmed witness
-	WitnessConfirmed = "confirmed"
+	// WitnessSubmitted stands for a witnessed transfer
+	WitnessSubmitted = "submitted"
+	// SubmissionConfirmed stands for a confirmed witness
+	SubmissionConfirmed = "confirmed"
 	// TransferSettled stands for a settled transfer
 	TransferSettled = "settled"
 )

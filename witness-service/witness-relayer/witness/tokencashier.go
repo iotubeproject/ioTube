@@ -10,8 +10,6 @@ import (
 	"context"
 	"math/big"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iotexproject/go-ethereum/accounts/abi"
@@ -23,10 +21,6 @@ import (
 
 // TokenCashier maintains the list of witnesses and tokens
 type TokenCashier struct {
-	mu                      sync.RWMutex
-	lastUpdateTime          time.Time
-	gasPriceLimitOnEthereum *big.Int
-
 	iotexClient iotex.ReadOnlyClient
 }
 

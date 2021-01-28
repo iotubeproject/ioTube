@@ -161,7 +161,7 @@ func (s *service) process() error {
 			} else {
 				log.Printf("failed to submit transfer (%s, %s, %d)\n", transfer.cashier, transfer.token, transfer.index)
 			}
-		case WitnessConfirmed:
+		case SubmissionConfirmed:
 			response, err := relayer.Check(
 				context.Background(),
 				&services.CheckRequest{

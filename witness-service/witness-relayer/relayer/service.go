@@ -111,17 +111,25 @@ func (s *Service) process() error {
 		return err
 	}
 	for _, transfer := range validatedTransfers {
-		settled, err := s.transferValidator.IsSettled(transfer)
+		confirmed, rejected, reset, err := s.transferValidator.Check(transfer)
 		if err != nil {
 			return err
 		}
-		if settled {
-			if err := s.recorder.MarkAsSettled(transfer.id); err != nil {
+		if !confirmed {
+			continue
+		}
+		switch {
+		case rejected:
+			if err := s.recorder.MarkAsFailed(transfer.id); err != nil {
 				return err
 			}
-		} else {
-			// TODO: check transaction status
+		case reset:
+			// nonce has been overwritten
 			if err := s.recorder.Reset(transfer.id); err != nil {
+				return err
+			}
+		default:
+			if err := s.recorder.MarkAsSettled(transfer.id); err != nil {
 				return err
 			}
 		}
@@ -140,14 +148,16 @@ func (s *Service) process() error {
 			return err
 		}
 		signatures := []byte{}
+		numOfValidSignatures := 0
 		for _, witness := range witnesses {
 			if !s.transferValidator.IsActiveWitness(witness.addr) {
 				log.Printf("Warning: %s is not an active witness\n", witness.addr.Hex())
 				continue
 			}
 			signatures = append(signatures, witness.signature...)
+			numOfValidSignatures++
 		}
-		if len(signatures)/130*3 > numOfActiveWitnesses*2 {
+		if numOfValidSignatures*3 > numOfActiveWitnesses*2 {
 			txHash, nonce, err := s.transferValidator.Submit(transfer, signatures)
 			if err != nil {
 				return err

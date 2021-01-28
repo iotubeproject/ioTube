@@ -137,9 +137,41 @@ func (tv *TransferValidator) NumOfActiveWitnesses() int {
 	return len(tv.witnesses)
 }
 
-// IsSettled returns true if a transfer has been settled
-func (tv *TransferValidator) IsSettled(transfer *Transfer) (bool, error) {
-	return true, nil
+// Check returns true if a transfer has been settled
+func (tv *TransferValidator) Check(transfer *Transfer) (confirmed bool, success bool, reset bool, err error) {
+	pendingNonce, err := tv.pendingNonce()
+	if err != nil {
+		return false, false, false, err
+	}
+	header, err := tv.client.HeaderByNumber(context.Background(), nil)
+	if err != nil {
+		return false, false, false, err
+	}
+	settleHeight, err := tv.validatorContract.Settles(&bind.CallOpts{}, transfer.id)
+	if err != nil {
+		return false, false, false, err
+	}
+	if settleHeight.Cmp(big.NewInt(0)) > 0 {
+		if new(big.Int).Add(settleHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
+			return false, false, false, nil
+		}
+		return true, true, false, err
+	}
+	r, err := tv.client.TransactionReceipt(context.Background(), transfer.txHash)
+	if err != nil {
+		return false, false, false, err
+	}
+	if r != nil {
+		if new(big.Int).Add(r.BlockNumber, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
+			return false, false, false, nil
+		}
+		// no matter what the receipt status is, mark the validation as failure
+		return true, false, false, nil
+	}
+	if transfer.nonce < pendingNonce {
+		return true, true, true, nil
+	}
+	return false, false, false, nil
 }
 
 // Submit submits validation for a transfer

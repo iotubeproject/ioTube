@@ -227,7 +227,7 @@ func (recorder *Recorder) Transaction(id common.Hash) (*Transfer, error) {
 }
 
 // Transfers returns the list of records of given status
-func (recorder *Recorder) Transfers(status TransferStatus, limit uint8) ([]*Transfer, error) {
+func (recorder *Recorder) Transfers(status ValidationStatus, limit uint8) ([]*Transfer, error) {
 	query := recorder.queryTransfersByStatus
 	if limit != 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, limit)
@@ -270,6 +270,16 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, no
 // MarkAsSettled marks a record as settled
 func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
 	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, TransferSettled, id.Hex(), ValidationSubmitted)
+	if err != nil {
+		return err
+	}
+
+	return recorder.validateResult(result)
+}
+
+// MarkAsFailed marks a record as failed
+func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, ValidationFailed, id.Hex(), ValidationSubmitted)
 	if err != nil {
 		return err
 	}
