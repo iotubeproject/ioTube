@@ -336,12 +336,14 @@ func (auth *Auth) Refresh() error {
 	auth.mu.Lock()
 	defer auth.mu.Unlock()
 	auth.lastUpdateTime = time.Now()
+	auth.witnessesOnIoTeX = make(map[string]bool)
 	str := "auth data refreshed\n  Witnesses on IoTeX"
 	for _, w := range witnessesOnIoTeX {
 		str += "\n    " + w.String()
 		auth.witnessesOnIoTeX[w.String()] = true
 	}
 	str += "\n  Witnesses on Ethereum"
+	auth.witnessesOnEthereum = make(map[string]bool)
 	for _, w := range witnessesOnEth {
 		str += "\n    " + w.String()
 		auth.witnessesOnEthereum[w.String()] = true
@@ -365,11 +367,11 @@ func (auth *Auth) IsActiveWitnessOnIoTeX(witness address.Address) bool {
 }
 
 // IsActiveWitnessOnEthereum returns true if the input address is an active witness on Ethereum
-func (auth *Auth) IsActiveWitnessOnEthereum() bool {
+func (auth *Auth) IsActiveWitnessOnEthereum(witness common.Address) bool {
 	auth.mu.RLock()
 	defer auth.mu.RUnlock()
 
-	return auth.witnessesOnEthereum[auth.witnessAddressOnEthereum.String()]
+	return auth.witnessesOnEthereum[witness.Hex()]
 }
 
 // CorrespondingXrc20Token returns the corresponding Xrc20 token address on IoTeX

@@ -8,14 +8,27 @@ import "witness-service/proto-files/types/witness.proto";
 
 service RelayService {
     rpc Submit(types.Witness) returns (WitnessSubmissionResponse);
-    rpc Check(CheckTransferStatusRequest) returns (types.TransferStatus);
+    rpc Check(CheckRequest) returns (CheckResponse);
 }
 
-message CheckTransferStatusRequest {
+message CheckRequest {
+    bytes id = 1;
+}
+
+message CheckResponse {
     bytes key = 1;
+    repeated bytes witnesses = 2;
+    bytes txHash = 3;
+    enum Status {
+        UNKNOWN = 0;
+        CREATED = 1;
+        SUBMITTED = 2;
+        SETTLED = 3;
+    }
+    Status status = 4;
 }
 
 message WitnessSubmissionResponse {
-    bytes key = 1;
-    string statusCode = 2;
+    bytes id = 1;
+    bool success = 2;
 }

@@ -9,7 +9,7 @@ interface ITokenList {
 }
 
 contract TokenCashierBaseV2 is Pausable {
-    event Receipt(uint256 indexed id, address indexed token, address indexed receiver, address sender, uint256 amount, uint256 fee);
+    event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee);
 
     ITokenList public tokenList;
     mapping(address => uint256) public counts;
@@ -33,7 +33,7 @@ contract TokenCashierBaseV2 is Pausable {
         require(_amount <= tokenList.maxAmount(_token), "amount too high");
         require(transferToSafe(_token, _amount), "failed to put into safe");
         counts[_token] += 1;
-        emit Receipt(counts[_token], _token, _to, msg.sender, _amount, msg.value);
+        emit Receipt(_token, counts[_token], msg.sender, _to, _amount, msg.value);
     }
 
     function deposit(address _token, uint256 _amount) public payable {

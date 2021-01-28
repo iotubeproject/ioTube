@@ -7,9 +7,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"net"
 	"os"
 	"strconv"
@@ -19,9 +21,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
-	"github.com/iotexproject/ioTube/witness-service/relayer"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/witness-relayer/relayer"
 )
 
 // Configuration defines the configuration of the witness service
@@ -34,6 +40,9 @@ type Configuration struct {
 	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
+	DatabaseURL           string        `json:"databaseURL" yaml:"databaseURL"`
+	TransferTableName     string        `json:"transferTableName" yaml:"transferTableName"`
+	WitnessTableName      string        `json:"witnessTableName" yaml:"witnessTableName"`
 }
 
 var defaultConfig = Configuration{
@@ -44,6 +53,8 @@ var defaultConfig = Configuration{
 	Port:                  8080,
 	PrivateKey:            "",
 	SlackWebHook:          "",
+	TransferTableName:     "transfers",
+	WitnessTableName:      "witnesses",
 }
 
 var configFile = flag.String("config", "", "path of config file")
@@ -85,9 +96,21 @@ func main() {
 	if client, ok := os.LookupEnv("RELAYER_ETH_CLIENT_URL"); ok {
 		cfg.EthClientURL = client
 	}
+	ethClient, err := ethclient.Dial(cfg.EthClientURL)
+	if err != nil {
+		log.Fatalf("failed to create eth client %v", err)
+	}
 	if pk, ok := os.LookupEnv("RELAYER_PRIVATE_KEY"); ok {
 		cfg.PrivateKey = pk
 	}
+	privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
+	if err != nil {
+		log.Fatalf("failed to decode private key %v", err)
+	}
+	if validatorAddr, ok := os.LookupEnv("RELAYER_VALIDATOR_ADDRESS"); ok {
+		cfg.ValidatorAddress = validatorAddr
+	}
+	// TODO: load more parameters from env
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
@@ -97,8 +120,33 @@ func main() {
 		log.Fatalf("failed to listen to port: %v\n", err)
 	}
 	grpcServer := grpc.NewServer()
-	log.Println("Creating server")
-	services.RegisterRelayServiceServer(grpcServer, relayer.NewService())
+	log.Println("Creating service")
+	transferValidator, err := relayer.NewTransferValidator(
+		ethClient,
+		privateKey,
+		cfg.EthConfirmBlockNumber,
+		new(big.Int).SetUint64(cfg.EthGasPriceLimit),
+		common.HexToAddress(cfg.ValidatorAddress),
+	)
+	if err != nil {
+		log.Fatalf("failed to create transfer validator: %v\n", err)
+	}
+	service, err := relayer.NewService(
+		transferValidator,
+		relayer.NewRecorder(
+			db.NewStore("mysql", cfg.DatabaseURL),
+			cfg.TransferTableName,
+			cfg.WitnessTableName,
+		),
+	)
+	if err != nil {
+		log.Fatalf("failed to create relay service: %v\n", err)
+	}
+	if err := service.Start(context.Background()); err != nil {
+		log.Fatalf("failed to start relay service: %v\n", err)
+	}
+	defer service.Stop(context.Background())
+	services.RegisterRelayServiceServer(grpcServer, service)
 	log.Println("Registering...")
 	reflection.Register(grpcServer)
 	log.Println("Serving...")

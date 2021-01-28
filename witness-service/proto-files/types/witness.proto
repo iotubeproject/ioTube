@@ -5,22 +5,16 @@ package types;
 option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/types";
 
 message Transfer {
-    string cashier = 1;
-    string token = 2;
-    int64 id = 3;
-    string sender = 4;
-    string receiver = 5;
+    bytes cashier = 1;
+    bytes token = 2;
+    int64 index = 3;
+    bytes sender = 4;
+    bytes recipient = 5;
     string amount = 6;
-}
-
-message TransferStatus {
-    bytes key = 1;
-    repeated string witnesses = 2;
-    bytes txhash = 3;
 }
 
 message Witness {
     Transfer transfer = 1;
-    string address = 2;
-    string signature = 3;
+    bytes address = 2;
+    bytes signature = 3;
 }

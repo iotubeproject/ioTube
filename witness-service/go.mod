@@ -7,6 +7,7 @@ require (
 	github.com/ethereum/go-ethereum v1.9.19
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/golang/protobuf v1.4.2
+	github.com/iotexproject/go-ethereum v1.7.3
 	github.com/iotexproject/go-pkgs v0.1.2-0.20200523040337-5f1d9ddaa8ee
 	github.com/iotexproject/iotex-address v0.2.2
 	github.com/iotexproject/iotex-antenna-go/v2 v2.4.0

@@ -45,7 +45,7 @@ func NewWitnessOnEthereum(
 }
 
 func (w *witnessOnEthereum) IsQualifiedWitness() bool {
-	return w.auth.IsActiveWitnessOnEthereum()
+	return w.auth.IsActiveWitnessOnEthereum(w.validatorAddress)
 }
 
 func (w *witnessOnEthereum) TokensToWatch() []string {

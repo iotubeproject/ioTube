@@ -23,7 +23,7 @@ contract TransferValidatorBaseV2 is Pausable {
 
     function upgrade(address _newValidator) external;
 
-    function submit(address tokenAddr, address cashier, uint256 index, address from, address to, uint256 amount, bytes memory signatures) public whenNotPaused {
+    function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory signatures) public whenNotPaused {
         require(whitelistedTokens.isAllowed(tokenAddr), "not whitelisted tokens");
         require(amount != 0, "amount cannot be zero");
         require(signatures.length % 65 == 0, "invalid signature length");
