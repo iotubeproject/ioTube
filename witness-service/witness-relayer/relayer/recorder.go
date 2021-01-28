@@ -57,8 +57,8 @@ func NewRecorder(store *db.SQLStore, transferTableName string, witnessTableName 
 		witnessTableName:                witnessTableName,
 		updateStatusQuery:               fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=? AND `status`=?", transferTableName),
 		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `nonce`=? WHERE `id`=? AND `status`=?", transferTableName),
-		queryTransfersByStatus:          fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `status`, `updateTime` FROM `%s` WHERE `status`=? ORDER BY `creationTime`", transferTableName),
-		queryTransferByID:               fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `status`, `updateTime` FROM `%s` WHERE `id`=?`", transferTableName),
+		queryTransfersByStatus:          fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime`", transferTableName),
+		queryTransferByID:               fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `status`, `updateTime` FROM %s WHERE `id`=?", transferTableName),
 		queryWitnesses:                  fmt.Sprintf("SELECT `witness`, `signature` FROM `%s` WHERE `transferId`=?", transferTableName),
 	}
 }
@@ -87,7 +87,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 		return errors.Wrap(err, "failed to create database")
 	}
 	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS `%s` ("+
+		"CREATE TABLE IF NOT EXISTS %s ("+
 			"`cashier` varchar(42) NOT NULL,"+
 			"`token` varchar(42) NOT NULL,"+
 			"`tidx` bigint(20) NOT NULL,"+
@@ -102,17 +102,21 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`nonce` bigint(20),"+
 			"`notes` varchar(45) DEFAULT NULL,"+
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
-			"UNIQUE KEY `ukey_UNIQUE` (`id`),"+
+			"UNIQUE KEY `id_UNIQUE` (`id`),"+
+			"KEY `cashier_index` (`cashier`),"+
+			"KEY `token_index` (`token`),"+
+			"KEY `sender_index` (`sender`),"+
+			"KEY `recipient_index` (`recipient`),"+
 			"KEY `status_index` (`status`),"+
 			"KEY `txHash_index` (`txHash`)"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
 		recorder.transferTableName,
 		TransferNew,
 	)); err != nil {
-		return errors.Wrap(err, "failed to create record table")
+		return errors.Wrap(err, "failed to create transfer table")
 	}
 	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS `%s` ("+
+		"CREATE TABLE IF NOT EXISTS %s ("+
 			"`transferId` varchar(66) NOT NULL,"+
 			"`witness` varchar(42) NOT NULL,"+
 			"`signature` varchar(132) NOT NULL,"+
@@ -206,10 +210,9 @@ func (recorder *Recorder) Witnesses(id common.Hash) ([]*Witness, error) {
 	return witnesses, nil
 }
 
-// Transaction returns the validation tx related information of a given transfer
-func (recorder *Recorder) Transaction(id common.Hash) (*Transfer, error) {
-	query := recorder.queryTransferByID
-	row := recorder.store.DB().QueryRow(query, id.Hex())
+// Transfer returns the validation tx related information of a given transfer
+func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
+	row := recorder.store.DB().QueryRow(recorder.queryTransferByID, id.Hex())
 	tx := &Transfer{}
 	var rawAmount string
 	var hash sql.NullString
@@ -233,7 +236,7 @@ func (recorder *Recorder) Transfers(status ValidationStatus, limit uint8) ([]*Tr
 	if limit != 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, limit)
 	}
-	rows, err := recorder.store.DB().Query(query)
+	rows, err := recorder.store.DB().Query(query, status)
 	if err != nil {
 		return nil, err
 	}

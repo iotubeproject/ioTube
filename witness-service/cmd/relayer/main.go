@@ -53,8 +53,8 @@ var defaultConfig = Configuration{
 	Port:                  8080,
 	PrivateKey:            "",
 	SlackWebHook:          "",
-	TransferTableName:     "transfers",
-	WitnessTableName:      "witnesses",
+	TransferTableName:     "relayer.transfers",
+	WitnessTableName:      "relayer.witnesses",
 }
 
 var configFile = flag.String("config", "", "path of config file")

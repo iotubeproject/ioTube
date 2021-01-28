@@ -53,7 +53,7 @@ func (s *Service) Stop(ctx context.Context) error {
 
 // Submit accepts a submission of witness
 func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
-	log.Println("receive a witness")
+	log.Printf("receive a witness from %x\n", w.Address)
 	transfer, err := s.transferValidator.UnmarshalTransferProto(w.Transfer)
 	if err != nil {
 		return nil, err
@@ -70,9 +70,9 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 
 // Check checks the status of a transfer
 func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*services.CheckResponse, error) {
-	log.Println("check transfer status")
+	log.Printf("check status of transfer %x\n", request.Id)
 	id := common.BytesToHash(request.Id)
-	transfer, err := s.recorder.Transaction(id)
+	transfer, err := s.recorder.Transfer(id)
 	if err != nil {
 		return nil, err
 	}
