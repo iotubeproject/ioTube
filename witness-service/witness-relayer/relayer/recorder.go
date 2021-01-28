@@ -97,7 +97,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`id` varchar(66) NOT NULL,"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
-			"`status` varchar(10) NOT NULL DEFAULT 'NEW',"+
+			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
 			"`txHash` varchar(66) DEFAULT NULL,"+
 			"`nonce` bigint(20),"+
 			"`notes` varchar(45) DEFAULT NULL,"+
@@ -107,6 +107,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"KEY `txHash_index` (`txHash`)"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
 		recorder.transferTableName,
+		TransferNew,
 	)); err != nil {
 		return errors.Wrap(err, "failed to create record table")
 	}

@@ -58,7 +58,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`amount` varchar(78) NOT NULL,"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
-			"`status` varchar(10) NOT NULL DEFAULT 'new',"+
+			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
 			"`id` varchar(132) NOT NULL UNIQUE,"+
 			"`signature` varchar(132) NOT NULL,"+
 			"`blockHeight` bigint(20) NOT NULL,"+
@@ -74,6 +74,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"KEY `blockHeight_index` (`blockHeight`)"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
 		recorder.transferTableName,
+		TransferNew,
 	)); err != nil {
 		return errors.Wrapf(err, "failed to create table %s", recorder.transferTableName)
 	}
@@ -126,7 +127,7 @@ func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
 		toIoTeXAddress(tx.cashier),
 		toIoTeXAddress(tx.token),
 		tx.index,
-		WitnessConfirmed,
+		SubmissionConfirmed,
 	)
 	if err != nil {
 		return err
@@ -139,7 +140,7 @@ func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
 func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
-		WitnessConfirmed,
+		SubmissionConfirmed,
 		tx.id.Hex(),
 		toIoTeXAddress(tx.cashier),
 		toIoTeXAddress(tx.token),
@@ -158,7 +159,7 @@ func (recorder *Recorder) TransfersNotSettled() ([]*Transfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `status`, `id` FROM %s WHERE `status` in (?, ?) ORDER BY `creationTime`", recorder.transferTableName),
 		TransferNew,
-		WitnessConfirmed,
+		SubmissionConfirmed,
 	)
 	if err != nil {
 		return nil, err

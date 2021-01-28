@@ -22,13 +22,14 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/iotexproject/ioTube/witness-service/witness-relayer/witness"
+	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
 )
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	IoTeXApiURL              string        `json:"iotexApiURL" yaml:"iotexApiURL"`
+	IoTeXClient              string        `json:"iotexClient" yaml:"iotexClient"`
 	RelayerURL               string        `json:"relayerURL" yaml:"relayerURL"`
 	PrivateKey               string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook             string        `json:"slackWebHook" yaml:"slackWebHook"`
@@ -48,8 +49,8 @@ var defaultConfig = Configuration{
 	BatchSize:                100,
 	PrivateKey:               "",
 	SlackWebHook:             "",
-	IoTeXApiURL:              "api.iotex.one:443",
-	TransferTableName:        "transfers",
+	IoTeXClient:              "api.iotex.one:443",
+	TransferTableName:        "witness.transfers",
 	ValidatorContractAddress: "",
 	CashierContractAddress:   "",
 }
@@ -93,7 +94,11 @@ func main() {
 	}
 	privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
 	if err != nil {
-		log.Fatalf("failed to decode private key %v", err)
+		log.Fatalf("failed to decode private key %v\n", err)
+	}
+	// TODO: load more parameters from env
+	if cfg.SlackWebHook != "" {
+		util.SetSlackURL(cfg.SlackWebHook)
 	}
 	if validatorAddr, ok := os.LookupEnv("WITNESS_VALIDATOR_CONTRACT_ADDRESS"); ok {
 		cfg.ValidatorContractAddress = validatorAddr
@@ -101,23 +106,26 @@ func main() {
 	if cashierAddr, ok := os.LookupEnv("WITNESS_CASHIER_CONTRACT_ADDRESS"); ok {
 		cfg.CashierContractAddress = cashierAddr
 	}
-	// TODO: load more parameters from env
-	if cfg.SlackWebHook != "" {
-		util.SetSlackURL(cfg.SlackWebHook)
+	cashierAddr, err := address.FromString(cfg.CashierContractAddress)
+	if err != nil {
+		log.Fatalf("failed to parse cashier address %v\n", err)
 	}
 	if url, ok := os.LookupEnv("WITNESS_IOTEX_API_URL"); ok {
-		cfg.IoTeXApiURL = url
+		cfg.IoTeXClient = url
 	}
-	conn, err := iotex.NewDefaultGRPCConn(cfg.IoTeXApiURL)
+	conn, err := iotex.NewDefaultGRPCConn(cfg.IoTeXClient)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-	client := iotex.NewReadOnlyClient(iotexapi.NewAPIServiceClient(conn))
+	cashier, err := witness.NewTokenCashier(cashierAddr, iotex.NewReadOnlyClient(iotexapi.NewAPIServiceClient(conn)))
+	if err != nil {
+		log.Fatalf("failed to create cashier %v\n", err)
+	}
 	service, err := witness.NewService(
 		cfg.RelayerURL,
 		common.HexToAddress(cfg.ValidatorContractAddress),
-		witness.NewTokenCashier(client),
+		cashier,
 		witness.NewRecorder(
 			db.NewStore("mysql", cfg.DatabaseURL),
 			cfg.TransferTableName,
@@ -128,10 +136,10 @@ func main() {
 		cfg.ProcessInterval,
 	)
 	if err != nil {
-		log.Fatalf("failed to create relay service: %v\n", err)
+		log.Fatalf("failed to create witness service: %v\n", err)
 	}
 	if err := service.Start(context.Background()); err != nil {
-		log.Fatalf("failed to start relay service: %v\n", err)
+		log.Fatalf("failed to start witness service: %v\n", err)
 	}
 	defer service.Stop(context.Background())
 	log.Println("Serving...")

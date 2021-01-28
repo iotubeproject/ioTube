@@ -7,7 +7,9 @@
 package witness
 
 import (
+	"bytes"
 	"context"
+	"log"
 	"math/big"
 	"strings"
 
@@ -17,16 +19,29 @@ import (
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
+	"github.com/pkg/errors"
 )
 
 // TokenCashier maintains the list of witnesses and tokens
 type TokenCashier struct {
-	iotexClient iotex.ReadOnlyClient
+	cashierContractAddr address.Address
+	iotexClient         iotex.ReadOnlyClient
+	tokenCashierABI     abi.ABI
 }
 
+const eventName = "Receipt"
+
 // NewTokenCashier creates a new TokenCashier
-func NewTokenCashier(iotexClient iotex.ReadOnlyClient) *TokenCashier {
-	return &TokenCashier{iotexClient: iotexClient}
+func NewTokenCashier(cashierContractAddr address.Address, iotexClient iotex.ReadOnlyClient) (*TokenCashier, error) {
+	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierV2ABI))
+	if err != nil {
+		return nil, err
+	}
+	return &TokenCashier{
+		cashierContractAddr: cashierContractAddr,
+		iotexClient:         iotexClient,
+		tokenCashierABI:     tokenCashierABI,
+	}, nil
 }
 
 type receipt struct {
@@ -39,25 +54,43 @@ type receipt struct {
 }
 
 // FetchTransfers fetches transfers by query token cashier receipts
-func (tc *TokenCashier) FetchTransfers(start uint64, end uint64) ([]*Transfer, error) {
-	response, err := tc.iotexClient.API().GetLogs(context.Background(), &iotexapi.GetLogsRequest{})
+func (tc *TokenCashier) FetchTransfers(offset uint64, count uint16) ([]*Transfer, error) {
+	topicToFilter := tc.tokenCashierABI.Events[eventName].Id().Bytes()
+	log.Printf("fetching events from block %d\n", offset)
+	response, err := tc.iotexClient.API().GetLogs(context.Background(), &iotexapi.GetLogsRequest{
+		Filter: &iotexapi.LogsFilter{
+			Address: []string{tc.cashierContractAddr.String()},
+			Topics: []*iotexapi.Topics{
+				{
+					Topic: [][]byte{
+						topicToFilter,
+					},
+				},
+			},
+		},
+		Lookup: &iotexapi.GetLogsRequest_ByRange{
+			ByRange: &iotexapi.GetLogsByRange{
+				FromBlock: offset,
+				// TODO: this is a bug, which should be fixed in iotex-core
+				Count: offset + uint64(count),
+			},
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("\t%d transfers fetched", len(response.Logs))
 	transfers := []*Transfer{}
-	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierV2ABI))
-	if err != nil {
-		return nil, err
-	}
-
 	for _, log := range response.Logs {
 		cashier, err := address.FromString(log.ContractAddress)
 		if err != nil {
 			return nil, err
 		}
 		var r receipt
-		// TODO: verify topics[0]
-		if err := tokenCashierABI.Unpack(&r, "Receipt", log.Data); err != nil {
+		if bytes.Compare(topicToFilter, log.Topics[0]) != 0 {
+			return nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], topicToFilter)
+		}
+		if err := tc.tokenCashierABI.Unpack(&r, eventName, log.Data); err != nil {
 			return nil, err
 		}
 		transfers = append(transfers, &Transfer{

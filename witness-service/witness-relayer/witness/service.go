@@ -103,11 +103,11 @@ func (s *service) collect() error {
 	if tipHeight < s.lastProcessBlockHeight {
 		tipHeight = s.lastProcessBlockHeight
 	}
-	transfers, err := s.cashier.FetchTransfers(tipHeight, tipHeight+uint64(s.batchSize))
+	transfers, err := s.cashier.FetchTransfers(tipHeight, s.batchSize)
 	if err != nil {
 		return err
 	}
-	s.lastProcessBlockHeight = tipHeight + uint64(s.batchSize)
+	s.lastProcessBlockHeight = tipHeight + uint64(s.batchSize) - 1
 	for _, transfer := range transfers {
 		if transfer.id, transfer.signature, err = s.sign(transfer); err != nil {
 			return err
