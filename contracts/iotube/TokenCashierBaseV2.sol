@@ -25,6 +25,18 @@ contract TokenCashierBaseV2 is Pausable {
 
     function transferToSafe(address _token, uint256 _amount) internal returns (bool);
 
+    function safeTransferFrom(address _token, address _from, address _to, uint256 _amount) internal returns (bool) {
+        // selector = bytes4(keccak256(bytes('transferFrom(address,address,uint256)')))
+        (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0x23b872dd, _from, _to, _amount));
+        return success && (data.length == 0 || abi.decode(data, (bool)));
+    }
+
+    function safeTransfer(address _token, address _to, uint256 _amount) internal returns (bool) {
+        // selector = bytes4(keccak256(bytes('transfer(address,uint256)')))
+        (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0xa9059cbb, _to, _amount));
+        return success && (data.length == 0 || abi.decode(data, (bool)));
+    }
+
     function depositTo(address _token, address _to, uint256 _amount) public whenNotPaused payable {
         require(tokenList.isAllowed(_token), "token is not in list");
         require(_to != address(0), "invalid destination");
@@ -46,5 +58,15 @@ contract TokenCashierBaseV2 is Pausable {
 
     function withdraw() external onlyOwner {
         msg.sender.transfer(address(this).balance);
+    }
+
+    function withdrawToken(address _token) public onlyOwner {
+        // selector = bytes4(keccak256(bytes('balanceOf(address)')))
+        (bool success, bytes memory balance) = _token.call(abi.encodeWithSelector(0x70a08231, address(this)));
+        require(success, "failed to call balanceOf");
+        uint256 bal = abi.decode(balance, (uint256));
+        if (bal > 0) {
+            require(safeTransfer(_token, msg.sender, bal), "failed to withdraw token");
+        }
     }
 }
