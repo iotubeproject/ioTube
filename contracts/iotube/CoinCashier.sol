@@ -6,18 +6,18 @@ interface TokenCashier {
     function depositTo(address _token, address _to, uint256 _amount) external payable;
 }
 
-interface WrappedEther {
+interface WrappedCoin {
     function approve(address _user, uint _amount) external returns (bool);
     function deposit() external payable;
 }
 
 contract EthCashier is Ownable {
     TokenCashier public tokenCashier;
-    WrappedEther public wrappedEther;
+    WrappedCoin public wrappedCoin;
 
-    constructor(address _tokenCashier, address _wrappedEther) public {
+    constructor(address _tokenCashier, address _wrappedCoin) public {
         tokenCashier = TokenCashier(_tokenCashier);
-        wrappedEther = WrappedEther(_wrappedEther);
+        wrappedCoin = WrappedCoin(_wrappedCoin);
     }
 
     function deposit() public payable {
@@ -25,9 +25,9 @@ contract EthCashier is Ownable {
     }
 
     function depositTo(address _to) public payable {
-        wrappedEther.deposit.value(msg.value)();
-        require(wrappedEther.approve(address(tokenCashier), msg.value), "approve failure");
-        tokenCashier.depositTo(address(wrappedEther), _to, msg.value);
+        wrappedCoin.deposit.value(msg.value)();
+        require(wrappedCoin.approve(address(tokenCashier), msg.value), "approve failure");
+        tokenCashier.depositTo(address(wrappedCoin), _to, msg.value);
     }
 
     function upgrade(address _newTokenCashier) public onlyOwner {

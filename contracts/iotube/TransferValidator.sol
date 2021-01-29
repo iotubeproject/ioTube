@@ -7,42 +7,64 @@ interface Allowlist {
     function numOfActive() external view returns (uint256);
 }
 
-contract TransferValidatorBaseV2 is Pausable {
+interface Minter {
+    function mint(address, address, uint256) external returns(bool);
+    function transferOwnership(address) external;
+}
+
+contract TransferValidator is Pausable {
     event Settled(bytes32 indexed key, address[] witnesses);
 
     mapping(bytes32 => uint256) public settles;
 
-    Allowlist public whitelistedTokens;
-    Allowlist public whitelistedWitnesses;
+    Minter[] public minters;
+    Allowlist[] public tokenLists;
+    Allowlist public witnessList;
     
+    constructor(Minter[] memory _minters, Allowlist[] memory _tokenLists, Allowlist _witnessList) public {
+        require(_minters.length == _tokenLists.length, "# of minters is not equal to # of token lists");
+        minters = _minters;
+        tokenLists = _tokenLists;
+        witnessList = _witnessList;
+    }
+
     function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount) public view returns(bytes32) {
         return keccak256(abi.encodePacked(address(this), cashier, tokenAddr, index, from, to, amount));
     }
 
-    function withdrawToken(address _token, address _to, uint256 _amount) internal returns(bool);
-
-    function upgrade(address _newValidator) external;
+    function upgrade(address _newValidator) external onlyOwner {
+        for (uint256 i = 0; i < minters.length; i++) {
+            minters[i].transferOwnership(_newValidator);
+        }
+    }
 
     function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory signatures) public whenNotPaused {
-        require(whitelistedTokens.isAllowed(tokenAddr), "not whitelisted tokens");
         require(amount != 0, "amount cannot be zero");
+        require(to != address(0), "recipient cannot be zero");
         require(signatures.length % 65 == 0, "invalid signature length");
         bytes32 key = generateKey(cashier, tokenAddr, index, from, to, amount);
         require(settles[key] == 0, "transfer has been settled");
-        uint256 numOfSignatures = signatures.length / 65;
-        address[] memory witnesses = new address[](numOfSignatures);
-        for (uint256 i = 0; i < numOfSignatures; i++) {
-            address witness = recover(key, signatures, i * 65);
-            require(whitelistedWitnesses.isAllowed(witness), "invalid signature");
-            for (uint256 j = 0; j < i; j++) {
-                require(witness != witnesses[j], "duplicate witness");
+        for (uint256 im = 0; im < minters.length; im++) {
+            if (tokenLists[im].isAllowed(tokenAddr)) {
+                uint256 numOfSignatures = signatures.length / 65;
+                address[] memory witnesses = new address[](numOfSignatures);
+                for (uint256 i = 0; i < numOfSignatures; i++) {
+                    address witness = recover(key, signatures, i * 65);
+                    require(witnessList.isAllowed(witness), "invalid signature");
+                    for (uint256 j = 0; j < i; j++) {
+                        require(witness != witnesses[j], "duplicate witness");
+                    }
+                    witnesses[i] = witness;
+                }
+                require(numOfSignatures * 3 > witnessList.numOfActive() * 2, "insufficient witnesses");
+                settles[key] = block.number;
+                require(minters[im].mint(tokenAddr, to, amount), "failed to mint token");
+                emit Settled(key, witnesses);
+
+                return;
             }
-            witnesses[i] = witness;
         }
-        require(numOfSignatures * 3 > whitelistedWitnesses.numOfActive() * 2, "insufficient witnesses");
-        settles[key] = block.number;
-        require(withdrawToken(tokenAddr, to, amount), "failed to withdraw");
-        emit Settled(key, witnesses);
+        revert("not a whitelisted token");
     }
 
     /**
