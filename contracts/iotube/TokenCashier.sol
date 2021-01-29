@@ -50,6 +50,7 @@ contract TokenCashier is Pausable {
                 }
                 counts[_token] += 1;
                 emit Receipt(_token, counts[_token], msg.sender, _to, _amount, msg.value);
+                return;
             }
         }
         revert("not a whitelisted token");
