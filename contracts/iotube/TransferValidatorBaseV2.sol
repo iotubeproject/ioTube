@@ -27,7 +27,7 @@ contract TransferValidatorBaseV2 is Pausable {
         require(whitelistedTokens.isAllowed(tokenAddr), "not whitelisted tokens");
         require(amount != 0, "amount cannot be zero");
         require(signatures.length % 65 == 0, "invalid signature length");
-        bytes32 key = generateKey(tokenAddr, cashier, index, from, to, amount);
+        bytes32 key = generateKey(cashier, tokenAddr, index, from, to, amount);
         require(settles[key] == 0, "transfer has been settled");
         uint256 numOfSignatures = signatures.length / 65;
         address[] memory witnesses = new address[](numOfSignatures);
