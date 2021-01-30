@@ -96,18 +96,18 @@ func (s *service) sign(transfer *Transfer) (common.Hash, []byte, error) {
 }
 
 func (s *service) collect() error {
-	tipHeight, err := s.recorder.TipHeight()
+	tipHeightInRecorder, err := s.recorder.TipHeight()
 	if err != nil {
 		return err
 	}
-	if tipHeight < s.lastProcessBlockHeight {
-		tipHeight = s.lastProcessBlockHeight
+	if tipHeightInRecorder < s.lastProcessBlockHeight {
+		tipHeightInRecorder = s.lastProcessBlockHeight
 	}
-	transfers, err := s.cashier.FetchTransfers(tipHeight, s.batchSize)
+	lastProcessBlockHeight, transfers, err := s.cashier.FetchTransfers(tipHeightInRecorder+1, s.batchSize)
 	if err != nil {
 		return err
 	}
-	s.lastProcessBlockHeight = tipHeight + uint64(s.batchSize) - 1
+	s.lastProcessBlockHeight = lastProcessBlockHeight
 	for _, transfer := range transfers {
 		if transfer.id, transfer.signature, err = s.sign(transfer); err != nil {
 			return err

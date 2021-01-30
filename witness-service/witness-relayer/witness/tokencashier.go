@@ -54,8 +54,23 @@ type receipt struct {
 }
 
 // FetchTransfers fetches transfers by query token cashier receipts
-func (tc *TokenCashier) FetchTransfers(offset uint64, count uint16) ([]*Transfer, error) {
+func (tc *TokenCashier) FetchTransfers(offset uint64, count uint16) (uint64, []*Transfer, error) {
 	topicToFilter := tc.tokenCashierABI.Events[eventName].Id().Bytes()
+	chainMetaResponse, err := tc.iotexClient.API().GetChainMeta(context.Background(), &iotexapi.GetChainMetaRequest{})
+	if err != nil {
+		return 0, nil, err
+	}
+	tipHeight := chainMetaResponse.ChainMeta.Height
+	if offset >= tipHeight {
+		return 0, nil, errors.Errorf("query height %d is larger than chain tip height %d", offset, tipHeight)
+	}
+	if count == 0 {
+		count = 1
+	}
+	endHeight := offset + uint64(count) - 1
+	if endHeight > tipHeight {
+		endHeight = tipHeight
+	}
 	log.Printf("fetching events from block %d\n", offset)
 	response, err := tc.iotexClient.API().GetLogs(context.Background(), &iotexapi.GetLogsRequest{
 		Filter: &iotexapi.LogsFilter{
@@ -72,26 +87,26 @@ func (tc *TokenCashier) FetchTransfers(offset uint64, count uint16) ([]*Transfer
 			ByRange: &iotexapi.GetLogsByRange{
 				FromBlock: offset,
 				// TODO: this is a bug, which should be fixed in iotex-core
-				Count: offset + uint64(count),
+				Count: endHeight,
 			},
 		},
 	})
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	log.Printf("\t%d transfers fetched", len(response.Logs))
 	transfers := []*Transfer{}
 	for _, log := range response.Logs {
 		cashier, err := address.FromString(log.ContractAddress)
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		var r receipt
 		if bytes.Compare(topicToFilter, log.Topics[0]) != 0 {
-			return nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], topicToFilter)
+			return 0, nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], topicToFilter)
 		}
 		if err := tc.tokenCashierABI.Unpack(&r, eventName, log.Data); err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		transfers = append(transfers, &Transfer{
 			cashier:     common.BytesToAddress(cashier.Bytes()),
@@ -104,5 +119,5 @@ func (tc *TokenCashier) FetchTransfers(offset uint64, count uint16) ([]*Transfer
 			txHash:      common.BytesToHash(log.ActHash),
 		})
 	}
-	return transfers, nil
+	return endHeight, transfers, nil
 }
