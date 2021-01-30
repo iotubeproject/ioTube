@@ -34,7 +34,7 @@ type TransferValidator struct {
 	validatorContractAddr common.Address
 
 	client              *ethclient.Client
-	validatorContract   *contract.TransferValidatorV2
+	validatorContract   *contract.TransferValidator
 	witnessListContract *contract.AddressListCaller
 	witnesses           map[string]bool
 }
@@ -47,7 +47,7 @@ func NewTransferValidator(
 	gasPriceLimit *big.Int,
 	validatorContractAddr common.Address,
 ) (*TransferValidator, error) {
-	validatorContract, err := contract.NewTransferValidatorV2(validatorContractAddr, client)
+	validatorContract, err := contract.NewTransferValidator(validatorContractAddr, client)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func NewTransferValidator(
 	if err != nil {
 		return nil, err
 	}
-	witnessContractAddr, err := tv.validatorContract.WhitelistedWitnesses(callOpts)
+	witnessContractAddr, err := tv.validatorContract.WitnessList(callOpts)
 	if err != nil {
 		return nil, err
 	}

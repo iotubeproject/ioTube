@@ -33,7 +33,7 @@ const eventName = "Receipt"
 
 // NewTokenCashier creates a new TokenCashier
 func NewTokenCashier(cashierContractAddr address.Address, iotexClient iotex.ReadOnlyClient) (*TokenCashier, error) {
-	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierV2ABI))
+	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierABI))
 	if err != nil {
 		return nil, err
 	}
