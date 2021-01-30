@@ -21,7 +21,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
-	"github.com/iotexproject/iotex-address/address"
 )
 
 type (
@@ -114,18 +113,13 @@ func (recorder *Recorder) AddTransfer(tx *Transfer) error {
 	return recorder.validateResult(result)
 }
 
-func toIoTeXAddress(addr common.Address) address.Address {
-	ioAddr, _ := address.FromBytes(addr[:])
-	return ioAddr
-}
-
 // SettleTransfer marks a record as submitted
 func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
 		TransferSettled,
-		toIoTeXAddress(tx.cashier),
-		toIoTeXAddress(tx.token),
+		tx.cashier.Hex(),
+		tx.token.Hex(),
 		tx.index,
 		SubmissionConfirmed,
 	)
@@ -142,8 +136,8 @@ func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
 		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
 		SubmissionConfirmed,
 		tx.id.Hex(),
-		toIoTeXAddress(tx.cashier),
-		toIoTeXAddress(tx.token),
+		tx.cashier.Hex(),
+		tx.token.Hex(),
 		tx.index,
 		TransferNew,
 	)

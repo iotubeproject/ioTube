@@ -24,7 +24,7 @@ import (
 )
 
 type service struct {
-	cashier                  *TokenCashier
+	cashier                  TokenCashier
 	recorder                 *Recorder
 	processor                dispatcher.Runner
 	lastProcessBlockHeight   uint64
@@ -40,7 +40,7 @@ type service struct {
 func NewService(
 	relayerURL string,
 	validatorContractAddress common.Address,
-	cashier *TokenCashier,
+	cashier TokenCashier,
 	recorder *Recorder,
 	privateKey *ecdsa.PrivateKey,
 	startBlockHeight uint64,
@@ -103,7 +103,7 @@ func (s *service) collect() error {
 	if tipHeightInRecorder < s.lastProcessBlockHeight {
 		tipHeightInRecorder = s.lastProcessBlockHeight
 	}
-	lastProcessBlockHeight, transfers, err := s.cashier.FetchTransfers(tipHeightInRecorder+1, s.batchSize)
+	lastProcessBlockHeight, transfers, err := s.cashier.PullTransfers(tipHeightInRecorder+1, s.batchSize)
 	if err != nil {
 		return err
 	}

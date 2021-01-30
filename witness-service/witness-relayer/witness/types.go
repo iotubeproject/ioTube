@@ -39,6 +39,11 @@ type (
 		// Stop stops the service
 		Stop(context.Context) error
 	}
+
+	// TokenCashier defines the interface to pull transfers from chain in a block range
+	TokenCashier interface {
+		PullTransfers(blockOffset uint64, blockCount uint16) (uint64, []*Transfer, error)
+	}
 )
 
 const (

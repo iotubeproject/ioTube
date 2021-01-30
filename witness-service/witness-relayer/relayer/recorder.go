@@ -231,7 +231,7 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 }
 
 // Transfers returns the list of records of given status
-func (recorder *Recorder) Transfers(status ValidationStatus, limit uint8) ([]*Transfer, error) {
+func (recorder *Recorder) Transfers(status ValidationStatusType, limit uint8) ([]*Transfer, error) {
 	query := recorder.queryTransfersByStatus
 	if limit != 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, limit)

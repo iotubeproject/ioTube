@@ -22,39 +22,41 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TokenCashier maintains the list of witnesses and tokens
-type TokenCashier struct {
-	cashierContractAddr address.Address
-	iotexClient         iotex.ReadOnlyClient
-	tokenCashierABI     abi.ABI
-}
+type (
+	// IoTeXTokenCashier maintains the list of witnesses and tokens
+	IoTeXTokenCashier struct {
+		cashierContractAddr address.Address
+		iotexClient         iotex.ReadOnlyClient
+		tokenCashierABI     abi.ABI
+	}
+
+	eventReceipt struct {
+		token     common.Address
+		id        *big.Int
+		sender    common.Address
+		recipient common.Address
+		amount    *big.Int
+		fee       *big.Int
+	}
+)
 
 const eventName = "Receipt"
 
 // NewTokenCashier creates a new TokenCashier
-func NewTokenCashier(cashierContractAddr address.Address, iotexClient iotex.ReadOnlyClient) (*TokenCashier, error) {
+func NewTokenCashier(cashierContractAddr address.Address, iotexClient iotex.ReadOnlyClient) (*IoTeXTokenCashier, error) {
 	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierABI))
 	if err != nil {
 		return nil, err
 	}
-	return &TokenCashier{
+	return &IoTeXTokenCashier{
 		cashierContractAddr: cashierContractAddr,
 		iotexClient:         iotexClient,
 		tokenCashierABI:     tokenCashierABI,
 	}, nil
 }
 
-type receipt struct {
-	token     common.Address
-	id        *big.Int
-	sender    common.Address
-	recipient common.Address
-	amount    *big.Int
-	fee       *big.Int
-}
-
-// FetchTransfers fetches transfers by query token cashier receipts
-func (tc *TokenCashier) FetchTransfers(offset uint64, count uint16) (uint64, []*Transfer, error) {
+// PullTransfers pulls transfers by query token cashier receipts
+func (tc *IoTeXTokenCashier) PullTransfers(offset uint64, count uint16) (uint64, []*Transfer, error) {
 	topicToFilter := tc.tokenCashierABI.Events[eventName].Id().Bytes()
 	chainMetaResponse, err := tc.iotexClient.API().GetChainMeta(context.Background(), &iotexapi.GetChainMetaRequest{})
 	if err != nil {
@@ -101,7 +103,7 @@ func (tc *TokenCashier) FetchTransfers(offset uint64, count uint16) (uint64, []*
 		if err != nil {
 			return 0, nil, err
 		}
-		var r receipt
+		var r eventReceipt
 		if bytes.Compare(topicToFilter, log.Topics[0]) != 0 {
 			return 0, nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], topicToFilter)
 		}

@@ -15,13 +15,13 @@ import (
 
 // Service defines the relayer service
 type Service struct {
-	transferValidator *TransferValidator
+	transferValidator TransferValidator
 	processor         dispatcher.Runner
 	recorder          *Recorder
 }
 
 // NewService creates a new relay service
-func NewService(tv *TransferValidator, recorder *Recorder) (*Service, error) {
+func NewService(tv TransferValidator, recorder *Recorder) (*Service, error) {
 	s := &Service{
 		transferValidator: tv,
 		recorder:          recorder,
@@ -54,7 +54,7 @@ func (s *Service) Stop(ctx context.Context) error {
 // Submit accepts a submission of witness
 func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
 	log.Printf("receive a witness from %x\n", w.Address)
-	transfer, err := s.transferValidator.UnmarshalTransferProto(w.Transfer)
+	transfer, err := UnmarshalTransferProto(s.transferValidator.Address(), w.Transfer)
 	if err != nil {
 		return nil, err
 	}
@@ -103,68 +103,55 @@ func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*s
 }
 
 func (s *Service) process() error {
-	if err := s.transferValidator.Refresh(); err != nil {
-		return err
-	}
 	validatedTransfers, err := s.recorder.Transfers(ValidationSubmitted, 1)
 	if err != nil {
 		return err
 	}
 	for _, transfer := range validatedTransfers {
-		confirmed, rejected, reset, err := s.transferValidator.Check(transfer)
+		statusOnChain, err := s.transferValidator.Check(transfer)
 		if err != nil {
 			return err
 		}
-		if !confirmed {
+		switch statusOnChain {
+		case StatusOnChainNotConfirmed:
 			continue
-		}
-		switch {
-		case rejected:
+		case StatusOnChainRejected:
 			if err := s.recorder.MarkAsFailed(transfer.id); err != nil {
 				return err
 			}
-		case reset:
+		case StatusOnChainNonceOverwritten:
 			// nonce has been overwritten
 			if err := s.recorder.Reset(transfer.id); err != nil {
 				return err
 			}
-		default:
+		case StatusOnChainSettled:
 			if err := s.recorder.MarkAsSettled(transfer.id); err != nil {
 				return err
 			}
+		default:
+			return errors.New("unexpected error")
 		}
 	}
 	newTransfers, err := s.recorder.Transfers(TransferNew, 1)
 	if err != nil {
 		return err
 	}
-	numOfActiveWitnesses := s.transferValidator.NumOfActiveWitnesses()
-	if numOfActiveWitnesses == 0 {
-		return errors.New("no active witnesses on ethereum")
-	}
 	for _, transfer := range newTransfers {
 		witnesses, err := s.recorder.Witnesses(transfer.id)
 		if err != nil {
 			return err
 		}
-		signatures := []byte{}
-		numOfValidSignatures := 0
-		for _, witness := range witnesses {
-			if !s.transferValidator.IsActiveWitness(witness.addr) {
-				log.Printf("Warning: %s is not an active witness\n", witness.addr.Hex())
-				continue
-			}
-			signatures = append(signatures, witness.signature...)
-			numOfValidSignatures++
-		}
-		if numOfValidSignatures*3 > numOfActiveWitnesses*2 {
-			txHash, nonce, err := s.transferValidator.Submit(transfer, signatures)
-			if err != nil {
-				return err
-			}
+
+		txHash, nonce, err := s.transferValidator.Submit(transfer, witnesses)
+		switch errors.Cause(err) {
+		case nil:
 			if err := s.recorder.MarkAsValidated(transfer.id, txHash, nonce); err != nil {
 				return err
 			}
+		case errInsufficientWitnesses:
+			// do nothing
+		default:
+			return err
 		}
 	}
 	return nil

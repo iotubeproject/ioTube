@@ -20,11 +20,10 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
-	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 )
 
-// TransferValidator defines the transfer validator
-type TransferValidator struct {
+// transferValidatorOnEthreum defines the transfer validator
+type transferValidatorOnEthreum struct {
 	mu                 sync.RWMutex
 	confirmBlockNumber uint8
 	gasPriceLimit      *big.Int
@@ -39,19 +38,19 @@ type TransferValidator struct {
 	witnesses           map[string]bool
 }
 
-// NewTransferValidator creates a new TransferValidator
-func NewTransferValidator(
+// NewTransferValidatorOnEthereum creates a new TransferValidator
+func NewTransferValidatorOnEthereum(
 	client *ethclient.Client,
 	privateKey *ecdsa.PrivateKey,
 	confirmBlockNumber uint8,
 	gasPriceLimit *big.Int,
 	validatorContractAddr common.Address,
-) (*TransferValidator, error) {
+) (TransferValidator, error) {
 	validatorContract, err := contract.NewTransferValidator(validatorContractAddr, client)
 	if err != nil {
 		return nil, err
 	}
-	tv := &TransferValidator{
+	tv := &transferValidatorOnEthreum{
 		confirmBlockNumber: confirmBlockNumber,
 		gasPriceLimit:      gasPriceLimit,
 
@@ -74,20 +73,18 @@ func NewTransferValidator(
 	if err != nil {
 		return nil, err
 	}
-	if err := tv.Refresh(); err != nil {
-		return nil, err
-	}
 
 	return tv, nil
 }
 
-// UnmarshalTransferProto unmalshals a witness proto
-func (tv *TransferValidator) UnmarshalTransferProto(transfer *types.Transfer) (*Transfer, error) {
-	return UnmarshalTransferProto(tv.validatorContractAddr, transfer)
+func (tv *transferValidatorOnEthreum) Address() common.Address {
+	tv.mu.RLock()
+	defer tv.mu.RUnlock()
+
+	return tv.validatorContractAddr
 }
 
-// Refresh refreshes the data stored
-func (tv *TransferValidator) Refresh() error {
+func (tv *transferValidatorOnEthreum) refresh() error {
 	callOpts, err := tv.callOpts()
 	if err != nil {
 		return err
@@ -108,7 +105,7 @@ func (tv *TransferValidator) Refresh() error {
 		offset.Add(offset, big.NewInt(int64(limit)))
 	}
 
-	log.Println("Refresh Witnesses on Ethereum")
+	log.Println("refresh Witnesses on Ethereum")
 	activeWitnesses := make(map[string]bool)
 	for _, w := range witnesses {
 		log.Println("\t" + w.String())
@@ -121,61 +118,71 @@ func (tv *TransferValidator) Refresh() error {
 	return nil
 }
 
-// IsActiveWitness returns true if the input relayerAddress is an active witness on Ethereum
-func (tv *TransferValidator) IsActiveWitness(witness common.Address) bool {
-	tv.mu.RLock()
-	defer tv.mu.RUnlock()
+func (tv *transferValidatorOnEthreum) isActiveWitness(witness common.Address) bool {
+	val, ok := tv.witnesses[witness.Hex()]
 
-	return tv.witnesses[witness.Hex()]
-}
-
-// NumOfActiveWitnesses returns the number of active witnesses on Ethereum
-func (tv *TransferValidator) NumOfActiveWitnesses() int {
-	tv.mu.RLock()
-	defer tv.mu.RUnlock()
-
-	return len(tv.witnesses)
+	return ok && val
 }
 
 // Check returns true if a transfer has been settled
-func (tv *TransferValidator) Check(transfer *Transfer) (confirmed bool, success bool, reset bool, err error) {
+func (tv *transferValidatorOnEthreum) Check(transfer *Transfer) (StatusOnChainType, error) {
+	tv.mu.RLock()
+	defer tv.mu.RUnlock()
 	pendingNonce, err := tv.pendingNonce()
 	if err != nil {
-		return false, false, false, err
+		return StatusOnChainUnknown, err
 	}
 	header, err := tv.client.HeaderByNumber(context.Background(), nil)
 	if err != nil {
-		return false, false, false, err
+		return StatusOnChainUnknown, err
 	}
 	settleHeight, err := tv.validatorContract.Settles(&bind.CallOpts{}, transfer.id)
 	if err != nil {
-		return false, false, false, err
+		return StatusOnChainUnknown, err
 	}
 	if settleHeight.Cmp(big.NewInt(0)) > 0 {
 		if new(big.Int).Add(settleHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
-			return false, false, false, nil
+			return StatusOnChainNotConfirmed, nil
 		}
-		return true, true, false, err
+		return StatusOnChainSettled, nil
 	}
 	r, err := tv.client.TransactionReceipt(context.Background(), transfer.txHash)
 	if err != nil {
-		return false, false, false, err
+		return StatusOnChainUnknown, err
 	}
 	if r != nil {
 		if new(big.Int).Add(r.BlockNumber, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
-			return false, false, false, nil
+			return StatusOnChainNotConfirmed, nil
 		}
 		// no matter what the receipt status is, mark the validation as failure
-		return true, false, false, nil
+		return StatusOnChainRejected, nil
 	}
 	if transfer.nonce < pendingNonce {
-		return true, true, true, nil
+		return StatusOnChainNonceOverwritten, nil
 	}
-	return false, false, false, nil
+	return StatusOnChainNotConfirmed, nil
 }
 
 // Submit submits validation for a transfer
-func (tv *TransferValidator) Submit(transfer *Transfer, signatures []byte) (common.Hash, uint64, error) {
+func (tv *transferValidatorOnEthreum) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, error) {
+	tv.mu.Lock()
+	defer tv.mu.Unlock()
+
+	if err := tv.refresh(); err != nil {
+		return common.Hash{}, 0, err
+	}
+	signatures := []byte{}
+	numOfValidSignatures := 0
+	for _, witness := range witnesses {
+		if !tv.isActiveWitness(witness.addr) {
+			continue
+		}
+		signatures = append(signatures, witness.signature...)
+		numOfValidSignatures++
+	}
+	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
+		return common.Hash{}, 0, errInsufficientWitnesses
+	}
 	tOpts, err := tv.transactionOpts()
 	if err != nil {
 		return common.Hash{}, 0, err
@@ -187,7 +194,7 @@ func (tv *TransferValidator) Submit(transfer *Transfer, signatures []byte) (comm
 	return transaction.Hash(), transaction.Nonce(), nil
 }
 
-func (tv *TransferValidator) transactionOpts() (*bind.TransactOpts, error) {
+func (tv *transferValidatorOnEthreum) transactionOpts() (*bind.TransactOpts, error) {
 	opts := bind.NewKeyedTransactor(tv.privateKey)
 	opts.Value = big.NewInt(0)
 	opts.GasLimit = tv.gasPriceLimit.Uint64()
@@ -217,11 +224,11 @@ func (tv *TransferValidator) transactionOpts() (*bind.TransactOpts, error) {
 	return opts, nil
 }
 
-func (tv *TransferValidator) pendingNonce() (uint64, error) {
+func (tv *transferValidatorOnEthreum) pendingNonce() (uint64, error) {
 	return tv.client.PendingNonceAt(context.Background(), tv.relayerAddr)
 }
 
-func (tv *TransferValidator) callOpts() (*bind.CallOpts, error) {
+func (tv *transferValidatorOnEthreum) callOpts() (*bind.CallOpts, error) {
 	tipBlockHeader, err := tv.client.HeaderByNumber(context.Background(), nil)
 	if err != nil {
 		return nil, err

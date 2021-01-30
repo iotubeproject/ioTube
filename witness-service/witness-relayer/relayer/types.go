@@ -17,8 +17,10 @@ import (
 )
 
 type (
-	// ValidationStatus type of transfer validation status
-	ValidationStatus string
+	// ValidationStatusType type of transfer validation status
+	ValidationStatusType string
+	// StatusOnChainType type of transfer status on chain
+	StatusOnChainType int
 	// Transfer defines a transfer structure
 	Transfer struct {
 		cashier    common.Address
@@ -31,18 +33,28 @@ type (
 		txHash     common.Hash
 		nonce      uint64
 		updateTime time.Time
-		status     ValidationStatus
+		status     ValidationStatusType
 	}
 	// Witness defines a witness structure
 	Witness struct {
 		addr      common.Address
 		signature []byte
 	}
+
+	// TransferValidator defines the interface of a transfer validator
+	TransferValidator interface {
+		// Address returns the transfer validator contract address
+		Address() common.Address
+		// Check returns transfer status on chain
+		Check(transfer *Transfer) (StatusOnChainType, error)
+		// Submit submits validation for a transfer
+		Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, error)
+	}
 )
 
 const (
 	// TransferNew stands for a transfer which needs more valid witnesses
-	TransferNew ValidationStatus = "new"
+	TransferNew ValidationStatusType = "new"
 	// ValidationSubmitted stands for a transfer with validation submitted
 	ValidationSubmitted = "validated"
 	// TransferSettled stands for a transfer which has been settled
@@ -50,6 +62,16 @@ const (
 	// ValidationFailed stands for the validation of a transfer failed
 	ValidationFailed = "failed"
 )
+
+const (
+	StatusOnChainUnknown StatusOnChainType = iota
+	StatusOnChainNotConfirmed
+	StatusOnChainRejected
+	StatusOnChainNonceOverwritten
+	StatusOnChainSettled
+)
+
+var errInsufficientWitnesses = errors.New("insufficient witnesses")
 
 // UnmarshalTransferProto unmarshals a transfer proto
 func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transfer) (*Transfer, error) {

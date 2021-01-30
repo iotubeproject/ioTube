@@ -121,7 +121,7 @@ func main() {
 	}
 	grpcServer := grpc.NewServer()
 	log.Println("Creating service")
-	transferValidator, err := relayer.NewTransferValidator(
+	transferValidator, err := relayer.NewTransferValidatorOnEthereum(
 		ethClient,
 		privateKey,
 		cfg.EthConfirmBlockNumber,
