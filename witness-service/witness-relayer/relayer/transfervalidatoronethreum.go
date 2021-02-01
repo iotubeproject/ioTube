@@ -183,7 +183,7 @@ func (tv *transferValidatorOnEthreum) Submit(transfer *Transfer, witnesses []*Wi
 	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
 		return common.Hash{}, 0, errInsufficientWitnesses
 	}
-	tOpts, err := tv.transactionOpts()
+	tOpts, err := tv.transactionOpts(200000)
 	if err != nil {
 		return common.Hash{}, 0, err
 	}
@@ -194,10 +194,10 @@ func (tv *transferValidatorOnEthreum) Submit(transfer *Transfer, witnesses []*Wi
 	return transaction.Hash(), transaction.Nonce(), nil
 }
 
-func (tv *transferValidatorOnEthreum) transactionOpts() (*bind.TransactOpts, error) {
+func (tv *transferValidatorOnEthreum) transactionOpts(gasLimit uint64) (*bind.TransactOpts, error) {
 	opts := bind.NewKeyedTransactor(tv.privateKey)
 	opts.Value = big.NewInt(0)
-	opts.GasLimit = tv.gasPriceLimit.Uint64()
+	opts.GasLimit = gasLimit
 	gasPrice, err := tv.client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get suggested gas price")

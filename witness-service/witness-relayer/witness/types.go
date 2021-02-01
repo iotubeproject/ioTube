@@ -44,9 +44,20 @@ type (
 	TokenCashier interface {
 		PullTransfers(blockOffset uint64, blockCount uint16) (uint64, []*Transfer, error)
 	}
+
+	eventReceipt struct {
+		token     common.Address
+		id        *big.Int
+		sender    common.Address
+		recipient common.Address
+		amount    *big.Int
+		fee       *big.Int
+	}
 )
 
 const (
+	eventName = "Receipt"
+
 	// TransferNew stands for a new transfer
 	TransferNew TransferStatus = "new"
 	// WitnessSubmitted stands for a witnessed transfer

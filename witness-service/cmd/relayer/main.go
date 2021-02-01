@@ -28,12 +28,17 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/iotexproject/ioTube/witness-service/witness-relayer/relayer"
+	"github.com/iotexproject/iotex-address/address"
+	"github.com/iotexproject/iotex-antenna-go/v2/account"
+	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
+	"github.com/iotexproject/iotex-proto/golang/iotexapi"
 )
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
+	Chain                 string        `json:"chain" yaml:"chain"`
 	RefreshInterval       time.Duration `json:"refreshInterval" yaml:"refreshInterval"`
-	EthClientURL          string        `json:"ethClientURL" yaml:"ethClientURL"`
+	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
 	EthConfirmBlockNumber uint8         `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
 	EthGasPriceLimit      uint64        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
 	Port                  int           `json:"port" yaml:"port"`
@@ -46,8 +51,9 @@ type Configuration struct {
 }
 
 var defaultConfig = Configuration{
+	Chain:                 "iotex",
 	RefreshInterval:       time.Hour,
-	EthClientURL:          "",
+	ClientURL:             "",
 	EthConfirmBlockNumber: 20,
 	EthGasPriceLimit:      120000000000,
 	Port:                  8080,
@@ -93,12 +99,8 @@ func main() {
 			log.Fatalln(err)
 		}
 	}
-	if client, ok := os.LookupEnv("RELAYER_ETH_CLIENT_URL"); ok {
-		cfg.EthClientURL = client
-	}
-	ethClient, err := ethclient.Dial(cfg.EthClientURL)
-	if err != nil {
-		log.Fatalf("failed to create eth client %v", err)
+	if client, ok := os.LookupEnv("RELAYER_CLIENT_URL"); ok {
+		cfg.ClientURL = client
 	}
 	if pk, ok := os.LookupEnv("RELAYER_PRIVATE_KEY"); ok {
 		cfg.PrivateKey = pk
@@ -121,15 +123,48 @@ func main() {
 	}
 	grpcServer := grpc.NewServer()
 	log.Println("Creating service")
-	transferValidator, err := relayer.NewTransferValidatorOnEthereum(
-		ethClient,
-		privateKey,
-		cfg.EthConfirmBlockNumber,
-		new(big.Int).SetUint64(cfg.EthGasPriceLimit),
-		common.HexToAddress(cfg.ValidatorAddress),
-	)
-	if err != nil {
-		log.Fatalf("failed to create transfer validator: %v\n", err)
+	var transferValidator relayer.TransferValidator
+	if chain, ok := os.LookupEnv("WITNESS_CHAIN"); ok {
+		cfg.Chain = chain
+	}
+	switch cfg.Chain {
+	case "ethereum":
+		ethClient, err := ethclient.Dial(cfg.ClientURL)
+		if err != nil {
+			log.Fatalf("failed to create eth client %v\n", err)
+		}
+		if transferValidator, err = relayer.NewTransferValidatorOnEthereum(
+			ethClient,
+			privateKey,
+			cfg.EthConfirmBlockNumber,
+			new(big.Int).SetUint64(cfg.EthGasPriceLimit),
+			common.HexToAddress(cfg.ValidatorAddress),
+		); err != nil {
+			log.Fatalf("failed to create transfer validator: %v\n", err)
+		}
+	case "iotex":
+		conn, err := iotex.NewDefaultGRPCConn(cfg.ClientURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// defer conn.Close()
+		acc, err := account.HexStringToAccount(cfg.PrivateKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+		validatorContractAddr, err := address.FromString(cfg.ValidatorAddress)
+		if err != nil {
+			log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
+		}
+		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
+			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), acc),
+			privateKey,
+			validatorContractAddr,
+		); err != nil {
+			log.Fatalf("failed to create transfer validator: %v\n", err)
+		}
+	default:
+		log.Fatalf("unknown chain name '%s'\n", cfg.Chain)
 	}
 	service, err := relayer.NewService(
 		transferValidator,

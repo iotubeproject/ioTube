@@ -27,8 +27,6 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/db"
 )
 
-var _CreateSchema = "CREATE DATABASE IF NOT EXISTS `relayer`"
-
 type (
 	// Recorder is a logger based on sql to record exchange events
 	Recorder struct {
@@ -83,9 +81,6 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 	if err := recorder.store.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start db")
 	}
-	if _, err := recorder.store.DB().Exec(_CreateSchema); err != nil {
-		return errors.Wrap(err, "failed to create database")
-	}
 	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s ("+
 			"`cashier` varchar(42) NOT NULL,"+
@@ -123,9 +118,11 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"PRIMARY KEY (`transferId`, `witness`),"+
 			"KEY `witness_index` (`witness`),"+
-			"CONSTRAINT `fk_transfer_id` FOREIGN KEY (`transferId`) REFERENCES `transfers` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION"+
+			"CONSTRAINT %s_id FOREIGN KEY (`transferId`) REFERENCES %s (`id`) ON DELETE CASCADE ON UPDATE NO ACTION"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
 		recorder.witnessTableName,
+		recorder.transferTableName,
+		recorder.transferTableName,
 	)); err != nil {
 		return errors.Wrap(err, "failed to create witness table")
 	}

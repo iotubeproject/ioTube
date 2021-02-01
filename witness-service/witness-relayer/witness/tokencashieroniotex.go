@@ -23,32 +23,21 @@ import (
 )
 
 type (
-	// IoTeXTokenCashier maintains the list of witnesses and tokens
-	IoTeXTokenCashier struct {
+	// tokenCashierOnIoTeX maintains the list of witnesses and tokens
+	tokenCashierOnIoTeX struct {
 		cashierContractAddr address.Address
 		iotexClient         iotex.ReadOnlyClient
 		tokenCashierABI     abi.ABI
 	}
-
-	eventReceipt struct {
-		token     common.Address
-		id        *big.Int
-		sender    common.Address
-		recipient common.Address
-		amount    *big.Int
-		fee       *big.Int
-	}
 )
 
-const eventName = "Receipt"
-
 // NewTokenCashier creates a new TokenCashier
-func NewTokenCashier(cashierContractAddr address.Address, iotexClient iotex.ReadOnlyClient) (*IoTeXTokenCashier, error) {
+func NewTokenCashier(cashierContractAddr address.Address, iotexClient iotex.ReadOnlyClient) (TokenCashier, error) {
 	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierABI))
 	if err != nil {
 		return nil, err
 	}
-	return &IoTeXTokenCashier{
+	return &tokenCashierOnIoTeX{
 		cashierContractAddr: cashierContractAddr,
 		iotexClient:         iotexClient,
 		tokenCashierABI:     tokenCashierABI,
@@ -56,7 +45,7 @@ func NewTokenCashier(cashierContractAddr address.Address, iotexClient iotex.Read
 }
 
 // PullTransfers pulls transfers by query token cashier receipts
-func (tc *IoTeXTokenCashier) PullTransfers(offset uint64, count uint16) (uint64, []*Transfer, error) {
+func (tc *tokenCashierOnIoTeX) PullTransfers(offset uint64, count uint16) (uint64, []*Transfer, error) {
 	topicToFilter := tc.tokenCashierABI.Events[eventName].Id().Bytes()
 	chainMetaResponse, err := tc.iotexClient.API().GetChainMeta(context.Background(), &iotexapi.GetChainMetaRequest{})
 	if err != nil {

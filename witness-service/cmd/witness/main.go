@@ -19,6 +19,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/iotexproject/ioTube/witness-service/witness-relayer/witness"
@@ -29,7 +30,8 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	IoTeXClient              string        `json:"iotexClient" yaml:"iotexClient"`
+	Chain                    string        `json:"chain" yaml:"chain"`
+	ClientURL                string        `json:"clientURL" yaml:"clientURL"`
 	RelayerURL               string        `json:"relayerURL" yaml:"relayerURL"`
 	PrivateKey               string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook             string        `json:"slackWebHook" yaml:"slackWebHook"`
@@ -42,18 +44,21 @@ type Configuration struct {
 	TransferTableName        string        `json:"transferTableName" yaml:"transferTableName"`
 }
 
-var defaultConfig = Configuration{
-	ProcessInterval:          time.Minute,
-	RelayerURL:               "",
-	StartBlockHeight:         9305000,
-	BatchSize:                100,
-	PrivateKey:               "",
-	SlackWebHook:             "",
-	IoTeXClient:              "api.iotex.one:443",
-	TransferTableName:        "witness.transfers",
-	ValidatorContractAddress: "",
-	CashierContractAddress:   "",
-}
+var (
+	defaultConfig = Configuration{
+		Chain:                    "ethereum",
+		ProcessInterval:          time.Minute,
+		RelayerURL:               "",
+		StartBlockHeight:         9305000,
+		BatchSize:                100,
+		PrivateKey:               "",
+		SlackWebHook:             "",
+		ClientURL:                "",
+		TransferTableName:        "witness.transfers",
+		ValidatorContractAddress: "",
+		CashierContractAddress:   "",
+	}
+)
 
 var configFile = flag.String("config", "", "path of config file")
 
@@ -100,6 +105,9 @@ func main() {
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
+	if chain, ok := os.LookupEnv("WITNESS_CHAIN"); ok {
+		cfg.Chain = chain
+	}
 	if validatorAddr, ok := os.LookupEnv("WITNESS_VALIDATOR_CONTRACT_ADDRESS"); ok {
 		cfg.ValidatorContractAddress = validatorAddr
 	}
@@ -110,18 +118,32 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to parse cashier address %v\n", err)
 	}
-	if url, ok := os.LookupEnv("WITNESS_IOTEX_API_URL"); ok {
-		cfg.IoTeXClient = url
+	if url, ok := os.LookupEnv("WITNESS_CLIENT_URL"); ok {
+		cfg.ClientURL = url
 	}
-	conn, err := iotex.NewDefaultGRPCConn(cfg.IoTeXClient)
-	if err != nil {
-		log.Fatal(err)
+	var cashier witness.TokenCashier
+	switch cfg.Chain {
+	case "iotex":
+		conn, err := iotex.NewDefaultGRPCConn(cfg.ClientURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// defer conn.Close()
+		if cashier, err = witness.NewTokenCashier(cashierAddr, iotex.NewReadOnlyClient(iotexapi.NewAPIServiceClient(conn))); err != nil {
+			log.Fatalf("failed to create cashier %v\n", err)
+		}
+	case "ethereum":
+		ethClient, err := ethclient.DialContext(context.Background(), cfg.ClientURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if cashier, err = witness.NewTokenCashierOnEthereum(common.HexToAddress(cfg.CashierContractAddress), ethClient, 12); err != nil {
+			log.Fatalf("failed to create cashier %v\n", err)
+		}
+	default:
+		log.Fatalf("unknown chain name %s", cfg.Chain)
 	}
-	defer conn.Close()
-	cashier, err := witness.NewTokenCashier(cashierAddr, iotex.NewReadOnlyClient(iotexapi.NewAPIServiceClient(conn)))
-	if err != nil {
-		log.Fatalf("failed to create cashier %v\n", err)
-	}
+
 	service, err := witness.NewService(
 		cfg.RelayerURL,
 		common.HexToAddress(cfg.ValidatorContractAddress),

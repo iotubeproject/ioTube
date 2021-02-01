@@ -44,9 +44,6 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 	if err := recorder.store.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start db")
 	}
-	if _, err := recorder.store.DB().Exec("CREATE DATABASE IF NOT EXISTS `witness`"); err != nil {
-		return errors.Wrap(err, "failed to create database")
-	}
 	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s ("+
 			"`cashier` varchar(42) NOT NULL,"+
