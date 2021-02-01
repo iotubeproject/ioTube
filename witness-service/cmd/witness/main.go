@@ -114,24 +114,26 @@ func main() {
 	if cashierAddr, ok := os.LookupEnv("WITNESS_CASHIER_CONTRACT_ADDRESS"); ok {
 		cfg.CashierContractAddress = cashierAddr
 	}
-	cashierAddr, err := address.FromString(cfg.CashierContractAddress)
-	if err != nil {
-		log.Fatalf("failed to parse cashier address %v\n", err)
-	}
 	if url, ok := os.LookupEnv("WITNESS_CLIENT_URL"); ok {
 		cfg.ClientURL = url
 	}
 	var cashier witness.TokenCashier
+	var validatorContractAddr common.Address
 	switch cfg.Chain {
 	case "iotex":
+		cashierAddr, err := address.FromString(cfg.CashierContractAddress)
+		if err != nil {
+			log.Fatalf("failed to parse cashier address %v\n", err)
+		}
 		conn, err := iotex.NewDefaultGRPCConn(cfg.ClientURL)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed ot create grpc connection %v\n", err)
 		}
 		// defer conn.Close()
 		if cashier, err = witness.NewTokenCashier(cashierAddr, iotex.NewReadOnlyClient(iotexapi.NewAPIServiceClient(conn))); err != nil {
 			log.Fatalf("failed to create cashier %v\n", err)
 		}
+		validatorContractAddr = common.HexToAddress(cfg.ValidatorContractAddress)
 	case "ethereum":
 		ethClient, err := ethclient.DialContext(context.Background(), cfg.ClientURL)
 		if err != nil {
@@ -140,13 +142,18 @@ func main() {
 		if cashier, err = witness.NewTokenCashierOnEthereum(common.HexToAddress(cfg.CashierContractAddress), ethClient, 12); err != nil {
 			log.Fatalf("failed to create cashier %v\n", err)
 		}
+		addr, err := address.FromString(cfg.ValidatorContractAddress)
+		if err != nil {
+			log.Fatalf("failed to parse validator contract address %v\n", err)
+		}
+		validatorContractAddr = common.BytesToAddress(addr.Bytes())
 	default:
 		log.Fatalf("unknown chain name %s", cfg.Chain)
 	}
 
 	service, err := witness.NewService(
 		cfg.RelayerURL,
-		common.HexToAddress(cfg.ValidatorContractAddress),
+		validatorContractAddr,
 		cashier,
 		witness.NewRecorder(
 			db.NewStore("mysql", cfg.DatabaseURL),
