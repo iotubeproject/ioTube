@@ -21,7 +21,7 @@ contract TransferValidator is Pausable {
     Allowlist[] public tokenLists;
     Allowlist public witnessList;
     
-    constructor(Minter[] memory _minters, Allowlist[] memory _tokenLists, Allowlist _witnessList) public {
+    constructor(Allowlist[] memory _tokenLists, Minter[] memory _minters, Allowlist _witnessList) public {
         require(_minters.length == _tokenLists.length, "# of minters is not equal to # of token lists");
         minters = _minters;
         tokenLists = _tokenLists;

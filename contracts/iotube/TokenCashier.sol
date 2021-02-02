@@ -43,6 +43,7 @@ contract TokenCashier is Pausable {
                 require(_amount <= tokenLists[i].maxAmount(_token), "amount too high");
                 if (tokenSafes[i] == address(0)) {
                     require(safeTransferFrom(_token, msg.sender, address(this), _amount), "fail to transfer token to cashier");
+                    // burn
                     (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0x42966c68, _amount));
                     require(success && (data.length == 0 || abi.decode(data, (bool))), "fail to burn token");
                 } else {

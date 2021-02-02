@@ -11,7 +11,7 @@ interface WrappedCoin {
     function deposit() external payable;
 }
 
-contract EthCashier is Ownable {
+contract CoinCashier is Ownable {
     TokenCashier public tokenCashier;
     WrappedCoin public wrappedCoin;
 
