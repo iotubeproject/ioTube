@@ -42,6 +42,7 @@ type Configuration struct {
 	ProcessInterval          time.Duration `json:"processInterval" yaml:"processInterval"`
 	DatabaseURL              string        `json:"databaseURL" yaml:"databaseURL"`
 	TransferTableName        string        `json:"transferTableName" yaml:"transferTableName"`
+	TokenPairTableName       string        `json:"tokenPairTableName" yaml:"tokenPairTableName"`
 }
 
 var (
@@ -54,7 +55,8 @@ var (
 		PrivateKey:               "",
 		SlackWebHook:             "",
 		ClientURL:                "",
-		TransferTableName:        "witness.transfers",
+		TransferTableName:        "",
+		TokenPairTableName:       "",
 		ValidatorContractAddress: "",
 		CashierContractAddress:   "",
 	}
@@ -158,6 +160,7 @@ func main() {
 		witness.NewRecorder(
 			db.NewStore("mysql", cfg.DatabaseURL),
 			cfg.TransferTableName,
+			cfg.TokenPairTableName,
 		),
 		privateKey,
 		uint64(cfg.StartBlockHeight),

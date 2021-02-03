@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -84,11 +85,11 @@ func (s *service) sign(transfer *Transfer) (common.Hash, []byte, error) {
 	id := crypto.Keccak256Hash(
 		s.validatorContractAddress.Bytes(),
 		transfer.cashier.Bytes(),
-		transfer.token.Bytes(),
-		new(big.Int).SetUint64(transfer.index).Bytes(),
+		transfer.coToken.Bytes(),
+		math.U256Bytes(new(big.Int).SetUint64(transfer.index)),
 		transfer.sender.Bytes(),
 		transfer.recipient.Bytes(),
-		transfer.amount.Bytes(),
+		math.U256Bytes(transfer.amount),
 	)
 	signature, err := crypto.Sign(id.Bytes(), s.privateKey)
 
@@ -107,15 +108,12 @@ func (s *service) collect() error {
 	if err != nil {
 		return err
 	}
-	s.lastProcessBlockHeight = lastProcessBlockHeight
 	for _, transfer := range transfers {
-		if transfer.id, transfer.signature, err = s.sign(transfer); err != nil {
-			return err
-		}
-		if s.recorder.AddTransfer(transfer); err != nil {
+		if err := s.recorder.AddTransfer(transfer); err != nil {
 			return err
 		}
 	}
+	s.lastProcessBlockHeight = lastProcessBlockHeight
 	return nil
 }
 
@@ -123,7 +121,11 @@ func (s *service) process() error {
 	if err := s.collect(); err != nil {
 		return err
 	}
-	transfers, err := s.recorder.TransfersNotSettled()
+	transfersToSubmit, err := s.recorder.TransfersToSubmit()
+	if err != nil {
+		return err
+	}
+	transfersToSettle, err := s.recorder.TransfersToSettle()
 	if err != nil {
 		return err
 	}
@@ -133,48 +135,49 @@ func (s *service) process() error {
 	}
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
-	for _, transfer := range transfers {
-		switch transfer.status {
-		case TransferNew:
-			response, err := relayer.Submit(
-				context.Background(),
-				&types.Witness{
-					Transfer: &types.Transfer{
-						Cashier:   transfer.cashier.Bytes(),
-						Token:     transfer.token.Bytes(),
-						Index:     int64(transfer.index),
-						Sender:    transfer.sender.Bytes(),
-						Recipient: transfer.recipient.Bytes(),
-						Amount:    transfer.amount.String(),
-					},
-					Address:   s.witnessAddress.Bytes(),
-					Signature: transfer.signature,
+	for _, transfer := range transfersToSubmit {
+		if transfer.id, transfer.signature, err = s.sign(transfer); err != nil {
+			return err
+		}
+		response, err := relayer.Submit(
+			context.Background(),
+			&types.Witness{
+				Transfer: &types.Transfer{
+					Cashier:   transfer.cashier.Bytes(),
+					Token:     transfer.coToken.Bytes(),
+					Index:     int64(transfer.index),
+					Sender:    transfer.sender.Bytes(),
+					Recipient: transfer.recipient.Bytes(),
+					Amount:    transfer.amount.String(),
 				},
-			)
-			if err != nil {
+				Address:   s.witnessAddress.Bytes(),
+				Signature: transfer.signature,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		if response.Success {
+			if err := s.recorder.ConfirmTransfer(transfer); err != nil {
 				return err
 			}
-			if response.Success {
-				if err := s.recorder.ConfirmTransfer(transfer); err != nil {
-					return err
-				}
-			} else {
-				log.Printf("failed to submit transfer (%s, %s, %d)\n", transfer.cashier, transfer.token, transfer.index)
-			}
-		case SubmissionConfirmed:
-			response, err := relayer.Check(
-				context.Background(),
-				&services.CheckRequest{
-					Id: transfer.id.Bytes(),
-				},
-			)
-			if err != nil {
+		} else {
+			log.Printf("failed to submit transfer (%s, %s, %d)\n", transfer.cashier, transfer.token, transfer.index)
+		}
+	}
+	for _, transfer := range transfersToSettle {
+		response, err := relayer.Check(
+			context.Background(),
+			&services.CheckRequest{
+				Id: transfer.id.Bytes(),
+			},
+		)
+		if err != nil {
+			return err
+		}
+		if response.Status == services.CheckResponse_SETTLED {
+			if s.recorder.SettleTransfer(transfer); err != nil {
 				return err
-			}
-			if response.Status == services.CheckResponse_SETTLED {
-				if s.recorder.SettleTransfer(transfer); err != nil {
-					return err
-				}
 			}
 		}
 	}

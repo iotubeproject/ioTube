@@ -108,12 +108,10 @@ func (tv *transferValidatorOnEthreum) refresh() error {
 	log.Println("refresh Witnesses on Ethereum")
 	activeWitnesses := make(map[string]bool)
 	for _, w := range witnesses {
-		log.Println("\t" + w.String())
-		activeWitnesses[w.String()] = true
+		log.Println("\t" + w.Hex())
+		activeWitnesses[w.Hex()] = true
 	}
 
-	tv.mu.Lock()
-	defer tv.mu.Unlock()
 	tv.witnesses = activeWitnesses
 	return nil
 }
@@ -175,6 +173,7 @@ func (tv *transferValidatorOnEthreum) Submit(transfer *Transfer, witnesses []*Wi
 	numOfValidSignatures := 0
 	for _, witness := range witnesses {
 		if !tv.isActiveWitness(witness.addr) {
+			log.Printf("witness %s is inactive\n", witness.addr.Hex())
 			continue
 		}
 		signatures = append(signatures, witness.signature...)
@@ -183,7 +182,7 @@ func (tv *transferValidatorOnEthreum) Submit(transfer *Transfer, witnesses []*Wi
 	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
 		return common.Hash{}, 0, errInsufficientWitnesses
 	}
-	tOpts, err := tv.transactionOpts(200000)
+	tOpts, err := tv.transactionOpts(300000)
 	if err != nil {
 		return common.Hash{}, 0, err
 	}
@@ -202,11 +201,10 @@ func (tv *transferValidatorOnEthreum) transactionOpts(gasLimit uint64) (*bind.Tr
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get suggested gas price")
 	}
-	// Slightly higher than suggested gas price
-	opts.GasPrice = gasPrice.Add(gasPrice, big.NewInt(1000000000))
-	if opts.GasPrice.Cmp(tv.gasPriceLimit) >= 0 {
-		return nil, errors.Errorf("suggested gas price is higher than limit %d", tv.gasPriceLimit)
+	if gasPrice.Cmp(tv.gasPriceLimit) >= 0 {
+		return nil, errors.Wrapf(errGasPriceTooHigh, "suggested gas price %d > limit %d", gasPrice, tv.gasPriceLimit)
 	}
+	opts.GasPrice = gasPrice
 	balance, err := tv.client.BalanceAt(context.Background(), tv.relayerAddr, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get balance of operator account")

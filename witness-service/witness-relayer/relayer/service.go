@@ -86,11 +86,11 @@ func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*s
 	}
 	status := services.CheckResponse_UNKNOWN
 	switch transfer.status {
-	case TransferNew:
+	case waitingForWitnesses:
 		status = services.CheckResponse_CREATED
-	case ValidationSubmitted:
+	case validationSubmitted:
 		status = services.CheckResponse_SUBMITTED
-	case TransferSettled:
+	case transferSettled:
 		status = services.CheckResponse_SETTLED
 	}
 
@@ -103,7 +103,7 @@ func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*s
 }
 
 func (s *Service) process() error {
-	validatedTransfers, err := s.recorder.Transfers(ValidationSubmitted, 1)
+	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 1)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (s *Service) process() error {
 			}
 		case StatusOnChainNonceOverwritten:
 			// nonce has been overwritten
-			if err := s.recorder.Reset(transfer.id); err != nil {
+			if err := s.recorder.ResetCausedByNonce(transfer.id); err != nil {
 				return err
 			}
 		case StatusOnChainSettled:
@@ -132,7 +132,7 @@ func (s *Service) process() error {
 			return errors.New("unexpected error")
 		}
 	}
-	newTransfers, err := s.recorder.Transfers(TransferNew, 1)
+	newTransfers, err := s.recorder.Transfers(waitingForWitnesses, 1)
 	if err != nil {
 		return err
 	}
@@ -141,15 +141,19 @@ func (s *Service) process() error {
 		if err != nil {
 			return err
 		}
-
+		if err := s.recorder.MarkAsProcessing(transfer.id); err != nil {
+			return err
+		}
 		txHash, nonce, err := s.transferValidator.Submit(transfer, witnesses)
 		switch errors.Cause(err) {
 		case nil:
-			if err := s.recorder.MarkAsValidated(transfer.id, txHash, nonce); err != nil {
-				return err
-			}
+			return s.recorder.MarkAsValidated(transfer.id, txHash, nonce)
+		case errGasPriceTooHigh:
+			log.Printf("gas price is too high, %v\n", err)
+			return s.recorder.Reset(transfer.id)
 		case errInsufficientWitnesses:
-			// do nothing
+			log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
+			return s.recorder.Reset(transfer.id)
 		default:
 			return err
 		}

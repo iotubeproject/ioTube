@@ -79,7 +79,7 @@ func (tc *tokenCashierOnEthereum) PullTransfers(offset uint64, count uint16) (ui
 	log.Printf("\t%d transfers fetched", len(logs))
 	transfers := []*Transfer{}
 	for _, log := range logs {
-		var r eventReceipt
+		r := new(contract.TokenCashierReceipt)
 		if topicToFilter == log.Topics[0] {
 			return 0, nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], topicToFilter)
 		}
@@ -90,9 +90,9 @@ func (tc *tokenCashierOnEthereum) PullTransfers(offset uint64, count uint16) (ui
 			cashier:     log.Address,
 			token:       common.BytesToAddress(log.Topics[1][24:]),
 			index:       new(big.Int).SetBytes(log.Topics[2][:]).Uint64(),
-			sender:      r.sender,
-			recipient:   r.recipient,
-			amount:      r.amount,
+			sender:      r.Sender,
+			recipient:   r.Recipient,
+			amount:      r.Amount,
 			blockHeight: log.BlockNumber,
 			txHash:      log.TxHash,
 		})

@@ -9,6 +9,7 @@ package witness
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math"
@@ -26,16 +27,18 @@ import (
 type (
 	// Recorder is a logger based on sql to record exchange events
 	Recorder struct {
-		store             *db.SQLStore
-		transferTableName string
+		store              *db.SQLStore
+		transferTableName  string
+		tokenPairTableName string
 	}
 )
 
 // NewRecorder returns a recorder for exchange
-func NewRecorder(store *db.SQLStore, transferTableName string) *Recorder {
+func NewRecorder(store *db.SQLStore, transferTableName string, tokenPairTableName string) *Recorder {
 	return &Recorder{
-		store:             store,
-		transferTableName: transferTableName,
+		store:              store,
+		transferTableName:  transferTableName,
+		tokenPairTableName: tokenPairTableName,
 	}
 }
 
@@ -55,12 +58,12 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
 			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
-			"`id` varchar(132) NOT NULL UNIQUE,"+
-			"`signature` varchar(132) NOT NULL,"+
+			"`id` varchar(132),"+
+			"`signature` varchar(132),"+
 			"`blockHeight` bigint(20) NOT NULL,"+
 			"`txHash` varchar(66) NOT NULL,"+
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
-			"UNIQUE KEY `id_UNIQUE` (`id`),"+
+			"KEY `id_index` (`id`),"+
 			"KEY `cashier_index` (`cashier`),"+
 			"KEY `token_index` (`token`),"+
 			"KEY `sender_index` (`sender`),"+
@@ -73,6 +76,18 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 		TransferNew,
 	)); err != nil {
 		return errors.Wrapf(err, "failed to create table %s", recorder.transferTableName)
+	}
+
+	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s ("+
+			"`fromToken` varchar(42) NOT NULL,"+
+			"`toToken` varchar(42) NOT NULL,"+
+			"PRIMARY KEY (`fromToken`),"+
+			"UNIQUE KEY `toToken_UNIQUE` (`toToken`)"+
+			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
+		recorder.tokenPairTableName,
+	)); err != nil {
+		return errors.Wrapf(err, "failed to create table %s", recorder.tokenPairTableName)
 	}
 
 	return nil
@@ -92,26 +107,32 @@ func (recorder *Recorder) AddTransfer(tx *Transfer) error {
 		return errors.New("amount should be larger than 0")
 	}
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `signature`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName),
-		tx.cashier.String(),
-		tx.token.String(),
+		fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName),
+		tx.cashier.Hex(),
+		tx.token.Hex(),
 		tx.index,
-		tx.sender.String(),
-		tx.recipient.String(),
+		tx.sender.Hex(),
+		tx.recipient.Hex(),
 		tx.amount.String(),
-		tx.id.Hex(),
-		tx.signature,
 		tx.blockHeight,
 		tx.txHash.Hex(),
 	)
 	if err != nil {
 		return err
 	}
-	return recorder.validateResult(result)
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
+	}
+	return nil
 }
 
 // SettleTransfer marks a record as submitted
 func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
+	log.Printf("mark transfer %s as settled", tx.id.Hex())
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
 		TransferSettled,
@@ -129,6 +150,7 @@ func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
 
 // ConfirmTransfer marks a record as settled
 func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
+	log.Printf("mark transfer %s as confirmed", tx.id.Hex())
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
 		SubmissionConfirmed,
@@ -145,26 +167,62 @@ func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
 	return recorder.validateResult(result)
 }
 
-// TransfersNotSettled returns the list of transfers to process
-func (recorder *Recorder) TransfersNotSettled() ([]*Transfer, error) {
+// TransfersToSettle returns the list of transfers to confirm
+func (recorder *Recorder) TransfersToSettle() ([]*Transfer, error) {
+	return recorder.transfers(SubmissionConfirmed)
+
+}
+
+// TransfersToSubmit returns the list of transfers to submit
+func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
+	return recorder.transfers(TransferNew)
+}
+
+func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
 	rows, err := recorder.store.DB().Query(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `status`, `id` FROM %s WHERE `status` in (?, ?) ORDER BY `creationTime`", recorder.transferTableName),
+		fmt.Sprintf(
+			"SELECT ts.cashier, tp.fromToken, tp.toToken, ts.tidx, ts.sender, ts.recipient, ts.amount, ts.status, ts.id, ts.signature "+
+				"FROM %s `ts` INNER JOIN %s `tp` "+
+				"ON ts.token=tp.fromToken "+
+				"WHERE ts.status=? "+
+				"ORDER BY ts.creationTime",
+			recorder.transferTableName,
+			recorder.tokenPairTableName,
+		),
 		TransferNew,
-		SubmissionConfirmed,
 	)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	var rec []*Transfer
 	for rows.Next() {
 		tx := &Transfer{}
+		var cashier string
+		var fromToken string
+		var toToken string
+		var sender string
+		var recipient string
 		var rawAmount string
 		var id sql.NullString
-		if err := rows.Scan(&tx.cashier, &tx.token, &tx.index, &tx.sender, &tx.recipient, &rawAmount, &tx.status, id); err != nil {
+		var signature sql.NullString
+		if err := rows.Scan(&cashier, &fromToken, &toToken, &tx.index, &sender, &recipient, &rawAmount, &tx.status, &id, &signature); err != nil {
 			return nil, err
 		}
+		tx.cashier = common.HexToAddress(cashier)
+		tx.token = common.HexToAddress(fromToken)
+		tx.coToken = common.HexToAddress(toToken)
+		tx.sender = common.HexToAddress(sender)
+		tx.recipient = common.HexToAddress(recipient)
 		if id.Valid {
 			tx.id = common.HexToHash(id.String)
+		}
+		if signature.Valid {
+			var err error
+			if tx.signature, err = hex.DecodeString(signature.String); err != nil {
+				return nil, err
+			}
 		}
 		var ok bool
 		tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
@@ -179,7 +237,7 @@ func (recorder *Recorder) TransfersNotSettled() ([]*Transfer, error) {
 // TipHeight returns the tip height of all the transfers in the recorder
 func (recorder *Recorder) TipHeight() (uint64, error) {
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT MAX(blockHeight) as tip, Count(*) as c FROM %s", recorder.transferTableName),
+		fmt.Sprintf("SELECT MAX(blockHeight) FROM %s", recorder.transferTableName),
 	)
 	var height sql.NullInt64
 	if err := row.Scan(&height); err != nil {

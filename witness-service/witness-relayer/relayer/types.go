@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/pkg/errors"
@@ -53,14 +54,16 @@ type (
 )
 
 const (
-	// TransferNew stands for a transfer which needs more valid witnesses
-	TransferNew ValidationStatusType = "new"
-	// ValidationSubmitted stands for a transfer with validation submitted
-	ValidationSubmitted = "validated"
-	// TransferSettled stands for a transfer which has been settled
-	TransferSettled = "settled"
-	// ValidationFailed stands for the validation of a transfer failed
-	ValidationFailed = "failed"
+	// waitingForWitnesses stands for a transfer which needs more valid witnesses
+	waitingForWitnesses ValidationStatusType = "new"
+	// validationInProcess stands for a transfer in process
+	validationInProcess = "processing"
+	// validationSubmitted stands for a transfer with validation submitted
+	validationSubmitted = "validated"
+	// transferSettled stands for a transfer which has been settled
+	transferSettled = "settled"
+	// validationFailed stands for the validation of a transfer failed
+	validationFailed = "failed"
 )
 
 const (
@@ -72,6 +75,7 @@ const (
 )
 
 var errInsufficientWitnesses = errors.New("insufficient witnesses")
+var errGasPriceTooHigh = errors.New("gas price is too high")
 
 // UnmarshalTransferProto unmarshals a transfer proto
 func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transfer) (*Transfer, error) {
@@ -81,17 +85,17 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 	sender := common.BytesToAddress(transfer.Sender)
 	recipient := common.BytesToAddress(transfer.Recipient)
 	amount, ok := new(big.Int).SetString(transfer.Amount, 10)
-	if !ok || amount.Sign() == 1 {
+	if !ok || amount.Sign() == -1 {
 		return nil, errors.Errorf("invalid amount %s", transfer.Amount)
 	}
 	id := crypto.Keccak256Hash(
 		validatorAddr.Bytes(),
 		cashier.Bytes(),
 		token.Bytes(),
-		new(big.Int).SetUint64(index).Bytes(),
+		math.U256Bytes(new(big.Int).SetUint64(index)),
 		sender.Bytes(),
 		recipient.Bytes(),
-		amount.Bytes(),
+		math.U256Bytes(amount),
 	)
 
 	return &Transfer{

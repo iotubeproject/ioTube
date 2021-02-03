@@ -21,6 +21,7 @@ type (
 	Transfer struct {
 		cashier     common.Address
 		token       common.Address
+		coToken     common.Address
 		index       uint64
 		sender      common.Address
 		recipient   common.Address
@@ -43,15 +44,6 @@ type (
 	// TokenCashier defines the interface to pull transfers from chain in a block range
 	TokenCashier interface {
 		PullTransfers(blockOffset uint64, blockCount uint16) (uint64, []*Transfer, error)
-	}
-
-	eventReceipt struct {
-		token     common.Address
-		id        *big.Int
-		sender    common.Address
-		recipient common.Address
-		amount    *big.Int
-		fee       *big.Int
 	}
 )
 

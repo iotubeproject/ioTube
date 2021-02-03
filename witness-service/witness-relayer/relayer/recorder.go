@@ -38,12 +38,6 @@ type (
 		updateStatusQuery string
 		// updateStatusAndTransactionQuery is a query to set status and transaction
 		updateStatusAndTransactionQuery string
-		// queryTransfersByStatus is a query to pull a batch of records of different status
-		queryTransfersByStatus string
-		// queryTransferByID is a query to pull a transfer record given id
-		queryTransferByID string
-		// queryWitnesses is a query to pull the witnesses of a transfer record given id
-		queryWitnesses string
 	}
 )
 
@@ -55,9 +49,6 @@ func NewRecorder(store *db.SQLStore, transferTableName string, witnessTableName 
 		witnessTableName:                witnessTableName,
 		updateStatusQuery:               fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=? AND `status`=?", transferTableName),
 		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `nonce`=? WHERE `id`=? AND `status`=?", transferTableName),
-		queryTransfersByStatus:          fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime`", transferTableName),
-		queryTransferByID:               fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `status`, `updateTime` FROM %s WHERE `id`=?", transferTableName),
-		queryWitnesses:                  fmt.Sprintf("SELECT `witness`, `signature` FROM `%s` WHERE `transferId`=?", transferTableName),
 	}
 }
 
@@ -106,7 +97,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"KEY `txHash_index` (`txHash`)"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
 		recorder.transferTableName,
-		TransferNew,
+		waitingForWitnesses,
 	)); err != nil {
 		return errors.Wrap(err, "failed to create transfer table")
 	}
@@ -148,7 +139,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 	}
 	pk, err := crypto.UnmarshalPubkey(rpk)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to unmarshal public key")
 	}
 	if crypto.PubkeyToAddress(*pk) != witness.addr {
 		return errors.New("invalid signature")
@@ -160,7 +151,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 		return err
 	}
 	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, recipient, amount, id) VALUES (?, ?, ?, ?, ?, ?)", recorder.transferTableName),
+		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, recipient, amount, id) VALUES (?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName),
 		transfer.cashier.Hex(),
 		transfer.token.Hex(),
 		transfer.index,
@@ -169,35 +160,39 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 		transfer.amount.String(),
 		transfer.id.Hex(),
 	); err != nil {
-		return err
+		return errors.Wrap(err, "failed to insert into transfer table")
 	}
 	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT INTO %s (`transferId`, `witness`, `signature`) VALUES (?, ?, ?)", recorder.witnessTableName),
+		fmt.Sprintf("INSERT IGNORE INTO %s (`transferId`, `witness`, `signature`) VALUES (?, ?, ?)", recorder.witnessTableName),
 		transfer.id.Hex(),
 		witness.addr.Hex(),
+		hex.EncodeToString(witness.signature),
 	); err != nil {
-		return err
+		return errors.Wrap(err, "failed to insert into witness table")
 	}
 	return tx.Commit()
 }
 
 // Witnesses returns the witnesses of a transfer
 func (recorder *Recorder) Witnesses(id common.Hash) ([]*Witness, error) {
-	query := recorder.queryWitnesses
-	rows, err := recorder.store.DB().Query(query, id.Hex())
+	rows, err := recorder.store.DB().Query(
+		fmt.Sprintf("SELECT `witness`, `signature` FROM `%s` WHERE `transferId`=?", recorder.witnessTableName),
+		id.Hex(),
+	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to query witnesses table")
 	}
+	defer rows.Close()
 	var witnesses []*Witness
 	for rows.Next() {
 		var addr string
 		var signature string
 		if err := rows.Scan(&addr, &signature); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to scan witness")
 		}
 		sigBytes, err := hex.DecodeString(signature)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to decode signature")
 		}
 		witnesses = append(witnesses, &Witness{
 			addr:      common.HexToAddress(addr),
@@ -209,15 +204,29 @@ func (recorder *Recorder) Witnesses(id common.Hash) ([]*Witness, error) {
 
 // Transfer returns the validation tx related information of a given transfer
 func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
-	row := recorder.store.DB().QueryRow(recorder.queryTransferByID, id.Hex())
+	row := recorder.store.DB().QueryRow(
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `txHash`, `nonce`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
+		id.Hex(),
+	)
 	tx := &Transfer{}
 	var rawAmount string
+	var cashier, token, sender, recipient string
 	var hash sql.NullString
-	if err := row.Scan(&tx.cashier, &tx.token, &tx.index, &tx.sender, &tx.recipient, &rawAmount, &tx.id, &hash, &tx.nonce, &tx.updateTime); err != nil {
-		return nil, err
+	var nonce sql.NullInt64
+	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &hash, &nonce, &tx.status, &tx.updateTime); err != nil {
+		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
+	tx.cashier = common.HexToAddress(cashier)
+	tx.token = common.HexToAddress(token)
+	tx.sender = common.HexToAddress(sender)
+	tx.recipient = common.HexToAddress(recipient)
+	tx.id = id
+
 	if hash.Valid {
 		tx.txHash = common.HexToHash(hash.String)
+	}
+	if nonce.Valid {
+		tx.nonce = uint64(nonce.Int64)
 	}
 	var ok bool
 	tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
@@ -229,24 +238,36 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 
 // Transfers returns the list of records of given status
 func (recorder *Recorder) Transfers(status ValidationStatusType, limit uint8) ([]*Transfer, error) {
-	query := recorder.queryTransfersByStatus
+	query := fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime`", recorder.transferTableName)
 	if limit != 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, limit)
 	}
 	rows, err := recorder.store.DB().Query(query, status)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to query transfers table")
 	}
+	defer rows.Close()
 	var txs []*Transfer
 	for rows.Next() {
 		tx := &Transfer{}
+		var cashier, token, sender, recipient, id string
 		var rawAmount string
 		var hash sql.NullString
-		if err := rows.Scan(&tx.cashier, &tx.token, &tx.index, &tx.sender, &tx.recipient, &rawAmount, &tx.id, &hash, &tx.nonce, &tx.updateTime); err != nil {
-			return nil, err
+		var nonce sql.NullInt64
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &id, &hash, &nonce, &tx.updateTime); err != nil {
+			return nil, errors.Wrap(err, "failed to scan transfer")
 		}
+		tx.cashier = common.HexToAddress(cashier)
+		tx.token = common.HexToAddress(token)
+		tx.sender = common.HexToAddress(sender)
+		tx.recipient = common.HexToAddress(recipient)
+		tx.id = common.HexToHash(id)
+		tx.status = status
 		if hash.Valid {
 			tx.txHash = common.HexToHash(hash.String)
+		}
+		if nonce.Valid {
+			tx.nonce = uint64(nonce.Int64)
 		}
 		var ok bool
 		tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
@@ -258,11 +279,23 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, limit uint8) ([
 	return txs, nil
 }
 
+// MarkAsProcessing marks a record as processing
+func (recorder *Recorder) MarkAsProcessing(id common.Hash) error {
+	log.Printf("processing %s\n", id.Hex())
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationInProcess, id.Hex(), waitingForWitnesses)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as processing")
+	}
+
+	return recorder.validateResult(result)
+}
+
 // MarkAsValidated marks a transfer as validated
 func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, nonce uint64) error {
-	result, err := recorder.store.DB().Exec(recorder.updateStatusAndTransactionQuery, ValidationSubmitted, txhash.Hex(), nonce, id.Hex(), TransferNew)
+	log.Printf("mark transfer %s as validated (%s, %d)\n", id.Hex(), txhash.Hex(), nonce)
+	result, err := recorder.store.DB().Exec(recorder.updateStatusAndTransactionQuery, validationSubmitted, txhash.Hex(), nonce, id.Hex(), validationInProcess)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to mark as validated")
 	}
 
 	return recorder.validateResult(result)
@@ -270,9 +303,10 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, no
 
 // MarkAsSettled marks a record as settled
 func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, TransferSettled, id.Hex(), ValidationSubmitted)
+	log.Printf("mark transfer %s as settled\n", id.Hex())
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, transferSettled, id.Hex(), validationSubmitted)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to mark as settled")
 	}
 
 	return recorder.validateResult(result)
@@ -280,9 +314,10 @@ func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
 
 // MarkAsFailed marks a record as failed
 func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, ValidationFailed, id.Hex(), ValidationSubmitted)
+	log.Printf("mark transfer %s as failed\n", id.Hex())
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationFailed, id.Hex(), validationSubmitted)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to mark as failed")
 	}
 
 	return recorder.validateResult(result)
@@ -290,9 +325,21 @@ func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
 
 // Reset marks a record as new
 func (recorder *Recorder) Reset(id common.Hash) error {
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, TransferNew, id.Hex(), ValidationSubmitted)
+	log.Printf("reset transfer %s\n", id.Hex())
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, waitingForWitnesses, id.Hex(), validationInProcess)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to reset")
+	}
+
+	return recorder.validateResult(result)
+}
+
+// ResetCausedByNonce marks a record as new
+func (recorder *Recorder) ResetCausedByNonce(id common.Hash) error {
+	log.Printf("reset transfer %s\n", id.Hex())
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, waitingForWitnesses, id.Hex(), validationSubmitted)
+	if err != nil {
+		return errors.Wrap(err, "failed to reset")
 	}
 
 	return recorder.validateResult(result)

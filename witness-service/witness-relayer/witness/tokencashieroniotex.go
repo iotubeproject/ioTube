@@ -88,24 +88,23 @@ func (tc *tokenCashierOnIoTeX) PullTransfers(offset uint64, count uint16) (uint6
 	log.Printf("\t%d transfers fetched", len(response.Logs))
 	transfers := []*Transfer{}
 	for _, log := range response.Logs {
-		cashier, err := address.FromString(log.ContractAddress)
-		if err != nil {
-			return 0, nil, err
-		}
-		var r eventReceipt
 		if bytes.Compare(topicToFilter, log.Topics[0]) != 0 {
 			return 0, nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], topicToFilter)
 		}
-		if err := tc.tokenCashierABI.Unpack(&r, eventName, log.Data); err != nil {
+		if len(log.Data) != 128 {
+			return 0, nil, errors.Errorf("Invalid data length %d, 128 expected", len(log.Data))
+		}
+		cashier, err := address.FromString(log.ContractAddress)
+		if err != nil {
 			return 0, nil, err
 		}
 		transfers = append(transfers, &Transfer{
 			cashier:     common.BytesToAddress(cashier.Bytes()),
 			token:       common.BytesToAddress(log.Topics[1]),
 			index:       new(big.Int).SetBytes(log.Topics[2]).Uint64(),
-			sender:      r.sender,
-			recipient:   r.recipient,
-			amount:      r.amount,
+			sender:      common.BytesToAddress(log.Data[:32]),
+			recipient:   common.BytesToAddress(log.Data[32:64]),
+			amount:      new(big.Int).SetBytes(log.Data[64:96]),
 			blockHeight: log.BlkHeight,
 			txHash:      common.BytesToHash(log.ActHash),
 		})
