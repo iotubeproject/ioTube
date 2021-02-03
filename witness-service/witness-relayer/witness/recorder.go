@@ -9,7 +9,6 @@ package witness
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"math"
@@ -59,7 +58,6 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
 			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
 			"`id` varchar(132),"+
-			"`signature` varchar(132),"+
 			"`blockHeight` bigint(20) NOT NULL,"+
 			"`txHash` varchar(66) NOT NULL,"+
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
@@ -181,7 +179,7 @@ func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
 func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
-			"SELECT ts.cashier, tp.fromToken, tp.toToken, ts.tidx, ts.sender, ts.recipient, ts.amount, ts.status, ts.id, ts.signature "+
+			"SELECT ts.cashier, tp.fromToken, tp.toToken, ts.tidx, ts.sender, ts.recipient, ts.amount, ts.status, ts.id "+
 				"FROM %s `ts` INNER JOIN %s `tp` "+
 				"ON ts.token=tp.fromToken "+
 				"WHERE ts.status=? "+
@@ -189,7 +187,7 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 			recorder.transferTableName,
 			recorder.tokenPairTableName,
 		),
-		TransferNew,
+		status,
 	)
 	if err != nil {
 		return nil, err
@@ -206,8 +204,7 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		var recipient string
 		var rawAmount string
 		var id sql.NullString
-		var signature sql.NullString
-		if err := rows.Scan(&cashier, &fromToken, &toToken, &tx.index, &sender, &recipient, &rawAmount, &tx.status, &id, &signature); err != nil {
+		if err := rows.Scan(&cashier, &fromToken, &toToken, &tx.index, &sender, &recipient, &rawAmount, &tx.status, &id); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -217,12 +214,6 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		tx.recipient = common.HexToAddress(recipient)
 		if id.Valid {
 			tx.id = common.HexToHash(id.String)
-		}
-		if signature.Valid {
-			var err error
-			if tx.signature, err = hex.DecodeString(signature.String); err != nil {
-				return nil, err
-			}
 		}
 		var ok bool
 		tx.amount, ok = new(big.Int).SetString(rawAmount, 10)

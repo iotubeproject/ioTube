@@ -21,12 +21,12 @@ type Service struct {
 }
 
 // NewService creates a new relay service
-func NewService(tv TransferValidator, recorder *Recorder) (*Service, error) {
+func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration) (*Service, error) {
 	s := &Service{
 		transferValidator: tv,
 		recorder:          recorder,
 	}
-	processor, err := dispatcher.NewRunner(time.Minute, s.process)
+	processor, err := dispatcher.NewRunner(interval, s.process)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create runner")
 	}

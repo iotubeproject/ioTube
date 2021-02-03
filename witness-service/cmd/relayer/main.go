@@ -173,6 +173,7 @@ func main() {
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
 		),
+		cfg.RefreshInterval,
 	)
 	if err != nil {
 		log.Fatalf("failed to create relay service: %v\n", err)

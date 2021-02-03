@@ -136,7 +136,8 @@ func (s *service) process() error {
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
 	for _, transfer := range transfersToSubmit {
-		if transfer.id, transfer.signature, err = s.sign(transfer); err != nil {
+		var signature []byte
+		if transfer.id, signature, err = s.sign(transfer); err != nil {
 			return err
 		}
 		response, err := relayer.Submit(
@@ -151,7 +152,7 @@ func (s *service) process() error {
 					Amount:    transfer.amount.String(),
 				},
 				Address:   s.witnessAddress.Bytes(),
-				Signature: transfer.signature,
+				Signature: signature,
 			},
 		)
 		if err != nil {

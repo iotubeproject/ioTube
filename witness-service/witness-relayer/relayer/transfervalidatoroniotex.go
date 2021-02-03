@@ -78,12 +78,17 @@ func NewTransferValidatorOnIoTeX(
 	if err != nil {
 		return nil, err
 	}
-	tv := &transferValidatorOnIoTeX{
+	relayerAddr, err := address.FromBytes(crypto.PubkeyToAddress(privateKey.PublicKey).Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return &transferValidatorOnIoTeX{
 		gasLimit: 2000000,
 		gasPrice: big.NewInt(unit.Qev),
 
 		privateKey:            privateKey,
-		relayerAddr:           crypto.PubkeyToAddress(privateKey.PublicKey),
+		relayerAddr:           relayerAddr,
 		validatorContractAddr: validatorContractIoAddr,
 
 		client:                 client,
@@ -91,8 +96,7 @@ func NewTransferValidatorOnIoTeX(
 		validatorContractABI:   validatorABI,
 		witnessListContract:    client.Contract(witnessContractIoAddr, witnessContractABI),
 		witnessListContractABI: witnessContractABI,
-	}
-	return tv, nil
+	}, nil
 }
 
 func (tv *transferValidatorOnIoTeX) Address() common.Address {
@@ -126,7 +130,8 @@ func (tv *transferValidatorOnIoTeX) refresh() error {
 		if err := tv.witnessListContractABI.Unpack(ret, "getActiveItems", data.Raw); err != nil {
 			return err
 		}
-		witnesses = append(witnesses, ret.Items...)
+		witnesses = append(witnesses, ret.Items[:int(ret.Count.Int64())]...)
+		offset.Add(offset, big.NewInt(int64(limit)))
 	}
 	log.Println("refresh Witnesses on IoTeX")
 	activeWitnesses := make(map[string]bool)
@@ -136,11 +141,8 @@ func (tv *transferValidatorOnIoTeX) refresh() error {
 			return err
 		}
 		log.Println("\t" + addr.String())
-		activeWitnesses[w.String()] = true
+		activeWitnesses[w.Hex()] = true
 	}
-	tv.mu.Lock()
-	defer tv.mu.Unlock()
-
 	tv.witnesses = activeWitnesses
 
 	return nil
@@ -179,7 +181,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		// no matter what the receipt status is, mark the validation as failure
 		return StatusOnChainRejected, nil
 	}
-	if transfer.nonce < accountMeta.Nonce {
+	if transfer.nonce <= accountMeta.Nonce {
 		return StatusOnChainNonceOverwritten, nil
 	}
 
@@ -198,6 +200,11 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 	numOfValidSignatures := 0
 	for _, witness := range witnesses {
 		if !tv.isActiveWitness(witness.addr) {
+			addr, err := address.FromBytes(witness.addr.Bytes())
+			if err != nil {
+				return common.Hash{}, 0, err
+			}
+			log.Printf("witness %s is inactive\n", addr.String())
 			continue
 		}
 		signatures = append(signatures, witness.signature...)
@@ -229,13 +236,13 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 		signatures,
 	).SetGasPrice(tv.gasPrice).
 		SetGasLimit(tv.gasLimit).
-		SetNonce(accountMeta.Nonce).
+		SetNonce(accountMeta.Nonce + 1).
 		Call(context.Background())
 	if err != nil {
 		return common.Hash{}, 0, err
 	}
 
-	return common.BytesToHash(actionHash[:]), accountMeta.Nonce, nil
+	return common.BytesToHash(actionHash[:]), accountMeta.Nonce + 1, nil
 }
 
 func (tv *transferValidatorOnIoTeX) relayerAccountMeta() (*iotextypes.AccountMeta, error) {

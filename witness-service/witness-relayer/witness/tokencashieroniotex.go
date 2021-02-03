@@ -27,7 +27,7 @@ type (
 	tokenCashierOnIoTeX struct {
 		cashierContractAddr address.Address
 		iotexClient         iotex.ReadOnlyClient
-		tokenCashierABI     abi.ABI
+		eventTopic          []byte
 	}
 )
 
@@ -40,13 +40,12 @@ func NewTokenCashier(cashierContractAddr address.Address, iotexClient iotex.Read
 	return &tokenCashierOnIoTeX{
 		cashierContractAddr: cashierContractAddr,
 		iotexClient:         iotexClient,
-		tokenCashierABI:     tokenCashierABI,
+		eventTopic:          tokenCashierABI.Events[eventName].Id().Bytes(),
 	}, nil
 }
 
 // PullTransfers pulls transfers by query token cashier receipts
 func (tc *tokenCashierOnIoTeX) PullTransfers(offset uint64, count uint16) (uint64, []*Transfer, error) {
-	topicToFilter := tc.tokenCashierABI.Events[eventName].Id().Bytes()
 	chainMetaResponse, err := tc.iotexClient.API().GetChainMeta(context.Background(), &iotexapi.GetChainMetaRequest{})
 	if err != nil {
 		return 0, nil, err
@@ -69,7 +68,7 @@ func (tc *tokenCashierOnIoTeX) PullTransfers(offset uint64, count uint16) (uint6
 			Topics: []*iotexapi.Topics{
 				{
 					Topic: [][]byte{
-						topicToFilter,
+						tc.eventTopic,
 					},
 				},
 			},
@@ -88,8 +87,8 @@ func (tc *tokenCashierOnIoTeX) PullTransfers(offset uint64, count uint16) (uint6
 	log.Printf("\t%d transfers fetched", len(response.Logs))
 	transfers := []*Transfer{}
 	for _, log := range response.Logs {
-		if bytes.Compare(topicToFilter, log.Topics[0]) != 0 {
-			return 0, nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], topicToFilter)
+		if bytes.Compare(tc.eventTopic, log.Topics[0]) != 0 {
+			return 0, nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], tc.eventTopic)
 		}
 		if len(log.Data) != 128 {
 			return 0, nil, errors.Errorf("Invalid data length %d, 128 expected", len(log.Data))

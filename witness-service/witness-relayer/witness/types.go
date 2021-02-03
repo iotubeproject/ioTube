@@ -28,7 +28,6 @@ type (
 		amount      *big.Int
 		id          common.Hash
 		status      TransferStatus
-		signature   []byte
 		blockHeight uint64
 		txHash      common.Hash
 	}

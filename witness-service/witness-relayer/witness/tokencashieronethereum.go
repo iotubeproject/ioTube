@@ -7,6 +7,7 @@
 package witness
 
 import (
+	"bytes"
 	"context"
 	"log"
 	"math/big"
@@ -25,7 +26,7 @@ type (
 	tokenCashierOnEthereum struct {
 		cashierContractAddr common.Address
 		ethereumClient      *ethclient.Client
-		tokenCashierABI     abi.ABI
+		eventTopic          common.Hash
 		confirmBlockNumber  uint64
 	}
 )
@@ -39,14 +40,13 @@ func NewTokenCashierOnEthereum(cashierContractAddr common.Address, ethereumClien
 	return &tokenCashierOnEthereum{
 		cashierContractAddr: cashierContractAddr,
 		ethereumClient:      ethereumClient,
-		tokenCashierABI:     tokenCashierABI,
+		eventTopic:          tokenCashierABI.Events[eventName].Id(),
 		confirmBlockNumber:  uint64(confirmBlockNumber),
 	}, nil
 }
 
 // PullTransfers pulls transfers by query token cashier receipts
 func (tc *tokenCashierOnEthereum) PullTransfers(offset uint64, count uint16) (uint64, []*Transfer, error) {
-	topicToFilter := tc.tokenCashierABI.Events[eventName].Id()
 	tipHeader, err := tc.ethereumClient.HeaderByNumber(context.Background(), nil)
 	if err != nil {
 		return 0, nil, err
@@ -69,7 +69,7 @@ func (tc *tokenCashierOnEthereum) PullTransfers(offset uint64, count uint16) (ui
 		Addresses: []common.Address{tc.cashierContractAddr},
 		Topics: [][]common.Hash{
 			{
-				topicToFilter,
+				tc.eventTopic,
 			},
 		},
 	})
@@ -79,20 +79,16 @@ func (tc *tokenCashierOnEthereum) PullTransfers(offset uint64, count uint16) (ui
 	log.Printf("\t%d transfers fetched", len(logs))
 	transfers := []*Transfer{}
 	for _, log := range logs {
-		r := new(contract.TokenCashierReceipt)
-		if topicToFilter == log.Topics[0] {
-			return 0, nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], topicToFilter)
-		}
-		if err := tc.tokenCashierABI.Unpack(&r, eventName, log.Data); err != nil {
-			return 0, nil, err
+		if !bytes.Equal(tc.eventTopic[:], log.Topics[0][:]) {
+			return 0, nil, errors.Errorf("Wrong event topic %x, %x expected", log.Topics[0], tc.eventTopic)
 		}
 		transfers = append(transfers, &Transfer{
 			cashier:     log.Address,
-			token:       common.BytesToAddress(log.Topics[1][24:]),
+			token:       common.BytesToAddress(log.Topics[1][:]),
 			index:       new(big.Int).SetBytes(log.Topics[2][:]).Uint64(),
-			sender:      r.Sender,
-			recipient:   r.Recipient,
-			amount:      r.Amount,
+			sender:      common.BytesToAddress(log.Data[:32]),
+			recipient:   common.BytesToAddress(log.Data[32:64]),
+			amount:      new(big.Int).SetBytes(log.Data[64:96]),
 			blockHeight: log.BlockNumber,
 			txHash:      log.TxHash,
 		})
