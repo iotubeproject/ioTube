@@ -16,3 +16,7 @@
 
 # Truffle build directories
 build/
+
+witness-service/bin/
+
+node_modules/

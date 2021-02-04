@@ -17,42 +17,43 @@ import (
 	"strconv"
 	"time"
 
-	uconfig "go.uber.org/config"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/iotexproject/ioTube/witness-service/db"
-	"github.com/iotexproject/ioTube/witness-service/grpc/services"
-	"github.com/iotexproject/ioTube/witness-service/util"
-	"github.com/iotexproject/ioTube/witness-service/witness-relayer/relayer"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/account"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
+	"go.uber.org/config"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+
+	"github.com/iotexproject/ioTube/witness-service/db"
+	"github.com/iotexproject/ioTube/witness-service/grpc/services"
+	"github.com/iotexproject/ioTube/witness-service/relayer"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
 	Chain                 string        `json:"chain" yaml:"chain"`
-	RefreshInterval       time.Duration `json:"refreshInterval" yaml:"refreshInterval"`
 	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
 	EthConfirmBlockNumber uint8         `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
 	EthGasPriceLimit      uint64        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
-	Port                  int           `json:"port" yaml:"port"`
 	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
-	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
+	Interval              time.Duration `json:"interval" yaml:"interval"`
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
-	DatabaseURL           string        `json:"databaseURL" yaml:"databaseURL"`
-	TransferTableName     string        `json:"transferTableName" yaml:"transferTableName"`
-	WitnessTableName      string        `json:"witnessTableName" yaml:"witnessTableName"`
+
+	SlackWebHook      string `json:"slackWebHook" yaml:"slackWebHook"`
+	Port              int    `json:"port" yaml:"port"`
+	DatabaseURL       string `json:"databaseURL" yaml:"databaseURL"`
+	TransferTableName string `json:"transferTableName" yaml:"transferTableName"`
+	WitnessTableName  string `json:"witnessTableName" yaml:"witnessTableName"`
 }
 
 var defaultConfig = Configuration{
 	Chain:                 "iotex",
-	RefreshInterval:       time.Hour,
+	Interval:              time.Hour,
 	ClientURL:             "",
 	EthConfirmBlockNumber: 20,
 	EthGasPriceLimit:      120000000000,
@@ -79,18 +80,16 @@ func init() {
 //	4.	listens on the port we want
 func main() {
 	flag.Parse()
-	opts := make([]uconfig.YAMLOption, 0)
-	opts = append(opts, uconfig.Static(defaultConfig))
-	opts = append(opts, uconfig.Expand(os.LookupEnv))
+	opts := []config.YAMLOption{config.Static(defaultConfig), config.Expand(os.LookupEnv)}
 	if *configFile != "" {
-		opts = append(opts, uconfig.File(*configFile))
+		opts = append(opts, config.File(*configFile))
 	}
-	yaml, err := uconfig.NewYAML(opts...)
+	yaml, err := config.NewYAML(opts...)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	var cfg Configuration
-	if err := yaml.Get(uconfig.Root).Populate(&cfg); err != nil {
+	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
 	if port, ok := os.LookupEnv("RELAYER_PORT"); ok {
@@ -124,7 +123,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	log.Println("Creating service")
 	var transferValidator relayer.TransferValidator
-	if chain, ok := os.LookupEnv("WITNESS_CHAIN"); ok {
+	if chain, ok := os.LookupEnv("RELAYER_CHAIN"); ok {
 		cfg.Chain = chain
 	}
 	switch cfg.Chain {
@@ -173,7 +172,7 @@ func main() {
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
 		),
-		cfg.RefreshInterval,
+		cfg.Interval,
 	)
 	if err != nil {
 		log.Fatalf("failed to create relay service: %v\n", err)

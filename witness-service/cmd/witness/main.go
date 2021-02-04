@@ -15,40 +15,42 @@ import (
 	"strconv"
 	"time"
 
-	uconfig "go.uber.org/config"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/iotexproject/ioTube/witness-service/db"
-	"github.com/iotexproject/ioTube/witness-service/util"
-	"github.com/iotexproject/ioTube/witness-service/witness-relayer/witness"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
+	"go.uber.org/config"
+
+	"github.com/iotexproject/ioTube/witness-service/db"
+	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/witness"
 )
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
 	Chain                    string        `json:"chain" yaml:"chain"`
 	ClientURL                string        `json:"clientURL" yaml:"clientURL"`
-	RelayerURL               string        `json:"relayerURL" yaml:"relayerURL"`
 	PrivateKey               string        `json:"privateKey" yaml:"privateKey"`
-	SlackWebHook             string        `json:"slackWebHook" yaml:"slackWebHook"`
 	ValidatorContractAddress string        `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
 	CashierContractAddress   string        `json:"cashierContractAddress" yaml:"cashierContractAddress"`
 	StartBlockHeight         int           `json:"startBlockHeight" yaml:"startBlockHeight"`
 	BatchSize                int           `json:"batchSize" yaml:"batchSize"`
-	ProcessInterval          time.Duration `json:"processInterval" yaml:"processInterval"`
-	DatabaseURL              string        `json:"databaseURL" yaml:"databaseURL"`
-	TransferTableName        string        `json:"transferTableName" yaml:"transferTableName"`
-	TokenPairTableName       string        `json:"tokenPairTableName" yaml:"tokenPairTableName"`
+	Interval                 time.Duration `json:"interval" yaml:"interval"`
+
+	RelayerURL   string `json:"relayerURL" yaml:"relayerURL"`
+	SlackWebHook string `json:"slackWebHook" yaml:"slackWebHook"`
+
+	DatabaseURL        string `json:"databaseURL" yaml:"databaseURL"`
+	TransferTableName  string `json:"transferTableName" yaml:"transferTableName"`
+	TokenPairTableName string `json:"tokenPairTableName" yaml:"tokenPairTableName"`
 }
 
 var (
 	defaultConfig = Configuration{
 		Chain:                    "ethereum",
-		ProcessInterval:          time.Minute,
+		Interval:                 time.Minute,
 		RelayerURL:               "",
 		StartBlockHeight:         9305000,
 		BatchSize:                100,
@@ -73,18 +75,16 @@ func init() {
 
 func main() {
 	flag.Parse()
-	opts := make([]uconfig.YAMLOption, 0)
-	opts = append(opts, uconfig.Static(defaultConfig))
-	opts = append(opts, uconfig.Expand(os.LookupEnv))
+	opts := []config.YAMLOption{config.Static(defaultConfig), config.Expand(os.LookupEnv)}
 	if *configFile != "" {
-		opts = append(opts, uconfig.File(*configFile))
+		opts = append(opts, config.File(*configFile))
 	}
-	yaml, err := uconfig.NewYAML(opts...)
+	yaml, err := config.NewYAML(opts...)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	var cfg Configuration
-	if err := yaml.Get(uconfig.Root).Populate(&cfg); err != nil {
+	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
 	if height, ok := os.LookupEnv("WITNESS_START_BLOCK_HEIGHT"); ok {
@@ -165,7 +165,7 @@ func main() {
 		privateKey,
 		uint64(cfg.StartBlockHeight),
 		uint16(cfg.BatchSize),
-		cfg.ProcessInterval,
+		cfg.Interval,
 	)
 	if err != nil {
 		log.Fatalf("failed to create witness service: %v\n", err)

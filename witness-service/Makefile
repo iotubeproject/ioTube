@@ -10,28 +10,32 @@
 GOCMD=go
 GOBUILD=$(GOCMD) build
 GOTEST=$(GOCMD) test
-BUILD_TARGET_SERVER=witness-service
 DOCKERCMD=docker
 
 install:                                                                                   
 	$(GOCMD) install -v
 
 docker:
-	$(DOCKERCMD) build -t iotex$(USER)/iotube-witness:latest .
+	$(DOCKERCMD) build -t iotex$(USER)/iotube-witness:latest . -f Dockerfile.witness
+	$(DOCKERCMD) build -t iotex$(USER)/iotube-relayer:latest . -f Dockerfile.relayer
 
 abi:
 	@echo "Creating contracts' golang file"
 	./contract/abigen.sh
 
-build-all: clean
-	$(GOBUILD) -o ./bin/$(BUILD_TARGET_SERVER)
+build-witness:
+	$(GOBUILD) -o ./bin/witness cmd/witness/main.go
 
-run: build
-	./bin/$(BUILD_TARGET_SERVER)
+build-relayer:
+	$(GOBUILD) -o ./bin/relayer cmd/relayer/main.go
+
+build-all: build-witness build-relayer
+
+all: clean build-all test
 
 clean:
 	@echo "Cleaning..."
-	rm -rf ./bin/$(BUILD_TARGET_SERVER)
+	rm -rf ./bin/
 
 fmt:
 	$(GOCMD) fmt ./...
