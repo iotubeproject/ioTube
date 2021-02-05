@@ -14,16 +14,19 @@ services:
     container_name: iotex-relayer
     image: relayer:latest
     restart: on-failure
+    ports:
+      - 7001:7001
     volumes:
       - $IOTEX_RELAYER/etc/relayer-config-iotex.yaml:/etc/iotube-relayer/relayer-config-iotex.yaml:ro
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex.yaml
-
   ethereum-relayer:
     container_name: ethereum-relayer
     image: relayer:latest
     restart: on-failure
+    ports:
+      - 7000:7000
     volumes:
       - $IOTEX_RELAYER/etc/relayer-config-ethereum.yaml:/etc/iotube-relayer/relayer-config-ethereum.yaml:ro
     links:

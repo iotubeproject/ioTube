@@ -1,0 +1,10 @@
+chain: "iotex"
+refreshInterval: 1m
+clientURL: "api.iotex.one:443"
+port: 7001
+privateKey: ""
+slackWebHook: "" 
+validatorAddress: "io"
+databaseURL: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+transferTableName: "iotex_transfers"
+witnessTableName: "iotex_witnesses"
