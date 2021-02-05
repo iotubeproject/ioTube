@@ -80,13 +80,14 @@ function downloadConfigFile() {
 
     [[ -f ${IOTEX_WITNESS}/etc/.env ]] || (echo "IOTEX_WITNESS=$IOTEX_WITNESS" > ${IOTEX_WITNESS}/etc/.env;echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${IOTEX_WITNESS}/etc/.env)
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_WITNESS}/etc/crontab
-    cp -f $PROJECT_ABS_DIR/backup ${IOTEX_WITNESS}/etc/backup
+    cp -f $PROJECT_ABS_DIR/backup_witness ${IOTEX_WITNESS}/etc/backup
 }
 
 function makeWorkspace() {
     mkdir -p ${IOTEX_WITNESS}
     mkdir -p ${IOTEX_WITNESS}/etc
     mkdir -p ${IOTEX_WITNESS}/data/mysql
+    mkdir -p ${IOTEX_WITNESS}/backup
     downloadConfigFile
 }
 
@@ -127,7 +128,7 @@ function grantPrivileges() {
 
 function buildService() {
     pushd $PROJECT_ABS_DIR
-    docker build . -t witness:latest || exit 2
+    docker build . -f Dockerfile.witness -t witness:latest || exit 2
 }
 
 function startup() {

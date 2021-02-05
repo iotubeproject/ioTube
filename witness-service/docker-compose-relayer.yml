@@ -1,0 +1,50 @@
+version: '2'
+
+services:
+  database:
+    container_name: relayer-db
+    image: mysql:8
+    restart: always
+    volumes:
+      - $IOTEX_RELAYER/data/mysql:/var/lib/mysql:rw
+    environment:
+       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+
+  iotex-relayer:
+    container_name: iotex-relayer
+    image: relayer:latest
+    restart: on-failure
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-iotex.yaml:/etc/iotube-relayer/relayer-config-iotex.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-iotex.yaml
+
+  ethereum-relayer:
+    container_name: ethereum-relayer
+    image: relayer:latest
+    restart: on-failure
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-ethereum.yaml:/etc/iotube-relayer/relayer-config-ethereum.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum.yaml
+  cron:
+    image: schnitzler/mysqldump
+    restart: always
+    volumes:
+      - $IOTEX_RELAYER/etc/crontab:/var/spool/cron/crontabs/root
+      - $IOTEX_RELAYER/etc/backup:/usr/local/bin/backup
+    volumes_from:
+      - backup
+    command: ["-l", "8", "-d", "8"]
+    environment:
+      MYSQL_HOST: database
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: relayer
+
+  backup:
+    image: busybox
+    volumes:
+      - $IOTEX_RELAYER/data/backup:/backup

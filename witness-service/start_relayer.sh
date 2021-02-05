@@ -79,13 +79,14 @@ function downloadConfigFile() {
     fi
     [[ -f ${IOTEX_RELAYER}/etc/.env ]] || (echo "IOTEX_RELAYER=$IOTEX_RELAYER" > ${IOTEX_RELAYER}/etc/.env;echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${IOTEX_RELAYER}/etc/.env)
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_RELAYER}/etc/crontab
-    cp -f $PROJECT_ABS_DIR/backup ${IOTEX_RELAYER}/etc/backup
+    cp -f $PROJECT_ABS_DIR/backup_relayer ${IOTEX_RELAYER}/etc/backup
 }
 
 function makeWorkspace() {
     mkdir -p ${IOTEX_RELAYER}
     mkdir -p ${IOTEX_RELAYER}/etc
     mkdir -p ${IOTEX_RELAYER}/data/mysql
+    mkdir -p ${IOTEX_RELAYER}/data/backup
     downloadConfigFile
 }
 
@@ -126,7 +127,7 @@ function grantPrivileges() {
 
 function buildService() {
     pushd $PROJECT_ABS_DIR
-    docker build . -t relayer:latest || exit 2
+    docker build . -f Dockerfile.relayer -t relayer:latest || exit 2
 }
 
 function startup() {

@@ -11,7 +11,7 @@ services:
        MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
   iotex-witness:
-    container_name: witness
+    container_name: iotex-witness
     image: witness:latest
     restart: on-failure
     volumes:
@@ -19,8 +19,9 @@ services:
     links:
       - database
     command: witness -config=/etc/iotube-witness/witness-config-iotex.yaml
+
   ethereum-witness:
-    container_name: witness
+    container_name: ethereum-witness
     image: witness:latest
     restart: on-failure
     volumes:
