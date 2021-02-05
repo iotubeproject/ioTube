@@ -10,18 +10,24 @@ services:
     environment:
        MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
-  app:
+  iotex-witness:
     container_name: witness
     image: witness:latest
     restart: on-failure
-    ports:
-      - 8080:8080
     volumes:
-      - $IOTEX_WITNESS/etc/service.yaml:/etc/iotube-witness/service.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-iotex.yaml:/etc/iotube-witness/witness-config-iotex.yaml:ro
     links:
       - database
-    command: witness-service -config=/etc/iotube-witness/service.yaml
-
+    command: witness -config=/etc/iotube-witness/witness-config-iotex.yaml
+  ethereum-witness:
+    container_name: witness
+    image: witness:latest
+    restart: on-failure
+    volumes:
+      - $IOTEX_WITNESS/etc/witness-config-ethereum.yaml:/etc/iotube-witness/witness-config-ethereum.yaml:ro
+    links:
+      - database
+    command: witness -config=/etc/iotube-witness/witness-config-ethereum.yaml
   cron:
     image: schnitzler/mysqldump
     restart: always
