@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package services;
+
+option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/services";
+
+import "witness-service/proto-files/types/witness.proto";
+
+service RelayService {
+    rpc Submit(types.Witness) returns (WitnessSubmissionResponse);
+    rpc Check(CheckRequest) returns (CheckResponse);
+}
+
+message CheckRequest {
+    bytes id = 1;
+}
+
+message CheckResponse {
+    bytes key = 1;
+    repeated bytes witnesses = 2;
+    bytes txHash = 3;
+    enum Status {
+        UNKNOWN = 0;
+        CREATED = 1;
+        SUBMITTED = 2;
+        SETTLED = 3;
+    }
+    Status status = 4;
+}
+
+message WitnessSubmissionResponse {
+    bytes id = 1;
+    bool success = 2;
+}

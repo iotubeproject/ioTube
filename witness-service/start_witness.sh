@@ -55,31 +55,39 @@ function confirmEnvironmentVariable() {
 }
 
 function downloadConfigFile() {
-    if [[ ! -f ${IOTEX_WITNESS}/etc/docker-compose.yml ]];then
-	cp -f $PROJECT_ABS_DIR/docker-compose.yml ${IOTEX_WITNESS}/etc/docker-compose.yml
-	if [ $? -ne 0 ];then
-		echo "Get docker-compose config error"
-		exit 2
-	fi
+    if [[ ! -f ${IOTEX_WITNESS}/etc/docker-compose-witness.yml ]];then
+        cp -f $PROJECT_ABS_DIR/docker-compose-witness.yml ${IOTEX_WITNESS}/etc/docker-compose.yml
+        if [ $? -ne 0 ];then
+            echo "Get docker-compose config error"
+            exit 2
+        fi
     fi
     
-    if [[ ! -f ${IOTEX_WITNESS}/etc/service.yaml ]];then
-	cp -f $PROJECT_ABS_DIR/service.yaml ${IOTEX_WITNESS}/etc/service.yaml
-	if [ $? -ne 0 ];then
-	    echo "Get config error"
-		exit 2
-	fi
+    if [[ ! -f ${IOTEX_WITNESS}/etc/witness-config-iotex.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/witness-config-iotex.yaml ${IOTEX_WITNESS}/etc/witness-config-iotex.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
     fi
-    
+    if [[ ! -f ${IOTEX_WITNESS}/etc/witness-config-ethereum.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/witness-config-ethereum.yaml ${IOTEX_WITNESS}/etc/witness-config-ethereum.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
+
     [[ -f ${IOTEX_WITNESS}/etc/.env ]] || (echo "IOTEX_WITNESS=$IOTEX_WITNESS" > ${IOTEX_WITNESS}/etc/.env;echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${IOTEX_WITNESS}/etc/.env)
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_WITNESS}/etc/crontab
-    cp -f $PROJECT_ABS_DIR/backup ${IOTEX_WITNESS}/etc/backup
+    cp -f $PROJECT_ABS_DIR/backup_witness ${IOTEX_WITNESS}/etc/backup
 }
 
 function makeWorkspace() {
     mkdir -p ${IOTEX_WITNESS}
     mkdir -p ${IOTEX_WITNESS}/etc
     mkdir -p ${IOTEX_WITNESS}/data/mysql
+    mkdir -p ${IOTEX_WITNESS}/backup
     downloadConfigFile
 }
 
@@ -120,7 +128,7 @@ function grantPrivileges() {
 
 function buildService() {
     pushd $PROJECT_ABS_DIR
-    docker build . -t witness:latest || exit 2
+    docker build . -f Dockerfile.witness -t witness:latest || exit 2
 }
 
 function startup() {
@@ -128,7 +136,7 @@ function startup() {
     pushd $IOTEX_WITNESS/etc
     docker-compose up -d
     if [ $? -eq 0 ];then
-        echo -e "${YELLOW} Server port on 8080. ${NC}"
+        echo -e "${YELLOW} Service on. ${NC}"
     fi
     popd
 }

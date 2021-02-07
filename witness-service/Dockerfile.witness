@@ -1,0 +1,23 @@
+FROM golang:1.14-alpine as build
+
+WORKDIR apps/iotube-witness
+
+RUN apk add --no-cache make gcc musl-dev linux-headers git
+
+COPY go.mod .
+COPY go.sum .
+
+RUN go mod download
+
+COPY . .
+
+RUN mkdir -p $GOPATH/pkg/linux_amd64/github.com/iotexproject/ && \
+    make clean build-witness
+
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates
+RUN mkdir -p /etc/iotube/
+COPY --from=build /go/apps/iotube-witness/bin/witness /usr/local/bin/witness
+
+CMD [ "witness" ]

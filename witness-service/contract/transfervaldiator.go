@@ -27,7 +27,7 @@ var (
 )
 
 // TransferValidatorABI is the input ABI used to generate the binding from.
-const TransferValidatorABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address[]\",\"name\":\"witnesses\",\"type\":\"address[]\"}],\"name\":\"Settled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"witness\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"WitnessSubmitted\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"transfers\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"settleHeight\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"whitelistedTokens\",\"outputs\":[{\"internalType\":\"contractAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"whitelistedWitnesses\",\"outputs\":[{\"internalType\":\"contractAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"witnessList\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"witnessMap\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"generateKey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"getStatus\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"settleHeight_\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"numOfWhitelistedWitnesses_\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"numOfValidWitnesses_\",\"type\":\"uint256\"},{\"internalType\":\"address[]\",\"name\":\"witnesses_\",\"type\":\"address[]\"},{\"internalType\":\"bool\",\"name\":\"includingMsgSender_\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"submit\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+const TransferValidatorABI = "[{\"inputs\":[{\"internalType\":\"contractMinter[]\",\"name\":\"_minters\",\"type\":\"address[]\"},{\"internalType\":\"contractAllowlist[]\",\"name\":\"_tokenLists\",\"type\":\"address[]\"},{\"internalType\":\"contractAllowlist\",\"name\":\"_witnessList\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address[]\",\"name\":\"witnesses\",\"type\":\"address[]\"}],\"name\":\"Settled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"minters\",\"outputs\":[{\"internalType\":\"contractMinter\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"settles\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenLists\",\"outputs\":[{\"internalType\":\"contractAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"witnessList\",\"outputs\":[{\"internalType\":\"contractAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"cashier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"generateKey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_newValidator\",\"type\":\"address\"}],\"name\":\"upgrade\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"cashier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"signatures\",\"type\":\"bytes\"}],\"name\":\"submit\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // TransferValidator is an auto generated Go binding around an Ethereum contract.
 type TransferValidator struct {
@@ -171,78 +171,56 @@ func (_TransferValidator *TransferValidatorTransactorRaw) Transact(opts *bind.Tr
 	return _TransferValidator.Contract.contract.Transact(opts, method, params...)
 }
 
-// GenerateKey is a free data retrieval call binding the contract method 0x3a9b56cc.
+// GenerateKey is a free data retrieval call binding the contract method 0x6b6bc862.
 //
-// Solidity: function generateKey(address tokenAddr, uint256 index, address from, address to, uint256 amount) pure returns(bytes32)
-func (_TransferValidator *TransferValidatorCaller) GenerateKey(opts *bind.CallOpts, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) ([32]byte, error) {
+// Solidity: function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount) view returns(bytes32)
+func (_TransferValidator *TransferValidatorCaller) GenerateKey(opts *bind.CallOpts, cashier common.Address, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) ([32]byte, error) {
 	var (
 		ret0 = new([32]byte)
 	)
 	out := ret0
-	err := _TransferValidator.contract.Call(opts, out, "generateKey", tokenAddr, index, from, to, amount)
+	err := _TransferValidator.contract.Call(opts, out, "generateKey", cashier, tokenAddr, index, from, to, amount)
 	return *ret0, err
 }
 
-// GenerateKey is a free data retrieval call binding the contract method 0x3a9b56cc.
+// GenerateKey is a free data retrieval call binding the contract method 0x6b6bc862.
 //
-// Solidity: function generateKey(address tokenAddr, uint256 index, address from, address to, uint256 amount) pure returns(bytes32)
-func (_TransferValidator *TransferValidatorSession) GenerateKey(tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) ([32]byte, error) {
-	return _TransferValidator.Contract.GenerateKey(&_TransferValidator.CallOpts, tokenAddr, index, from, to, amount)
+// Solidity: function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount) view returns(bytes32)
+func (_TransferValidator *TransferValidatorSession) GenerateKey(cashier common.Address, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) ([32]byte, error) {
+	return _TransferValidator.Contract.GenerateKey(&_TransferValidator.CallOpts, cashier, tokenAddr, index, from, to, amount)
 }
 
-// GenerateKey is a free data retrieval call binding the contract method 0x3a9b56cc.
+// GenerateKey is a free data retrieval call binding the contract method 0x6b6bc862.
 //
-// Solidity: function generateKey(address tokenAddr, uint256 index, address from, address to, uint256 amount) pure returns(bytes32)
-func (_TransferValidator *TransferValidatorCallerSession) GenerateKey(tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) ([32]byte, error) {
-	return _TransferValidator.Contract.GenerateKey(&_TransferValidator.CallOpts, tokenAddr, index, from, to, amount)
+// Solidity: function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount) view returns(bytes32)
+func (_TransferValidator *TransferValidatorCallerSession) GenerateKey(cashier common.Address, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) ([32]byte, error) {
+	return _TransferValidator.Contract.GenerateKey(&_TransferValidator.CallOpts, cashier, tokenAddr, index, from, to, amount)
 }
 
-// GetStatus is a free data retrieval call binding the contract method 0xae972e95.
+// Minters is a free data retrieval call binding the contract method 0x8623ec7b.
 //
-// Solidity: function getStatus(address tokenAddr, uint256 index, address from, address to, uint256 amount) view returns(uint256 settleHeight_, uint256 numOfWhitelistedWitnesses_, uint256 numOfValidWitnesses_, address[] witnesses_, bool includingMsgSender_)
-func (_TransferValidator *TransferValidatorCaller) GetStatus(opts *bind.CallOpts, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) (struct {
-	SettleHeight              *big.Int
-	NumOfWhitelistedWitnesses *big.Int
-	NumOfValidWitnesses       *big.Int
-	Witnesses                 []common.Address
-	IncludingMsgSender        bool
-}, error) {
-	ret := new(struct {
-		SettleHeight              *big.Int
-		NumOfWhitelistedWitnesses *big.Int
-		NumOfValidWitnesses       *big.Int
-		Witnesses                 []common.Address
-		IncludingMsgSender        bool
-	})
-	out := ret
-	err := _TransferValidator.contract.Call(opts, out, "getStatus", tokenAddr, index, from, to, amount)
-	return *ret, err
+// Solidity: function minters(uint256 ) view returns(address)
+func (_TransferValidator *TransferValidatorCaller) Minters(opts *bind.CallOpts, arg0 *big.Int) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _TransferValidator.contract.Call(opts, out, "minters", arg0)
+	return *ret0, err
 }
 
-// GetStatus is a free data retrieval call binding the contract method 0xae972e95.
+// Minters is a free data retrieval call binding the contract method 0x8623ec7b.
 //
-// Solidity: function getStatus(address tokenAddr, uint256 index, address from, address to, uint256 amount) view returns(uint256 settleHeight_, uint256 numOfWhitelistedWitnesses_, uint256 numOfValidWitnesses_, address[] witnesses_, bool includingMsgSender_)
-func (_TransferValidator *TransferValidatorSession) GetStatus(tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) (struct {
-	SettleHeight              *big.Int
-	NumOfWhitelistedWitnesses *big.Int
-	NumOfValidWitnesses       *big.Int
-	Witnesses                 []common.Address
-	IncludingMsgSender        bool
-}, error) {
-	return _TransferValidator.Contract.GetStatus(&_TransferValidator.CallOpts, tokenAddr, index, from, to, amount)
+// Solidity: function minters(uint256 ) view returns(address)
+func (_TransferValidator *TransferValidatorSession) Minters(arg0 *big.Int) (common.Address, error) {
+	return _TransferValidator.Contract.Minters(&_TransferValidator.CallOpts, arg0)
 }
 
-// GetStatus is a free data retrieval call binding the contract method 0xae972e95.
+// Minters is a free data retrieval call binding the contract method 0x8623ec7b.
 //
-// Solidity: function getStatus(address tokenAddr, uint256 index, address from, address to, uint256 amount) view returns(uint256 settleHeight_, uint256 numOfWhitelistedWitnesses_, uint256 numOfValidWitnesses_, address[] witnesses_, bool includingMsgSender_)
-func (_TransferValidator *TransferValidatorCallerSession) GetStatus(tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) (struct {
-	SettleHeight              *big.Int
-	NumOfWhitelistedWitnesses *big.Int
-	NumOfValidWitnesses       *big.Int
-	Witnesses                 []common.Address
-	IncludingMsgSender        bool
-}, error) {
-	return _TransferValidator.Contract.GetStatus(&_TransferValidator.CallOpts, tokenAddr, index, from, to, amount)
+// Solidity: function minters(uint256 ) view returns(address)
+func (_TransferValidator *TransferValidatorCallerSession) Minters(arg0 *big.Int) (common.Address, error) {
+	return _TransferValidator.Contract.Minters(&_TransferValidator.CallOpts, arg0)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
@@ -297,160 +275,82 @@ func (_TransferValidator *TransferValidatorCallerSession) Paused() (bool, error)
 	return _TransferValidator.Contract.Paused(&_TransferValidator.CallOpts)
 }
 
-// Transfers is a free data retrieval call binding the contract method 0x3c64f04b.
+// Settles is a free data retrieval call binding the contract method 0xf98b2332.
 //
-// Solidity: function transfers(bytes32 ) view returns(address tokenAddr, uint256 index, address from, address to, uint256 amount, uint256 settleHeight)
-func (_TransferValidator *TransferValidatorCaller) Transfers(opts *bind.CallOpts, arg0 [32]byte) (struct {
-	TokenAddr    common.Address
-	Index        *big.Int
-	From         common.Address
-	To           common.Address
-	Amount       *big.Int
-	SettleHeight *big.Int
-}, error) {
-	ret := new(struct {
-		TokenAddr    common.Address
-		Index        *big.Int
-		From         common.Address
-		To           common.Address
-		Amount       *big.Int
-		SettleHeight *big.Int
-	})
-	out := ret
-	err := _TransferValidator.contract.Call(opts, out, "transfers", arg0)
-	return *ret, err
-}
-
-// Transfers is a free data retrieval call binding the contract method 0x3c64f04b.
-//
-// Solidity: function transfers(bytes32 ) view returns(address tokenAddr, uint256 index, address from, address to, uint256 amount, uint256 settleHeight)
-func (_TransferValidator *TransferValidatorSession) Transfers(arg0 [32]byte) (struct {
-	TokenAddr    common.Address
-	Index        *big.Int
-	From         common.Address
-	To           common.Address
-	Amount       *big.Int
-	SettleHeight *big.Int
-}, error) {
-	return _TransferValidator.Contract.Transfers(&_TransferValidator.CallOpts, arg0)
-}
-
-// Transfers is a free data retrieval call binding the contract method 0x3c64f04b.
-//
-// Solidity: function transfers(bytes32 ) view returns(address tokenAddr, uint256 index, address from, address to, uint256 amount, uint256 settleHeight)
-func (_TransferValidator *TransferValidatorCallerSession) Transfers(arg0 [32]byte) (struct {
-	TokenAddr    common.Address
-	Index        *big.Int
-	From         common.Address
-	To           common.Address
-	Amount       *big.Int
-	SettleHeight *big.Int
-}, error) {
-	return _TransferValidator.Contract.Transfers(&_TransferValidator.CallOpts, arg0)
-}
-
-// WhitelistedTokens is a free data retrieval call binding the contract method 0x5e1762a0.
-//
-// Solidity: function whitelistedTokens() view returns(address)
-func (_TransferValidator *TransferValidatorCaller) WhitelistedTokens(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _TransferValidator.contract.Call(opts, out, "whitelistedTokens")
-	return *ret0, err
-}
-
-// WhitelistedTokens is a free data retrieval call binding the contract method 0x5e1762a0.
-//
-// Solidity: function whitelistedTokens() view returns(address)
-func (_TransferValidator *TransferValidatorSession) WhitelistedTokens() (common.Address, error) {
-	return _TransferValidator.Contract.WhitelistedTokens(&_TransferValidator.CallOpts)
-}
-
-// WhitelistedTokens is a free data retrieval call binding the contract method 0x5e1762a0.
-//
-// Solidity: function whitelistedTokens() view returns(address)
-func (_TransferValidator *TransferValidatorCallerSession) WhitelistedTokens() (common.Address, error) {
-	return _TransferValidator.Contract.WhitelistedTokens(&_TransferValidator.CallOpts)
-}
-
-// WhitelistedWitnesses is a free data retrieval call binding the contract method 0x92072052.
-//
-// Solidity: function whitelistedWitnesses() view returns(address)
-func (_TransferValidator *TransferValidatorCaller) WhitelistedWitnesses(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _TransferValidator.contract.Call(opts, out, "whitelistedWitnesses")
-	return *ret0, err
-}
-
-// WhitelistedWitnesses is a free data retrieval call binding the contract method 0x92072052.
-//
-// Solidity: function whitelistedWitnesses() view returns(address)
-func (_TransferValidator *TransferValidatorSession) WhitelistedWitnesses() (common.Address, error) {
-	return _TransferValidator.Contract.WhitelistedWitnesses(&_TransferValidator.CallOpts)
-}
-
-// WhitelistedWitnesses is a free data retrieval call binding the contract method 0x92072052.
-//
-// Solidity: function whitelistedWitnesses() view returns(address)
-func (_TransferValidator *TransferValidatorCallerSession) WhitelistedWitnesses() (common.Address, error) {
-	return _TransferValidator.Contract.WhitelistedWitnesses(&_TransferValidator.CallOpts)
-}
-
-// WitnessList is a free data retrieval call binding the contract method 0x11a734d3.
-//
-// Solidity: function witnessList(bytes32 , uint256 ) view returns(address)
-func (_TransferValidator *TransferValidatorCaller) WitnessList(opts *bind.CallOpts, arg0 [32]byte, arg1 *big.Int) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _TransferValidator.contract.Call(opts, out, "witnessList", arg0, arg1)
-	return *ret0, err
-}
-
-// WitnessList is a free data retrieval call binding the contract method 0x11a734d3.
-//
-// Solidity: function witnessList(bytes32 , uint256 ) view returns(address)
-func (_TransferValidator *TransferValidatorSession) WitnessList(arg0 [32]byte, arg1 *big.Int) (common.Address, error) {
-	return _TransferValidator.Contract.WitnessList(&_TransferValidator.CallOpts, arg0, arg1)
-}
-
-// WitnessList is a free data retrieval call binding the contract method 0x11a734d3.
-//
-// Solidity: function witnessList(bytes32 , uint256 ) view returns(address)
-func (_TransferValidator *TransferValidatorCallerSession) WitnessList(arg0 [32]byte, arg1 *big.Int) (common.Address, error) {
-	return _TransferValidator.Contract.WitnessList(&_TransferValidator.CallOpts, arg0, arg1)
-}
-
-// WitnessMap is a free data retrieval call binding the contract method 0xd7c347a6.
-//
-// Solidity: function witnessMap(bytes32 , address ) view returns(uint256)
-func (_TransferValidator *TransferValidatorCaller) WitnessMap(opts *bind.CallOpts, arg0 [32]byte, arg1 common.Address) (*big.Int, error) {
+// Solidity: function settles(bytes32 ) view returns(uint256)
+func (_TransferValidator *TransferValidatorCaller) Settles(opts *bind.CallOpts, arg0 [32]byte) (*big.Int, error) {
 	var (
 		ret0 = new(*big.Int)
 	)
 	out := ret0
-	err := _TransferValidator.contract.Call(opts, out, "witnessMap", arg0, arg1)
+	err := _TransferValidator.contract.Call(opts, out, "settles", arg0)
 	return *ret0, err
 }
 
-// WitnessMap is a free data retrieval call binding the contract method 0xd7c347a6.
+// Settles is a free data retrieval call binding the contract method 0xf98b2332.
 //
-// Solidity: function witnessMap(bytes32 , address ) view returns(uint256)
-func (_TransferValidator *TransferValidatorSession) WitnessMap(arg0 [32]byte, arg1 common.Address) (*big.Int, error) {
-	return _TransferValidator.Contract.WitnessMap(&_TransferValidator.CallOpts, arg0, arg1)
+// Solidity: function settles(bytes32 ) view returns(uint256)
+func (_TransferValidator *TransferValidatorSession) Settles(arg0 [32]byte) (*big.Int, error) {
+	return _TransferValidator.Contract.Settles(&_TransferValidator.CallOpts, arg0)
 }
 
-// WitnessMap is a free data retrieval call binding the contract method 0xd7c347a6.
+// Settles is a free data retrieval call binding the contract method 0xf98b2332.
 //
-// Solidity: function witnessMap(bytes32 , address ) view returns(uint256)
-func (_TransferValidator *TransferValidatorCallerSession) WitnessMap(arg0 [32]byte, arg1 common.Address) (*big.Int, error) {
-	return _TransferValidator.Contract.WitnessMap(&_TransferValidator.CallOpts, arg0, arg1)
+// Solidity: function settles(bytes32 ) view returns(uint256)
+func (_TransferValidator *TransferValidatorCallerSession) Settles(arg0 [32]byte) (*big.Int, error) {
+	return _TransferValidator.Contract.Settles(&_TransferValidator.CallOpts, arg0)
+}
+
+// TokenLists is a free data retrieval call binding the contract method 0x1cb928a9.
+//
+// Solidity: function tokenLists(uint256 ) view returns(address)
+func (_TransferValidator *TransferValidatorCaller) TokenLists(opts *bind.CallOpts, arg0 *big.Int) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _TransferValidator.contract.Call(opts, out, "tokenLists", arg0)
+	return *ret0, err
+}
+
+// TokenLists is a free data retrieval call binding the contract method 0x1cb928a9.
+//
+// Solidity: function tokenLists(uint256 ) view returns(address)
+func (_TransferValidator *TransferValidatorSession) TokenLists(arg0 *big.Int) (common.Address, error) {
+	return _TransferValidator.Contract.TokenLists(&_TransferValidator.CallOpts, arg0)
+}
+
+// TokenLists is a free data retrieval call binding the contract method 0x1cb928a9.
+//
+// Solidity: function tokenLists(uint256 ) view returns(address)
+func (_TransferValidator *TransferValidatorCallerSession) TokenLists(arg0 *big.Int) (common.Address, error) {
+	return _TransferValidator.Contract.TokenLists(&_TransferValidator.CallOpts, arg0)
+}
+
+// WitnessList is a free data retrieval call binding the contract method 0x373f0d49.
+//
+// Solidity: function witnessList() view returns(address)
+func (_TransferValidator *TransferValidatorCaller) WitnessList(opts *bind.CallOpts) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _TransferValidator.contract.Call(opts, out, "witnessList")
+	return *ret0, err
+}
+
+// WitnessList is a free data retrieval call binding the contract method 0x373f0d49.
+//
+// Solidity: function witnessList() view returns(address)
+func (_TransferValidator *TransferValidatorSession) WitnessList() (common.Address, error) {
+	return _TransferValidator.Contract.WitnessList(&_TransferValidator.CallOpts)
+}
+
+// WitnessList is a free data retrieval call binding the contract method 0x373f0d49.
+//
+// Solidity: function witnessList() view returns(address)
+func (_TransferValidator *TransferValidatorCallerSession) WitnessList() (common.Address, error) {
+	return _TransferValidator.Contract.WitnessList(&_TransferValidator.CallOpts)
 }
 
 // Pause is a paid mutator transaction binding the contract method 0x8456cb59.
@@ -474,25 +374,25 @@ func (_TransferValidator *TransferValidatorTransactorSession) Pause() (*types.Tr
 	return _TransferValidator.Contract.Pause(&_TransferValidator.TransactOpts)
 }
 
-// Submit is a paid mutator transaction binding the contract method 0x2145c88c.
+// Submit is a paid mutator transaction binding the contract method 0xa9013dce.
 //
-// Solidity: function submit(address tokenAddr, uint256 index, address from, address to, uint256 amount) returns()
-func (_TransferValidator *TransferValidatorTransactor) Submit(opts *bind.TransactOpts, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _TransferValidator.contract.Transact(opts, "submit", tokenAddr, index, from, to, amount)
+// Solidity: function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes signatures) returns()
+func (_TransferValidator *TransferValidatorTransactor) Submit(opts *bind.TransactOpts, cashier common.Address, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int, signatures []byte) (*types.Transaction, error) {
+	return _TransferValidator.contract.Transact(opts, "submit", cashier, tokenAddr, index, from, to, amount, signatures)
 }
 
-// Submit is a paid mutator transaction binding the contract method 0x2145c88c.
+// Submit is a paid mutator transaction binding the contract method 0xa9013dce.
 //
-// Solidity: function submit(address tokenAddr, uint256 index, address from, address to, uint256 amount) returns()
-func (_TransferValidator *TransferValidatorSession) Submit(tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _TransferValidator.Contract.Submit(&_TransferValidator.TransactOpts, tokenAddr, index, from, to, amount)
+// Solidity: function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes signatures) returns()
+func (_TransferValidator *TransferValidatorSession) Submit(cashier common.Address, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int, signatures []byte) (*types.Transaction, error) {
+	return _TransferValidator.Contract.Submit(&_TransferValidator.TransactOpts, cashier, tokenAddr, index, from, to, amount, signatures)
 }
 
-// Submit is a paid mutator transaction binding the contract method 0x2145c88c.
+// Submit is a paid mutator transaction binding the contract method 0xa9013dce.
 //
-// Solidity: function submit(address tokenAddr, uint256 index, address from, address to, uint256 amount) returns()
-func (_TransferValidator *TransferValidatorTransactorSession) Submit(tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) (*types.Transaction, error) {
-	return _TransferValidator.Contract.Submit(&_TransferValidator.TransactOpts, tokenAddr, index, from, to, amount)
+// Solidity: function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes signatures) returns()
+func (_TransferValidator *TransferValidatorTransactorSession) Submit(cashier common.Address, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int, signatures []byte) (*types.Transaction, error) {
+	return _TransferValidator.Contract.Submit(&_TransferValidator.TransactOpts, cashier, tokenAddr, index, from, to, amount, signatures)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
@@ -535,6 +435,27 @@ func (_TransferValidator *TransferValidatorSession) Unpause() (*types.Transactio
 // Solidity: function unpause() returns()
 func (_TransferValidator *TransferValidatorTransactorSession) Unpause() (*types.Transaction, error) {
 	return _TransferValidator.Contract.Unpause(&_TransferValidator.TransactOpts)
+}
+
+// Upgrade is a paid mutator transaction binding the contract method 0x0900f010.
+//
+// Solidity: function upgrade(address _newValidator) returns()
+func (_TransferValidator *TransferValidatorTransactor) Upgrade(opts *bind.TransactOpts, _newValidator common.Address) (*types.Transaction, error) {
+	return _TransferValidator.contract.Transact(opts, "upgrade", _newValidator)
+}
+
+// Upgrade is a paid mutator transaction binding the contract method 0x0900f010.
+//
+// Solidity: function upgrade(address _newValidator) returns()
+func (_TransferValidator *TransferValidatorSession) Upgrade(_newValidator common.Address) (*types.Transaction, error) {
+	return _TransferValidator.Contract.Upgrade(&_TransferValidator.TransactOpts, _newValidator)
+}
+
+// Upgrade is a paid mutator transaction binding the contract method 0x0900f010.
+//
+// Solidity: function upgrade(address _newValidator) returns()
+func (_TransferValidator *TransferValidatorTransactorSession) Upgrade(_newValidator common.Address) (*types.Transaction, error) {
+	return _TransferValidator.Contract.Upgrade(&_TransferValidator.TransactOpts, _newValidator)
 }
 
 // TransferValidatorOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the TransferValidator contract.
@@ -890,51 +811,39 @@ func (it *TransferValidatorSettledIterator) Close() error {
 
 // TransferValidatorSettled represents a Settled event raised by the TransferValidator contract.
 type TransferValidatorSettled struct {
-	Token     common.Address
-	Index     *big.Int
-	From      common.Address
-	To        common.Address
-	Amount    *big.Int
+	Key       [32]byte
 	Witnesses []common.Address
 	Raw       types.Log // Blockchain specific contextual infos
 }
 
-// FilterSettled is a free log retrieval operation binding the contract event 0xd6ab5657d95b4550fb80aaa04300334ac444e1cf6a4562fe1b6bd77476f6b35c.
+// FilterSettled is a free log retrieval operation binding the contract event 0xe24922ac8cf2a1430fb8c7ce6a9125d7db5076a1eb2cefced90e82d6fcb24db0.
 //
-// Solidity: event Settled(address indexed token, uint256 indexed index, address from, address to, uint256 amount, address[] witnesses)
-func (_TransferValidator *TransferValidatorFilterer) FilterSettled(opts *bind.FilterOpts, token []common.Address, index []*big.Int) (*TransferValidatorSettledIterator, error) {
+// Solidity: event Settled(bytes32 indexed key, address[] witnesses)
+func (_TransferValidator *TransferValidatorFilterer) FilterSettled(opts *bind.FilterOpts, key [][32]byte) (*TransferValidatorSettledIterator, error) {
 
-	var tokenRule []interface{}
-	for _, tokenItem := range token {
-		tokenRule = append(tokenRule, tokenItem)
-	}
-	var indexRule []interface{}
-	for _, indexItem := range index {
-		indexRule = append(indexRule, indexItem)
+	var keyRule []interface{}
+	for _, keyItem := range key {
+		keyRule = append(keyRule, keyItem)
 	}
 
-	logs, sub, err := _TransferValidator.contract.FilterLogs(opts, "Settled", tokenRule, indexRule)
+	logs, sub, err := _TransferValidator.contract.FilterLogs(opts, "Settled", keyRule)
 	if err != nil {
 		return nil, err
 	}
 	return &TransferValidatorSettledIterator{contract: _TransferValidator.contract, event: "Settled", logs: logs, sub: sub}, nil
 }
 
-// WatchSettled is a free log subscription operation binding the contract event 0xd6ab5657d95b4550fb80aaa04300334ac444e1cf6a4562fe1b6bd77476f6b35c.
+// WatchSettled is a free log subscription operation binding the contract event 0xe24922ac8cf2a1430fb8c7ce6a9125d7db5076a1eb2cefced90e82d6fcb24db0.
 //
-// Solidity: event Settled(address indexed token, uint256 indexed index, address from, address to, uint256 amount, address[] witnesses)
-func (_TransferValidator *TransferValidatorFilterer) WatchSettled(opts *bind.WatchOpts, sink chan<- *TransferValidatorSettled, token []common.Address, index []*big.Int) (event.Subscription, error) {
+// Solidity: event Settled(bytes32 indexed key, address[] witnesses)
+func (_TransferValidator *TransferValidatorFilterer) WatchSettled(opts *bind.WatchOpts, sink chan<- *TransferValidatorSettled, key [][32]byte) (event.Subscription, error) {
 
-	var tokenRule []interface{}
-	for _, tokenItem := range token {
-		tokenRule = append(tokenRule, tokenItem)
-	}
-	var indexRule []interface{}
-	for _, indexItem := range index {
-		indexRule = append(indexRule, indexItem)
+	var keyRule []interface{}
+	for _, keyItem := range key {
+		keyRule = append(keyRule, keyItem)
 	}
 
-	logs, sub, err := _TransferValidator.contract.WatchLogs(opts, "Settled", tokenRule, indexRule)
+	logs, sub, err := _TransferValidator.contract.WatchLogs(opts, "Settled", keyRule)
 	if err != nil {
 		return nil, err
 	}
@@ -966,9 +875,9 @@ func (_TransferValidator *TransferValidatorFilterer) WatchSettled(opts *bind.Wat
 	}), nil
 }
 
-// ParseSettled is a log parse operation binding the contract event 0xd6ab5657d95b4550fb80aaa04300334ac444e1cf6a4562fe1b6bd77476f6b35c.
+// ParseSettled is a log parse operation binding the contract event 0xe24922ac8cf2a1430fb8c7ce6a9125d7db5076a1eb2cefced90e82d6fcb24db0.
 //
-// Solidity: event Settled(address indexed token, uint256 indexed index, address from, address to, uint256 amount, address[] witnesses)
+// Solidity: event Settled(bytes32 indexed key, address[] witnesses)
 func (_TransferValidator *TransferValidatorFilterer) ParseSettled(log types.Log) (*TransferValidatorSettled, error) {
 	event := new(TransferValidatorSettled)
 	if err := _TransferValidator.contract.UnpackLog(event, "Settled", log); err != nil {
@@ -1104,170 +1013,6 @@ func (_TransferValidator *TransferValidatorFilterer) WatchUnpause(opts *bind.Wat
 func (_TransferValidator *TransferValidatorFilterer) ParseUnpause(log types.Log) (*TransferValidatorUnpause, error) {
 	event := new(TransferValidatorUnpause)
 	if err := _TransferValidator.contract.UnpackLog(event, "Unpause", log); err != nil {
-		return nil, err
-	}
-	return event, nil
-}
-
-// TransferValidatorWitnessSubmittedIterator is returned from FilterWitnessSubmitted and is used to iterate over the raw logs and unpacked data for WitnessSubmitted events raised by the TransferValidator contract.
-type TransferValidatorWitnessSubmittedIterator struct {
-	Event *TransferValidatorWitnessSubmitted // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *TransferValidatorWitnessSubmittedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(TransferValidatorWitnessSubmitted)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(TransferValidatorWitnessSubmitted)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *TransferValidatorWitnessSubmittedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *TransferValidatorWitnessSubmittedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// TransferValidatorWitnessSubmitted represents a WitnessSubmitted event raised by the TransferValidator contract.
-type TransferValidatorWitnessSubmitted struct {
-	Token   common.Address
-	Index   *big.Int
-	Witness common.Address
-	From    common.Address
-	To      common.Address
-	Amount  *big.Int
-	Raw     types.Log // Blockchain specific contextual infos
-}
-
-// FilterWitnessSubmitted is a free log retrieval operation binding the contract event 0x1cdff7b967b444d02eddbcfcc10321dd9a282aa97c9a12d0813ca535ef0d047e.
-//
-// Solidity: event WitnessSubmitted(address indexed token, uint256 indexed index, address indexed witness, address from, address to, uint256 amount)
-func (_TransferValidator *TransferValidatorFilterer) FilterWitnessSubmitted(opts *bind.FilterOpts, token []common.Address, index []*big.Int, witness []common.Address) (*TransferValidatorWitnessSubmittedIterator, error) {
-
-	var tokenRule []interface{}
-	for _, tokenItem := range token {
-		tokenRule = append(tokenRule, tokenItem)
-	}
-	var indexRule []interface{}
-	for _, indexItem := range index {
-		indexRule = append(indexRule, indexItem)
-	}
-	var witnessRule []interface{}
-	for _, witnessItem := range witness {
-		witnessRule = append(witnessRule, witnessItem)
-	}
-
-	logs, sub, err := _TransferValidator.contract.FilterLogs(opts, "WitnessSubmitted", tokenRule, indexRule, witnessRule)
-	if err != nil {
-		return nil, err
-	}
-	return &TransferValidatorWitnessSubmittedIterator{contract: _TransferValidator.contract, event: "WitnessSubmitted", logs: logs, sub: sub}, nil
-}
-
-// WatchWitnessSubmitted is a free log subscription operation binding the contract event 0x1cdff7b967b444d02eddbcfcc10321dd9a282aa97c9a12d0813ca535ef0d047e.
-//
-// Solidity: event WitnessSubmitted(address indexed token, uint256 indexed index, address indexed witness, address from, address to, uint256 amount)
-func (_TransferValidator *TransferValidatorFilterer) WatchWitnessSubmitted(opts *bind.WatchOpts, sink chan<- *TransferValidatorWitnessSubmitted, token []common.Address, index []*big.Int, witness []common.Address) (event.Subscription, error) {
-
-	var tokenRule []interface{}
-	for _, tokenItem := range token {
-		tokenRule = append(tokenRule, tokenItem)
-	}
-	var indexRule []interface{}
-	for _, indexItem := range index {
-		indexRule = append(indexRule, indexItem)
-	}
-	var witnessRule []interface{}
-	for _, witnessItem := range witness {
-		witnessRule = append(witnessRule, witnessItem)
-	}
-
-	logs, sub, err := _TransferValidator.contract.WatchLogs(opts, "WitnessSubmitted", tokenRule, indexRule, witnessRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(TransferValidatorWitnessSubmitted)
-				if err := _TransferValidator.contract.UnpackLog(event, "WitnessSubmitted", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseWitnessSubmitted is a log parse operation binding the contract event 0x1cdff7b967b444d02eddbcfcc10321dd9a282aa97c9a12d0813ca535ef0d047e.
-//
-// Solidity: event WitnessSubmitted(address indexed token, uint256 indexed index, address indexed witness, address from, address to, uint256 amount)
-func (_TransferValidator *TransferValidatorFilterer) ParseWitnessSubmitted(log types.Log) (*TransferValidatorWitnessSubmitted, error) {
-	event := new(TransferValidatorWitnessSubmitted)
-	if err := _TransferValidator.contract.UnpackLog(event, "WitnessSubmitted", log); err != nil {
 		return nil, err
 	}
 	return event, nil

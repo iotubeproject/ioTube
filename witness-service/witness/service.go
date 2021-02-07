@@ -8,52 +8,61 @@ package witness
 
 import (
 	"context"
-	"encoding/hex"
+	"crypto/ecdsa"
 	"log"
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
+	"github.com/iotexproject/ioTube/witness-service/grpc/services"
+	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 )
 
 type service struct {
-	witness          Witness
-	recorder         *Recorder
-	runners          []dispatcher.Runner
-	pullBatchSize    uint8
-	processBatchSize uint8
-	checkBatchSize   uint8
-	retryDuration    time.Duration
+	cashier                  TokenCashier
+	recorder                 *Recorder
+	processor                dispatcher.Runner
+	lastProcessBlockHeight   uint64
+	batchSize                uint16
+	processInterval          time.Duration
+	relayerURL               string
+	privateKey               *ecdsa.PrivateKey
+	witnessAddress           common.Address
+	validatorContractAddress common.Address
 }
 
 // NewService creates a new witness service
 func NewService(
-	witness Witness,
+	relayerURL string,
+	validatorContractAddress common.Address,
+	cashier TokenCashier,
 	recorder *Recorder,
-	pullInterval time.Duration,
-	pullBatchSize uint8,
+	privateKey *ecdsa.PrivateKey,
+	startBlockHeight uint64,
+	batchSize uint16,
 	processInterval time.Duration,
-	processBatchSize uint8,
-	retryDuration time.Duration,
 ) (Service, error) {
 	s := &service{
-		witness:          witness,
-		recorder:         recorder,
-		pullBatchSize:    pullBatchSize,
-		processBatchSize: processBatchSize,
-		retryDuration:    retryDuration,
+		cashier:                  cashier,
+		recorder:                 recorder,
+		lastProcessBlockHeight:   startBlockHeight,
+		processInterval:          processInterval,
+		batchSize:                batchSize,
+		relayerURL:               relayerURL,
+		privateKey:               privateKey,
+		witnessAddress:           crypto.PubkeyToAddress(privateKey.PublicKey),
+		validatorContractAddress: validatorContractAddress,
 	}
-	producer, err := dispatcher.NewRunner(pullInterval, s.collect)
-	if err != nil {
-		return nil, errors.New("failed to create collector")
-	}
-	consumer, err := dispatcher.NewRunner(processInterval, s.process)
-	if err != nil {
+	var err error
+	if s.processor, err = dispatcher.NewRunner(processInterval, s.process); err != nil {
 		return nil, errors.New("failed to create swapper")
 	}
-	s.runners = []dispatcher.Runner{producer, consumer}
 
 	return s, nil
 }
@@ -62,111 +71,114 @@ func (s *service) Start(ctx context.Context) error {
 	if err := s.recorder.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start recorder")
 	}
-	for _, d := range s.runners {
-		if err := d.Start(); err != nil {
-			return errors.Wrap(err, "failed to start runner")
-		}
-	}
-	return nil
+	return s.processor.Start()
 }
 
 func (s *service) Stop(ctx context.Context) error {
-	for _, d := range s.runners {
-		if err := d.Close(); err != nil {
-			return err
-		}
+	if err := s.processor.Close(); err != nil {
+		return err
 	}
 	return s.recorder.Stop(ctx)
 }
 
+func (s *service) sign(transfer *Transfer) (common.Hash, []byte, error) {
+	id := crypto.Keccak256Hash(
+		s.validatorContractAddress.Bytes(),
+		transfer.cashier.Bytes(),
+		transfer.coToken.Bytes(),
+		math.U256Bytes(new(big.Int).SetUint64(transfer.index)),
+		transfer.sender.Bytes(),
+		transfer.recipient.Bytes(),
+		math.U256Bytes(transfer.amount),
+	)
+	signature, err := crypto.Sign(id.Bytes(), s.privateKey)
+
+	return id, signature, err
+}
+
 func (s *service) collect() error {
-	if !s.witness.IsQualifiedWitness() {
-		return nil
-	}
-	ids, err := s.recorder.NextIDsToFetch()
+	tipHeightInRecorder, err := s.recorder.TipHeight()
 	if err != nil {
 		return err
 	}
-	var ok bool
-	var index *big.Int
-	for _, token := range s.witness.TokensToWatch() {
-		if index, ok = ids[token]; !ok {
-			index = big.NewInt(0)
-		}
-		records, err := s.witness.FetchRecords(token, index, s.pullBatchSize)
-		if err != nil {
-			log.Println("failed to fetch records for token", token, err)
-			continue
-		}
-		if len(records) > 0 {
-			log.Printf("fetching %d records of token %s from index %d\n", len(records), token, index)
-		}
-		for _, record := range records {
-			if err := s.recorder.Create(record); err != nil {
-				log.Println("failed to put record", token, record, err)
-				break
-			}
+	if tipHeightInRecorder < s.lastProcessBlockHeight {
+		tipHeightInRecorder = s.lastProcessBlockHeight
+	}
+	lastProcessBlockHeight, transfers, err := s.cashier.PullTransfers(tipHeightInRecorder+1, s.batchSize)
+	if err != nil {
+		return err
+	}
+	for _, transfer := range transfers {
+		if err := s.recorder.AddTransfer(transfer); err != nil {
+			return err
 		}
 	}
+	s.lastProcessBlockHeight = lastProcessBlockHeight
 	return nil
 }
 
 func (s *service) process() error {
-	if !s.witness.IsQualifiedWitness() {
-		return nil
+	if err := s.collect(); err != nil {
+		return err
 	}
-	recordsToSubmit, err := s.recorder.RecordsToSubmit(s.processBatchSize)
+	transfersToSubmit, err := s.recorder.TransfersToSubmit()
 	if err != nil {
 		return err
 	}
-	recordsToCheck, err := s.recorder.RecordsToCheck(s.processBatchSize)
+	transfersToSettle, err := s.recorder.TransfersToSettle()
 	if err != nil {
 		return err
 	}
-	if err := s.processRecords(recordsToSubmit, true); err != nil {
+	conn, err := grpc.Dial(s.relayerURL, grpc.WithInsecure())
+	if err != nil {
 		return err
 	}
-
-	return s.processRecords(recordsToCheck, false)
-}
-
-func (s *service) processRecords(records []*TxRecord, submitIfNotFound bool) error {
-	for _, record := range records {
-		log.Printf("Processing witness of {%s, %d}\n", record.token, record.id)
-		status, err := s.witness.StatusOnChain(record)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get status of {%s, %d}", record.token, record.id)
+	defer conn.Close()
+	relayer := services.NewRelayServiceClient(conn)
+	for _, transfer := range transfersToSubmit {
+		var signature []byte
+		if transfer.id, signature, err = s.sign(transfer); err != nil {
+			return err
 		}
-		switch status {
-		case SettledOnChain:
-			if err := s.recorder.MarkAsSettled(record); err != nil {
+		response, err := relayer.Submit(
+			context.Background(),
+			&types.Witness{
+				Transfer: &types.Transfer{
+					Cashier:   transfer.cashier.Bytes(),
+					Token:     transfer.coToken.Bytes(),
+					Index:     int64(transfer.index),
+					Sender:    transfer.sender.Bytes(),
+					Recipient: transfer.recipient.Bytes(),
+					Amount:    transfer.amount.String(),
+				},
+				Address:   s.witnessAddress.Bytes(),
+				Signature: signature,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		if response.Success {
+			if err := s.recorder.ConfirmTransfer(transfer); err != nil {
 				return err
 			}
-		case WitnessConfirmedOnChain:
-			if err := s.recorder.MarkAsConfirmed(record); err != nil {
+		} else {
+			log.Printf("failed to submit transfer (%s, %s, %d)\n", transfer.cashier, transfer.token, transfer.index)
+		}
+	}
+	for _, transfer := range transfersToSettle {
+		response, err := relayer.Check(
+			context.Background(),
+			&services.CheckRequest{
+				Id: transfer.id.Bytes(),
+			},
+		)
+		if err != nil {
+			return err
+		}
+		if response.Status == services.CheckResponse_SETTLED {
+			if s.recorder.SettleTransfer(transfer); err != nil {
 				return err
-			}
-		case WitnessSubmissionRejected:
-			if err := s.recorder.Fail(record); err != nil {
-				return err
-			}
-		case WitnessNotFoundOnChain:
-			if submitIfNotFound {
-				txhash, err := s.witness.SubmitWitness(record)
-				if err != nil {
-					return err
-				}
-				if err := s.recorder.MarkAsSubmitted(record, hex.EncodeToString(txhash)); err != nil {
-					return err
-				}
-			} else {
-				if record.updateTime.Add(s.retryDuration).Before(time.Now()) {
-					if err := s.recorder.Reset(record); err != nil {
-						return err
-					}
-				} else {
-					log.Printf("record {%s, %d} not found on chain\n", record.token, record.id)
-				}
 			}
 		}
 	}

@@ -1,0 +1,4 @@
+#!/bin/sh
+
+now=$(date +"%s_%Y-%m-%d")
+/usr/bin/mysqldump --opt -h 127.0.0.1 -u root -pkdfjjrU64fjK58H relayer > "/backup/${now}_relayer.sql"

@@ -2,13 +2,10 @@ pragma solidity <6.0 >=0.4.24;
 
 import "../ownership/Ownable.sol";
 
-interface Token {
-    function transfer(address to, uint256 value) external returns (bool);
-}
-
 contract TokenSafe is Ownable {
-    function withdrawToken(address _token, address _to, uint256 _amount) public onlyOwner returns (bool) {
-        require(Token(_token).transfer(_to, _amount), "failed to transfer token");
-        return true;
+    function mint(address _token, address _to, uint256 _amount) public onlyOwner returns (bool) {
+        // selector = bytes4(keccak256(bytes('transfer(address,uint256)')))
+        (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0xa9059cbb, _to, _amount));
+        return success && (data.length == 0 || abi.decode(data, (bool)));	    
     }
 }

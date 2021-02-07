@@ -9,14 +9,28 @@ package witness
 import (
 	"context"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 type (
-	// StatusOnChain defines the status of the record on chain
-	StatusOnChain uint8
+	// TransferStatus is the status of a transfer
+	TransferStatus string
 
-	// StatusInDB represents the status of a record
-	StatusInDB uint8
+	// Transfer defines a record
+	Transfer struct {
+		cashier     common.Address
+		token       common.Address
+		coToken     common.Address
+		index       uint64
+		sender      common.Address
+		recipient   common.Address
+		amount      *big.Int
+		id          common.Hash
+		status      TransferStatus
+		blockHeight uint64
+		txHash      common.Hash
+	}
 
 	// Service manages to exchange iotex coin to ERC20 token on ethereum
 	Service interface {
@@ -26,38 +40,21 @@ type (
 		Stop(context.Context) error
 	}
 
-	// Witness is an interface defines the behavior of a witness
-	Witness interface {
-		IsQualifiedWitness() bool
-		TokensToWatch() []string
-		FetchRecords(token string, startID *big.Int, limit uint8) ([]*TxRecord, error)
-		StatusOnChain(*TxRecord) (StatusOnChain, error)
-		SubmitWitness(*TxRecord) ([]byte, error)
+	// TokenCashier defines the interface to pull transfers from chain in a block range
+	TokenCashier interface {
+		PullTransfers(blockOffset uint64, blockCount uint16) (uint64, []*Transfer, error)
 	}
 )
 
 const (
-	// WitnessNotFoundOnChain stands for the status of a witness which has not been confirmed on chain yet
-	WitnessNotFoundOnChain = iota
-	// WitnessConfirmedOnChain stands for the status of a witness of which has been confirmed on chain
-	WitnessConfirmedOnChain
-	// WitnessSubmissionRejected stands for the status of a witness whose submission has been rejected
-	WitnessSubmissionRejected
-	// SettledOnChain stands for the status of a record which has been settled on Chain
-	SettledOnChain
-)
+	eventName = "Receipt"
 
-const (
-	// Invalid stands for an invalid status of the record, which won't be processed any more
-	Invalid StatusInDB = iota
-	// New stands for a newly created record
-	New
-	// Submitted stands for a record of which the submit action has been taken
-	Submitted
-	// Confirmed stands for a record whose submission has been confirmed
-	Confirmed
-	// Settled stands for a record who has been settled
-	Settled
-	// Failed stands for a failure status
-	Failed
+	// TransferNew stands for a new transfer
+	TransferNew TransferStatus = "new"
+	// WitnessSubmitted stands for a witnessed transfer
+	WitnessSubmitted = "submitted"
+	// SubmissionConfirmed stands for a confirmed witness
+	SubmissionConfirmed = "confirmed"
+	// TransferSettled stands for a settled transfer
+	TransferSettled = "settled"
 )

@@ -27,7 +27,7 @@ var (
 )
 
 // TokenCashierABI is the input ABI used to generate the binding from.
-const TokenCashierABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"customer\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"Receipt\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"fallback\"},{\"constant\":true,\"inputs\":[],\"name\":\"depositFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"tokenList\",\"outputs\":[{\"internalType\":\"contractTokenList\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_fee\",\"type\":\"uint256\"}],\"name\":\"setDepositFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"depositTo\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"deposit\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"count\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_offset\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"_limit\",\"type\":\"uint256\"}],\"name\":\"getRecords\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"customers_\",\"type\":\"address[]\"},{\"internalType\":\"address[]\",\"name\":\"receivers_\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts_\",\"type\":\"uint256[]\"},{\"internalType\":\"uint256[]\",\"name\":\"fees_\",\"type\":\"uint256[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"withdraw\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+const TokenCashierABI = "[{\"inputs\":[{\"internalType\":\"contractTokenList[]\",\"name\":\"_tokenLists\",\"type\":\"address[]\"},{\"internalType\":\"address[]\",\"name\":\"_tokenSafes\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"Receipt\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"fallback\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"counts\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"depositFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenLists\",\"outputs\":[{\"internalType\":\"contractTokenList\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenSafes\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"count\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_fee\",\"type\":\"uint256\"}],\"name\":\"setDepositFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"depositTo\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"deposit\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"withdraw\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"withdrawToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // TokenCashier is an auto generated Go binding around an Ethereum contract.
 type TokenCashier struct {
@@ -197,6 +197,32 @@ func (_TokenCashier *TokenCashierCallerSession) Count(_token common.Address) (*b
 	return _TokenCashier.Contract.Count(&_TokenCashier.CallOpts, _token)
 }
 
+// Counts is a free data retrieval call binding the contract method 0x0568e65e.
+//
+// Solidity: function counts(address ) view returns(uint256)
+func (_TokenCashier *TokenCashierCaller) Counts(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
+	var (
+		ret0 = new(*big.Int)
+	)
+	out := ret0
+	err := _TokenCashier.contract.Call(opts, out, "counts", arg0)
+	return *ret0, err
+}
+
+// Counts is a free data retrieval call binding the contract method 0x0568e65e.
+//
+// Solidity: function counts(address ) view returns(uint256)
+func (_TokenCashier *TokenCashierSession) Counts(arg0 common.Address) (*big.Int, error) {
+	return _TokenCashier.Contract.Counts(&_TokenCashier.CallOpts, arg0)
+}
+
+// Counts is a free data retrieval call binding the contract method 0x0568e65e.
+//
+// Solidity: function counts(address ) view returns(uint256)
+func (_TokenCashier *TokenCashierCallerSession) Counts(arg0 common.Address) (*big.Int, error) {
+	return _TokenCashier.Contract.Counts(&_TokenCashier.CallOpts, arg0)
+}
+
 // DepositFee is a free data retrieval call binding the contract method 0x67a52793.
 //
 // Solidity: function depositFee() view returns(uint256)
@@ -221,50 +247,6 @@ func (_TokenCashier *TokenCashierSession) DepositFee() (*big.Int, error) {
 // Solidity: function depositFee() view returns(uint256)
 func (_TokenCashier *TokenCashierCallerSession) DepositFee() (*big.Int, error) {
 	return _TokenCashier.Contract.DepositFee(&_TokenCashier.CallOpts)
-}
-
-// GetRecords is a free data retrieval call binding the contract method 0x1bdb94a4.
-//
-// Solidity: function getRecords(address _token, uint256 _offset, uint256 _limit) view returns(address[] customers_, address[] receivers_, uint256[] amounts_, uint256[] fees_)
-func (_TokenCashier *TokenCashierCaller) GetRecords(opts *bind.CallOpts, _token common.Address, _offset *big.Int, _limit *big.Int) (struct {
-	Customers []common.Address
-	Receivers []common.Address
-	Amounts   []*big.Int
-	Fees      []*big.Int
-}, error) {
-	ret := new(struct {
-		Customers []common.Address
-		Receivers []common.Address
-		Amounts   []*big.Int
-		Fees      []*big.Int
-	})
-	out := ret
-	err := _TokenCashier.contract.Call(opts, out, "getRecords", _token, _offset, _limit)
-	return *ret, err
-}
-
-// GetRecords is a free data retrieval call binding the contract method 0x1bdb94a4.
-//
-// Solidity: function getRecords(address _token, uint256 _offset, uint256 _limit) view returns(address[] customers_, address[] receivers_, uint256[] amounts_, uint256[] fees_)
-func (_TokenCashier *TokenCashierSession) GetRecords(_token common.Address, _offset *big.Int, _limit *big.Int) (struct {
-	Customers []common.Address
-	Receivers []common.Address
-	Amounts   []*big.Int
-	Fees      []*big.Int
-}, error) {
-	return _TokenCashier.Contract.GetRecords(&_TokenCashier.CallOpts, _token, _offset, _limit)
-}
-
-// GetRecords is a free data retrieval call binding the contract method 0x1bdb94a4.
-//
-// Solidity: function getRecords(address _token, uint256 _offset, uint256 _limit) view returns(address[] customers_, address[] receivers_, uint256[] amounts_, uint256[] fees_)
-func (_TokenCashier *TokenCashierCallerSession) GetRecords(_token common.Address, _offset *big.Int, _limit *big.Int) (struct {
-	Customers []common.Address
-	Receivers []common.Address
-	Amounts   []*big.Int
-	Fees      []*big.Int
-}, error) {
-	return _TokenCashier.Contract.GetRecords(&_TokenCashier.CallOpts, _token, _offset, _limit)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
@@ -319,30 +301,56 @@ func (_TokenCashier *TokenCashierCallerSession) Paused() (bool, error) {
 	return _TokenCashier.Contract.Paused(&_TokenCashier.CallOpts)
 }
 
-// TokenList is a free data retrieval call binding the contract method 0x9e2c58ca.
+// TokenLists is a free data retrieval call binding the contract method 0x1cb928a9.
 //
-// Solidity: function tokenList() view returns(address)
-func (_TokenCashier *TokenCashierCaller) TokenList(opts *bind.CallOpts) (common.Address, error) {
+// Solidity: function tokenLists(uint256 ) view returns(address)
+func (_TokenCashier *TokenCashierCaller) TokenLists(opts *bind.CallOpts, arg0 *big.Int) (common.Address, error) {
 	var (
 		ret0 = new(common.Address)
 	)
 	out := ret0
-	err := _TokenCashier.contract.Call(opts, out, "tokenList")
+	err := _TokenCashier.contract.Call(opts, out, "tokenLists", arg0)
 	return *ret0, err
 }
 
-// TokenList is a free data retrieval call binding the contract method 0x9e2c58ca.
+// TokenLists is a free data retrieval call binding the contract method 0x1cb928a9.
 //
-// Solidity: function tokenList() view returns(address)
-func (_TokenCashier *TokenCashierSession) TokenList() (common.Address, error) {
-	return _TokenCashier.Contract.TokenList(&_TokenCashier.CallOpts)
+// Solidity: function tokenLists(uint256 ) view returns(address)
+func (_TokenCashier *TokenCashierSession) TokenLists(arg0 *big.Int) (common.Address, error) {
+	return _TokenCashier.Contract.TokenLists(&_TokenCashier.CallOpts, arg0)
 }
 
-// TokenList is a free data retrieval call binding the contract method 0x9e2c58ca.
+// TokenLists is a free data retrieval call binding the contract method 0x1cb928a9.
 //
-// Solidity: function tokenList() view returns(address)
-func (_TokenCashier *TokenCashierCallerSession) TokenList() (common.Address, error) {
-	return _TokenCashier.Contract.TokenList(&_TokenCashier.CallOpts)
+// Solidity: function tokenLists(uint256 ) view returns(address)
+func (_TokenCashier *TokenCashierCallerSession) TokenLists(arg0 *big.Int) (common.Address, error) {
+	return _TokenCashier.Contract.TokenLists(&_TokenCashier.CallOpts, arg0)
+}
+
+// TokenSafes is a free data retrieval call binding the contract method 0x84378ec6.
+//
+// Solidity: function tokenSafes(uint256 ) view returns(address)
+func (_TokenCashier *TokenCashierCaller) TokenSafes(opts *bind.CallOpts, arg0 *big.Int) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _TokenCashier.contract.Call(opts, out, "tokenSafes", arg0)
+	return *ret0, err
+}
+
+// TokenSafes is a free data retrieval call binding the contract method 0x84378ec6.
+//
+// Solidity: function tokenSafes(uint256 ) view returns(address)
+func (_TokenCashier *TokenCashierSession) TokenSafes(arg0 *big.Int) (common.Address, error) {
+	return _TokenCashier.Contract.TokenSafes(&_TokenCashier.CallOpts, arg0)
+}
+
+// TokenSafes is a free data retrieval call binding the contract method 0x84378ec6.
+//
+// Solidity: function tokenSafes(uint256 ) view returns(address)
+func (_TokenCashier *TokenCashierCallerSession) TokenSafes(arg0 *big.Int) (common.Address, error) {
+	return _TokenCashier.Contract.TokenSafes(&_TokenCashier.CallOpts, arg0)
 }
 
 // Deposit is a paid mutator transaction binding the contract method 0x47e7ef24.
@@ -490,6 +498,27 @@ func (_TokenCashier *TokenCashierSession) Withdraw() (*types.Transaction, error)
 // Solidity: function withdraw() returns()
 func (_TokenCashier *TokenCashierTransactorSession) Withdraw() (*types.Transaction, error) {
 	return _TokenCashier.Contract.Withdraw(&_TokenCashier.TransactOpts)
+}
+
+// WithdrawToken is a paid mutator transaction binding the contract method 0x89476069.
+//
+// Solidity: function withdrawToken(address _token) returns()
+func (_TokenCashier *TokenCashierTransactor) WithdrawToken(opts *bind.TransactOpts, _token common.Address) (*types.Transaction, error) {
+	return _TokenCashier.contract.Transact(opts, "withdrawToken", _token)
+}
+
+// WithdrawToken is a paid mutator transaction binding the contract method 0x89476069.
+//
+// Solidity: function withdrawToken(address _token) returns()
+func (_TokenCashier *TokenCashierSession) WithdrawToken(_token common.Address) (*types.Transaction, error) {
+	return _TokenCashier.Contract.WithdrawToken(&_TokenCashier.TransactOpts, _token)
+}
+
+// WithdrawToken is a paid mutator transaction binding the contract method 0x89476069.
+//
+// Solidity: function withdrawToken(address _token) returns()
+func (_TokenCashier *TokenCashierTransactorSession) WithdrawToken(_token common.Address) (*types.Transaction, error) {
+	return _TokenCashier.Contract.WithdrawToken(&_TokenCashier.TransactOpts, _token)
 }
 
 // Fallback is a paid mutator transaction binding the contract fallback function.
@@ -866,58 +895,51 @@ func (it *TokenCashierReceiptIterator) Close() error {
 
 // TokenCashierReceipt represents a Receipt event raised by the TokenCashier contract.
 type TokenCashierReceipt struct {
-	Customer common.Address
-	Receiver common.Address
-	Token    common.Address
-	Amount   *big.Int
-	Fee      *big.Int
-	Raw      types.Log // Blockchain specific contextual infos
+	Token     common.Address
+	Id        *big.Int
+	Sender    common.Address
+	Recipient common.Address
+	Amount    *big.Int
+	Fee       *big.Int
+	Raw       types.Log // Blockchain specific contextual infos
 }
 
-// FilterReceipt is a free log retrieval operation binding the contract event 0x5a724f2629bc1fea6af562d66f78fa16618c939eacef15aeea7b962c0044779f.
+// FilterReceipt is a free log retrieval operation binding the contract event 0x85425e130ee5cbf9eea6de0d309f1fdd5f7a343aeb20ad4263f3e1305fd5b919.
 //
-// Solidity: event Receipt(address indexed customer, address indexed receiver, address indexed token, uint256 amount, uint256 fee)
-func (_TokenCashier *TokenCashierFilterer) FilterReceipt(opts *bind.FilterOpts, customer []common.Address, receiver []common.Address, token []common.Address) (*TokenCashierReceiptIterator, error) {
+// Solidity: event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee)
+func (_TokenCashier *TokenCashierFilterer) FilterReceipt(opts *bind.FilterOpts, token []common.Address, id []*big.Int) (*TokenCashierReceiptIterator, error) {
 
-	var customerRule []interface{}
-	for _, customerItem := range customer {
-		customerRule = append(customerRule, customerItem)
-	}
-	var receiverRule []interface{}
-	for _, receiverItem := range receiver {
-		receiverRule = append(receiverRule, receiverItem)
-	}
 	var tokenRule []interface{}
 	for _, tokenItem := range token {
 		tokenRule = append(tokenRule, tokenItem)
 	}
+	var idRule []interface{}
+	for _, idItem := range id {
+		idRule = append(idRule, idItem)
+	}
 
-	logs, sub, err := _TokenCashier.contract.FilterLogs(opts, "Receipt", customerRule, receiverRule, tokenRule)
+	logs, sub, err := _TokenCashier.contract.FilterLogs(opts, "Receipt", tokenRule, idRule)
 	if err != nil {
 		return nil, err
 	}
 	return &TokenCashierReceiptIterator{contract: _TokenCashier.contract, event: "Receipt", logs: logs, sub: sub}, nil
 }
 
-// WatchReceipt is a free log subscription operation binding the contract event 0x5a724f2629bc1fea6af562d66f78fa16618c939eacef15aeea7b962c0044779f.
+// WatchReceipt is a free log subscription operation binding the contract event 0x85425e130ee5cbf9eea6de0d309f1fdd5f7a343aeb20ad4263f3e1305fd5b919.
 //
-// Solidity: event Receipt(address indexed customer, address indexed receiver, address indexed token, uint256 amount, uint256 fee)
-func (_TokenCashier *TokenCashierFilterer) WatchReceipt(opts *bind.WatchOpts, sink chan<- *TokenCashierReceipt, customer []common.Address, receiver []common.Address, token []common.Address) (event.Subscription, error) {
+// Solidity: event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee)
+func (_TokenCashier *TokenCashierFilterer) WatchReceipt(opts *bind.WatchOpts, sink chan<- *TokenCashierReceipt, token []common.Address, id []*big.Int) (event.Subscription, error) {
 
-	var customerRule []interface{}
-	for _, customerItem := range customer {
-		customerRule = append(customerRule, customerItem)
-	}
-	var receiverRule []interface{}
-	for _, receiverItem := range receiver {
-		receiverRule = append(receiverRule, receiverItem)
-	}
 	var tokenRule []interface{}
 	for _, tokenItem := range token {
 		tokenRule = append(tokenRule, tokenItem)
 	}
+	var idRule []interface{}
+	for _, idItem := range id {
+		idRule = append(idRule, idItem)
+	}
 
-	logs, sub, err := _TokenCashier.contract.WatchLogs(opts, "Receipt", customerRule, receiverRule, tokenRule)
+	logs, sub, err := _TokenCashier.contract.WatchLogs(opts, "Receipt", tokenRule, idRule)
 	if err != nil {
 		return nil, err
 	}
@@ -949,9 +971,9 @@ func (_TokenCashier *TokenCashierFilterer) WatchReceipt(opts *bind.WatchOpts, si
 	}), nil
 }
 
-// ParseReceipt is a log parse operation binding the contract event 0x5a724f2629bc1fea6af562d66f78fa16618c939eacef15aeea7b962c0044779f.
+// ParseReceipt is a log parse operation binding the contract event 0x85425e130ee5cbf9eea6de0d309f1fdd5f7a343aeb20ad4263f3e1305fd5b919.
 //
-// Solidity: event Receipt(address indexed customer, address indexed receiver, address indexed token, uint256 amount, uint256 fee)
+// Solidity: event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee)
 func (_TokenCashier *TokenCashierFilterer) ParseReceipt(log types.Log) (*TokenCashierReceipt, error) {
 	event := new(TokenCashierReceipt)
 	if err := _TokenCashier.contract.UnpackLog(event, "Receipt", log); err != nil {

@@ -1,0 +1,12 @@
+chain: "ethereum"
+refreshInterval: 5m
+clientURL: ""
+ethConfirmBlockNumber: 20
+ethGasPriceLimit: 10000000000
+port: 7000
+privateKey: ""
+slackWebHook: "" 
+validatorAddress: "0x"
+databaseURL: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+transferTableName: "ethereum_transfers"
+witnessTableName: "ethereum_witnesses"
