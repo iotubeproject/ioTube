@@ -4,7 +4,7 @@ const TransferValidator = artifacts.require('TransferValidator');
 const TokenList = artifacts.require('TokenList');
 const ShadowToken = artifacts.require('ShadowToken');
 const WitnessList = artifacts.require('WitnessList');
-const ethjs = require('eth-lib');
+const Account = require('eth-lib/lib/account');
 const {assertAsyncThrows} = require('./assert-async-throws');
 
 const witnessPrivateKeys = [
@@ -63,7 +63,7 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
             });
             it('one witness', async function() {
                 await this.witnessList.addWitness(witness1);
-                const signature = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
+                const signature = await Account.sign(key, witnessPrivateKeys[0]);
                 await this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature, {from: relayer});
                 assert.notEqual(await this.validator.settles(key), 0);
                 assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
@@ -72,8 +72,8 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
             it('two witnesses', async function() {
                 await this.witnessList.addWitness(witness1);
                 await this.witnessList.addWitness(witness2);
-                const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
+                const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
                 await this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature1 + signature2.substr(2), {from: relayer});
                 assert.notEqual(await this.validator.settles(key), 0);
                 assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
@@ -86,23 +86,23 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
                     await this.witnessList.addWitness(witness3);
                 });
                 it("three valid signatures", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
-                    const signature3 = await ethjs.Account.sign(key, witnessPrivateKeys[2]);
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
+                    const signature3 = await Account.sign(key, witnessPrivateKeys[2]);
                     await this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature1 + signature2.substr(2) + signature3.substr(2), {from: relayer});
                     assert.notEqual(await this.validator.settles(key), 0);
                     assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
                     assert.equal(await this.shadowToken.balanceOf(this.tokenSafe.address), 99987655);    
                 });
                 it("insufficient signatures", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
                     await assertAsyncThrows(this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature1 + signature2.substr(2), {from: relayer}));
                 });
                 it("signature from invalid witness", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
-                    const signature3 = await ethjs.Account.sign(key, witnessPrivateKeys[3]);
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
+                    const signature3 = await Account.sign(key, witnessPrivateKeys[3]);
                     await assertAsyncThrows(this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature1 + signature2.substr(2) + signature3.substr(2), {from: relayer}));
                 });
             });
@@ -114,19 +114,19 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
                     await this.witnessList.addWitness(witness4);
                 });
                 it("three submissions", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
-                    const signature3 = await ethjs.Account.sign(key, witnessPrivateKeys[2]);
-                    await this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature1 + signature2.substr(2) + signature3.substr(2), {from: relayer});
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
+                    const signature3 = await Account.sign(key, witnessPrivateKeys[2]);
+                    const response = await this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature1 + signature2.substr(2) + signature3.substr(2), {from: relayer});
                     assert.notEqual(await this.validator.settles(key), 0);
                     assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
                     assert.equal(await this.shadowToken.balanceOf(this.tokenSafe.address), 99987655);    
                 });
                 it("four submissions", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
-                    const signature3 = await ethjs.Account.sign(key, witnessPrivateKeys[2]);
-                    const signature4 = await ethjs.Account.sign(key, witnessPrivateKeys[3]);
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
+                    const signature3 = await Account.sign(key, witnessPrivateKeys[2]);
+                    const signature4 = await Account.sign(key, witnessPrivateKeys[3]);
                     await this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature1 + signature2.substr(2) + signature3.substr(2) + signature4.substr(2), {from: relayer});
                     assert.notEqual(await this.validator.settles(key), 0);
                     assert.equal(await this.shadowToken.balanceOf(receiver), 12345);
@@ -152,7 +152,7 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
             });
             it('one witness', async function() {
                 await this.witnessList.addWitness(witness1);
-                const signature = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
+                const signature = await Account.sign(key, witnessPrivateKeys[0]);
                 await this.validator.submit(cashier, this.mintableToken.address, 321, sender, receiver, 12345, signature, {from: relayer});
                 assert.notEqual(await this.validator.settles(key), 0);
                 assert.equal(await this.mintableToken.balanceOf(receiver), 12345);
@@ -160,8 +160,8 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
             it('two witnesses', async function() {
                 await this.witnessList.addWitness(witness1);
                 await this.witnessList.addWitness(witness2);
-                const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
+                const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
                 await this.validator.submit(cashier, this.mintableToken.address, 321, sender, receiver, 12345, signature1 + signature2.substr(2), {from: relayer});
                 assert.notEqual(await this.validator.settles(key), 0);
                 assert.equal(await this.mintableToken.balanceOf(receiver), 12345);
@@ -173,22 +173,22 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
                     await this.witnessList.addWitness(witness3);
                 });
                 it("three valid signatures", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
-                    const signature3 = await ethjs.Account.sign(key, witnessPrivateKeys[2]);
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
+                    const signature3 = await Account.sign(key, witnessPrivateKeys[2]);
                     await this.validator.submit(cashier, this.mintableToken.address, 321, sender, receiver, 12345, signature1 + signature2.substr(2) + signature3.substr(2), {from: relayer});
                     assert.notEqual(await this.validator.settles(key), 0);
                     assert.equal(await this.mintableToken.balanceOf(receiver), 12345);
                 });
                 it("insufficient signatures", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
                     await assertAsyncThrows(this.validator.submit(cashier, this.mintableToken.address, 321, sender, receiver, 12345, signature1 + signature2.substr(2), {from: relayer}));
                 });
                 it("signature from invalid witness", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
-                    const signature3 = await ethjs.Account.sign(key, witnessPrivateKeys[3]);
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
+                    const signature3 = await Account.sign(key, witnessPrivateKeys[3]);
                     await assertAsyncThrows(this.validator.submit(cashier, this.mintableToken.address, 321, sender, receiver, 12345, signature1 + signature2.substr(2) + signature3.substr(2), {from: relayer}));
                 });
             });
@@ -200,18 +200,18 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
                     await this.witnessList.addWitness(witness4);
                 });
                 it("three submissions", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
-                    const signature3 = await ethjs.Account.sign(key, witnessPrivateKeys[2]);
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
+                    const signature3 = await Account.sign(key, witnessPrivateKeys[2]);
                     await this.validator.submit(cashier, this.mintableToken.address, 321, sender, receiver, 12345, signature1 + signature2.substr(2) + signature3.substr(2), {from: relayer});
                     assert.notEqual(await this.validator.settles(key), 0);
                     assert.equal(await this.mintableToken.balanceOf(receiver), 12345);
                 });
                 it("four submissions", async function() {
-                    const signature1 = await ethjs.Account.sign(key, witnessPrivateKeys[0]);
-                    const signature2 = await ethjs.Account.sign(key, witnessPrivateKeys[1]);
-                    const signature3 = await ethjs.Account.sign(key, witnessPrivateKeys[2]);
-                    const signature4 = await ethjs.Account.sign(key, witnessPrivateKeys[3]);
+                    const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
+                    const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
+                    const signature3 = await Account.sign(key, witnessPrivateKeys[2]);
+                    const signature4 = await Account.sign(key, witnessPrivateKeys[3]);
                     await this.validator.submit(cashier, this.mintableToken.address, 321, sender, receiver, 12345, signature1 + signature2.substr(2) + signature3.substr(2) + signature4.substr(2), {from: relayer});
                     assert.notEqual(await this.validator.settles(key), 0);
                     assert.equal(await this.mintableToken.balanceOf(receiver), 12345);
