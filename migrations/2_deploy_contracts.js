@@ -19,6 +19,7 @@ module.exports = function(deployer, network, accounts) {
         console.log('Standard Token List Address: ', standardTokenList.address);
         const tokenCashier = await deployer.deploy(
             TokenCashier,
+            "0x0000000000000000000000000000000000000000",
             [standardTokenList.address, mintableTokenList.address],
             [tokenSafe.address, minterPool.address],
         );

@@ -2,6 +2,7 @@ const TokenCashier = artifacts.require('TokenCashier');
 const TokenList = artifacts.require('TokenList');
 const TokenSafe = artifacts.require('TokenSafe');
 const ShadowToken = artifacts.require('ShadowToken');
+const WETH = artifacts.require('WETH9');
 const {assertAsyncThrows} = require('./assert-async-throws');
 
 contract('TokenCashier', function([owner, minter, sender, receiver, fakeTokenAddress1, fakeTokenAddress2]) {
@@ -12,8 +13,10 @@ contract('TokenCashier', function([owner, minter, sender, receiver, fakeTokenAdd
         assert.equal(await this.shadowToken.balanceOf(sender), 10000000000);
         this.mintableTokenList = await TokenList.new();
         this.standardTokenList = await TokenList.new();
+        this.weth = await WETH.new();
         this.tokenSafe = await TokenSafe.new();
         this.cashier = await TokenCashier.new(
+            this.weth.address,
             [this.mintableTokenList.address, this.standardTokenList.address],
             ['0x0000000000000000000000000000000000000000', this.tokenSafe.address],
         );
@@ -94,6 +97,7 @@ contract('TokenCashier', function([owner, minter, sender, receiver, fakeTokenAdd
         });
         it("deposit into safe", async function() {
             await this.standardTokenList.addToken(this.shadowToken.address, 10, 1000);
+            await this.standardTokenList.addToken(this.weth.address, 1, 100000);
             assert.equal(await this.standardTokenList.isAllowed(this.shadowToken.address), true);
             assert.equal(await this.cashier.count(this.shadowToken.address), 0);
             assert.equal(await web3.eth.getBalance(this.cashier.address), 0);
@@ -127,6 +131,21 @@ contract('TokenCashier', function([owner, minter, sender, receiver, fakeTokenAdd
             assert.equal(depositResponse.logs[0].args.recipient, receiver);
             assert.equal(depositResponse.logs[0].args.amount, 500);
             assert.equal(depositResponse.logs[0].args.fee, 1234);
+            const balanceBeforeDeposit = await web3.eth.getBalance(sender);
+            depositResponse = await this.cashier.depositTo("0x0000000000000000000000000000000000000000", receiver, 50000, {from: sender, value: 54321, gasPrice: 1});
+            assert.equal(await web3.eth.getBalance(sender), balanceBeforeDeposit - depositResponse.receipt.gasUsed - 54321);
+            assert.equal(await this.weth.balanceOf(this.tokenSafe.address), 50000);
+            assert.equal(await this.cashier.count(this.weth.address), 1);
+            assert.equal(await web3.eth.getBalance(this.cashier.address), 5555);
+            assert.equal(depositResponse.logs.length, 1);
+            assert.equal(depositResponse.logs[0].event, "Receipt");
+            assert.equal(depositResponse.logs[0].address, this.cashier.address);
+            assert.equal(depositResponse.logs[0].args.token, this.weth.address);
+            assert.equal(depositResponse.logs[0].args.id, 1);
+            assert.equal(depositResponse.logs[0].args.sender, sender);
+            assert.equal(depositResponse.logs[0].args.recipient, receiver);
+            assert.equal(depositResponse.logs[0].args.amount, 50000);
+            assert.equal(depositResponse.logs[0].args.fee, 4321);
         });
     });
 });
