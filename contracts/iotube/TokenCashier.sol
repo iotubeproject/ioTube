@@ -8,6 +8,10 @@ interface TokenList {
     function minAmount(address) external returns (uint256);
 }
 
+interface WrappedCoin {
+    function deposit() external payable;
+}
+
 contract TokenCashier is Pausable {
     event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee);
 
@@ -15,9 +19,11 @@ contract TokenCashier is Pausable {
     address[] public tokenSafes;
     mapping(address => uint256) public counts;
     uint256 public depositFee;
+    WrappedCoin public wrappedCoin;
 
-    constructor(TokenList[] memory _tokenLists, address[] memory _tokenSafes) public {
+    constructor(WrappedCoin _wrappedCoin, TokenList[] memory _tokenLists, address[] memory _tokenSafes) public {
         require(_tokenLists.length == _tokenSafes.length, "# of token lists is not equal to # of safes");
+        wrappedCoin = _wrappedCoin;
         tokenLists = _tokenLists;
         tokenSafes = _tokenSafes;
     }
@@ -36,21 +42,34 @@ contract TokenCashier is Pausable {
 
     function depositTo(address _token, address _to, uint256 _amount) public whenNotPaused payable {
         require(_to != address(0), "invalid destination");
-        require(msg.value >= depositFee, "insufficient balance");
+        bool isCoin = false;
+        uint256 fee = msg.value;
+        if (_token == address(0)) {
+            require(msg.value >= _amount, "insufficient msg.value");
+            fee = msg.value - _amount;
+            wrappedCoin.deposit.value(_amount)();
+            _token = address(wrappedCoin);
+            isCoin = true;
+        }
+        require(fee >= depositFee, "insufficient fee");
         for (uint256 i = 0; i < tokenLists.length; i++) {
             if (tokenLists[i].isAllowed(_token)) {
                 require(_amount >= tokenLists[i].minAmount(_token), "amount too low");
                 require(_amount <= tokenLists[i].maxAmount(_token), "amount too high");
                 if (tokenSafes[i] == address(0)) {
-                    require(safeTransferFrom(_token, msg.sender, address(this), _amount), "fail to transfer token to cashier");
-                    // burn
+                    require(!isCoin && safeTransferFrom(_token, msg.sender, address(this), _amount), "fail to transfer token to cashier");
+                    // selector = bytes4(keccak256(bytes('burn(uint256)')))
                     (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0x42966c68, _amount));
                     require(success && (data.length == 0 || abi.decode(data, (bool))), "fail to burn token");
                 } else {
-                    require(safeTransferFrom(_token, msg.sender, tokenSafes[i], _amount), "failed to put into safe");
+                    if (isCoin) {
+                        require(safeTransfer(_token, tokenSafes[i], _amount), "failed to put into safe");
+                    } else {
+                        require(safeTransferFrom(_token, msg.sender, tokenSafes[i], _amount), "failed to put into safe");
+                    }
                 }
                 counts[_token] += 1;
-                emit Receipt(_token, counts[_token], msg.sender, _to, _amount, msg.value);
+                emit Receipt(_token, counts[_token], msg.sender, _to, _amount, fee);
                 return;
             }
         }
