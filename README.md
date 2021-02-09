@@ -25,35 +25,44 @@ Different from traditional bridges, ioTube comes with two components:
 - **a golang service** witnessing what has happened on both changes and relay the finalized information
 - **a set of smart contracts** pre-deployed on both chains letting the legitimate witnesses relay information back and forth to facilitate cross-chain transferring of assets
 
-### Deploy Contracts on IoTeX
-* Deploy a MinterPool `mp`
-* Deploy a TokenList `tl`
-* Deploy a WitnessList `wl`
-* Deploy a BurnableTokenCashier with `tl`
-* Deploy a TransferValidatorWithMinterPool with `mp`, `tl`, `wl`
-* Transfer ownership of `mp` to the TransferValidatorWithMinterPool
-* Add witnesses to `wl`
-
-### Deploy Contracts on Ethereum
+### Deploy Contracts on IoTeX/Ethereum
 * Deploy a TokenSafe `ts`
-* Deploy a TokenList `tl`
+* Deploy a TokenList `tl1`, which stores tokens using `ts`
+* Deploy a MinterPool `mp`
+* Deploy a TokenList `tl2`, which stores tokens using `mp`
 * Deploy a WitnessList `wl`
-* Deploy a TokenCashierWithSafe with `tl` and `ts`
-* Deploy a TransferValidatorWithTokenSafe with `ts`, `tl`, and `wl`
-* Transfer ownership of `ts` to the TransferValidatorWithTokenSafe
+* Deploy a TokenCashier `tc` with `ts`, `tl1`, and `tl2`
+* Deploy a TransferValidator `tv` with `ts`, `mp`, `tl1`, `tl2`, and `wl`
+* Transfer ownership of `mp` to `tv`
+* Transfer ownership of `ts` to `tv`
 * Add witnesses to `wl`
+* Add tokens to `tl1` or `tl2`
 
-### Join as a Witness
+### Join as a Relayer
 
-1. Edit `witness-service/service.yaml` to fill in the following fields:
-* iotex.privateKey
-* ethereum.privateKey
-* ethereum.client
+1. Edit `witness-service/relayer-config-iotex.yaml` and `witness-service/relayer-config-ethereum.yaml` to fill in the following fields:
+* privateKey
+* clientURL
+* validatorContractAddress
 
 2. start containers
 ```
 cd witness-service
-./start.sh
+./start_relayer.sh
+```
+
+### Join as a Witness
+
+1. Edit `witness-service/witness-config-iotex.yaml` and `witness-service/witness-config-ethereum.yaml` to fill in the following fields:
+* privateKey
+* clientURL
+* validatorContractAddress
+* cashierContractAddress
+
+2. start containers
+```
+cd witness-service
+./start_witness.sh
 ```
 
 3. Clean up everything by running
