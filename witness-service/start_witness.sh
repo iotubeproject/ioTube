@@ -121,6 +121,7 @@ function grantPrivileges() {
         popd
         echo -e "$YELLOW Success! $NC"
         docker exec witness-db mysql -uroot -p${DB_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%'"  > /dev/null 2>&1
+        docker exec witness-db mysql -uroot -p${DB_ROOT_PASSWORD} -e "CREATE DATABASE witness"  > /dev/null 2>&1
         $WHITE_LINE
         touch $IOTEX_WITNESS/data/mysql/.inited
     fi

@@ -7,7 +7,7 @@ validatorContractAddress: "io"
 cashierContractAddress: "0x"
 startBlockHeight: 0
 batchSize: 1000
-processInterval: 1m
+interval: 1m
 databaseURL: "root:kdfjjrU64fjK58H@tcp(database:3306)/witness?parseTime=true"
 transferTableName: "ethereum_transfers"
 tokenPairTableName: "ethereum_to_iotex_pairs"
