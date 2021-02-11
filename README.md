@@ -20,6 +20,8 @@ ioTube is a decentralized cross-chain bridge that enables the bidirectional exch
 
 &nbsp;
 
+# NOTICE: The information of this README is pending an update after tube's recent upgrade to V3.
+
 ## Deployment
 Different from traditional bridges, ioTube comes with two components:
 - **a golang service** witnessing what has happened on both changes and relay the finalized information
