@@ -120,22 +120,45 @@ Gas fees on IoTeX are negligible, both for bridge maintenance and for asset tran
 - To transfer token from Ethereum to IoTeX: ~43,952 gas to set allowance and ~151,122 to lock it;
 - To transfer token back from IoTeX to ETH: ~422,525 gas to unlock the token.
 
+## Contract addresses
+
+Contracts on IoTeX 
+
+- Wrapped IOTX: io15qr5fzpxsnp7garl4m7k355rafzqn8grrm0grz
+- Token Safe: io1cj3f498390srqv765nnvaxuk0rpxyadzpfjz75
+- Minter Pool: io1g7va274ltufv5nh4xawfmt0clel6tfz58p7n5r
+- Standard Token List: io1t89whrwyfr0supctsqcx9n7ex5dd8yusfqhyfz 
+- Proxy Token List: io1dn8nqk3pmmll990xz6a94fpradtrljxmmx5p8j 
+- Witness List: io1hezp6d7y3246c5gklnnkh0z95qfld4zdsphhsw
+- Token Cashier: io1gsr52ahqzklaf7flqar8r0269f2utkw9349qg8
+- Transfer Validator: io1dwaxh2ml4fd2wg8cg35vhfsgdcyzrczffp3vus
+
+Contacts on Ethereum
+
+- WETH: 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2
+- Standard Token List: 0x7c0bef36e1b1cbeb1f1a5541300786a7b608aede
+- Proxy Token List: 0x73ffdfc98983ad59fb441fc5fe855c1589e35b3e
+- Witness List: 0x8598dF1Ec0ac7dfBa802f4bDD93A6B93bd0AD83f 
+- Token Safe: 0xc2e0f31d739cb3153ba5760a203b3bd7c27f0d7a 
+- Minter Pool: 0x964f4f19bc823e72cc1f806021937cfc06f63b45 
+- Token Cashier: 0xa0fd7430852361931b23a31f84374ba3314e1682
+- Transfer Validator: 0xd8165188ccc135b3a3b2a5d2bc3af9d94753d955
 
 ## Current Supported Tokens
-0. WETH (0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2) - min=0.1 max=1000 
+
+- WETH (0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2) - min=0.1 max=1000 
 
 ioETH contract (io1qfvgvmk6lpxkpqwlzanqx4atyzs86ryqjnfuad)
 
-1. PAXG (0x45804880de22913dafe09f4980848ece6ecbaf78) - min=0.01 max=200
-
-ioPAXG contract (io19fsq8e9krrlng4ay5gyq6q5tqfym28yq9ly0fz)
-
-2. BUSD (0x4Fabb145d64652a948d72533023f6E7A623C7C53) - min=1 max=400000
+- BUSD (0x4Fabb145d64652a948d72533023f6E7A623C7C53) - min=1 max=400000
 
 ioBUSD contract (io14nhfkywdfvl40evgsqnh43ev33q6he8yez8c8a)
 
-3. UNISWAP (0x1f9840a85d5af5bf1d1762f925bdaddc4201f984) - min=0.1 max=80000
+- UNISWAP (0x1f9840a85d5af5bf1d1762f925bdaddc4201f984) - min=0.1 max=80000
 
 ioUNI contract (io1ahh04jn2zkqlug6feh7rpq75a75p3rj42hp4ch)
 
+- PAXG (0x45804880de22913dafe09f4980848ece6ecbaf78) - min=0.01 max=200
+
+ioPAXG contract (io19fsq8e9krrlng4ay5gyq6q5tqfym28yq9ly0fz)
 
