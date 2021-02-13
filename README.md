@@ -1,8 +1,8 @@
 [![tests](https://github.com/iotexproject/ioTube/workflows/tests/badge.svg)](https://github.com/iotexproject/ioTube/actions?query=workflow%3Atests)
 
-<p align="center">
-  <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px">
-</p>
+<h1 align="center">
+  <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px"> V3
+</h1>
 
 <p>
   <strong>A multi-assets, fully decentralized and bidirectional bridge for exchanging ERC20/XRC20 tokens between Ethereum and IoTeX.</strong>
