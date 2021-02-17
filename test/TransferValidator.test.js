@@ -37,6 +37,14 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
     it('token not in list', async function() {
         await assertAsyncThrows(this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, "", {from: relayer}));
     });
+    it('add minter pair', async function() {
+        assert.equal(await this.validator.numOfPairs(), 2);
+        const tl = await TokenList.new();
+        const safe = await TokenSafe.new();
+        await safe.transferOwnership(this.validator.address);
+        await this.validator.addPair(tl.address, safe.address);
+        assert.equal(await this.validator.numOfPairs(), 3);
+    });
     it('upgrade', async function() {
         assert.equal(await this.tokenSafe.owner(), this.validator.address);
         assert.equal(await this.minterPool.owner(), this.validator.address);

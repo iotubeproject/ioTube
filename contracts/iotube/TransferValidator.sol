@@ -32,12 +32,6 @@ contract TransferValidator is Pausable {
         return keccak256(abi.encodePacked(address(this), cashier, tokenAddr, index, from, to, amount));
     }
 
-    function upgrade(address _newValidator) external onlyOwner {
-        for (uint256 i = 0; i < minters.length; i++) {
-            minters[i].transferOwnership(_newValidator);
-        }
-    }
-
     function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory signatures) public whenNotPaused {
         require(amount != 0, "amount cannot be zero");
         require(to != address(0), "recipient cannot be zero");
@@ -65,6 +59,21 @@ contract TransferValidator is Pausable {
             }
         }
         revert("not a whitelisted token");
+    }
+
+    function numOfPairs() external view returns (uint256) {
+        return minters.length;
+    }
+
+    function addPair(Allowlist _tokenList, Minter _minter) external onlyOwner {
+        tokenLists.push(_tokenList);
+        minters.push(_minter);
+    }
+
+    function upgrade(address _newValidator) external onlyOwner {
+        for (uint256 i = 0; i < minters.length; i++) {
+            minters[i].transferOwnership(_newValidator);
+        }
     }
 
     /**
