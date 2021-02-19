@@ -136,6 +136,9 @@ func main() {
 			log.Fatalf("failed to create cashier %v\n", err)
 		}
 		validatorContractAddr = common.HexToAddress(cfg.ValidatorContractAddress)
+	case "heco":
+		// Heco is identical to ethereum
+		fallthrough
 	case "ethereum":
 		ethClient, err := ethclient.DialContext(context.Background(), cfg.ClientURL)
 		if err != nil {
