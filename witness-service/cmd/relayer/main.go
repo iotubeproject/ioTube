@@ -127,8 +127,8 @@ func main() {
 		cfg.Chain = chain
 	}
 	switch cfg.Chain {
-	case "heco":
-		// heco is idential to ethereum
+	case "heco", "bsc":
+		// heco and bsc are idential to ethereum
 		fallthrough
 	case "ethereum":
 		ethClient, err := ethclient.Dial(cfg.ClientURL)
