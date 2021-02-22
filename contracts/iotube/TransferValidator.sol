@@ -2,12 +2,12 @@ pragma solidity <6.0 >=0.4.24;
 
 import "../lifecycle/Pausable.sol";
 
-interface Allowlist {
+interface IAllowlist {
     function isAllowed(address) external view returns (bool);
     function numOfActive() external view returns (uint256);
 }
 
-interface Minter {
+interface IMinter {
     function mint(address, address, uint256) external returns(bool);
     function transferOwnership(address) external;
 }
@@ -17,11 +17,11 @@ contract TransferValidator is Pausable {
 
     mapping(bytes32 => uint256) public settles;
 
-    Minter[] public minters;
-    Allowlist[] public tokenLists;
-    Allowlist public witnessList;
+    IMinter[] public minters;
+    IAllowlist[] public tokenLists;
+    IAllowlist public witnessList;
     
-    constructor(Allowlist[] memory _tokenLists, Minter[] memory _minters, Allowlist _witnessList) public {
+    constructor(IAllowlist[] memory _tokenLists, IMinter[] memory _minters, IAllowlist _witnessList) public {
         require(_minters.length == _tokenLists.length, "# of minters is not equal to # of token lists");
         minters = _minters;
         tokenLists = _tokenLists;
@@ -65,7 +65,7 @@ contract TransferValidator is Pausable {
         return minters.length;
     }
 
-    function addPair(Allowlist _tokenList, Minter _minter) external onlyOwner {
+    function addPair(IAllowlist _tokenList, IMinter _minter) external onlyOwner {
         tokenLists.push(_tokenList);
         minters.push(_minter);
     }

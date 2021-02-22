@@ -2,26 +2,26 @@ pragma solidity <6.0 >=0.4.24;
 
 import "../lifecycle/Pausable.sol";
 
-interface TokenList {
+interface ITokenList {
     function isAllowed(address) external returns (bool);
     function maxAmount(address) external returns (uint256);
     function minAmount(address) external returns (uint256);
 }
 
-interface WrappedCoin {
+interface IWrappedCoin {
     function deposit() external payable;
 }
 
 contract TokenCashier is Pausable {
     event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee);
 
-    TokenList[] public tokenLists;
+    ITokenList[] public tokenLists;
     address[] public tokenSafes;
     mapping(address => uint256) public counts;
     uint256 public depositFee;
-    WrappedCoin public wrappedCoin;
+    IWrappedCoin public wrappedCoin;
 
-    constructor(WrappedCoin _wrappedCoin, TokenList[] memory _tokenLists, address[] memory _tokenSafes) public {
+    constructor(IWrappedCoin _wrappedCoin, ITokenList[] memory _tokenLists, address[] memory _tokenSafes) public {
         require(_tokenLists.length == _tokenSafes.length, "# of token lists is not equal to # of safes");
         wrappedCoin = _wrappedCoin;
         tokenLists = _tokenLists;
