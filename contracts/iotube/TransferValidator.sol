@@ -10,6 +10,7 @@ interface IAllowlist {
 interface IMinter {
     function mint(address, address, uint256) external returns(bool);
     function transferOwnership(address) external;
+    function owner() external view returns(address);
 }
 
 contract TransferValidator is Pausable {
@@ -20,11 +21,8 @@ contract TransferValidator is Pausable {
     IMinter[] public minters;
     IAllowlist[] public tokenLists;
     IAllowlist public witnessList;
-    
-    constructor(IAllowlist[] memory _tokenLists, IMinter[] memory _minters, IAllowlist _witnessList) public {
-        require(_minters.length == _tokenLists.length, "# of minters is not equal to # of token lists");
-        minters = _minters;
-        tokenLists = _tokenLists;
+
+    constructor(IAllowlist _witnessList) public {
         witnessList = _witnessList;
     }
 
@@ -38,8 +36,8 @@ contract TransferValidator is Pausable {
         require(signatures.length % 65 == 0, "invalid signature length");
         bytes32 key = generateKey(cashier, tokenAddr, index, from, to, amount);
         require(settles[key] == 0, "transfer has been settled");
-        for (uint256 im = 0; im < minters.length; im++) {
-            if (tokenLists[im].isAllowed(tokenAddr)) {
+        for (uint256 it = 0; it < tokenLists.length; it++) {
+            if (tokenLists[it].isAllowed(tokenAddr)) {
                 uint256 numOfSignatures = signatures.length / 65;
                 address[] memory witnesses = new address[](numOfSignatures);
                 for (uint256 i = 0; i < numOfSignatures; i++) {
@@ -52,7 +50,7 @@ contract TransferValidator is Pausable {
                 }
                 require(numOfSignatures * 3 > witnessList.numOfActive() * 2, "insufficient witnesses");
                 settles[key] = block.number;
-                require(minters[im].mint(tokenAddr, to, amount), "failed to mint token");
+                require(minters[it].mint(tokenAddr, to, amount), "failed to mint token");
                 emit Settled(key, witnesses);
 
                 return;
@@ -62,7 +60,7 @@ contract TransferValidator is Pausable {
     }
 
     function numOfPairs() external view returns (uint256) {
-        return minters.length;
+        return tokenLists.length;
     }
 
     function addPair(IAllowlist _tokenList, IMinter _minter) external onlyOwner {
@@ -71,8 +69,12 @@ contract TransferValidator is Pausable {
     }
 
     function upgrade(address _newValidator) external onlyOwner {
+        address contractAddr = address(this);
         for (uint256 i = 0; i < minters.length; i++) {
-            minters[i].transferOwnership(_newValidator);
+            IMinter minter = minters[i];
+            if (minter.owner() == contractAddr) {
+                minter.transferOwnership(_newValidator);
+            }
         }
     }
 

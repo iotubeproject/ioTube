@@ -26,11 +26,10 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
         this.mintableTokenList = await TokenList.new();
         this.standardTokenList = await TokenList.new();
         this.witnessList = await WitnessList.new();
-        this.validator = await TransferValidator.new(
-            [this.standardTokenList.address, this.mintableTokenList.address],
-            [this.tokenSafe.address, this.minterPool.address],
-            this.witnessList.address,
-        );
+        this.validator = await TransferValidator.new(this.witnessList.address);
+        await this.validator.addPair(this.standardTokenList.address, this.tokenSafe.address);
+        await this.validator.addPair(this.mintableTokenList.address, this.minterPool.address);
+
         await this.tokenSafe.transferOwnership(this.validator.address);
         await this.minterPool.transferOwnership(this.validator.address);
     });

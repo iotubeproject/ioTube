@@ -26,10 +26,11 @@ module.exports = function(deployer, network, accounts) {
         console.log('Token Cashier Address: ', tokenCashier.address);
         const validator = await deployer.deploy(
             TransferValidator,
-            [standardTokenList.address, mintableTokenList.address],
-            [tokenSafe.address, minterPool.address],
             witnessList.address,
         );
+        console.log("Add new pairs")
+        await validator.addPair(standardTokenList.address, tokenSafe.address);
+        await validator.addPair(mintableTokenList.address,minterPool.address),
         console.log('Transfer Validator Address: ', validator.address);
         await minterPool.transferOwnership(validator.address);
         console.log('Ownership of minter pool is transferred to validator');
