@@ -24,6 +24,7 @@ import (
 // NewTokenCashierOnEthereum creates a new TokenCashier on ethereum
 func NewTokenCashierOnEthereum(
 	id string,
+	relayerURL string,
 	ethereumClient *ethclient.Client,
 	cashierContractAddr common.Address,
 	validatorContractAddr common.Address,
@@ -39,6 +40,7 @@ func NewTokenCashierOnEthereum(
 	return newTokenCashierBase(
 		id,
 		recorder,
+		relayerURL,
 		validatorContractAddr,
 		startBlockHeight,
 		func(startHeight uint64, count uint16) (uint64, error) {

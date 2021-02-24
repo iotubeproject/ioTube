@@ -45,8 +45,8 @@ type (
 		Start(context.Context) error
 		Stop(context.Context) error
 		PullTransfers(blockCount uint16) error
-		SubmitTransfers(func(*Transfer, common.Address) (bool, error)) error
-		CheckTransfers(func(*Transfer) (bool, error)) error
+		SubmitTransfers(func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error
+		CheckTransfers() error
 	}
 )
 

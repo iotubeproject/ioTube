@@ -25,6 +25,7 @@ import (
 // NewTokenCashier creates a new TokenCashier
 func NewTokenCashier(
 	id string,
+	relayerURL string,
 	iotexClient iotex.ReadOnlyClient,
 	cashierContractAddr address.Address,
 	validatorContractAddr common.Address,
@@ -39,6 +40,7 @@ func NewTokenCashier(
 	return newTokenCashierBase(
 		id,
 		recorder,
+		relayerURL,
 		validatorContractAddr,
 		startBlockHeight,
 		func(startHeight uint64, count uint16) (uint64, error) {

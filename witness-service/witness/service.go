@@ -16,11 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
-	"github.com/iotexproject/ioTube/witness-service/grpc/services"
-	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 )
 
 type service struct {
@@ -28,7 +25,6 @@ type service struct {
 	processor       dispatcher.Runner
 	batchSize       uint16
 	processInterval time.Duration
-	relayerURL      string
 	privateKey      *ecdsa.PrivateKey
 	witnessAddress  common.Address
 }
@@ -36,7 +32,6 @@ type service struct {
 // NewService creates a new witness service
 func NewService(
 	privateKey *ecdsa.PrivateKey,
-	relayerURL string,
 	cashiers []TokenCashier,
 	batchSize uint16,
 	processInterval time.Duration,
@@ -45,7 +40,6 @@ func NewService(
 		cashiers:        cashiers,
 		processInterval: processInterval,
 		batchSize:       batchSize,
-		relayerURL:      relayerURL,
 		privateKey:      privateKey,
 		witnessAddress:  crypto.PubkeyToAddress(privateKey.PublicKey),
 	}
@@ -78,7 +72,7 @@ func (s *service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address) (common.Hash, []byte, error) {
+func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address) (common.Hash, common.Address, []byte, error) {
 	id := crypto.Keccak256Hash(
 		validatorContractAddr.Bytes(),
 		transfer.cashier.Bytes(),
@@ -90,7 +84,7 @@ func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address)
 	)
 	signature, err := crypto.Sign(id.Bytes(), s.privateKey)
 
-	return id, signature, err
+	return id, s.witnessAddress, signature, err
 }
 
 func (s *service) process() error {
@@ -98,50 +92,10 @@ func (s *service) process() error {
 		if err := cashier.PullTransfers(s.batchSize); err != nil {
 			return err
 		}
-		conn, err := grpc.Dial(s.relayerURL, grpc.WithInsecure())
-		if err != nil {
+		if err := cashier.SubmitTransfers(s.sign); err != nil {
 			return err
 		}
-		defer conn.Close()
-		relayer := services.NewRelayServiceClient(conn)
-		if err := cashier.SubmitTransfers(func(transfer *Transfer, validatorContractAddr common.Address) (bool, error) {
-			var signature []byte
-			if transfer.id, signature, err = s.sign(transfer, validatorContractAddr); err != nil {
-				return false, err
-			}
-			response, err := relayer.Submit(
-				context.Background(),
-				&types.Witness{
-					Transfer: &types.Transfer{
-						Cashier:   transfer.cashier.Bytes(),
-						Token:     transfer.coToken.Bytes(),
-						Index:     int64(transfer.index),
-						Sender:    transfer.sender.Bytes(),
-						Recipient: transfer.recipient.Bytes(),
-						Amount:    transfer.amount.String(),
-					},
-					Address:   s.witnessAddress.Bytes(),
-					Signature: signature,
-				},
-			)
-			if err != nil {
-				return false, err
-			}
-			return response.Success, nil
-		}); err != nil {
-			return err
-		}
-		if err := cashier.CheckTransfers(func(transfer *Transfer) (bool, error) {
-			response, err := relayer.Check(
-				context.Background(),
-				&services.CheckRequest{Id: transfer.id.Bytes()},
-			)
-			if err != nil {
-				return false, err
-			}
-			return response.Status == services.CheckResponse_SETTLED, nil
-		}); err != nil {
-
+		if err := cashier.CheckTransfers(); err != nil {
 			return err
 		}
 	}

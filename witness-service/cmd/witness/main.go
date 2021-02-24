@@ -33,12 +33,12 @@ type Configuration struct {
 	ClientURL    string        `json:"clientURL" yaml:"clientURL"`
 	DatabaseURL  string        `json:"databaseURL" yaml:"databaseURL"`
 	PrivateKey   string        `json:"privateKey" yaml:"privateKey"`
-	RelayerURL   string        `json:"relayerURL" yaml:"relayerURL"`
 	SlackWebHook string        `json:"slackWebHook" yaml:"slackWebHook"`
 	BatchSize    int           `json:"batchSize" yaml:"batchSize"`
 	Interval     time.Duration `json:"interval" yaml:"interval"`
 	Cashiers     []struct {
 		ID                       string `json:"id" yaml:"id"`
+		RelayerURL               string `json:"relayerURL" yaml:"relayerURL"`
 		CashierContractAddress   string `json:"cashierContractAddress" yaml:"cashierContractAddress"`
 		ValidatorContractAddress string `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
 		TransferTableName        string `json:"transferTableName" yaml:"transferTableName"`
@@ -54,7 +54,6 @@ var (
 	defaultConfig = Configuration{
 		Chain:        "ethereum",
 		Interval:     time.Minute,
-		RelayerURL:   "",
 		BatchSize:    100,
 		PrivateKey:   "",
 		SlackWebHook: "",
@@ -84,9 +83,6 @@ func main() {
 	var cfg Configuration
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
-	}
-	if relayerURL, ok := os.LookupEnv("WITNESS_RELAYER_URL"); ok {
-		cfg.RelayerURL = relayerURL
 	}
 	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok {
 		cfg.PrivateKey = pk
@@ -126,6 +122,7 @@ func main() {
 			}
 			cashier, err := witness.NewTokenCashier(
 				cc.ID,
+				cc.RelayerURL,
 				iotexClient,
 				cashierContractAddr,
 				common.HexToAddress(cc.ValidatorContractAddress),
@@ -167,6 +164,7 @@ func main() {
 			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
 				cc.ID,
+				cc.RelayerURL,
 				ethClient,
 				common.HexToAddress(cc.CashierContractAddress),
 				common.BytesToAddress(addr.Bytes()),
@@ -189,7 +187,6 @@ func main() {
 
 	service, err := witness.NewService(
 		privateKey,
-		cfg.RelayerURL,
 		cashiers,
 		uint16(cfg.BatchSize),
 		cfg.Interval,

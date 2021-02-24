@@ -11,12 +11,16 @@ import (
 	"log"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/iotexproject/ioTube/witness-service/grpc/services"
+	"github.com/iotexproject/ioTube/witness-service/grpc/types"
+	"google.golang.org/grpc"
 )
 
 type (
 	tokenCashierBase struct {
 		id                     string
 		recorder               *Recorder
+		relayerURL             string
 		validatorContractAddr  common.Address
 		lastProcessBlockHeight uint64
 		calcEndHeight          calcEndHeightFunc
@@ -29,6 +33,7 @@ type (
 func newTokenCashierBase(
 	id string,
 	recorder *Recorder,
+	relayerURL string,
 	validatorContractAddr common.Address,
 	startBlockHeight uint64,
 	calcEndHeight calcEndHeightFunc,
@@ -37,6 +42,7 @@ func newTokenCashierBase(
 	return &tokenCashierBase{
 		id:                     id,
 		recorder:               recorder,
+		relayerURL:             relayerURL,
 		lastProcessBlockHeight: startBlockHeight,
 		validatorContractAddr:  validatorContractAddr,
 		calcEndHeight:          calcEndHeight,
@@ -79,17 +85,42 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	return nil
 }
 
-func (tc *tokenCashierBase) SubmitTransfers(submit func(*Transfer, common.Address) (bool, error)) error {
+func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error {
 	transfersToSubmit, err := tc.recorder.TransfersToSubmit()
 	if err != nil {
 		return err
 	}
+	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	relayer := services.NewRelayServiceClient(conn)
 	for _, transfer := range transfersToSubmit {
-		succeed, err := submit(transfer, tc.validatorContractAddr)
+		id, witness, signature, err := sign(transfer, tc.validatorContractAddr)
 		if err != nil {
 			return err
 		}
-		if succeed {
+		transfer.id = id
+		response, err := relayer.Submit(
+			context.Background(),
+			&types.Witness{
+				Transfer: &types.Transfer{
+					Cashier:   transfer.cashier.Bytes(),
+					Token:     transfer.coToken.Bytes(),
+					Index:     int64(transfer.index),
+					Sender:    transfer.sender.Bytes(),
+					Recipient: transfer.recipient.Bytes(),
+					Amount:    transfer.amount.String(),
+				},
+				Address:   witness.Bytes(),
+				Signature: signature,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		if response.Success {
 			if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
 				return err
 			}
@@ -100,18 +131,27 @@ func (tc *tokenCashierBase) SubmitTransfers(submit func(*Transfer, common.Addres
 	return nil
 }
 
-func (tc *tokenCashierBase) CheckTransfers(check func(*Transfer) (bool, error)) error {
+func (tc *tokenCashierBase) CheckTransfers() error {
 	transfersToSettle, err := tc.recorder.TransfersToSettle()
 	if err != nil {
 		return err
 	}
+	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	relayer := services.NewRelayServiceClient(conn)
 
 	for _, transfer := range transfersToSettle {
-		settled, err := check(transfer)
+		response, err := relayer.Check(
+			context.Background(),
+			&services.CheckRequest{Id: transfer.id.Bytes()},
+		)
 		if err != nil {
 			return err
 		}
-		if settled {
+		if response.Status == services.CheckResponse_SETTLED {
 			if err := tc.recorder.SettleTransfer(transfer); err != nil {
 				return err
 			}
