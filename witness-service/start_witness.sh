@@ -77,6 +77,13 @@ function downloadConfigFile() {
             exit 2
         fi
     fi
+    if [[ ! -f ${IOTEX_WITNESS}/etc/witness-config-heco.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/witness-config-heco.yaml ${IOTEX_WITNESS}/etc/witness-config-heco.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
 
     [[ -f ${IOTEX_WITNESS}/etc/.env ]] || (echo "IOTEX_WITNESS=$IOTEX_WITNESS" > ${IOTEX_WITNESS}/etc/.env;echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${IOTEX_WITNESS}/etc/.env)
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_WITNESS}/etc/crontab
