@@ -55,8 +55,8 @@ function confirmEnvironmentVariable() {
 }
 
 function downloadConfigFile() {
-    if [[ ! -f ${IOTEX_RELAYER}/etc/docker-compose-relayer.yml ]];then
-        cp -f $PROJECT_ABS_DIR/docker-compose-relayer.yml ${IOTEX_RELAYER}/etc/docker-compose-relayer.yml
+    if [[ ! -f ${IOTEX_RELAYER}/etc/docker-compose.yml ]];then
+        cp -f $PROJECT_ABS_DIR/docker-compose-relayer.yml ${IOTEX_RELAYER}/etc/docker-compose.yml
         if [ $? -ne 0 ];then
             echo "Get docker-compose config error"
             exit 2

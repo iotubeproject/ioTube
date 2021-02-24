@@ -42,7 +42,11 @@ type (
 
 	// TokenCashier defines the interface to pull transfers from chain in a block range
 	TokenCashier interface {
-		PullTransfers(blockOffset uint64, blockCount uint16) (uint64, []*Transfer, error)
+		Start(context.Context) error
+		Stop(context.Context) error
+		PullTransfers(blockCount uint16) error
+		SubmitTransfers(func(*Transfer, common.Address) (bool, error)) error
+		CheckTransfers(func(*Transfer) (bool, error)) error
 	}
 )
 

@@ -30,7 +30,7 @@ module.exports = function(deployer, network, accounts) {
         );
         console.log("Add new pairs")
         await validator.addPair(standardTokenList.address, tokenSafe.address);
-        await validator.addPair(mintableTokenList.address,minterPool.address),
+        await validator.addPair(mintableTokenList.address, minterPool.address),
         console.log('Transfer Validator Address: ', validator.address);
         await minterPool.transferOwnership(validator.address);
         console.log('Ownership of minter pool is transferred to validator');

@@ -14,8 +14,8 @@ import (
 	"math"
 	"math/big"
 
-	// mute lint error
 	"github.com/ethereum/go-ethereum/common"
+	// mute lint error
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
@@ -26,18 +26,22 @@ import (
 type (
 	// Recorder is a logger based on sql to record exchange events
 	Recorder struct {
-		store              *db.SQLStore
-		transferTableName  string
-		tokenPairTableName string
+		store             *db.SQLStore
+		transferTableName string
+		tokenPairs        map[common.Address]common.Address
 	}
 )
 
 // NewRecorder returns a recorder for exchange
-func NewRecorder(store *db.SQLStore, transferTableName string, tokenPairTableName string) *Recorder {
+func NewRecorder(
+	store *db.SQLStore,
+	transferTableName string,
+	tokenPairs map[common.Address]common.Address,
+) *Recorder {
 	return &Recorder{
-		store:              store,
-		transferTableName:  transferTableName,
-		tokenPairTableName: tokenPairTableName,
+		store:             store,
+		transferTableName: transferTableName,
+		tokenPairs:        tokenPairs,
 	}
 }
 
@@ -74,18 +78,6 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 		TransferNew,
 	)); err != nil {
 		return errors.Wrapf(err, "failed to create table %s", recorder.transferTableName)
-	}
-
-	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s ("+
-			"`fromToken` varchar(42) NOT NULL,"+
-			"`toToken` varchar(42) NOT NULL,"+
-			"PRIMARY KEY (`fromToken`),"+
-			"UNIQUE KEY `toToken_UNIQUE` (`toToken`)"+
-			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
-		recorder.tokenPairTableName,
-	)); err != nil {
-		return errors.Wrapf(err, "failed to create table %s", recorder.tokenPairTableName)
 	}
 
 	return nil
@@ -179,13 +171,11 @@ func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
 func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
-			"SELECT ts.cashier, tp.fromToken, tp.toToken, ts.tidx, ts.sender, ts.recipient, ts.amount, ts.status, ts.id "+
-				"FROM %s `ts` INNER JOIN %s `tp` "+
-				"ON ts.token=tp.fromToken "+
-				"WHERE ts.status=? "+
-				"ORDER BY ts.creationTime",
+			"SELECT cashier, token, tidx, sender, recipient, amount, status, id "+
+				"FROM %s "+
+				"WHERE status=? "+
+				"ORDER BY creationTime",
 			recorder.transferTableName,
-			recorder.tokenPairTableName,
 		),
 		status,
 	)
@@ -198,18 +188,16 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 	for rows.Next() {
 		tx := &Transfer{}
 		var cashier string
-		var fromToken string
-		var toToken string
+		var token string
 		var sender string
 		var recipient string
 		var rawAmount string
 		var id sql.NullString
-		if err := rows.Scan(&cashier, &fromToken, &toToken, &tx.index, &sender, &recipient, &rawAmount, &tx.status, &id); err != nil {
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &tx.status, &id); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
-		tx.token = common.HexToAddress(fromToken)
-		tx.coToken = common.HexToAddress(toToken)
+		tx.token = common.HexToAddress(token)
 		tx.sender = common.HexToAddress(sender)
 		tx.recipient = common.HexToAddress(recipient)
 		if id.Valid {
@@ -219,6 +207,12 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
 		if !ok || tx.amount.Sign() != 1 {
 			return nil, errors.Errorf("invalid amount %s", rawAmount)
+		}
+		if toToken, ok := recorder.tokenPairs[tx.token]; ok {
+			tx.coToken = toToken
+		} else {
+			// skip if token is not in whitelist
+			continue
 		}
 		rec = append(rec, tx)
 	}

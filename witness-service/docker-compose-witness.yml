@@ -29,6 +29,17 @@ services:
     links:
       - database
     command: witness -config=/etc/iotube-witness/witness-config-ethereum.yaml
+
+  heco-witness:
+    container_name: heco-witness
+    image: witness:latest
+    restart: on-failure
+    volumes:
+      - $IOTEX_WITNESS/etc/witness-config-heco.yaml:/etc/iotube-witness/witness-config-heco.yaml:ro
+    links:
+      - database
+    command: witness -config=/etc/iotube-witness/witness-config-heco.yaml
+
   cron:
     image: schnitzler/mysqldump
     restart: always

@@ -21,6 +21,7 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex.yaml
+
   ethereum-relayer:
     container_name: ethereum-relayer
     image: relayer:latest
@@ -32,6 +33,19 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum.yaml
+
+  heco-relayer:
+    container_name: heco-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7002:7002
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-heco.yaml:/etc/iotube-relayer/relayer-config-heco.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-heco.yaml
+
   cron:
     image: schnitzler/mysqldump
     restart: always

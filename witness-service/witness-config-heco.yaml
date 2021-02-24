@@ -1,0 +1,15 @@
+chain: "heco"
+clientURL: "https://http-mainnet-node.huobichain.com"
+relayerURL: "localhost:7002"
+privateKey: ""
+slackWebHook: ""
+interval: 1m
+batchSize: 40
+databaseURL: "root:kdfjjrU64fjK58H@tcp(database:3306)/witness?parseTime=true"
+cashiers:
+  - id: "heco-to-iotex"
+    startBlockHeight: 2431000
+    validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
+    cashierContractAddress: "0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E"
+    transferTableName: "heco_transfers"
+    tokenPairs:

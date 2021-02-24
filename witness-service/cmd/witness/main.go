@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -30,37 +29,36 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	Chain                    string        `json:"chain" yaml:"chain"`
-	ClientURL                string        `json:"clientURL" yaml:"clientURL"`
-	PrivateKey               string        `json:"privateKey" yaml:"privateKey"`
-	ValidatorContractAddress string        `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
-	CashierContractAddress   string        `json:"cashierContractAddress" yaml:"cashierContractAddress"`
-	StartBlockHeight         int           `json:"startBlockHeight" yaml:"startBlockHeight"`
-	BatchSize                int           `json:"batchSize" yaml:"batchSize"`
-	Interval                 time.Duration `json:"interval" yaml:"interval"`
-
-	RelayerURL   string `json:"relayerURL" yaml:"relayerURL"`
-	SlackWebHook string `json:"slackWebHook" yaml:"slackWebHook"`
-
-	DatabaseURL        string `json:"databaseURL" yaml:"databaseURL"`
-	TransferTableName  string `json:"transferTableName" yaml:"transferTableName"`
-	TokenPairTableName string `json:"tokenPairTableName" yaml:"tokenPairTableName"`
+	Chain        string        `json:"chain" yaml:"chain"`
+	ClientURL    string        `json:"clientURL" yaml:"clientURL"`
+	DatabaseURL  string        `json:"databaseURL" yaml:"databaseURL"`
+	PrivateKey   string        `json:"privateKey" yaml:"privateKey"`
+	RelayerURL   string        `json:"relayerURL" yaml:"relayerURL"`
+	SlackWebHook string        `json:"slackWebHook" yaml:"slackWebHook"`
+	BatchSize    int           `json:"batchSize" yaml:"batchSize"`
+	Interval     time.Duration `json:"interval" yaml:"interval"`
+	Cashiers     []struct {
+		ID                       string `json:"id" yaml:"id"`
+		CashierContractAddress   string `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+		ValidatorContractAddress string `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
+		TransferTableName        string `json:"transferTableName" yaml:"transferTableName"`
+		TokenPairs               []struct {
+			Token1 string `json:"token1" yaml:"token1"`
+			Token2 string `json:"token2" yaml:"token2"`
+		} `json:"tokenPairs" yaml:"tokenPairs"`
+		StartBlockHeight int `json:"startBlockHeight" yaml:"startBlockHeight"`
+	} `json:"cashiers" yaml:"cashiers"`
 }
 
 var (
 	defaultConfig = Configuration{
-		Chain:                    "ethereum",
-		Interval:                 time.Minute,
-		RelayerURL:               "",
-		StartBlockHeight:         9305000,
-		BatchSize:                100,
-		PrivateKey:               "",
-		SlackWebHook:             "",
-		ClientURL:                "",
-		TransferTableName:        "",
-		TokenPairTableName:       "",
-		ValidatorContractAddress: "",
-		CashierContractAddress:   "",
+		Chain:        "ethereum",
+		Interval:     time.Minute,
+		RelayerURL:   "",
+		BatchSize:    100,
+		PrivateKey:   "",
+		SlackWebHook: "",
+		ClientURL:    "",
 	}
 )
 
@@ -87,12 +85,6 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	if height, ok := os.LookupEnv("WITNESS_START_BLOCK_HEIGHT"); ok {
-		cfg.StartBlockHeight, err = strconv.Atoi(height)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
 	if relayerURL, ok := os.LookupEnv("WITNESS_RELAYER_URL"); ok {
 		cfg.RelayerURL = relayerURL
 	}
@@ -107,35 +99,48 @@ func main() {
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
-	if chain, ok := os.LookupEnv("WITNESS_CHAIN"); ok {
-		cfg.Chain = chain
-	}
-	if validatorAddr, ok := os.LookupEnv("WITNESS_VALIDATOR_CONTRACT_ADDRESS"); ok {
-		cfg.ValidatorContractAddress = validatorAddr
-	}
-	if cashierAddr, ok := os.LookupEnv("WITNESS_CASHIER_CONTRACT_ADDRESS"); ok {
-		cfg.CashierContractAddress = cashierAddr
-	}
-	if url, ok := os.LookupEnv("WITNESS_CLIENT_URL"); ok {
-		cfg.ClientURL = url
-	}
-	var cashier witness.TokenCashier
-	var validatorContractAddr common.Address
+	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
 	switch cfg.Chain {
 	case "iotex":
-		cashierAddr, err := address.FromString(cfg.CashierContractAddress)
-		if err != nil {
-			log.Fatalf("failed to parse cashier address %v\n", err)
-		}
 		conn, err := iotex.NewDefaultGRPCConn(cfg.ClientURL)
 		if err != nil {
 			log.Fatalf("failed ot create grpc connection %v\n", err)
 		}
+		iotexClient := iotex.NewReadOnlyClient(iotexapi.NewAPIServiceClient(conn))
 		// defer conn.Close()
-		if cashier, err = witness.NewTokenCashier(cashierAddr, iotex.NewReadOnlyClient(iotexapi.NewAPIServiceClient(conn))); err != nil {
-			log.Fatalf("failed to create cashier %v\n", err)
+		for _, cc := range cfg.Cashiers {
+			cashierContractAddr, err := address.FromString(cc.CashierContractAddress)
+			if err != nil {
+				log.Fatalf("failed to parse cashier contract address %s, %v\n", cc.CashierContractAddress, err)
+			}
+			pairs := make(map[common.Address]common.Address)
+			for _, pair := range cc.TokenPairs {
+				ioAddr, err := address.FromString(pair.Token1)
+				if err != nil {
+					log.Fatalf("failed to parse iotex address %s, %v\n", pair.Token1, err)
+				}
+				if _, ok := pairs[common.BytesToAddress(ioAddr.Bytes())]; ok {
+					log.Fatalf("duplicate token key %s\n", pair.Token1)
+				}
+				pairs[common.BytesToAddress(ioAddr.Bytes())] = common.HexToAddress(pair.Token2)
+			}
+			cashier, err := witness.NewTokenCashier(
+				cc.ID,
+				iotexClient,
+				cashierContractAddr,
+				common.HexToAddress(cc.ValidatorContractAddress),
+				witness.NewRecorder(
+					db.NewStore("mysql", cfg.DatabaseURL),
+					cc.TransferTableName,
+					pairs,
+				),
+				uint64(cc.StartBlockHeight),
+			)
+			if err != nil {
+				log.Fatalf("failed to create cashier %v\n", err)
+			}
+			cashiers = append(cashiers, cashier)
 		}
-		validatorContractAddr = common.HexToAddress(cfg.ValidatorContractAddress)
 	case "heco", "bsc":
 		// heco and bsc are identical to ethereum
 		fallthrough
@@ -144,29 +149,48 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if cashier, err = witness.NewTokenCashierOnEthereum(common.HexToAddress(cfg.CashierContractAddress), ethClient, 12); err != nil {
-			log.Fatalf("failed to create cashier %v\n", err)
+		for _, cc := range cfg.Cashiers {
+			addr, err := address.FromString(cc.ValidatorContractAddress)
+			if err != nil {
+				log.Fatalf("failed to parse validator contract address %v\n", err)
+			}
+			pairs := make(map[common.Address]common.Address)
+			for _, pair := range cc.TokenPairs {
+				if _, ok := pairs[common.HexToAddress(pair.Token1)]; ok {
+					log.Fatalf("duplicate token key %s\n", pair.Token1)
+				}
+				ioAddr, err := address.FromString(pair.Token2)
+				if err != nil {
+					log.Fatalf("failed to parse iotex address %s, %v\n", pair.Token2, err)
+				}
+				pairs[common.HexToAddress(pair.Token1)] = common.BytesToAddress(ioAddr.Bytes())
+			}
+			cashier, err := witness.NewTokenCashierOnEthereum(
+				cc.ID,
+				ethClient,
+				common.HexToAddress(cc.CashierContractAddress),
+				common.BytesToAddress(addr.Bytes()),
+				witness.NewRecorder(
+					db.NewStore("mysql", cfg.DatabaseURL),
+					cc.TransferTableName,
+					pairs,
+				),
+				uint64(cc.StartBlockHeight),
+				12,
+			)
+			if err != nil {
+				log.Fatalf("failed to create cashier %v\n", err)
+			}
+			cashiers = append(cashiers, cashier)
 		}
-		addr, err := address.FromString(cfg.ValidatorContractAddress)
-		if err != nil {
-			log.Fatalf("failed to parse validator contract address %v\n", err)
-		}
-		validatorContractAddr = common.BytesToAddress(addr.Bytes())
 	default:
 		log.Fatalf("unknown chain name %s", cfg.Chain)
 	}
 
 	service, err := witness.NewService(
-		cfg.RelayerURL,
-		validatorContractAddr,
-		cashier,
-		witness.NewRecorder(
-			db.NewStore("mysql", cfg.DatabaseURL),
-			cfg.TransferTableName,
-			cfg.TokenPairTableName,
-		),
 		privateKey,
-		uint64(cfg.StartBlockHeight),
+		cfg.RelayerURL,
+		cashiers,
 		uint16(cfg.BatchSize),
 		cfg.Interval,
 	)
