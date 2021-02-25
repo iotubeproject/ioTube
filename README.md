@@ -8,16 +8,24 @@
 
 ioTube is a decentralized cross-chain bridge that enables the bidirectional exchange of digital assets between different blockchain networks. ioTube has three major versions. 
 
-## V1 IOTX tube
-The first version of ioTube was built by core-dev around 2019 June to facilitate the swap of IOTX-E (ERC20 version of IOTX on Ethereum) and IOTX mainnet token.
+## V1.0 IOTX tube 
+Launch date: Apr 2019 (<a href="https://iotex.medium.com/everything-you-need-to-know-about-iotex-mainnet-alpha-b8d790e0bd55">Announcement</a>)
 
-## V2 Multi Token Tube (IoTeX <-> Ethereum)
+The first version of ioTube was built by core-dev in Apr. 2019 to facilitate the swap of IOTX-E (ERC20 version of IOTX on Ethereum) and IOTX mainnet token.
+
+## V2.0 Multi Token Tube (IoTeX <-> Ethereum)
+Launch date: Aug 31, 2020 (<a href="https://iotex.medium.com/iotube-cross-chain-bridge-to-connect-iotex-with-the-blockchain-universe-b0f5b08c1943">Announcement</a>)
+
 V2 generalizes the ioTube V1 to support multiple assets on Ethereum & IoTeX blockchains.
 
-## V3 Rebuilt with largely fee reduction.
+## V3.0 Rebuilt with largely fee reduction
+Launch date: Feb 8, 2021 (<a href="https://community.iotex.io/t/iotube-v3-faster-cheaper-and-unified/2001">Announcement</a>)
+
 Ethereum has been suffering high gas cost for a long period. The core-dev team rebuilt ioTube to largely reduced the gas cost on ETH side by introducing a relayer and putting signature offchain.
 
 ## V3.1 Multi-Chain support
+Launch date: TBD. Work in progress!
+
 Because of Ethereum's high gas cost, many projects and users also adopted Binance Smart Chain (BSC) and Huobi Eco Chain (Heco). The need of supporting BSC and Heco is increasing. Since BSC and Heco are mainly Ethereum's fork with different chain IDs. We are working on a release to support them. 
 
 <h3>
