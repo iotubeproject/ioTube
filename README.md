@@ -118,7 +118,7 @@ Gas fees on IoTeX are negligible, both for bridge maintenance and for asset tran
 - To transfer token from Ethereum to IoTeX: ~43,952 gas to set allowance and ~151,122 to lock it;
 - To transfer token back from IoTeX to ETH: ~422,525 gas to unlock the token.
 
-## Contract addresses
+## Tube of IoTeX <-> Ethereum
 
 Contracts on IoTeX 
 
@@ -142,14 +142,14 @@ Contacts on Ethereum
 - Token Cashier: 0xa0fd7430852361931b23a31f84374ba3314e1682
 - Transfer Validator: 0xd8165188ccc135b3a3b2a5d2bc3af9d94753d955
 
-## Current Supported Tokens
+### Tokens
 
 - WETH (0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2) - min=0.1 max=1000 
-
+- 
 ioETH contract (io1qfvgvmk6lpxkpqwlzanqx4atyzs86ryqjnfuad)
 
 - BUSD (0x4Fabb145d64652a948d72533023f6E7A623C7C53) - min=1 max=400000
-
+- 
 ioBUSD contract (io14nhfkywdfvl40evgsqnh43ev33q6he8yez8c8a)
 
 - UNISWAP (0x1f9840a85d5af5bf1d1762f925bdaddc4201f984) - min=0.1 max=80000
@@ -160,3 +160,43 @@ ioUNI contract (io1ahh04jn2zkqlug6feh7rpq75a75p3rj42hp4ch)
 
 ioPAXG contract (io19fsq8e9krrlng4ay5gyq6q5tqfym28yq9ly0fz)
 
+
+## Tube of IoTeX <-> BSC (Binance Smart Chain) 
+
+Please note this is still being added. They are not in production use yet. Please contact us if you want to use them without interfaces.
+
+IoTeX Side
+- Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y  (same for all)
+- Standard Token list: io1h2d3r0d20t58sv6h707ppc959kvs8wjsurrtnk
+- Proxy Token list: io17r9ehjstwj4gfqzwpm08fjnd606h04h2m6r92f
+- Token Cashier: io1zjlng7je02kxyvjq4eavswp6uxvfvcnh2a0a3d
+
+BSC Side
+
+- Witness List Address:  0x8119411F5A78F73784A1B87dE43d452DA4A1EE3F
+- Minter Pool Address:  0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be
+- Token Safe Address:  0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B
+- Mintable Token List Address:  0xa6ae9312D0AA3CC74d969Fcd4806d7729A321EE3
+- Standard Token List Address:  0x0d793F4D4287265B9bdA86b7a4083193E8743b34
+- Token Cashier Address:  0x082020Ae0B38fD1bef48895c6cFf4428e420F400
+- Transfer Validator Address:  0x116404F86e97846110EA08cd52fC2882d4AD3123
+
+## Tube of IoTeX <-> Heco (Huobi Eco Chain)
+
+Please note this is still being added. They are not in production use yet. Please contact us if you want to use them without interfaces.
+
+IoTeX Side:
+- Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y  (same for all)
+- Standard Token list: io1kh0vgtxyamdkzvrlvga3r8l7r2plm7phd9ywv9
+- Proxy Token list:  io18uqxuel6d93hluua4d9jxs8rjw3r2qe5g3adgk
+- Token Cashier:  io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra
+
+Heco Side:
+
+- Witness List Address:  0x2f1a0BCa4005eBfD6A589850F436c8D8f9c2aEd2
+- Minter Pool Address:  0xd2165D222B3dAF2528Fc1b1Aa2DB18B8821EE623
+- Token Safe Address:  0x1E58cA53d90fe9B37F7f6AEB548b4BC7c6292C17
+- Mintable Token List Address:  0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f
+- Standard Token List Address:  0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45
+- Token Cashier Address:  0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E
+- Transfer Validator Address:  0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7
