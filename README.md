@@ -153,22 +153,63 @@ Contacts on Ethereum
 - Transfer Validator: 0xd8165188ccc135b3a3b2a5d2bc3af9d94753d955
 
 ### Tokens
-
-- WETH (0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2) - min=0.1 max=1000 
-- 
-ioETH contract (io1qfvgvmk6lpxkpqwlzanqx4atyzs86ryqjnfuad)
-
-- BUSD (0x4Fabb145d64652a948d72533023f6E7A623C7C53) - min=1 max=400000
-- 
-ioBUSD contract (io14nhfkywdfvl40evgsqnh43ev33q6he8yez8c8a)
-
-- UNISWAP (0x1f9840a85d5af5bf1d1762f925bdaddc4201f984) - min=0.1 max=80000
-
-ioUNI contract (io1ahh04jn2zkqlug6feh7rpq75a75p3rj42hp4ch)
-
-- PAXG (0x45804880de22913dafe09f4980848ece6ecbaf78) - min=0.01 max=200
-
-ioPAXG contract (io19fsq8e9krrlng4ay5gyq6q5tqfym28yq9ly0fz)
+<table>
+  <tr>
+    <th>ERC20 Token</th>
+    <th>XRC20 Token</th>
+    <th>Min</th>
+    <th>Max</th>
+    <th>Type</th>
+  </tr>
+  <tr>
+    <td><a href="https://etherscan.io/token/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2">WETH</a></td>
+    <td><a href="http://iotexscan.io/token/io1qfvgvmk6lpxkpqwlzanqx4atyzs86ryqjnfuad">ioETH</a></td>
+    <td>0.1</td>
+    <td>1000</td>
+    <td>Standard <-> Proxy</td>
+  </tr>
+  <tr>
+    <td><a href="https://etherscan.io/token/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599">WBTC</a></td>
+    <td><a href="http://iotexscan.io/token/io1c7unwg8h8vph89xwqru4f7zfa4yy5002wxvlrm">ioWBTC</a></td>
+    <td>0.0001</td>
+    <td>40</td>
+    <td>Standard <-> Proxy</td>
+  </tr>
+  <tr>
+    <td><a href="https://etherscan.io/token/0x4Fabb145d64652a948d72533023f6E7A623C7C53">BUSD</a></td>
+    <td><a href="http://iotexscan.io/token/io14nhfkywdfvl40evgsqnh43ev33q6he8yez8c8a">ioBUSD</a></td>
+    <td>1</td>
+    <td>400000</td>
+    <td>Standard <-> Proxy</td>
+  </tr>
+  <tr>
+    <td><a href="https://etherscan.io/token/0x1f9840a85d5af5bf1d1762f925bdaddc4201f984">Uniswap</a></td>
+    <td><a href="http://iotexscan.io/token/io1ahh04jn2zkqlug6feh7rpq75a75p3rj42hp4ch">ioUNI</a></td>
+    <td>0.1</td>
+    <td>80000</td>
+  </tr>
+  <tr>
+    <td><a href="https://etherscan.io/token/0x45804880de22913dafe09f4980848ece6ecbaf78">PAXG</a></td>
+    <td><a href="http://iotexscan.io/token/io19fsq8e9krrlng4ay5gyq6q5tqfym28yq9ly0fz">ioPAXG</a></td>
+    <td>0.01</td>
+    <td>200</td>
+    <td>Standard <-> Proxy</td>
+  </tr>
+  <tr>
+    <td><a href="https://etherscan.io/token/0x8861cfF2366C1128fd699B68304aD99a0764Ef9a">CYC</a></td>
+    <td><a href="http://iotexscan.io/token/io1f4acssp65t6s90egjkzpvrdsrjjyysnvxgqjrh">CYC</a></td>
+    <td>0.01</td>
+    <td>4000</td>
+    <td>Proxy <-> Proxy</td>
+  </tr>
+  <tr>
+    <td><a href="https://etherscan.io/token/0x6fb3e0a217407efff7ca062d46c26e5d60a14d69">IOTX-E</a></td>
+    <td><a href="http://iotexscan.io/token/io15qr5fzpxsnp7garl4m7k355rafzqn8grrm0grz">IOTX</a></td>
+    <td>100</td>
+    <td>40000000</td>
+    <td>Standard <-> Standard</td>
+  </tr>
+</table>
 
 
 ## Tube of IoTeX <-> BSC (Binance Smart Chain) 
