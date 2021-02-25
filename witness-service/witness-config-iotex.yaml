@@ -8,8 +8,8 @@ databaseURL: "root:kdfjjrU64fjK58H@tcp(database:3306)/witness?parseTime=true"
 cashiers:
   - id: "iotex-to-ethereum"
     relayerURL: ":7000"
-    validatorContractAddress: "0xd8165188ccc135b3a3b2a5d2bc3af9d94753d955"
     cashierContractAddress: "io1gsr52ahqzklaf7flqar8r0269f2utkw9349qg8"
+    validatorContractAddress: "0xd8165188ccc135b3a3b2a5d2bc3af9d94753d955"
     startBlockHeight: 9526978
     transferTableName: "iotex_transfers"
     tokenPairs:
@@ -36,10 +36,15 @@ cashiers:
         token2: "0x6fB3e0A217407EFFf7Ca062D46c26E5d60a14d69"
   - id: "iotex-to-heco"
     relayerURL: ":7002"
-    validatorContractAddress: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"
     cashierContractAddress: "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
-    startBlockHeight: 9762600
+    validatorContractAddress: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"
+    startBlockHeight: 2431000
     transferTableName: "iotex_to_heco_transfers"
     tokenPairs:
-      - token1: "io1f4acssp65t6s90egjkzpvrdsrjjyysnvxgqjrh"
-        token2: "0x"
+  - id: "iotex-to-bsc"
+    relayerURL: ":7003"
+    cashierContractAddress: "io1zjlng7je02kxyvjq4eavswp6uxvfvcnh2a0a3d"
+    validatorContractAddress: "0x116404F86e97846110EA08cd52fC2882d4AD3123"
+    startBlockHeight: 5177821
+    transferTableName: "iotex_to_bsc_transfers"
+    tokenPairs:

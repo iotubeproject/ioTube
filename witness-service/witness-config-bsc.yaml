@@ -1,0 +1,15 @@
+chain: "bsc"
+clientURL: "https://bsc-dataseed.binance.org/"
+privateKey: ""
+slackWebHook: ""
+interval: 1m
+batchSize: 40
+databaseURL: "root:kdfjjrU64fjK58H@tcp(database:3306)/witness?parseTime=true"
+cashiers:
+  - id: "bsc-to-iotex"
+    relayerURL: "localhost:7001"
+    startBlockHeight: 5177821
+    cashierContractAddress: "0x082020Ae0B38fD1bef48895c6cFf4428e420F400"
+    validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
+    transferTableName: "bsc_transfers"
+    tokenPairs:

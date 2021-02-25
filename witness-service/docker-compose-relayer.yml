@@ -46,6 +46,18 @@ services:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-heco.yaml
 
+  bsc-relayer:
+    container_name: bsc-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7003:7003
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-bsc.yaml:/etc/iotube-relayer/relayer-config-bsc.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-bsc.yaml
+
   cron:
     image: schnitzler/mysqldump
     restart: always
