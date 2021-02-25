@@ -1,14 +1,24 @@
 [![tests](https://github.com/iotexproject/ioTube/workflows/tests/badge.svg)](https://github.com/iotexproject/ioTube/actions?query=workflow%3Atests)
 
 <h1 align="center">
-  <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px"> V3
+  <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px"> V3.1
 </h1>
 
-<p>
-  <strong>A multi-assets, fully decentralized and bidirectional bridge for exchanging ERC20/XRC20 tokens between Ethereum and IoTeX.</strong>
-  
-ioTube is a decentralized cross-chain bridge that enables the bidirectional exchange of digital assets (e.g., tokens, stable coins) between IoTeX and other blockchain networks. The <a href="https://member.iotex.io/tools/iotex">first version</a> of ioTube was built by core-dev around 2019 June to facilitate the swap of IOTX-ERC20 and IOTX until now, and this released version generalizes the original ioTube to support multiple assets on Ethereum & IoTeX blockchains. In the future, we plan to add support more blockchain networks to increase the reach and impact of ioTube.
-</p>
+# ioTube - A decentralized bridge for multi assets across multi-chains. 
+
+ioTube is a decentralized cross-chain bridge that enables the bidirectional exchange of digital assets between different blockchain networks. ioTube has three major versions. 
+
+## V1 IOTX tube
+The first version of ioTube was built by core-dev around 2019 June to facilitate the swap of IOTX-E (ERC20 version of IOTX on Ethereum) and IOTX mainnet token.
+
+## V2 Multi Token Tube (IoTeX <-> Ethereum)
+V2 generalizes the ioTube V1 to support multiple assets on Ethereum & IoTeX blockchains.
+
+## V3 Rebuilt with largely fee reduction.
+Ethereum has been suffering high gas cost for a long period. The core-dev team rebuilt ioTube to largely reduced the gas cost on ETH side by introducing a relayer and putting signature offchain.
+
+## V3.1 Multi-Chain support
+Because of Ethereum's high gas cost, many projects and users also adopted Binance Smart Chain (BSC) and Huobi Eco Chain (Heco). The need of supporting BSC and Heco is increasing. Since BSC and Heco are mainly Ethereum's fork with different chain IDs. We are working on a release to support them. 
 
 <h3>
       <a href="https://github.com/iotexproject/ioTube#deployement">Deployement</a>
