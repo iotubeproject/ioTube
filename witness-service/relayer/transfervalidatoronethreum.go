@@ -211,7 +211,7 @@ func (tv *transferValidatorOnEthreum) transactionOpts(gasLimit uint64) (*bind.Tr
 	}
 	gasFee := new(big.Int).Mul(new(big.Int).SetUint64(opts.GasLimit), opts.GasPrice)
 	if gasFee.Cmp(balance) > 0 {
-		return nil, errors.Errorf("insuffient balance for gas fee on Ethereum")
+		return nil, errors.Errorf("insuffient balance for gas fee")
 	}
 	nonce, err := tv.pendingNonce()
 	if err != nil {

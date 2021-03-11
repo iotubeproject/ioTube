@@ -17,11 +17,16 @@ module.exports = function(deployer, network, accounts) {
         console.log('Mintable Token List Address: ', mintableTokenList.address);
         const standardTokenList = await deployer.deploy(TokenList);
         console.log('Standard Token List Address: ', standardTokenList.address);
+        const wrappedCoin = undefined;
+        if (wrappedCoin == undefined) {
+            console.log("Wrapped Coin is not specified, early quit.");
+            return;
+        }
         const tokenCashier = await deployer.deploy(
             TokenCashier,
-            "0x0000000000000000000000000000000000000000",
+            wrappedCoin,
             [standardTokenList.address, mintableTokenList.address],
-            [tokenSafe.address, minterPool.address],
+            [tokenSafe.address, "0x0000000000000000000000000000000000000000"],
         );
         console.log('Token Cashier Address: ', tokenCashier.address);
         const validator = await deployer.deploy(
