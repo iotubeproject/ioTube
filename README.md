@@ -1,7 +1,7 @@
 [![tests](https://github.com/iotexproject/ioTube/workflows/tests/badge.svg)](https://github.com/iotexproject/ioTube/actions?query=workflow%3Atests)
 
 <h1 align="center">
-  <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px"> V3.1
+  <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px"> V3.0
 </h1>
 
 # ioTube - A decentralized bridge for multi assets across multi-chains. 
@@ -23,7 +23,7 @@ Launch date: Feb 8, 2021 (<a href="https://community.iotex.io/t/iotube-v3-faster
 
 Ethereum has been suffering high gas cost for a long period. The core-dev team rebuilt ioTube to largely reduced the gas cost on ETH side by introducing a relayer and putting signature offchain.
 
-## V3.1 Multi-Chain support
+## V4.0 Multi-Chain support
 Launch date: TBD. Work in progress!
 
 Because of Ethereum's high gas cost, many projects and users also adopted Binance Smart Chain (BSC) and Huobi Eco Chain (Heco). The need of supporting BSC and Heco is increasing. Since BSC and Heco are mainly Ethereum's fork with different chain IDs. We are working on a release to support them. 
