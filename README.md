@@ -1,29 +1,33 @@
 [![tests](https://github.com/iotexproject/ioTube/workflows/tests/badge.svg)](https://github.com/iotexproject/ioTube/actions?query=workflow%3Atests)
 
-<h1 align="center">
-  <img src="https://github.com/iotexproject/ioTube/blob/master/ioTube.png" width="480px"> V3.0
-</h1>
+![image](https://user-images.githubusercontent.com/448293/111065299-30859400-8476-11eb-9e75-a756d97302e6.png)
 
 # ioTube - A decentralized bridge for multi assets across multi-chains. 
 
 ioTube is a decentralized cross-chain bridge that enables the bidirectional exchange of digital assets between different blockchain networks. ioTube has three major versions. 
 
-## V1.0 IOTX tube 
+Running versions:
+- Latest version V4.0-preview (https://bsc-tube.iotex.io/bsc)
+- Stable version V3.0 (https://bsc-tube.iotex.io/bsc)
+
+## Version history 
+
+### V1.0 IOTX tube 
 Launch date: Apr 2019 (<a href="https://iotex.medium.com/everything-you-need-to-know-about-iotex-mainnet-alpha-b8d790e0bd55">Announcement</a>)
 
 The first version of ioTube was built by core-dev in Apr. 2019 to facilitate the swap of IOTX-E (ERC20 version of IOTX on Ethereum) and IOTX mainnet token.
 
-## V2.0 Multi Token Tube (IoTeX <-> Ethereum)
+### V2.0 Multi Token Tube (IoTeX <-> Ethereum)
 Launch date: Aug 31, 2020 (<a href="https://iotex.medium.com/iotube-cross-chain-bridge-to-connect-iotex-with-the-blockchain-universe-b0f5b08c1943">Announcement</a>)
 
 V2 generalizes the ioTube V1 to support multiple assets on Ethereum & IoTeX blockchains.
 
-## V3.0 Rebuilt with largely fee reduction
+### V3.0 Rebuilt with largely fee reduction
 Launch date: Feb 8, 2021 (<a href="https://community.iotex.io/t/iotube-v3-faster-cheaper-and-unified/2001">Announcement</a>)
 
 Ethereum has been suffering high gas cost for a long period. The core-dev team rebuilt ioTube to largely reduced the gas cost on ETH side by introducing a relayer and putting signature offchain.
 
-## V4.0 Multi-Chain support
+### V4.0 Multi-Chain support
 Launch date: TBD. 
 
 Work in progress! Preview: https://bsc-tube.iotex.io/ (keep updating!)
