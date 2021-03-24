@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -68,16 +69,16 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	}
 	endHeight, err := tc.calcEndHeight(startHeight, count)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to get end height with start height %d, count %d", startHeight, count)
 	}
-	log.Printf("fetching events from block %d for %s\n", startHeight, tc.id)
+	log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
 	transfers, err := tc.pullTransfers(startHeight, endHeight)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, endHeight)
 	}
 	for _, transfer := range transfers {
 		if err := tc.recorder.AddTransfer(transfer); err != nil {
-			return err
+			return errors.Wrap(err, "failed to add transfer")
 		}
 	}
 	tc.lastProcessBlockHeight = endHeight
