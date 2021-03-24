@@ -154,7 +154,13 @@ func (s *Service) process() error {
 		case errInsufficientWitnesses:
 			log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
 			return s.recorder.Reset(transfer.id)
+		case errNoncritical:
+			log.Printf("failed to prepare submission: %v\n", err)
+			return s.recorder.Reset(transfer.id)
 		default:
+			if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
+				log.Printf("failed to mark transfer %s as failed, %v\n", transfer.id, recorderErr)
+			}
 			return err
 		}
 	}

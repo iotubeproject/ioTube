@@ -105,7 +105,7 @@ func (tv *transferValidatorOnEthreum) refresh() error {
 		offset.Add(offset, big.NewInt(int64(limit)))
 	}
 
-	log.Println("refresh Witnesses on Ethereum")
+	log.Println("refresh Witnesses")
 	activeWitnesses := make(map[string]bool)
 	for _, w := range witnesses {
 		log.Println("\t" + w.Hex())
@@ -167,7 +167,7 @@ func (tv *transferValidatorOnEthreum) Submit(transfer *Transfer, witnesses []*Wi
 	defer tv.mu.Unlock()
 
 	if err := tv.refresh(); err != nil {
-		return common.Hash{}, 0, err
+		return common.Hash{}, 0, errors.Wrap(errNoncritical, err.Error())
 	}
 	signatures := []byte{}
 	numOfValidSignatures := 0
@@ -184,7 +184,7 @@ func (tv *transferValidatorOnEthreum) Submit(transfer *Transfer, witnesses []*Wi
 	}
 	tOpts, err := tv.transactionOpts(300000)
 	if err != nil {
-		return common.Hash{}, 0, err
+		return common.Hash{}, 0, errors.Wrap(errNoncritical, err.Error())
 	}
 	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
 	if err != nil {

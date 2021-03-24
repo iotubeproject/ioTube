@@ -76,6 +76,7 @@ const (
 
 var errInsufficientWitnesses = errors.New("insufficient witnesses")
 var errGasPriceTooHigh = errors.New("gas price is too high")
+var errNoncritical = errors.New("error before submission")
 
 // UnmarshalTransferProto unmarshals a transfer proto
 func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transfer) (*Transfer, error) {

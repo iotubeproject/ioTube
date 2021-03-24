@@ -194,7 +194,7 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 	defer tv.mu.Unlock()
 
 	if err := tv.refresh(); err != nil {
-		return common.Hash{}, 0, err
+		return common.Hash{}, 0, errors.Wrap(errNoncritical, err.Error())
 	}
 	signatures := []byte{}
 	numOfValidSignatures := 0
@@ -202,7 +202,7 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 		if !tv.isActiveWitness(witness.addr) {
 			addr, err := address.FromBytes(witness.addr.Bytes())
 			if err != nil {
-				return common.Hash{}, 0, err
+				return common.Hash{}, 0, errors.Wrap(errNoncritical, err.Error())
 			}
 			log.Printf("witness %s is inactive\n", addr.String())
 			continue
@@ -215,11 +215,11 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 	}
 	accountMeta, err := tv.relayerAccountMeta()
 	if err != nil {
-		return common.Hash{}, 0, errors.Wrapf(err, "failed to get account of %s", tv.relayerAddr.String())
+		return common.Hash{}, 0, errors.Wrapf(errNoncritical, "failed to get account of %s, %v", tv.relayerAddr.String(), err)
 	}
 	balance, ok := big.NewInt(0).SetString(accountMeta.Balance, 10)
 	if !ok {
-		return common.Hash{}, 0, errors.Wrapf(err, "failed to convert balance %s of account %s", accountMeta.Balance, tv.relayerAddr.String())
+		return common.Hash{}, 0, errors.Wrapf(errNoncritical, "failed to convert balance %s of account %s, %v", accountMeta.Balance, tv.relayerAddr.String(), err)
 	}
 	if balance.Cmp(new(big.Int).Mul(tv.gasPrice, new(big.Int).SetUint64(tv.gasLimit))) < 0 {
 		util.Alert("IOTX native balance has dropped to " + balance.String() + ", please refill account for gas " + tv.relayerAddr.String())
