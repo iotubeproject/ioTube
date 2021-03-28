@@ -1,6 +1,6 @@
 [![tests](https://github.com/iotexproject/ioTube/workflows/tests/badge.svg)](https://github.com/iotexproject/ioTube/actions?query=workflow%3Atests)
 
-![image](https://user-images.githubusercontent.com/448293/111065299-30859400-8476-11eb-9e75-a756d97302e6.png)
+![111065299-30859400-8476-11eb-9e75-a756d97302e6](https://user-images.githubusercontent.com/989846/112756458-1e3d4700-8f9a-11eb-9af8-b51f23189b16.png)
 
 # ioTube - the decentralized tridirectional bridge for Ethereum, Binance Smart Chain and IoTeX
 
