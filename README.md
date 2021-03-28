@@ -2,9 +2,7 @@
 
 ![image](https://user-images.githubusercontent.com/448293/111065299-30859400-8476-11eb-9e75-a756d97302e6.png)
 
-# ioTube - A decentralized bridge for multi assets across multi-chains. 
-
-ioTube is a decentralized cross-chain bridge that enables the bidirectional exchange of digital assets between different blockchain networks. ioTube has three major versions. 
+# ioTube - the decentralized tridirectional bridge for Ethereum, Binance Smart Chain and IoTeX
 
 Running versions:
 - Latest version V4.0-preview (https://bsc-tube.iotex.io/bsc)
