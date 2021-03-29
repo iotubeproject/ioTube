@@ -175,6 +175,8 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 
 // Witnesses returns the witnesses of a transfer
 func (recorder *Recorder) Witnesses(id common.Hash) ([]*Witness, error) {
+	recorder.mutex.RLock()
+	defer recorder.mutex.RUnlock()
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf("SELECT `witness`, `signature` FROM `%s` WHERE `transferId`=?", recorder.witnessTableName),
 		id.Hex(),
@@ -204,6 +206,8 @@ func (recorder *Recorder) Witnesses(id common.Hash) ([]*Witness, error) {
 
 // Transfer returns the validation tx related information of a given transfer
 func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
+	recorder.mutex.RLock()
+	defer recorder.mutex.RUnlock()
 	row := recorder.store.DB().QueryRow(
 		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `txHash`, `nonce`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
 		id.Hex(),
@@ -238,6 +242,8 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 
 // Transfers returns the list of records of given status
 func (recorder *Recorder) Transfers(status ValidationStatusType, limit uint8) ([]*Transfer, error) {
+	recorder.mutex.RLock()
+	defer recorder.mutex.RUnlock()
 	query := fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime`", recorder.transferTableName)
 	if limit != 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, limit)
@@ -282,6 +288,8 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, limit uint8) ([
 // MarkAsProcessing marks a record as processing
 func (recorder *Recorder) MarkAsProcessing(id common.Hash) error {
 	log.Printf("processing %s\n", id.Hex())
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationInProcess, id.Hex(), waitingForWitnesses)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as processing")
@@ -293,6 +301,8 @@ func (recorder *Recorder) MarkAsProcessing(id common.Hash) error {
 // MarkAsValidated marks a transfer as validated
 func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, nonce uint64) error {
 	log.Printf("mark transfer %s as validated (%s, %d)\n", id.Hex(), txhash.Hex(), nonce)
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(recorder.updateStatusAndTransactionQuery, validationSubmitted, txhash.Hex(), nonce, id.Hex(), validationInProcess)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as validated")
@@ -304,6 +314,8 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, no
 // MarkAsSettled marks a record as settled
 func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
 	log.Printf("mark transfer %s as settled\n", id.Hex())
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, transferSettled, id.Hex(), validationSubmitted)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as settled")
@@ -315,6 +327,8 @@ func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
 // MarkAsFailed marks a record as failed
 func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
 	log.Printf("mark transfer %s as failed\n", id.Hex())
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationFailed, id.Hex(), validationSubmitted)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as failed")
@@ -326,6 +340,8 @@ func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
 // Reset marks a record as new
 func (recorder *Recorder) Reset(id common.Hash) error {
 	log.Printf("reset transfer %s\n", id.Hex())
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, waitingForWitnesses, id.Hex(), validationInProcess)
 	if err != nil {
 		return errors.Wrap(err, "failed to reset")
@@ -337,6 +353,8 @@ func (recorder *Recorder) Reset(id common.Hash) error {
 // ResetCausedByNonce marks a record as new
 func (recorder *Recorder) ResetCausedByNonce(id common.Hash) error {
 	log.Printf("reset transfer %s\n", id.Hex())
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, waitingForWitnesses, id.Hex(), validationSubmitted)
 	if err != nil {
 		return errors.Wrap(err, "failed to reset")
