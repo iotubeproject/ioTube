@@ -113,6 +113,25 @@ func (s *Service) process() error {
 			return err
 		}
 		switch statusOnChain {
+		case StatusOnChainNeedSpeedUp:
+			witnesses, err := s.recorder.Witnesses(transfer.id)
+			if err != nil {
+				return err
+			}
+			txHash, nonce, gasPrice, err := s.transferValidator.SpeedUp(transfer, witnesses)
+			switch errors.Cause(err) {
+			case nil:
+				return s.recorder.UpdateRecord(transfer.id, txHash, nonce, gasPrice)
+			case errGasPriceTooHigh:
+				log.Printf("gas price %s is too high, %v\n", gasPrice, err)
+			case errInsufficientWitnesses:
+				log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
+				return s.recorder.Reset(transfer.id)
+			case errNoncritical:
+				log.Printf("failed to prepare submission: %v\n", err)
+			default:
+				return err
+			}
 		case StatusOnChainNotConfirmed:
 			continue
 		case StatusOnChainRejected:
@@ -144,12 +163,12 @@ func (s *Service) process() error {
 		if err := s.recorder.MarkAsProcessing(transfer.id); err != nil {
 			return err
 		}
-		txHash, nonce, err := s.transferValidator.Submit(transfer, witnesses)
+		txHash, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses)
 		switch errors.Cause(err) {
 		case nil:
-			return s.recorder.MarkAsValidated(transfer.id, txHash, nonce)
+			return s.recorder.MarkAsValidated(transfer.id, txHash, nonce, gasPrice)
 		case errGasPriceTooHigh:
-			log.Printf("gas price is too high, %v\n", err)
+			log.Printf("gas price %s is too high, %v\n", gasPrice, err)
 			return s.recorder.Reset(transfer.id)
 		case errInsufficientWitnesses:
 			log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())

@@ -158,10 +158,6 @@ func (tv *transferValidatorOnIoTeX) isActiveWitness(witness common.Address) bool
 func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType, error) {
 	tv.mu.RLock()
 	defer tv.mu.RUnlock()
-	accountMeta, err := tv.relayerAccountMeta()
-	if err != nil {
-		return StatusOnChainUnknown, err
-	}
 	settleHeightData, err := tv.validatorContract.Read("settles", transfer.id).Call(context.Background())
 	if err != nil {
 		return StatusOnChainUnknown, err
@@ -181,20 +177,17 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		// no matter what the receipt status is, mark the validation as failure
 		return StatusOnChainRejected, nil
 	}
-	if transfer.nonce <= accountMeta.Nonce {
-		return StatusOnChainNonceOverwritten, nil
-	}
 
 	return StatusOnChainNotConfirmed, nil
 }
 
 // Submit submits validation for a transfer
-func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, error) {
+func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
 
 	if err := tv.refresh(); err != nil {
-		return common.Hash{}, 0, errors.Wrap(errNoncritical, err.Error())
+		return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
 	signatures := []byte{}
 	numOfValidSignatures := 0
@@ -202,7 +195,7 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 		if !tv.isActiveWitness(witness.addr) {
 			addr, err := address.FromBytes(witness.addr.Bytes())
 			if err != nil {
-				return common.Hash{}, 0, errors.Wrap(errNoncritical, err.Error())
+				return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 			}
 			log.Printf("witness %s is inactive\n", addr.String())
 			continue
@@ -211,15 +204,15 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 		numOfValidSignatures++
 	}
 	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
-		return common.Hash{}, 0, errInsufficientWitnesses
+		return common.Hash{}, 0, nil, errInsufficientWitnesses
 	}
 	accountMeta, err := tv.relayerAccountMeta()
 	if err != nil {
-		return common.Hash{}, 0, errors.Wrapf(errNoncritical, "failed to get account of %s, %v", tv.relayerAddr.String(), err)
+		return common.Hash{}, 0, nil, errors.Wrapf(errNoncritical, "failed to get account of %s, %v", tv.relayerAddr.String(), err)
 	}
 	balance, ok := big.NewInt(0).SetString(accountMeta.Balance, 10)
 	if !ok {
-		return common.Hash{}, 0, errors.Wrapf(errNoncritical, "failed to convert balance %s of account %s, %v", accountMeta.Balance, tv.relayerAddr.String(), err)
+		return common.Hash{}, 0, nil, errors.Wrapf(errNoncritical, "failed to convert balance %s of account %s, %v", accountMeta.Balance, tv.relayerAddr.String(), err)
 	}
 	if balance.Cmp(new(big.Int).Mul(tv.gasPrice, new(big.Int).SetUint64(tv.gasLimit))) < 0 {
 		util.Alert("IOTX native balance has dropped to " + balance.String() + ", please refill account for gas " + tv.relayerAddr.String())
@@ -239,10 +232,14 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 		SetNonce(accountMeta.Nonce + 1).
 		Call(context.Background())
 	if err != nil {
-		return common.Hash{}, 0, err
+		return common.Hash{}, 0, nil, err
 	}
 
-	return common.BytesToHash(actionHash[:]), accountMeta.Nonce + 1, nil
+	return common.BytesToHash(actionHash[:]), accountMeta.Nonce + 1, tv.gasPrice, nil
+}
+
+func (tv *transferValidatorOnIoTeX) SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
+	panic("cannot speed up iotex actions")
 }
 
 func (tv *transferValidatorOnIoTeX) relayerAccountMeta() (*iotextypes.AccountMeta, error) {

@@ -48,7 +48,7 @@ func NewRecorder(store *db.SQLStore, transferTableName string, witnessTableName 
 		transferTableName:               transferTableName,
 		witnessTableName:                witnessTableName,
 		updateStatusQuery:               fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=? AND `status`=?", transferTableName),
-		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `nonce`=? WHERE `id`=? AND `status`=?", transferTableName),
+		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `nonce`=?, `gasPrice`=? WHERE `id`=? AND `status`=?", transferTableName),
 	}
 }
 
@@ -86,6 +86,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
 			"`txHash` varchar(66) DEFAULT NULL,"+
 			"`nonce` bigint(20),"+
+			"`gasPrice` varchar(78) DEFAULT NULL,"+
 			"`notes` varchar(45) DEFAULT NULL,"+
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
 			"UNIQUE KEY `id_UNIQUE` (`id`),"+
@@ -209,15 +210,15 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `txHash`, `nonce`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
 		id.Hex(),
 	)
 	tx := &Transfer{}
 	var rawAmount string
 	var cashier, token, sender, recipient string
-	var hash sql.NullString
+	var hash, gasPrice sql.NullString
 	var nonce sql.NullInt64
-	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &hash, &nonce, &tx.status, &tx.updateTime); err != nil {
+	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &hash, &nonce, &gasPrice, &tx.status, &tx.updateTime); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = common.HexToAddress(cashier)
@@ -237,6 +238,12 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	if !ok || tx.amount.Sign() != 1 {
 		return nil, errors.Errorf("invalid amount %s", rawAmount)
 	}
+	if gasPrice.Valid {
+		tx.gasPrice, ok = new(big.Int).SetString(gasPrice.String, 10)
+		if !ok || tx.gasPrice.Sign() != 1 {
+			return nil, errors.Errorf("invalid gas price %s", gasPrice.String)
+		}
+	}
 	return tx, nil
 }
 
@@ -244,7 +251,7 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 func (recorder *Recorder) Transfers(status ValidationStatusType, limit uint8) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
-	query := fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime`", recorder.transferTableName)
+	query := fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime`", recorder.transferTableName)
 	if limit != 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, limit)
 	}
@@ -258,9 +265,9 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, limit uint8) ([
 		tx := &Transfer{}
 		var cashier, token, sender, recipient, id string
 		var rawAmount string
-		var hash sql.NullString
+		var hash, gasPrice sql.NullString
 		var nonce sql.NullInt64
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &id, &hash, &nonce, &tx.updateTime); err != nil {
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &id, &hash, &nonce, &gasPrice, &tx.updateTime); err != nil {
 			return nil, errors.Wrap(err, "failed to scan transfer")
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -280,6 +287,12 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, limit uint8) ([
 		if !ok || tx.amount.Sign() != 1 {
 			return nil, errors.Errorf("invalid amount %s", rawAmount)
 		}
+		if gasPrice.Valid {
+			tx.gasPrice, ok = new(big.Int).SetString(gasPrice.String, 10)
+			if !ok || tx.gasPrice.Sign() != 1 {
+				return nil, errors.Errorf("invalid gas price %s", gasPrice.String)
+			}
+		}
 		txs = append(txs, tx)
 	}
 	return txs, nil
@@ -298,12 +311,42 @@ func (recorder *Recorder) MarkAsProcessing(id common.Hash) error {
 	return recorder.validateResult(result)
 }
 
+// UpdateRecord updates a transfer gas price
+func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, nonce uint64, gasPrice *big.Int) error {
+	log.Printf("update transfer %s as validated (%s, %d)\n", id.Hex(), txhash.Hex(), nonce)
+	// TODO: introduce new type
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
+	result, err := recorder.store.DB().Exec(
+		recorder.updateStatusAndTransactionQuery,
+		validationSubmitted,
+		txhash.Hex(),
+		nonce,
+		gasPrice.String(),
+		id.Hex(),
+		validationSubmitted,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as validated")
+	}
+
+	return recorder.validateResult(result)
+}
+
 // MarkAsValidated marks a transfer as validated
-func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, nonce uint64) error {
+func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, nonce uint64, gasPrice *big.Int) error {
 	log.Printf("mark transfer %s as validated (%s, %d)\n", id.Hex(), txhash.Hex(), nonce)
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusAndTransactionQuery, validationSubmitted, txhash.Hex(), nonce, id.Hex(), validationInProcess)
+	result, err := recorder.store.DB().Exec(
+		recorder.updateStatusAndTransactionQuery,
+		validationSubmitted,
+		txhash.Hex(),
+		nonce,
+		gasPrice.String(),
+		id.Hex(),
+		validationInProcess,
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as validated")
 	}

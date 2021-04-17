@@ -43,6 +43,7 @@ type Configuration struct {
 	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
+	EnableSpeedUp         bool          `json:"enableSpeedUp" yaml:"enableSpeedUp"`
 
 	SlackWebHook      string `json:"slackWebHook" yaml:"slackWebHook"`
 	Port              int    `json:"port" yaml:"port"`
@@ -141,6 +142,7 @@ func main() {
 			cfg.EthConfirmBlockNumber,
 			new(big.Int).SetUint64(cfg.EthGasPriceLimit),
 			common.HexToAddress(cfg.ValidatorAddress),
+			cfg.EnableSpeedUp,
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}
