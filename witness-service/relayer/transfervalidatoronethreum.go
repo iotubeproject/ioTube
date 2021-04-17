@@ -29,7 +29,8 @@ type transferValidatorOnEthreum struct {
 	mu                 sync.RWMutex
 	confirmBlockNumber uint8
 	gasPriceLimit      *big.Int
-	enableSpeedUp      bool
+	gasPriceDeviation  *big.Int
+	gasPriceGap        *big.Int
 
 	privateKey            *ecdsa.PrivateKey
 	relayerAddr           common.Address
@@ -47,8 +48,9 @@ func NewTransferValidatorOnEthereum(
 	privateKey *ecdsa.PrivateKey,
 	confirmBlockNumber uint8,
 	gasPriceLimit *big.Int,
+	gasPriceDeviation *big.Int,
+	gasPriceGap *big.Int,
 	validatorContractAddr common.Address,
-	enableSpeedUp bool,
 ) (TransferValidator, error) {
 	validatorContract, err := contract.NewTransferValidator(validatorContractAddr, client)
 	if err != nil {
@@ -57,7 +59,8 @@ func NewTransferValidatorOnEthereum(
 	tv := &transferValidatorOnEthreum{
 		confirmBlockNumber: confirmBlockNumber,
 		gasPriceLimit:      gasPriceLimit,
-		enableSpeedUp:      enableSpeedUp,
+		gasPriceDeviation:  gasPriceDeviation,
+		gasPriceGap:        gasPriceGap,
 
 		privateKey:            privateKey,
 		relayerAddr:           crypto.PubkeyToAddress(privateKey.PublicKey),
@@ -197,9 +200,12 @@ func (tv *transferValidatorOnEthreum) submit(transfer *Transfer, witnesses []*Wi
 	if err != nil {
 		return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
+	if tv.gasPriceDeviation != nil && new(big.Int).Add(tv.gasPriceDeviation, tOpts.GasPrice).Sign() > 0 {
+		tOpts.GasPrice = new(big.Int).Add(tv.gasPriceDeviation, tOpts.GasPrice)
+	}
 	if isSpeedUp {
-		if new(big.Int).Sub(tOpts.GasPrice, transfer.gasPrice).Cmp(big.NewInt(20000000000)) < 0 {
-			return common.Hash{}, 0, nil, errors.Errorf("current gas price %s is not significantly larger than old gas price %s", tOpts.GasPrice, transfer.gasPrice)
+		if new(big.Int).Sub(tOpts.GasPrice, transfer.gasPrice).Cmp(tv.gasPriceGap) < 0 {
+			return common.Hash{}, 0, nil, errors.Wrapf(errNoncritical, "current gas price %s is not significantly larger than old gas price %s", tOpts.GasPrice, transfer.gasPrice)
 		}
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
@@ -222,6 +228,9 @@ func (tv *transferValidatorOnEthreum) Submit(transfer *Transfer, witnesses []*Wi
 func (tv *transferValidatorOnEthreum) SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
+	if tv.gasPriceGap == nil || tv.gasPriceGap.Cmp(big.NewInt(0)) > 0 {
+		return common.Hash{}, 0, nil, errNoncritical
+	}
 
 	return tv.submit(transfer, witnesses, true)
 }
