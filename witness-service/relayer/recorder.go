@@ -372,7 +372,20 @@ func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
 	log.Printf("mark transfer %s as failed\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationFailed, id.Hex(), validationSubmitted)
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationFailed, id.Hex(), validationInProcess)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as failed")
+	}
+
+	return recorder.validateResult(result)
+}
+
+// MarkAsRejected marks a record as failed
+func (recorder *Recorder) MarkAsRejected(id common.Hash) error {
+	log.Printf("mark transfer %s as failed\n", id.Hex())
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationRejected, id.Hex(), validationSubmitted)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as failed")
 	}

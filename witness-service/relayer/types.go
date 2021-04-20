@@ -67,6 +67,8 @@ const (
 	transferSettled = "settled"
 	// validationFailed stands for the validation of a transfer failed
 	validationFailed = "failed"
+	// validationRejected stands for the validation of a transfer is rejected
+	validationRejected = "rejected"
 )
 
 const (

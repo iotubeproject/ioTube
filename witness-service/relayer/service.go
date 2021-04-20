@@ -135,7 +135,7 @@ func (s *Service) process() error {
 		case StatusOnChainNotConfirmed:
 			continue
 		case StatusOnChainRejected:
-			if err := s.recorder.MarkAsFailed(transfer.id); err != nil {
+			if err := s.recorder.MarkAsRejected(transfer.id); err != nil {
 				return err
 			}
 		case StatusOnChainNonceOverwritten:
@@ -178,7 +178,7 @@ func (s *Service) process() error {
 			return s.recorder.Reset(transfer.id)
 		default:
 			if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
-				log.Printf("failed to mark transfer %s as failed, %v\n", transfer.id, recorderErr)
+				log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
 			}
 			return err
 		}
