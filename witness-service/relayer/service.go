@@ -70,7 +70,6 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 
 // Check checks the status of a transfer
 func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*services.CheckResponse, error) {
-	log.Printf("check status of transfer %x\n", request.Id)
 	id := common.BytesToHash(request.Id)
 	transfer, err := s.recorder.Transfer(id)
 	if err != nil {
