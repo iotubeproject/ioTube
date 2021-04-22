@@ -76,6 +76,14 @@ module.exports = {
       // production: true    // Treats this network as if it was a public net. (default: false)
     // }
 
+    kovan: {
+      provider: () => new HDWalletProvider(process.env.PRIVATE_KEY, `https://kovan.infura.io/${process.env.INFURA_KEY}`),
+      network_id: 42,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true
+    },
+
     bsc_test: {
       provider: () => new HDWalletProvider(process.env.PRIVATE_KEY, `https://data-seed-prebsc-2-s1.binance.org:8545`),
       network_id: 97,
