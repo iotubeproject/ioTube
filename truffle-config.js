@@ -77,7 +77,7 @@ module.exports = {
     // }
 
     kovan: {
-      provider: () => new HDWalletProvider(process.env.PRIVATE_KEY, `https://kovan.infura.io/${process.env.INFURA_KEY}`),
+      provider: () => new HDWalletProvider(process.env.PRIVATE_KEY, `https://kovan.infura.io/v3/${process.env.INFURA_KEY}`),
       network_id: 42,
       confirmations: 2,
       timeoutBlocks: 200,

@@ -23,6 +23,7 @@
   "dependencies": {
     "eth-lib": "^0.2.8",
     "truffle": "^5.0.22",
+    "truffle-hdwallet-provider": "^1.0.17",
     "web3-utils": "^1.0.0-beta.55"
   }
 }
