@@ -18,6 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/util"
@@ -170,7 +172,12 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		return StatusOnChainSettled, nil
 	}
 	response, err := tv.client.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{})
-	if err != nil {
+	switch status.Code(err) {
+	case codes.NotFound:
+		return StatusOnChainNeedSpeedUp, nil
+	case codes.OK:
+		break
+	default:
 		return StatusOnChainUnknown, err
 	}
 	if response != nil {
@@ -181,11 +188,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 	return StatusOnChainNotConfirmed, nil
 }
 
-// Submit submits validation for a transfer
-func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
-	tv.mu.Lock()
-	defer tv.mu.Unlock()
-
+func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witness, resubmit bool) (common.Hash, uint64, *big.Int, error) {
 	if err := tv.refresh(); err != nil {
 		return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
@@ -217,6 +220,12 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 	if balance.Cmp(new(big.Int).Mul(tv.gasPrice, new(big.Int).SetUint64(tv.gasLimit))) < 0 {
 		util.Alert("IOTX native balance has dropped to " + balance.String() + ", please refill account for gas " + tv.relayerAddr.String())
 	}
+	var nonce uint64
+	if resubmit {
+		nonce = transfer.nonce
+	} else {
+		nonce = accountMeta.Nonce + 1
+	}
 
 	actionHash, err := tv.validatorContract.Execute(
 		"submit",
@@ -229,17 +238,28 @@ func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witn
 		signatures,
 	).SetGasPrice(tv.gasPrice).
 		SetGasLimit(tv.gasLimit).
-		SetNonce(accountMeta.Nonce + 1).
+		SetNonce(nonce).
 		Call(context.Background())
 	if err != nil {
 		return common.Hash{}, 0, nil, err
 	}
 
-	return common.BytesToHash(actionHash[:]), accountMeta.Nonce + 1, tv.gasPrice, nil
+	return common.BytesToHash(actionHash[:]), nonce, tv.gasPrice, nil
+}
+
+// Submit submits validation for a transfer
+func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
+	tv.mu.Lock()
+	defer tv.mu.Unlock()
+
+	return tv.submit(transfer, witnesses, false)
 }
 
 func (tv *transferValidatorOnIoTeX) SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
-	panic("cannot speed up iotex actions")
+	tv.mu.Lock()
+	defer tv.mu.Unlock()
+
+	return tv.submit(transfer, witnesses, true)
 }
 
 func (tv *transferValidatorOnIoTeX) relayerAccountMeta() (*iotextypes.AccountMeta, error) {
