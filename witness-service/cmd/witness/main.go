@@ -31,7 +31,7 @@ import (
 type Configuration struct {
 	Chain        string        `json:"chain" yaml:"chain"`
 	ClientURL    string        `json:"clientURL" yaml:"clientURL"`
-	DatabaseURL  string        `json:"databaseURL" yaml:"databaseURL"`
+	Database     db.Config     `json:"database" yaml:"database"`
 	PrivateKey   string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook string        `json:"slackWebHook" yaml:"slackWebHook"`
 	BatchSize    int           `json:"batchSize" yaml:"batchSize"`
@@ -127,7 +127,7 @@ func main() {
 				cashierContractAddr,
 				common.HexToAddress(cc.ValidatorContractAddress),
 				witness.NewRecorder(
-					db.NewStore("mysql", cfg.DatabaseURL),
+					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
 				),
@@ -169,7 +169,7 @@ func main() {
 				common.HexToAddress(cc.CashierContractAddress),
 				common.BytesToAddress(addr.Bytes()),
 				witness.NewRecorder(
-					db.NewStore("mysql", cfg.DatabaseURL),
+					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
 				),

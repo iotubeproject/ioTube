@@ -7,6 +7,8 @@ port: 7002
 privateKey: ""
 slackWebHook: "" 
 validatorAddress: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"
-databaseURL: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+  driver: "mysql"
 transferTableName: "heco_transfers"
 witnessTableName: "heco_witnesses"

@@ -4,7 +4,9 @@ privateKey: ""
 slackWebHook: ""
 interval: 1m
 batchSize: 100
-databaseURL: "root:kdfjjrU64fjK58H@tcp(database:3306)/witness?parseTime=true"
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/witness?parseTime=true"
+  driver: "mysql"
 cashiers:
   - id: "iotex-to-ethereum"
     relayerURL: ":7000"

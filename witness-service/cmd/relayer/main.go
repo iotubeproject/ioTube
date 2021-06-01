@@ -46,11 +46,11 @@ type Configuration struct {
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
 
-	SlackWebHook      string `json:"slackWebHook" yaml:"slackWebHook"`
-	Port              int    `json:"port" yaml:"port"`
-	DatabaseURL       string `json:"databaseURL" yaml:"databaseURL"`
-	TransferTableName string `json:"transferTableName" yaml:"transferTableName"`
-	WitnessTableName  string `json:"witnessTableName" yaml:"witnessTableName"`
+	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
+	Port              int       `json:"port" yaml:"port"`
+	Database          db.Config `json:"database" yaml:"database"`
+	TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
+	WitnessTableName  string    `json:"witnessTableName" yaml:"witnessTableName"`
 }
 
 var defaultConfig = Configuration{
@@ -177,7 +177,7 @@ func main() {
 	service, err := relayer.NewService(
 		transferValidator,
 		relayer.NewRecorder(
-			db.NewStore("mysql", cfg.DatabaseURL),
+			db.NewStore(cfg.Database),
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
 		),

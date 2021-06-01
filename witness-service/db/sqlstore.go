@@ -12,16 +12,23 @@ import (
 	"time"
 )
 
-// SQLStore is local sqlite3
-type SQLStore struct {
-	db         *sql.DB
-	connectStr string
-	driverName string
-}
+type (
+	// Config is the config of database
+	Config struct {
+		URI    string `json:"uri" yaml:"uri"`
+		Driver string `json:"driver" yaml:"driver"`
+	}
+
+	// SQLStore is local sqlite3
+	SQLStore struct {
+		db  *sql.DB
+		cfg Config
+	}
+)
 
 // NewStore instantiates a store
-func NewStore(driverName string, connectStr string) *SQLStore {
-	return &SQLStore{db: nil, connectStr: connectStr, driverName: driverName}
+func NewStore(cfg Config) *SQLStore {
+	return &SQLStore{db: nil, cfg: cfg}
 }
 
 // Start opens the SQL (creates new file if not existing yet)
@@ -29,7 +36,7 @@ func (s *SQLStore) Start(_ context.Context) error {
 	if s.db != nil {
 		return nil
 	}
-	db, err := sql.Open(s.driverName, s.connectStr)
+	db, err := sql.Open(s.cfg.Driver, s.cfg.URI)
 	if err != nil {
 		return err
 	}
@@ -58,5 +65,5 @@ func (s *SQLStore) DB() *sql.DB {
 
 // DriverName returns the name of the driver
 func (s *SQLStore) DriverName() string {
-	return s.driverName
+	return s.cfg.Driver
 }
