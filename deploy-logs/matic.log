@@ -3,7 +3,6 @@ truffle migrate --network matic
 Compiling your contracts...
 ===========================
 > Compiling ./contracts/iotube/TransferValidator.sol
-> Artifacts written to /Users/dong/iotex/ioTube/build/contracts
 > Compiled successfully using:
    - solc: 0.5.16+commit.9c3226ce.Emscripten.clang
 
@@ -147,31 +146,17 @@ Standard Token List Address:  0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7
    ------------------------
    > transaction hash:    0xb50288949c2b07c2e035e08b3b4b7764dfd96be393aedf877d023a5ce772ddd0
    ⠹ Blocks: 2            Seconds: 4
-/Users/dong/iotex/ioTube/node_modules/@trufflesuite/web3-provider-engine/subproviders/rpc.js:53
+/Users/
+/iotex/ioTube/node_modules/@trufflesuite/web3-provider-engine/subproviders/rpc.js:53
         })()
           ^
 Error: PollingBlockTracker - encountered an error while attempting to update latest block:
 Error: Too Many Requests
-    at /Users/dong/iotex/ioTube/node_modules/@trufflesuite/web3-provider-engine/subproviders/rpc.js:51:23
-    at Request._callback (/Users/dong/iotex/ioTube/node_modules/@trufflesuite/web3-provider-engine/subproviders/rpc.js:53:11)
-    at Request.self.callback (/Users/dong/iotex/ioTube/node_modules/request/request.js:185:22)
-    at Request.emit (events.js:315:20)
-    at Request.<anonymous> (/Users/dong/iotex/ioTube/node_modules/request/request.js:1154:10)
-    at Request.emit (events.js:315:20)
-    at IncomingMessage.<anonymous> (/Users/dong/iotex/ioTube/node_modules/request/request.js:1076:12)
-    at Object.onceWrapper (events.js:421:28)
-    at IncomingMessage.emit (events.js:327:22)
-    at endReadableNT (internal/streams/readable.js:1327:12)
-    at processTicksAndRejections (internal/process/task_queues.js:80:21)
-    at PollingBlockTracker._performSync (/Users/dong/iotex/ioTube/node_modules/eth-block-tracker/src/polling.js:51:24)
-    at runMicrotasks (<anonymous>)
-    at processTicksAndRejections (internal/process/task_queues.js:93:5)
-    
+
  
 Compiling your contracts...
 ===========================
 > Compiling ./contracts/iotube/TransferValidatorV2.sol
-> Artifacts written to /Users/dong/iotex/ioTube/build/contracts
 > Compiled successfully using:
    - solc: 0.5.16+commit.9c3226ce.Emscripten.clang
 
@@ -232,14 +217,6 @@ Add new pairs
 Transfer Validator Address:  0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B
 
 TypeError: minterPool.transferOwnership is not a function
-    at /Users/dong/iotex/ioTube/migrations/2_deploy_contracts.js:40:26
-    at runMicrotasks (<anonymous>)
-    at processTicksAndRejections (internal/process/task_queues.js:93:5)
-    at Migration._deploy (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/Migration.js:74:1)
-    at Migration._load (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/Migration.js:61:1)
-    at Migration.run (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/Migration.js:212:1)
-    at Object.runMigrations (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/index.js:150:1)
-    at Object.runFrom (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/index.js:110:1)
-    at Object.run (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/index.js:87:1)
-    at runMigrations (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/core/lib/commands/migrate.js:258:1)
-Truffle v5.3.7 (core: 5.3.7)
+
+
+
