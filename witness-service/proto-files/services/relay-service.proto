@@ -9,6 +9,7 @@ import "witness-service/proto-files/types/witness.proto";
 service RelayService {
     rpc Submit(types.Witness) returns (WitnessSubmissionResponse);
     rpc Check(CheckRequest) returns (CheckResponse);
+    rpc List(ListRequest) returns (ListResponse);
 }
 
 message CheckRequest {
@@ -26,6 +27,16 @@ message CheckResponse {
         SETTLED = 3;
     }
     Status status = 4;
+}
+
+message ListRequest {
+	int32 first = 1;
+	int32 skip = 2;
+}
+
+message ListResponse {
+	repeated types.Transfer transfers = 1;
+	repeated CheckResponse statuses = 2;
 }
 
 message WitnessSubmissionResponse {

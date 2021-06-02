@@ -169,6 +169,17 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		return StatusOnChainUnknown, err
 	}
 	if settleHeight.Cmp(big.NewInt(0)) > 0 {
+		// TODO: send 0.1 iotx
+		/*
+			addr, err := address.FromBytes(transfer.recipient.Bytes())
+			if err != nil {
+				log.Panic("failed to convert address", transfer.recipient)
+			}
+			_, err = tv.client.Transfer(addr, math.BigPow(10, 17)).SetGasPrice(tv.gasPrice).SetGasLimit(10000).Call(context.Background())
+			if err != nil {
+				log.Print("failed to transfer iotx", err)
+			}
+		*/
 		return StatusOnChainSettled, nil
 	}
 	response, err := tv.client.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{})

@@ -13,6 +13,7 @@ require (
 	github.com/iotexproject/iotex-antenna-go/v2 v2.4.0
 	github.com/iotexproject/iotex-core v1.1.1
 	github.com/iotexproject/iotex-proto v0.4.2
+	github.com/lib/pq v1.10.2
 	github.com/mattn/go-sqlite3 v1.14.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1

@@ -50,6 +50,16 @@ services:
       - database
     command: witness -config=/etc/iotube-witness/witness-config-bsc.yaml
 
+  matic-witness:
+    container_name: matic-witness
+    image: witness:latest
+    restart: on-failure
+    volumes:
+      - $IOTEX_WITNESS/etc/witness-config-matic.yaml:/etc/iotube-witness/witness-config-matic.yaml:ro
+    links:
+      - database
+    command: witness -config=/etc/iotube-witness/witness-config-matic.yaml
+
   cron:
     image: schnitzler/mysqldump
     restart: always

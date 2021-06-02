@@ -1,0 +1,14 @@
+chain: "bsc"
+interval: 1m
+clientURL: "https://rpc-mainnet.maticvigil.com"
+ethConfirmBlockNumber: 2
+ethGasPriceLimit: 5
+port: 7004
+privateKey: ""
+slackWebHook: "" 
+validatorAddress: "0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B"
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+  driver: "mysql"
+transferTableName: "matic_transfers"
+witnessTableName: "matic_witnesses"

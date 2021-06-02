@@ -1,0 +1,17 @@
+chain: "matic"
+clientURL: "https://rpc-mainnet.maticvigil.com"
+privateKey: ""
+slackWebHook: ""
+interval: 1m
+batchSize: 40
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/witness?parseTime=true"
+  driver: "mysql"
+cashiers:
+  - id: "matic-to-iotex"
+    relayerURL: "localhost:7001"
+    startBlockHeight: 15246000
+    cashierContractAddress: "0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be"
+    validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
+    transferTableName: "matic_transfers"
+    tokenPairs:

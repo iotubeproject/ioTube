@@ -91,6 +91,13 @@ function downloadConfigFile() {
             exit 2
         fi
     fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/relayer-config-matic.yaml ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
     [[ -f ${IOTEX_RELAYER}/etc/.env ]] || (echo "IOTEX_RELAYER=$IOTEX_RELAYER" > ${IOTEX_RELAYER}/etc/.env;echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${IOTEX_RELAYER}/etc/.env)
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_RELAYER}/etc/crontab
     cp -f $PROJECT_ABS_DIR/backup_relayer ${IOTEX_RELAYER}/etc/backup

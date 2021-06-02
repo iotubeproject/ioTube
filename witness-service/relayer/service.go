@@ -68,6 +68,82 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	}, nil
 }
 
+// List lists the recent transfers
+func (s *Service) List(ctx context.Context, request *services.ListRequest) (*services.ListResponse, error) {
+	first := request.First
+	skip := request.Skip
+	if skip < 0 {
+		skip = 0
+	}
+	if first <= 0 {
+		first = 100
+	}
+	if first > 1<<8 {
+		return nil, errors.Errorf("pagination size %d is too large", first)
+	}
+	transfers, err := s.recorder.Transfers("", uint32(skip), uint8(first), true)
+	if err != nil {
+		return nil, err
+	}
+	ids := []common.Hash{}
+	for _, transfer := range transfers {
+		ids = append(ids, transfer.id)
+	}
+	witnesses, err := s.recorder.Witnesses(ids...)
+	if err != nil {
+		return nil, err
+	}
+	response := &services.ListResponse{
+		Transfers: make([]*types.Transfer, len(transfers)),
+		Statuses:  make([]*services.CheckResponse, len(transfers)),
+	}
+	for i, transfer := range transfers {
+		response.Transfers[i] = &types.Transfer{
+			Cashier:   transfer.cashier.Bytes(),
+			Token:     transfer.token.Bytes(),
+			Index:     int64(transfer.index),
+			Sender:    transfer.sender.Bytes(),
+			Recipient: transfer.recipient.Bytes(),
+			Amount:    transfer.amount.String(),
+		}
+		response.Statuses[i] = s.assembleCheckResponse(transfer, witnesses)
+	}
+	return response, nil
+}
+
+func (s *Service) extractWitnesses(witnesses map[common.Hash][]*Witness, id common.Hash) [][]byte {
+	var witnessAddrs [][]byte
+	if _, ok := witnesses[id]; ok {
+		witnessAddrs = make([][]byte, 0, len(witnesses[id]))
+		for _, witness := range witnesses[id] {
+			witnessAddrs = append(witnessAddrs, witness.addr.Bytes())
+		}
+	}
+	return witnessAddrs
+}
+
+func (s *Service) convertStatus(status ValidationStatusType) services.CheckResponse_Status {
+	switch status {
+	case waitingForWitnesses:
+		return services.CheckResponse_CREATED
+	case validationSubmitted:
+		return services.CheckResponse_SUBMITTED
+	case transferSettled:
+		return services.CheckResponse_SETTLED
+	}
+
+	return services.CheckResponse_UNKNOWN
+}
+
+func (s *Service) assembleCheckResponse(transfer *Transfer, witnesses map[common.Hash][]*Witness) *services.CheckResponse {
+	return &services.CheckResponse{
+		Key:       transfer.id[:],
+		Witnesses: s.extractWitnesses(witnesses, transfer.id),
+		TxHash:    transfer.txHash.Bytes(),
+		Status:    s.convertStatus(transfer.status),
+	}
+}
+
 // Check checks the status of a transfer
 func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*services.CheckResponse, error) {
 	id := common.BytesToHash(request.Id)
@@ -79,30 +155,12 @@ func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*s
 	if err != nil {
 		return nil, err
 	}
-	witnessAddrs := make([][]byte, 0, len(witnesses))
-	for _, witness := range witnesses {
-		witnessAddrs = append(witnessAddrs, witness.addr.Bytes())
-	}
-	status := services.CheckResponse_UNKNOWN
-	switch transfer.status {
-	case waitingForWitnesses:
-		status = services.CheckResponse_CREATED
-	case validationSubmitted:
-		status = services.CheckResponse_SUBMITTED
-	case transferSettled:
-		status = services.CheckResponse_SETTLED
-	}
 
-	return &services.CheckResponse{
-		Key:       request.Id,
-		Witnesses: witnessAddrs,
-		TxHash:    transfer.txHash.Bytes(),
-		Status:    status,
-	}, nil
+	return s.assembleCheckResponse(transfer, witnesses), nil
 }
 
 func (s *Service) process() error {
-	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 1)
+	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, 1, false)
 	if err != nil {
 		return err
 	}
@@ -117,7 +175,10 @@ func (s *Service) process() error {
 			if err != nil {
 				return err
 			}
-			txHash, nonce, gasPrice, err := s.transferValidator.SpeedUp(transfer, witnesses)
+			if _, ok := witnesses[transfer.id]; !ok {
+				return errors.Errorf("no witness are found for %x", transfer.id)
+			}
+			txHash, nonce, gasPrice, err := s.transferValidator.SpeedUp(transfer, witnesses[transfer.id])
 			switch errors.Cause(err) {
 			case nil:
 				return s.recorder.UpdateRecord(transfer.id, txHash, nonce, gasPrice)
@@ -150,7 +211,7 @@ func (s *Service) process() error {
 			return errors.New("unexpected error")
 		}
 	}
-	newTransfers, err := s.recorder.Transfers(waitingForWitnesses, 1)
+	newTransfers, err := s.recorder.Transfers(waitingForWitnesses, 0, 1, false)
 	if err != nil {
 		return err
 	}
@@ -159,10 +220,13 @@ func (s *Service) process() error {
 		if err != nil {
 			return err
 		}
+		if _, ok := witnesses[transfer.id]; !ok {
+			return errors.Errorf("no witness are found for %x", transfer.id)
+		}
 		if err := s.recorder.MarkAsProcessing(transfer.id); err != nil {
 			return err
 		}
-		txHash, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses)
+		txHash, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses[transfer.id])
 		switch errors.Cause(err) {
 		case nil:
 			return s.recorder.MarkAsValidated(transfer.id, txHash, nonce, gasPrice)

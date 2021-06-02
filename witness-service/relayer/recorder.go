@@ -14,6 +14,7 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"strings"
 	"sync"
 
 	// mute lint error
@@ -176,29 +177,41 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 }
 
 // Witnesses returns the witnesses of a transfer
-func (recorder *Recorder) Witnesses(id common.Hash) ([]*Witness, error) {
+func (recorder *Recorder) Witnesses(ids ...common.Hash) (map[common.Hash][]*Witness, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
+	if len(ids) == 0 {
+		return map[common.Hash][]*Witness{}, nil
+	}
+	strIDs := make([]interface{}, len(ids))
+	for i, id := range ids {
+		strIDs[i] = id.Hex()
+	}
 	rows, err := recorder.store.DB().Query(
-		fmt.Sprintf("SELECT `witness`, `signature` FROM `%s` WHERE `transferId`=?", recorder.witnessTableName),
-		id.Hex(),
+		fmt.Sprintf("SELECT `transferId`, `witness`, `signature` FROM `%s` WHERE `transferId` in (?"+strings.Repeat(",?", len(ids)-1)+")", recorder.witnessTableName),
+		strIDs...,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query witnesses table")
 	}
 	defer rows.Close()
-	var witnesses []*Witness
+	witnesses := map[common.Hash][]*Witness{}
 	for rows.Next() {
+		var transferId string
 		var addr string
 		var signature string
-		if err := rows.Scan(&addr, &signature); err != nil {
+		if err := rows.Scan(&transferId, &addr, &signature); err != nil {
 			return nil, errors.Wrap(err, "failed to scan witness")
 		}
+		id := common.HexToHash(transferId)
 		sigBytes, err := hex.DecodeString(signature)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decode signature")
 		}
-		witnesses = append(witnesses, &Witness{
+		if _, ok := witnesses[id]; !ok {
+			witnesses[id] = []*Witness{}
+		}
+		witnesses[id] = append(witnesses[id], &Witness{
 			addr:      common.HexToAddress(addr),
 			signature: sigBytes,
 		})
@@ -206,27 +219,20 @@ func (recorder *Recorder) Witnesses(id common.Hash) ([]*Witness, error) {
 	return witnesses, nil
 }
 
-// Transfer returns the validation tx related information of a given transfer
-func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
-	recorder.mutex.RLock()
-	defer recorder.mutex.RUnlock()
-	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
-		id.Hex(),
-	)
+func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error) (*Transfer, error) {
 	tx := &Transfer{}
 	var rawAmount string
-	var cashier, token, sender, recipient string
+	var cashier, token, sender, recipient, id string
 	var hash, gasPrice sql.NullString
 	var nonce sql.NullInt64
-	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &hash, &nonce, &gasPrice, &tx.status, &tx.updateTime); err != nil {
+	if err := scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &id, &hash, &nonce, &gasPrice, &tx.status, &tx.updateTime); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = common.HexToAddress(cashier)
 	tx.token = common.HexToAddress(token)
 	tx.sender = common.HexToAddress(sender)
 	tx.recipient = common.HexToAddress(recipient)
-	tx.id = id
+	tx.id = common.HexToHash(id)
 
 	if hash.Valid {
 		tx.txHash = common.HexToHash(hash.String)
@@ -248,51 +254,51 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	return tx, nil
 }
 
-// Transfers returns the list of records of given status
-func (recorder *Recorder) Transfers(status ValidationStatusType, limit uint8) ([]*Transfer, error) {
+// Transfer returns the validation tx related information of a given transfer
+func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
-	query := fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime`", recorder.transferTableName)
-	if limit != 0 {
-		query = fmt.Sprintf("%s LIMIT %d", query, limit)
-	}
-	rows, err := recorder.store.DB().Query(query, status)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query transfers table")
+	row := recorder.store.DB().QueryRow(
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
+		id.Hex(),
+	)
+	return recorder.assembleTransfer(row.Scan)
+}
+
+// Transfers returns the list of records of given status
+func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, limit uint8, desc bool) ([]*Transfer, error) {
+	recorder.mutex.RLock()
+	defer recorder.mutex.RUnlock()
+	var rows *sql.Rows
+	var err error
+	var query string
+	if status == "" {
+		if desc {
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+		} else {
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+		}
+		rows, err = recorder.store.DB().Query(query, offset, limit)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to query transfers table")
+		}
+	} else {
+		if desc {
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+		} else {
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+		}
+		rows, err = recorder.store.DB().Query(query, status, offset, limit)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to query transfers table")
+		}
 	}
 	defer rows.Close()
 	var txs []*Transfer
 	for rows.Next() {
-		tx := &Transfer{}
-		var cashier, token, sender, recipient, id string
-		var rawAmount string
-		var hash, gasPrice sql.NullString
-		var nonce sql.NullInt64
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &id, &hash, &nonce, &gasPrice, &tx.updateTime); err != nil {
+		tx, err := recorder.assembleTransfer(rows.Scan)
+		if err != nil {
 			return nil, errors.Wrap(err, "failed to scan transfer")
-		}
-		tx.cashier = common.HexToAddress(cashier)
-		tx.token = common.HexToAddress(token)
-		tx.sender = common.HexToAddress(sender)
-		tx.recipient = common.HexToAddress(recipient)
-		tx.id = common.HexToHash(id)
-		tx.status = status
-		if hash.Valid {
-			tx.txHash = common.HexToHash(hash.String)
-		}
-		if nonce.Valid {
-			tx.nonce = uint64(nonce.Int64)
-		}
-		var ok bool
-		tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
-		if !ok || tx.amount.Sign() != 1 {
-			return nil, errors.Errorf("invalid amount %s", rawAmount)
-		}
-		if gasPrice.Valid {
-			tx.gasPrice, ok = new(big.Int).SetString(gasPrice.String, 10)
-			if !ok || tx.gasPrice.Sign() != 1 {
-				return nil, errors.Errorf("invalid gas price %s", gasPrice.String)
-			}
 		}
 		txs = append(txs, tx)
 	}
