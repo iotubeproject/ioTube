@@ -1,0 +1,245 @@
+truffle migrate --network matic       
+
+Compiling your contracts...
+===========================
+> Compiling ./contracts/iotube/TransferValidator.sol
+> Artifacts written to /Users/dong/iotex/ioTube/build/contracts
+> Compiled successfully using:
+   - solc: 0.5.16+commit.9c3226ce.Emscripten.clang
+
+
+
+Starting migrations...
+======================
+> Network name:    'matic'
+> Network id:      137
+> Block gas limit: 20000000 (0x1312d00)
+
+
+1_initial_migration.js
+======================
+
+   Deploying 'Migrations'
+   ----------------------
+   > transaction hash:    0x05754926a6c0a82734e330d46f5281d3d82c20480c36c3d1e5d8691a7531296e
+   > Blocks: 3            Seconds: 4
+   > contract address:    0x2f1a0BCa4005eBfD6A589850F436c8D8f9c2aEd2
+   > block number:        15254688
+   > block timestamp:     1622664526
+   > account:             0x3Ec4Fb908F34Ff0ED131cc48c7a626fe8F927a24
+   > balance:             0.479700481
+   > gas used:            226537 (0x374e9)
+   > gas price:           1 gwei
+   > value sent:          0 ETH
+   > total cost:          0.000226537 ETH
+
+   Pausing for 2 confirmations...
+   ------------------------------
+   > confirmation number: 3 (block: 15254691)
+
+   > Saving migration to chain.
+   > Saving artifacts
+   -------------------------------------
+   > Total cost:         0.000226537 ETH
+
+
+2_deploy_contracts.js
+=====================
+
+   Deploying 'WitnessList'
+   -----------------------
+   > transaction hash:    0x951a567b21ca392c8db682dbc0f88aeae31d042d02f838cdb728d4ae62b840cd
+   > Blocks: 4            Seconds: 8
+   > contract address:    0x1E58cA53d90fe9B37F7f6AEB548b4BC7c6292C17
+   > block number:        15254700
+   > block timestamp:     1622664550
+   > account:             0x3Ec4Fb908F34Ff0ED131cc48c7a626fe8F927a24
+   > balance:             0.478891478
+   > gas used:            763240 (0xba568)
+   > gas price:           1 gwei
+   > value sent:          0 ETH
+   > total cost:          0.00076324 ETH
+
+   Pausing for 2 confirmations...
+   ------------------------------
+   > confirmation number: 2 (block: 15254702)
+Witness List Address:  0x1E58cA53d90fe9B37F7f6AEB548b4BC7c6292C17
+
+   Deploying 'MinterPool'
+   ----------------------
+   > transaction hash:    0xb215f4c5e37b16ff95c231ca6716e35b1221887fe0404603ee99df1a71cb4755
+   > Blocks: 2            Seconds: 4
+   > contract address:    0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f
+   > block number:        15254706
+   > block timestamp:     1622664562
+   > account:             0x3Ec4Fb908F34Ff0ED131cc48c7a626fe8F927a24
+   > balance:             0.478584759
+   > gas used:            306719 (0x4ae1f)
+   > gas price:           1 gwei
+   > value sent:          0 ETH
+   > total cost:          0.000306719 ETH
+
+   Pausing for 2 confirmations...
+   ------------------------------
+   > confirmation number: 1 (block: 15254708)
+   > confirmation number: 4 (block: 15254711)
+Minter Pool Address:  0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f
+
+   Deploying 'TokenSafe'
+   ---------------------
+   > transaction hash:    0x4202a3eb4306d9701b5a0866da7fd8da1edc9dd161a1ba257ea811092549b8c7
+   > Blocks: 1            Seconds: 4
+   > contract address:    0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45
+   > block number:        15254714
+   > block timestamp:     1622664578
+   > account:             0x3Ec4Fb908F34Ff0ED131cc48c7a626fe8F927a24
+   > balance:             0.478236567
+   > gas used:            348192 (0x55020)
+   > gas price:           1 gwei
+   > value sent:          0 ETH
+   > total cost:          0.000348192 ETH
+
+   Pausing for 2 confirmations...
+   ------------------------------
+   > confirmation number: 2 (block: 15254716)
+Token Safe Address:  0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45
+
+   Deploying 'TokenList'
+   ---------------------
+   > transaction hash:    0x71ae0824234d7bf52c589d1f50d5153ed19397a8af0206899161eb3cc9bf25e3
+   > Blocks: 2            Seconds: 8
+   > contract address:    0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E
+   > block number:        15254720
+   > block timestamp:     1622664594
+   > account:             0x3Ec4Fb908F34Ff0ED131cc48c7a626fe8F927a24
+   > balance:             0.476943659
+   > gas used:            1292908 (0x13ba6c)
+   > gas price:           1 gwei
+   > value sent:          0 ETH
+   > total cost:          0.001292908 ETH
+
+   Pausing for 2 confirmations...
+   ------------------------------
+   > confirmation number: 1 (block: 15254722)
+   > confirmation number: 4 (block: 15254725)
+Mintable Token List Address:  0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E
+
+   Replacing 'TokenList'
+   ---------------------
+   > transaction hash:    0x328dfc9d8c89f7e1b04401b9d25937812bcdf6e9eff163bc07c0a6b80f0b3425
+   > Blocks: 2            Seconds: 4
+   > contract address:    0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7
+   > block number:        15254728
+   > block timestamp:     1622664610
+   > account:             0x3Ec4Fb908F34Ff0ED131cc48c7a626fe8F927a24
+   > balance:             0.475650751
+   > gas used:            1292908 (0x13ba6c)
+   > gas price:           1 gwei
+   > value sent:          0 ETH
+   > total cost:          0.001292908 ETH
+
+   Pausing for 2 confirmations...
+   ------------------------------
+   > confirmation number: 2 (block: 15254730)
+Standard Token List Address:  0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7
+
+   Deploying 'TokenCashier'
+   ------------------------
+   > transaction hash:    0xb50288949c2b07c2e035e08b3b4b7764dfd96be393aedf877d023a5ce772ddd0
+   ⠹ Blocks: 2            Seconds: 4
+/Users/dong/iotex/ioTube/node_modules/@trufflesuite/web3-provider-engine/subproviders/rpc.js:53
+        })()
+          ^
+Error: PollingBlockTracker - encountered an error while attempting to update latest block:
+Error: Too Many Requests
+    at /Users/dong/iotex/ioTube/node_modules/@trufflesuite/web3-provider-engine/subproviders/rpc.js:51:23
+    at Request._callback (/Users/dong/iotex/ioTube/node_modules/@trufflesuite/web3-provider-engine/subproviders/rpc.js:53:11)
+    at Request.self.callback (/Users/dong/iotex/ioTube/node_modules/request/request.js:185:22)
+    at Request.emit (events.js:315:20)
+    at Request.<anonymous> (/Users/dong/iotex/ioTube/node_modules/request/request.js:1154:10)
+    at Request.emit (events.js:315:20)
+    at IncomingMessage.<anonymous> (/Users/dong/iotex/ioTube/node_modules/request/request.js:1076:12)
+    at Object.onceWrapper (events.js:421:28)
+    at IncomingMessage.emit (events.js:327:22)
+    at endReadableNT (internal/streams/readable.js:1327:12)
+    at processTicksAndRejections (internal/process/task_queues.js:80:21)
+    at PollingBlockTracker._performSync (/Users/dong/iotex/ioTube/node_modules/eth-block-tracker/src/polling.js:51:24)
+    at runMicrotasks (<anonymous>)
+    at processTicksAndRejections (internal/process/task_queues.js:93:5)
+    
+ 
+Compiling your contracts...
+===========================
+> Compiling ./contracts/iotube/TransferValidatorV2.sol
+> Artifacts written to /Users/dong/iotex/ioTube/build/contracts
+> Compiled successfully using:
+   - solc: 0.5.16+commit.9c3226ce.Emscripten.clang
+
+
+
+Starting migrations...
+======================
+> Network name:    'matic'
+> Network id:      137
+> Block gas limit: 20000000 (0x1312d00)
+
+
+2_deploy_contracts.js
+=====================
+Witness List Address:  0x1E58cA53d90fe9B37F7f6AEB548b4BC7c6292C17
+Minter Pool Address:  0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f
+Token Safe Address:  0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45
+Mintable Token List Address:  0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E
+Standard Token List Address:  0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7
+
+   Deploying 'TokenCashier'
+   ------------------------
+   > transaction hash:    0x8ea57c89791cf3968c6597d7b39b17e50992f8440d8fadfebf4962a3472f36b3
+   > Blocks: 2            Seconds: 8
+   > contract address:    0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be
+   > block number:        15254913
+   > block timestamp:     1622664992
+   > account:             0x3Ec4Fb908F34Ff0ED131cc48c7a626fe8F927a24
+   > balance:             0.471938153
+   > gas used:            1856299 (0x1c532b)
+   > gas price:           1 gwei
+   > value sent:          0 ETH
+   > total cost:          0.001856299 ETH
+
+   Pausing for 2 confirmations...
+   ------------------------------
+   > confirmation number: 2 (block: 15254916)
+Token Cashier Address:  0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be
+
+   Deploying 'TransferValidator'
+   -----------------------------
+   > transaction hash:    0x19f95762ffb51b1da6e4a07609bbe4eec2c267dea618dba64ed98308e44a72c4
+   > Blocks: 2            Seconds: 4
+   > contract address:    0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B
+   > block number:        15254919
+   > block timestamp:     1622665004
+   > account:             0x3Ec4Fb908F34Ff0ED131cc48c7a626fe8F927a24
+   > balance:             0.469653429
+   > gas used:            2284724 (0x22dcb4)
+   > gas price:           1 gwei
+   > value sent:          0 ETH
+   > total cost:          0.002284724 ETH
+
+   Pausing for 2 confirmations...
+   ------------------------------
+   > confirmation number: 2 (block: 15254921)
+Add new pairs
+Transfer Validator Address:  0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B
+
+TypeError: minterPool.transferOwnership is not a function
+    at /Users/dong/iotex/ioTube/migrations/2_deploy_contracts.js:40:26
+    at runMicrotasks (<anonymous>)
+    at processTicksAndRejections (internal/process/task_queues.js:93:5)
+    at Migration._deploy (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/Migration.js:74:1)
+    at Migration._load (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/Migration.js:61:1)
+    at Migration.run (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/Migration.js:212:1)
+    at Object.runMigrations (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/index.js:150:1)
+    at Object.runFrom (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/index.js:110:1)
+    at Object.run (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/migrate/index.js:87:1)
+    at runMigrations (/Users/dong/.nvm/versions/node/v14.16.1/lib/node_modules/truffle/build/webpack:/packages/core/lib/commands/migrate.js:258:1)
+Truffle v5.3.7 (core: 5.3.7)
