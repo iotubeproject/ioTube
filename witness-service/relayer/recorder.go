@@ -21,7 +21,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	// _ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql"
+	// _ "github.com/lib/pq"
 	// _ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
