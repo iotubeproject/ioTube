@@ -25,7 +25,6 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
-	"github.com/iotexproject/iotex-core/pkg/unit"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
 	"github.com/iotexproject/iotex-proto/golang/iotextypes"
 )
@@ -87,7 +86,7 @@ func NewTransferValidatorOnIoTeX(
 
 	return &transferValidatorOnIoTeX{
 		gasLimit: 2000000,
-		gasPrice: big.NewInt(unit.Qev),
+		gasPrice: big.NewInt(1000000000000),
 
 		privateKey:            privateKey,
 		relayerAddr:           relayerAddr,

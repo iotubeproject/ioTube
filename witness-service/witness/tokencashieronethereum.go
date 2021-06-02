@@ -14,9 +14,9 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/iotexproject/go-ethereum/accounts/abi"
 	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/pkg/errors"
 )
@@ -36,7 +36,7 @@ func NewTokenCashierOnEthereum(
 	if err != nil {
 		return nil, err
 	}
-	eventTopic := tokenCashierABI.Events[eventName].Id()
+	eventTopic := tokenCashierABI.Events[eventName].ID
 	return newTokenCashierBase(
 		id,
 		recorder,
