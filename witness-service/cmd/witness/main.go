@@ -138,7 +138,7 @@ func main() {
 			}
 			cashiers = append(cashiers, cashier)
 		}
-	case "heco", "bsc":
+	case "heco", "bsc", "matic":
 		// heco and bsc are identical to ethereum
 		fallthrough
 	case "ethereum":
