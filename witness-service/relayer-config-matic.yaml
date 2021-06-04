@@ -1,4 +1,4 @@
-chain: "bsc"
+chain: "matic"
 interval: 1m
 clientURL: "https://rpc-mainnet.maticvigil.com"
 ethConfirmBlockNumber: 2

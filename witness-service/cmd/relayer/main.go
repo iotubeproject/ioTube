@@ -131,7 +131,7 @@ func main() {
 		cfg.Chain = chain
 	}
 	switch cfg.Chain {
-	case "heco", "bsc":
+	case "heco", "bsc", "matic":
 		// heco and bsc are idential to ethereum
 		fallthrough
 	case "ethereum":
