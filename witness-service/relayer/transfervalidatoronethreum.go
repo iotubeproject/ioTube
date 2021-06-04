@@ -32,6 +32,7 @@ type transferValidatorOnEthreum struct {
 	gasPriceDeviation  *big.Int
 	gasPriceGap        *big.Int
 
+	chainID               *big.Int
 	privateKey            *ecdsa.PrivateKey
 	relayerAddr           common.Address
 	validatorContractAddr common.Address
@@ -56,12 +57,18 @@ func NewTransferValidatorOnEthereum(
 	if err != nil {
 		return nil, err
 	}
+	chainID, err := client.ChainID(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Create transfer validator for chain %d\n", chainID)
 	tv := &transferValidatorOnEthreum{
 		confirmBlockNumber: confirmBlockNumber,
 		gasPriceLimit:      gasPriceLimit,
 		gasPriceDeviation:  gasPriceDeviation,
 		gasPriceGap:        gasPriceGap,
 
+		chainID:               chainID,
 		privateKey:            privateKey,
 		relayerAddr:           crypto.PubkeyToAddress(privateKey.PublicKey),
 		validatorContractAddr: validatorContractAddr,
@@ -236,7 +243,10 @@ func (tv *transferValidatorOnEthreum) SpeedUp(transfer *Transfer, witnesses []*W
 }
 
 func (tv *transferValidatorOnEthreum) transactionOpts(gasLimit uint64) (*bind.TransactOpts, error) {
-	opts := bind.NewKeyedTransactor(tv.privateKey)
+	opts, err := bind.NewKeyedTransactorWithChainID(tv.privateKey, tv.chainID)
+	if err != nil {
+		return nil, err
+	}
 	opts.Value = big.NewInt(0)
 	opts.GasLimit = gasLimit
 	gasPrice, err := tv.client.SuggestGasPrice(context.Background())
