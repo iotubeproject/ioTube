@@ -11,6 +11,7 @@ import (
 	"crypto/ecdsa"
 	"log"
 	"math/big"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -67,9 +68,14 @@ func NewTransferValidatorOnIoTeX(
 	if err != nil {
 		return nil, err
 	}
-	witnessContractAddr := common.Address{}
-	if validatorABI.Unpack(&witnessContractAddr, "witnessList", data.Raw); err != nil {
+
+	ret, err := validatorABI.Unpack("witnessList", data.Raw)
+	if err != nil {
 		return nil, err
+	}
+	witnessContractAddr, ok := ret[0].(common.Address)
+	if !ok {
+		return nil, errors.Errorf("invalid type %s", reflect.TypeOf(ret[0]))
 	}
 	witnessContractIoAddr, err := address.FromBytes(witnessContractAddr.Bytes())
 	if err != nil {
@@ -113,9 +119,13 @@ func (tv *transferValidatorOnIoTeX) refresh() error {
 	if err != nil {
 		return err
 	}
-	count := big.NewInt(0)
-	if err := countData.Unmarshal(&count); err != nil {
+	ret, err := countData.Unmarshal()
+	if err != nil {
 		return err
+	}
+	count, ok := ret[0].(*big.Int)
+	if !ok {
+		return errors.Errorf("invalid type %s", reflect.TypeOf(ret[0]))
 	}
 	offset := big.NewInt(0)
 	limit := uint8(10)
@@ -124,14 +134,19 @@ func (tv *transferValidatorOnIoTeX) refresh() error {
 		if err != nil {
 			return err
 		}
-		ret := new(struct {
+		ret, err := tv.witnessListContractABI.Unpack("getActiveItems", data.Raw)
+		if err != nil {
+			return err
+		}
+		ai, ok := ret[0].(struct {
 			Count *big.Int
 			Items []common.Address
 		})
-		if err := tv.witnessListContractABI.Unpack(ret, "getActiveItems", data.Raw); err != nil {
-			return err
+		if !ok {
+			return errors.Errorf("invalid type %s", reflect.TypeOf(ret[0]))
 		}
-		witnesses = append(witnesses, ret.Items[:int(ret.Count.Int64())]...)
+
+		witnesses = append(witnesses, ai.Items[:int(ai.Count.Int64())]...)
 		offset.Add(offset, big.NewInt(int64(limit)))
 	}
 	log.Println("refresh Witnesses on IoTeX")
@@ -163,10 +178,15 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 	if err != nil {
 		return StatusOnChainUnknown, err
 	}
-	settleHeight := big.NewInt(0)
-	if err := tv.validatorContractABI.Unpack(&settleHeight, "settles", settleHeightData.Raw); err != nil {
+	ret, err := tv.validatorContractABI.Unpack("settles", settleHeightData.Raw)
+	if err != nil {
 		return StatusOnChainUnknown, err
 	}
+	settleHeight, ok := ret[0].(*big.Int)
+	if !ok {
+		return StatusOnChainUnknown, errors.Errorf("invalid type %s", reflect.TypeOf(ret[0]))
+	}
+
 	if settleHeight.Cmp(big.NewInt(0)) > 0 {
 		// TODO: send 0.1 iotx
 		/*

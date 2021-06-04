@@ -6,10 +6,9 @@ require (
 	github.com/ethereum/go-ethereum v1.10.3
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/golang/protobuf v1.4.3
-	github.com/iotexproject/go-pkgs v0.1.2-0.20200523040337-5f1d9ddaa8ee // indirect
-	github.com/iotexproject/iotex-address v0.2.2
-	github.com/iotexproject/iotex-antenna-go/v2 v2.4.0
-	github.com/iotexproject/iotex-proto v0.4.2
+	github.com/iotexproject/iotex-address v0.2.4
+	github.com/iotexproject/iotex-antenna-go/v2 v2.5.0
+	github.com/iotexproject/iotex-proto v0.4.4-0.20201029172022-a8466422b0f1
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1

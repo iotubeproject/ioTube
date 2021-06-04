@@ -137,7 +137,7 @@ func bindAddressList(address common.Address, caller bind.ContractCaller, transac
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_AddressList *AddressListRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_AddressList *AddressListRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _AddressList.Contract.AddressListCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -156,7 +156,7 @@ func (_AddressList *AddressListRaw) Transact(opts *bind.TransactOpts, method str
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_AddressList *AddressListCallerRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_AddressList *AddressListCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _AddressList.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -175,12 +175,17 @@ func (_AddressList *AddressListTransactorRaw) Transact(opts *bind.TransactOpts, 
 //
 // Solidity: function count() view returns(uint256)
 func (_AddressList *AddressListCaller) Count(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _AddressList.contract.Call(opts, out, "count")
-	return *ret0, err
+	var out []interface{}
+	err := _AddressList.contract.Call(opts, &out, "count")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // Count is a free data retrieval call binding the contract method 0x06661abd.
@@ -204,13 +209,22 @@ func (_AddressList *AddressListCaller) GetActiveItems(opts *bind.CallOpts, offse
 	Count *big.Int
 	Items []common.Address
 }, error) {
-	ret := new(struct {
+	var out []interface{}
+	err := _AddressList.contract.Call(opts, &out, "getActiveItems", offset, limit)
+
+	outstruct := new(struct {
 		Count *big.Int
 		Items []common.Address
 	})
-	out := ret
-	err := _AddressList.contract.Call(opts, out, "getActiveItems", offset, limit)
-	return *ret, err
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.Count = *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+	outstruct.Items = *abi.ConvertType(out[1], new([]common.Address)).(*[]common.Address)
+
+	return *outstruct, err
+
 }
 
 // GetActiveItems is a free data retrieval call binding the contract method 0xf7cb1312.
@@ -237,12 +251,17 @@ func (_AddressList *AddressListCallerSession) GetActiveItems(offset *big.Int, li
 //
 // Solidity: function isActive(address _item) view returns(bool)
 func (_AddressList *AddressListCaller) IsActive(opts *bind.CallOpts, _item common.Address) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _AddressList.contract.Call(opts, out, "isActive", _item)
-	return *ret0, err
+	var out []interface{}
+	err := _AddressList.contract.Call(opts, &out, "isActive", _item)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // IsActive is a free data retrieval call binding the contract method 0x9f8a13d7.
@@ -263,12 +282,17 @@ func (_AddressList *AddressListCallerSession) IsActive(_item common.Address) (bo
 //
 // Solidity: function isExist(address _item) view returns(bool)
 func (_AddressList *AddressListCaller) IsExist(opts *bind.CallOpts, _item common.Address) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _AddressList.contract.Call(opts, out, "isExist", _item)
-	return *ret0, err
+	var out []interface{}
+	err := _AddressList.contract.Call(opts, &out, "isExist", _item)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // IsExist is a free data retrieval call binding the contract method 0x0013eb4b.
@@ -289,12 +313,17 @@ func (_AddressList *AddressListCallerSession) IsExist(_item common.Address) (boo
 //
 // Solidity: function numOfActive() view returns(uint256)
 func (_AddressList *AddressListCaller) NumOfActive(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _AddressList.contract.Call(opts, out, "numOfActive")
-	return *ret0, err
+	var out []interface{}
+	err := _AddressList.contract.Call(opts, &out, "numOfActive")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // NumOfActive is a free data retrieval call binding the contract method 0x593f6969.
@@ -315,12 +344,17 @@ func (_AddressList *AddressListCallerSession) NumOfActive() (*big.Int, error) {
 //
 // Solidity: function owner() view returns(address)
 func (_AddressList *AddressListCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _AddressList.contract.Call(opts, out, "owner")
-	return *ret0, err
+	var out []interface{}
+	err := _AddressList.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
@@ -507,5 +541,6 @@ func (_AddressList *AddressListFilterer) ParseOwnershipTransferred(log types.Log
 	if err := _AddressList.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }

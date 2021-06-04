@@ -77,7 +77,7 @@ func NewTokenCashier(
 					ByRange: &iotexapi.GetLogsByRange{
 						FromBlock: startHeight,
 						// TODO: this is a bug, which should be fixed in iotex-core
-						Count: endHeight,
+						ToBlock: endHeight,
 					},
 				},
 			})
