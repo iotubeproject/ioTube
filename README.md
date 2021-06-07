@@ -6,10 +6,6 @@
 
 # ioTube - the decentralized tridirectional bridge for Ethereum, Binance Smart Chain and IoTeX
 
-Running versions:
-- Latest version V4.0-preview (https://bsc-tube.iotex.io/bsc)
-- Stable version V3.0 (https://bsc-tube.iotex.io/bsc)
-
 ## Version history 
 
 ### V1.0 IOTX tube 
