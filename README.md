@@ -28,11 +28,13 @@ Launch date: Feb 8, 2021 (<a href="https://community.iotex.io/t/iotube-v3-faster
 Ethereum has been suffering high gas cost for a long period. The core-dev team rebuilt ioTube to largely reduced the gas cost on ETH side by introducing a relayer and putting signature offchain.
 
 ### V4.0 Multi-Chain support
-Launch date: TBD. 
-
-Work in progress! Preview: https://bsc-tube.iotex.io/ (keep updating!)
+Launch date: Apr 13, 2021 ([Annoucement](https://medium.com/iotex/iotube-v4-cross-chain-bridge-for-iotex-ethereum-and-binance-smart-chain-9670c86723e2))
 
 Because of Ethereum's high gas cost, many projects and users also adopted Binance Smart Chain (BSC) and Huobi Eco Chain (Heco). The need of supporting BSC and Heco is increasing. The demand of cross-chain support from Ethereum and BSC or other blockchains are increasing. We'd love to support them in ioTube.  
+
+
+Matic support: Jun 10, 2021
+
 
 <h3>
       <a href="https://github.com/iotexproject/ioTube#deployement">Deployement</a>
