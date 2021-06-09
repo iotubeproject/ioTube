@@ -4,7 +4,7 @@
 <img src="https://user-images.githubusercontent.com/989846/112756458-1e3d4700-8f9a-11eb-9af8-b51f23189b16.png" width="720">
 </p>
 
-# ioTube - the decentralized tridirectional bridge for Ethereum, Binance Smart Chain and IoTeX
+# ioTube - the decentralized bridge for Ethereum, Binance Smart Chain and IoTeX
 
 ## Version history 
 
