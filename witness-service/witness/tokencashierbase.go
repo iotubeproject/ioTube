@@ -59,6 +59,10 @@ func (tc *tokenCashierBase) Stop(ctx context.Context) error {
 	return tc.recorder.Stop(ctx)
 }
 
+func (tc *tokenCashierBase) GetRecorder() *Recorder {
+	return tc.recorder
+}
+
 func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	startHeight, err := tc.recorder.TipHeight()
 	if err != nil {

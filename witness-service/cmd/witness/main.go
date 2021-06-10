@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -29,14 +30,16 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	Chain        string        `json:"chain" yaml:"chain"`
-	ClientURL    string        `json:"clientURL" yaml:"clientURL"`
-	Database     db.Config     `json:"database" yaml:"database"`
-	PrivateKey   string        `json:"privateKey" yaml:"privateKey"`
-	SlackWebHook string        `json:"slackWebHook" yaml:"slackWebHook"`
-	BatchSize    int           `json:"batchSize" yaml:"batchSize"`
-	Interval     time.Duration `json:"interval" yaml:"interval"`
-	Cashiers     []struct {
+	Chain            string        `json:"chain" yaml:"chain"`
+	ClientURL        string        `json:"clientURL" yaml:"clientURL"`
+	Database         db.Config     `json:"database" yaml:"database"`
+	PrivateKey       string        `json:"privateKey" yaml:"privateKey"`
+	SlackWebHook     string        `json:"slackWebHook" yaml:"slackWebHook"`
+	BatchSize        int           `json:"batchSize" yaml:"batchSize"`
+	Interval         time.Duration `json:"interval" yaml:"interval"`
+	GrpcPort         int           `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort    int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	Cashiers         []struct {
 		ID                       string `json:"id" yaml:"id"`
 		RelayerURL               string `json:"relayerURL" yaml:"relayerURL"`
 		CashierContractAddress   string `json:"cashierContractAddress" yaml:"cashierContractAddress"`
@@ -52,12 +55,14 @@ type Configuration struct {
 
 var (
 	defaultConfig = Configuration{
-		Chain:        "ethereum",
-		Interval:     time.Minute,
-		BatchSize:    100,
-		PrivateKey:   "",
-		SlackWebHook: "",
-		ClientURL:    "",
+		Chain:        	"ethereum",
+		Interval:     	time.Minute,
+		BatchSize:    	100,
+		PrivateKey:   	"",
+		SlackWebHook: 	"",
+		ClientURL:    	"",
+		GrpcPort:     	9080,
+		GrpcProxyPort:  9081,
 	}
 )
 
@@ -87,6 +92,21 @@ func main() {
 	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok {
 		cfg.PrivateKey = pk
 	}
+
+	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok {
+		cfg.GrpcPort, err = strconv.Atoi(port)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+	if port, ok := os.LookupEnv("WITNESS_GRPC_PROXY_PORT"); ok {
+		cfg.GrpcProxyPort, err = strconv.Atoi(port)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+
 	privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
 	if err != nil {
 		log.Fatalf("failed to decode private key %v\n", err)
@@ -95,6 +115,7 @@ func main() {
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
+
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
 	switch cfg.Chain {
 	case "iotex":
@@ -198,6 +219,9 @@ func main() {
 		log.Fatalf("failed to start witness service: %v\n", err)
 	}
 	defer service.Stop(context.Background())
+
+	witness.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort)
+
 	log.Println("Serving...")
 	select {}
 }

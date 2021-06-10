@@ -15,6 +15,7 @@ import (
 
 // Service defines the relayer service
 type Service struct {
+	services.UnimplementedRelayServiceServer
 	transferValidator TransferValidator
 	processor         dispatcher.Runner
 	recorder          *Recorder

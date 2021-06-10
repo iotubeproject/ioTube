@@ -18,9 +18,12 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
+	"github.com/iotexproject/ioTube/witness-service/grpc/services"
+	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 )
 
 type service struct {
+	services.UnimplementedWitnessServiceServer
 	cashiers        []TokenCashier
 	processor       dispatcher.Runner
 	batchSize       uint16
@@ -35,7 +38,7 @@ func NewService(
 	cashiers []TokenCashier,
 	batchSize uint16,
 	processInterval time.Duration,
-) (Service, error) {
+) (*service, error) {
 	s := &service{
 		cashiers:        cashiers,
 		processInterval: processInterval,
@@ -100,4 +103,36 @@ func (s *service) process() error {
 		}
 	}
 	return nil
+}
+
+func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*services.QueryResponse, error) {
+	id := common.BytesToHash(request.Id)
+
+	var tx *Transfer
+	var e error
+	for _, c := range s.cashiers {
+		tx, e = c.GetRecorder().Transfer(id)
+		if e == nil {
+			break
+		}
+	}
+
+	if tx == nil {
+		return &services.QueryResponse{
+			Transfer: nil,
+		}, nil
+	}
+
+	response := &services.QueryResponse{
+		Transfer: &types.Transfer{
+			Cashier:   tx.cashier.Bytes(),
+			Token:     tx.token.Bytes(),
+			Index:     int64(tx.index),
+			Sender:    tx.sender.Bytes(),
+			Recipient: tx.recipient.Bytes(),
+			Amount:    tx.amount.String(),
+		},
+	}
+
+	return response, nil
 }
