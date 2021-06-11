@@ -46,6 +46,13 @@ test: fmt
 validate:
 	swagger validate ./swagger/swagger.yml
 
+proto:
+	protoc -I ./proto --go_out ./ proto/types/*.proto
+	protoc -I ./proto --go_out ./ --go-grpc_out ./ --grpc-gateway_out ./ proto/services/*.proto
+	@mv github.com/iotexproject/ioTube/witness-service/grpc/types/*.go grpc/types/
+	@mv github.com/iotexproject/ioTube/witness-service/grpc/services/*.go grpc/services/
+	@rm github.com -fr
+
 gen: validate
 	swagger generate server \
 		--target=./swagger \
@@ -56,4 +63,4 @@ gen: validate
 doc:
 	swagger serve ./swagger/swagger.yml
 
-.PHONY: install build run clean fmt validate gen doc
+.PHONY: install build run clean fmt validate gen doc proto

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"net"
 	"os"
 	"strconv"
 	"time"
@@ -25,11 +24,8 @@ import (
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
 	"go.uber.org/config"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
-	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/relayer"
 	"github.com/iotexproject/ioTube/witness-service/util"
 )
@@ -46,11 +42,12 @@ type Configuration struct {
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
 
-	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
-	Port              int       `json:"port" yaml:"port"`
-	Database          db.Config `json:"database" yaml:"database"`
-	TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
-	WitnessTableName  string    `json:"witnessTableName" yaml:"witnessTableName"`
+	SlackWebHook      	  string        `json:"slackWebHook" yaml:"slackWebHook"`
+	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	Database              db.Config     `json:"database" yaml:"database"`
+	TransferTableName     string        `json:"transferTableName" yaml:"transferTableName"`
+	WitnessTableName      string        `json:"witnessTableName" yaml:"witnessTableName"`
 }
 
 var defaultConfig = Configuration{
@@ -61,7 +58,8 @@ var defaultConfig = Configuration{
 	EthGasPriceLimit:      120000000000,
 	EthGasPriceDeviation:  0,
 	EthGasPriceGap:        0,
-	Port:                  8080,
+	GrpcPort:              8080,
+	GrpcProxyPort:         8081,
 	PrivateKey:            "",
 	SlackWebHook:          "",
 	TransferTableName:     "relayer.transfers",
@@ -96,8 +94,14 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	if port, ok := os.LookupEnv("RELAYER_PORT"); ok {
-		cfg.Port, err = strconv.Atoi(port)
+	if port, ok := os.LookupEnv("RELAYER_GRPC_PORT"); ok {
+		cfg.GrpcPort, err = strconv.Atoi(port)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+	if port, ok := os.LookupEnv("RELAYER_GRPC_PROXY_PORT"); ok {
+		cfg.GrpcProxyPort, err = strconv.Atoi(port)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -119,12 +123,7 @@ func main() {
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
-	log.Printf("Listening to port %d\n", cfg.Port)
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
-	if err != nil {
-		log.Fatalf("failed to listen to port: %v\n", err)
-	}
-	grpcServer := grpc.NewServer()
+
 	log.Println("Creating service")
 	var transferValidator relayer.TransferValidator
 	if chain, ok := os.LookupEnv("RELAYER_CHAIN"); ok {
@@ -190,11 +189,8 @@ func main() {
 		log.Fatalf("failed to start relay service: %v\n", err)
 	}
 	defer service.Stop(context.Background())
-	services.RegisterRelayServiceServer(grpcServer, service)
-	log.Println("Registering...")
-	reflection.Register(grpcServer)
-	log.Println("Serving...")
-	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("failed to serve: %v\n", err)
-	}
+
+	relayer.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort)
+
+	select {}
 }

@@ -220,6 +220,44 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 	return rec, nil
 }
 
+func (recorder *Recorder) Transfer(_id common.Hash) (*Transfer, error) {
+	row := recorder.store.DB().QueryRow(
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `status`, `id` FROM %s WHERE `id`=?", recorder.transferTableName),
+		_id.Hex(),
+	)
+
+	tx := &Transfer{}
+	var cashier string
+	var token string
+	var sender string
+	var recipient string
+	var rawAmount string
+	var id sql.NullString
+	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &tx.status, &id); err != nil {
+		return nil, err
+	}
+
+	tx.cashier = common.HexToAddress(cashier)
+	tx.token = common.HexToAddress(token)
+	tx.sender = common.HexToAddress(sender)
+	tx.recipient = common.HexToAddress(recipient)
+	if id.Valid {
+		tx.id = common.HexToHash(id.String)
+	}
+	var ok bool
+	tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
+	if !ok || tx.amount.Sign() != 1 {
+		return nil, errors.Errorf("invalid amount %s", rawAmount)
+	}
+	if toToken, ok := recorder.tokenPairs[tx.token]; ok {
+		tx.coToken = toToken
+	} else {
+		return nil, errors.New("invalid token")
+	}
+
+	return tx, nil
+}
+
 // TipHeight returns the tip height of all the transfers in the recorder
 func (recorder *Recorder) TipHeight() (uint64, error) {
 	row := recorder.store.DB().QueryRow(

@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package services;
+import "google/api/annotations.proto";
+import "types/witness.proto";
+
+option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/services";
+
+service WitnessService {
+    rpc Query(QueryRequest) returns (QueryResponse) {
+        option (google.api.http) = {
+            post: "/query"
+            body: "*"
+        };
+    };
+}
+
+message QueryRequest {
+    bytes id = 1;
+}
+
+message QueryResponse {
+    types.Transfer transfer = 1;
+}
