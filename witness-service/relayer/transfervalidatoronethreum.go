@@ -120,10 +120,10 @@ func (tv *transferValidatorOnEthreum) refresh() error {
 		offset.Add(offset, big.NewInt(int64(limit)))
 	}
 
-	log.Println("refresh Witnesses")
+	// log.Println("refresh Witnesses")
 	activeWitnesses := make(map[string]bool)
 	for _, w := range witnesses {
-		log.Println("\t" + w.Hex())
+		// log.Println("\t" + w.Hex())
 		activeWitnesses[w.Hex()] = true
 	}
 

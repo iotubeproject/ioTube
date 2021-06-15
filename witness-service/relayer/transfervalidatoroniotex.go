@@ -75,7 +75,7 @@ func NewTransferValidatorOnIoTeX(
 	}
 	witnessContractAddr, ok := ret[0].(common.Address)
 	if !ok {
-		return nil, errors.Errorf("invalid type %s", reflect.TypeOf(ret[0]))
+		return nil, errors.Errorf("invalid type %s, common.Address expected", reflect.TypeOf(ret[0]))
 	}
 	witnessContractIoAddr, err := address.FromBytes(witnessContractAddr.Bytes())
 	if err != nil {
@@ -125,7 +125,7 @@ func (tv *transferValidatorOnIoTeX) refresh() error {
 	}
 	count, ok := ret[0].(*big.Int)
 	if !ok {
-		return errors.Errorf("invalid type %s", reflect.TypeOf(ret[0]))
+		return errors.Errorf("invalid type %s, *big.Int expected", reflect.TypeOf(ret[0]))
 	}
 	offset := big.NewInt(0)
 	limit := uint8(10)
@@ -138,25 +138,26 @@ func (tv *transferValidatorOnIoTeX) refresh() error {
 		if err != nil {
 			return err
 		}
-		ai, ok := ret[0].(struct {
-			Count *big.Int
-			Items []common.Address
-		})
+		count, ok := ret[0].(*big.Int)
 		if !ok {
-			return errors.Errorf("invalid type %s", reflect.TypeOf(ret[0]))
+			return errors.Errorf("invalid type %s, *big.Int expected", reflect.TypeOf(ret[0]))
+		}
+		items, ok := ret[1].([]common.Address)
+		if !ok {
+			return errors.Errorf("invalid type %s, []common.Address expected", reflect.TypeOf(ret[0]))
 		}
 
-		witnesses = append(witnesses, ai.Items[:int(ai.Count.Int64())]...)
+		witnesses = append(witnesses, items[:int(count.Int64())]...)
 		offset.Add(offset, big.NewInt(int64(limit)))
 	}
-	log.Println("refresh Witnesses on IoTeX")
+	// log.Println("refresh Witnesses on IoTeX")
 	activeWitnesses := make(map[string]bool)
 	for _, w := range witnesses {
-		addr, err := address.FromBytes(w.Bytes())
+		_, err := address.FromBytes(w.Bytes())
 		if err != nil {
 			return err
 		}
-		log.Println("\t" + addr.String())
+		// log.Println("\t" + addr.String())
 		activeWitnesses[w.Hex()] = true
 	}
 	tv.witnesses = activeWitnesses
