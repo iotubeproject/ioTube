@@ -3,7 +3,8 @@ interval: 1m
 clientURL: "https://bsc-dataseed.binance.org/"
 ethConfirmBlockNumber: 2
 ethGasPriceLimit: 10
-port: 7003
+grpcPort: 7003
+grpcProxyPort: 8003
 privateKey: ""
 slackWebHook: "" 
 validatorAddress: "0x116404F86e97846110EA08cd52fC2882d4AD3123"

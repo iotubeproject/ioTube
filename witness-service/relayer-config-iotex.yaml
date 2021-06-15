@@ -1,7 +1,8 @@
 chain: "iotex"
 interval: 1m
 clientURL: "api.iotex.one:443"
-port: 7001
+grpcPort: 7001
+grpcProxyPort: 8001
 privateKey: ""
 slackWebHook: "" 
 validatorAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"

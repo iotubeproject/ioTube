@@ -3,7 +3,8 @@ interval: 1m
 clientURL: "https://http-mainnet-node.huobichain.com"
 ethConfirmBlockNumber: 2
 ethGasPriceLimit: 10
-port: 7002
+grpcPort: 7002
+grpcProxyPort: 8002
 privateKey: ""
 slackWebHook: "" 
 validatorAddress: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"

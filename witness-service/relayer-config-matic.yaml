@@ -3,7 +3,8 @@ interval: 1m
 clientURL: "https://rpc-mainnet.maticvigil.com"
 ethConfirmBlockNumber: 2
 ethGasPriceLimit: 5
-port: 7004
+grpcPort: 7004
+grpcProxyPort: 8004
 privateKey: ""
 slackWebHook: "" 
 validatorAddress: "0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B"
