@@ -38,6 +38,8 @@ for more information.
 
 ## Token Name
 
+## Link to the token icon
+
 ## Short description of your project
 
 ## What is the native blockchain for yout token
