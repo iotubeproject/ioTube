@@ -1,6 +1,6 @@
 ---
 name: New blank issue
-about: Describe this issue template's purpose here.
+about: A blank issue template.
 title: ''
 labels: ''
 assignees: ''
