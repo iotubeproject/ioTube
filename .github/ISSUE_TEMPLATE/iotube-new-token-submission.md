@@ -51,7 +51,7 @@ for more information.
 ## Your social channels
 
 ## Blockchains you want to bridge from
-<!-- Delete those you are not interested in -->
+<!-- Delete those you are not interested in, and add the contract address for each selected chain -->
 - IoTeX: <contract address>
 - Ethereum: <contract address>
 - Binance Smart Chain: <contract address>
