@@ -4,7 +4,7 @@
 <img src="https://user-images.githubusercontent.com/989846/112756458-1e3d4700-8f9a-11eb-9af8-b51f23189b16.png" width="720">
 </p>
 
-# ioTube - the decentralized bridge for Ethereum, Binance Smart Chain and IoTeX
+# ioTube - the decentralized bridge for Ethereum, Binance Smart Chain, Polygon(Matic) and IoTeX
 
 ## Version history 
 
@@ -29,7 +29,7 @@ Launch date: Apr 13, 2021 ([Annoucement](https://medium.com/iotex/iotube-v4-cros
 Because of Ethereum's high gas cost, many projects and users also adopted Binance Smart Chain (BSC) and Huobi Eco Chain (Heco). The need of supporting BSC and Heco is increasing. The demand of cross-chain support from Ethereum and BSC or other blockchains are increasing. We'd love to support them in ioTube.  
 
 
-Matic support: Jun 10, 2021
+Matic support is launched on Jun 10, 2021 ([Annoucement](https://iotex.medium.com/iotube-v4-iotex-polygon-matic-cross-chain-token-swaps-are-live-bb2ae5bf41b4))
 
 
 <h3>
@@ -263,3 +263,36 @@ Heco Side:
 - Standard Token List Address:  0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45
 - Token Cashier Address:  0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E
 - Transfer Validator Address:  0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7
+
+## Tube of IoTeX <-> Polygon (formerly Matic) 
+
+Launched on Jun 10, 2021.
+
+We started adding 0x address to this doc because of IoTeX start supporting 0x address and web3 from IoTeX V1.2 (Babel API). Some IoTeX address are same as other tubes and we include 0x addresses here.
+
+IoTeX side:
+
+- Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y 
+  - (0x7987aaf615b0f749f12da7d4d6e2b1eff4bfbe1b)
+- Standard Token list: io197rk3nff9622pkncvuvhfwyms73esdtwph4rlq
+  - (0x2F8768cD292E94A0Da78671974B89B87a398356E)
+- Proxy Token list: io16at6mlcwcsrqutz2zhuhwam87h988r9fcdauk8
+  - (0xD757adFF0eC4060e2c4A15f9777767f5Ca738Ca9)
+- Token Cashier:   
+  - io12s9f9hv4zsr7umy5hxt6g0k0xr4x6pxdp5w998
+  - (0x540a92dd951407ee6c94b997a43ecf30ea6d04cd)
+- Token safe: from old. 
+  - (0xc4A29a94f12be03033daa4e6Ce9b9678c26275a2)
+- Minter pool (old); io1g7va274ltufv5nh4xawfmt0clel6tfz58p7n5r
+  - (0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454)
+  
+Matic side:
+
+- Witness List Address:  0x1E58cA53d90fe9B37F7f6AEB548b4BC7c6292C17
+- Minter Pool Address:  0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f
+- Token Safe Address:  0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45
+- Mintable Token List Address:  0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E
+- Standard Token List Address:  0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7
+- Token Cashier Address:  0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be
+- Transfer Validator Address: 0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B
+
