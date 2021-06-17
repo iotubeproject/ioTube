@@ -23,13 +23,16 @@ abi:
 	@echo "Creating contracts' golang file"
 	./contract/abigen.sh
 
+build-addtokenpair:
+	$(GOBUILD) -o ./bin/addtokenpair cmd/addtokenpair/main.go
+
 build-witness:
 	$(GOBUILD) -o ./bin/witness cmd/witness/main.go
 
 build-relayer:
 	$(GOBUILD) -o ./bin/relayer cmd/relayer/main.go
 
-build-all: build-witness build-relayer
+build-all: build-addtokenpair build-witness build-relayer
 
 all: clean build-all test
 

@@ -27,7 +27,24 @@ var (
 )
 
 // TransferValidatorABI is the input ABI used to generate the binding from.
-const TransferValidatorABI = "[{\"inputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"_witnessList\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address[]\",\"name\":\"witnesses\",\"type\":\"address[]\"}],\"name\":\"Settled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"minters\",\"outputs\":[{\"internalType\":\"contractIMinter\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"settles\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenLists\",\"outputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"witnessList\",\"outputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"cashier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"generateKey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"cashier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"signatures\",\"type\":\"bytes\"}],\"name\":\"submit\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"numOfPairs\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"_tokenList\",\"type\":\"address\"},{\"internalType\":\"contractIMinter\",\"name\":\"_minter\",\"type\":\"address\"}],\"name\":\"addPair\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_newValidator\",\"type\":\"address\"}],\"name\":\"upgrade\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+const TransferValidatorABI = "[{\"inputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"_witnessList\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address[]\",\"name\":\"witnesses\",\"type\":\"address[]\"}],\"name\":\"Settled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"minters\",\"outputs\":[{\"internalType\":\"contractIMinter\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"settles\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenLists\",\"outputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"witnessList\",\"outputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"cashier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"generateKey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"keys\",\"type\":\"bytes32[]\"}],\"name\":\"concatKeys\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"cashiers\",\"type\":\"address[]\"},{\"internalType\":\"address[]\",\"name\":\"tokenAddrs\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"indexes\",\"type\":\"uint256[]\"},{\"internalType\":\"address[]\",\"name\":\"senders\",\"type\":\"address[]\"},{\"internalType\":\"address[]\",\"name\":\"recipients\",\"type\":\"address[]\"},{\"internalType\":\"uint256[]\",\"name\":\"amounts\",\"type\":\"uint256[]\"},{\"internalType\":\"bytes\",\"name\":\"signatures\",\"type\":\"bytes\"}],\"name\":\"submitMulti\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"getTokenGroup\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"signatures\",\"type\":\"bytes\"}],\"name\":\"extractWitnesses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"witnesses\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"cashier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"signatures\",\"type\":\"bytes\"}],\"name\":\"submit\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"numOfPairs\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"_tokenList\",\"type\":\"address\"},{\"internalType\":\"contractIMinter\",\"name\":\"_minter\",\"type\":\"address\"}],\"name\":\"addPair\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_newValidator\",\"type\":\"address\"}],\"name\":\"upgrade\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+
+// TransferValidatorBin is the compiled bytecode used for deploying new contracts.
+var TransferValidatorBin = "0xnull"
+
+// DeployTransferValidator deploys a new Ethereum contract, binding an instance of TransferValidator to it.
+func DeployTransferValidator(auth *bind.TransactOpts, backend bind.ContractBackend, _witnessList common.Address) (common.Address, *types.Transaction, *TransferValidator, error) {
+	parsed, err := abi.JSON(strings.NewReader(TransferValidatorABI))
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+
+	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(TransferValidatorBin), backend, _witnessList)
+	if err != nil {
+		return common.Address{}, nil, nil, err
+	}
+	return address, tx, &TransferValidator{TransferValidatorCaller: TransferValidatorCaller{contract: contract}, TransferValidatorTransactor: TransferValidatorTransactor{contract: contract}, TransferValidatorFilterer: TransferValidatorFilterer{contract: contract}}, nil
+}
 
 // TransferValidator is an auto generated Go binding around an Ethereum contract.
 type TransferValidator struct {
@@ -171,6 +188,68 @@ func (_TransferValidator *TransferValidatorTransactorRaw) Transact(opts *bind.Tr
 	return _TransferValidator.Contract.contract.Transact(opts, method, params...)
 }
 
+// ConcatKeys is a free data retrieval call binding the contract method 0xc836fef0.
+//
+// Solidity: function concatKeys(bytes32[] keys) pure returns(bytes32)
+func (_TransferValidator *TransferValidatorCaller) ConcatKeys(opts *bind.CallOpts, keys [][32]byte) ([32]byte, error) {
+	var out []interface{}
+	err := _TransferValidator.contract.Call(opts, &out, "concatKeys", keys)
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
+}
+
+// ConcatKeys is a free data retrieval call binding the contract method 0xc836fef0.
+//
+// Solidity: function concatKeys(bytes32[] keys) pure returns(bytes32)
+func (_TransferValidator *TransferValidatorSession) ConcatKeys(keys [][32]byte) ([32]byte, error) {
+	return _TransferValidator.Contract.ConcatKeys(&_TransferValidator.CallOpts, keys)
+}
+
+// ConcatKeys is a free data retrieval call binding the contract method 0xc836fef0.
+//
+// Solidity: function concatKeys(bytes32[] keys) pure returns(bytes32)
+func (_TransferValidator *TransferValidatorCallerSession) ConcatKeys(keys [][32]byte) ([32]byte, error) {
+	return _TransferValidator.Contract.ConcatKeys(&_TransferValidator.CallOpts, keys)
+}
+
+// ExtractWitnesses is a free data retrieval call binding the contract method 0xba390a64.
+//
+// Solidity: function extractWitnesses(bytes32 key, bytes signatures) view returns(address[] witnesses)
+func (_TransferValidator *TransferValidatorCaller) ExtractWitnesses(opts *bind.CallOpts, key [32]byte, signatures []byte) ([]common.Address, error) {
+	var out []interface{}
+	err := _TransferValidator.contract.Call(opts, &out, "extractWitnesses", key, signatures)
+
+	if err != nil {
+		return *new([]common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([]common.Address)).(*[]common.Address)
+
+	return out0, err
+
+}
+
+// ExtractWitnesses is a free data retrieval call binding the contract method 0xba390a64.
+//
+// Solidity: function extractWitnesses(bytes32 key, bytes signatures) view returns(address[] witnesses)
+func (_TransferValidator *TransferValidatorSession) ExtractWitnesses(key [32]byte, signatures []byte) ([]common.Address, error) {
+	return _TransferValidator.Contract.ExtractWitnesses(&_TransferValidator.CallOpts, key, signatures)
+}
+
+// ExtractWitnesses is a free data retrieval call binding the contract method 0xba390a64.
+//
+// Solidity: function extractWitnesses(bytes32 key, bytes signatures) view returns(address[] witnesses)
+func (_TransferValidator *TransferValidatorCallerSession) ExtractWitnesses(key [32]byte, signatures []byte) ([]common.Address, error) {
+	return _TransferValidator.Contract.ExtractWitnesses(&_TransferValidator.CallOpts, key, signatures)
+}
+
 // GenerateKey is a free data retrieval call binding the contract method 0x6b6bc862.
 //
 // Solidity: function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount) view returns(bytes32)
@@ -200,6 +279,37 @@ func (_TransferValidator *TransferValidatorSession) GenerateKey(cashier common.A
 // Solidity: function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount) view returns(bytes32)
 func (_TransferValidator *TransferValidatorCallerSession) GenerateKey(cashier common.Address, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int) ([32]byte, error) {
 	return _TransferValidator.Contract.GenerateKey(&_TransferValidator.CallOpts, cashier, tokenAddr, index, from, to, amount)
+}
+
+// GetTokenGroup is a free data retrieval call binding the contract method 0xe01eba71.
+//
+// Solidity: function getTokenGroup(address tokenAddr) view returns(uint256)
+func (_TransferValidator *TransferValidatorCaller) GetTokenGroup(opts *bind.CallOpts, tokenAddr common.Address) (*big.Int, error) {
+	var out []interface{}
+	err := _TransferValidator.contract.Call(opts, &out, "getTokenGroup", tokenAddr)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetTokenGroup is a free data retrieval call binding the contract method 0xe01eba71.
+//
+// Solidity: function getTokenGroup(address tokenAddr) view returns(uint256)
+func (_TransferValidator *TransferValidatorSession) GetTokenGroup(tokenAddr common.Address) (*big.Int, error) {
+	return _TransferValidator.Contract.GetTokenGroup(&_TransferValidator.CallOpts, tokenAddr)
+}
+
+// GetTokenGroup is a free data retrieval call binding the contract method 0xe01eba71.
+//
+// Solidity: function getTokenGroup(address tokenAddr) view returns(uint256)
+func (_TransferValidator *TransferValidatorCallerSession) GetTokenGroup(tokenAddr common.Address) (*big.Int, error) {
+	return _TransferValidator.Contract.GetTokenGroup(&_TransferValidator.CallOpts, tokenAddr)
 }
 
 // Minters is a free data retrieval call binding the contract method 0x8623ec7b.
@@ -480,6 +590,27 @@ func (_TransferValidator *TransferValidatorSession) Submit(cashier common.Addres
 // Solidity: function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes signatures) returns()
 func (_TransferValidator *TransferValidatorTransactorSession) Submit(cashier common.Address, tokenAddr common.Address, index *big.Int, from common.Address, to common.Address, amount *big.Int, signatures []byte) (*types.Transaction, error) {
 	return _TransferValidator.Contract.Submit(&_TransferValidator.TransactOpts, cashier, tokenAddr, index, from, to, amount, signatures)
+}
+
+// SubmitMulti is a paid mutator transaction binding the contract method 0x9f8c11e3.
+//
+// Solidity: function submitMulti(address[] cashiers, address[] tokenAddrs, uint256[] indexes, address[] senders, address[] recipients, uint256[] amounts, bytes signatures) returns()
+func (_TransferValidator *TransferValidatorTransactor) SubmitMulti(opts *bind.TransactOpts, cashiers []common.Address, tokenAddrs []common.Address, indexes []*big.Int, senders []common.Address, recipients []common.Address, amounts []*big.Int, signatures []byte) (*types.Transaction, error) {
+	return _TransferValidator.contract.Transact(opts, "submitMulti", cashiers, tokenAddrs, indexes, senders, recipients, amounts, signatures)
+}
+
+// SubmitMulti is a paid mutator transaction binding the contract method 0x9f8c11e3.
+//
+// Solidity: function submitMulti(address[] cashiers, address[] tokenAddrs, uint256[] indexes, address[] senders, address[] recipients, uint256[] amounts, bytes signatures) returns()
+func (_TransferValidator *TransferValidatorSession) SubmitMulti(cashiers []common.Address, tokenAddrs []common.Address, indexes []*big.Int, senders []common.Address, recipients []common.Address, amounts []*big.Int, signatures []byte) (*types.Transaction, error) {
+	return _TransferValidator.Contract.SubmitMulti(&_TransferValidator.TransactOpts, cashiers, tokenAddrs, indexes, senders, recipients, amounts, signatures)
+}
+
+// SubmitMulti is a paid mutator transaction binding the contract method 0x9f8c11e3.
+//
+// Solidity: function submitMulti(address[] cashiers, address[] tokenAddrs, uint256[] indexes, address[] senders, address[] recipients, uint256[] amounts, bytes signatures) returns()
+func (_TransferValidator *TransferValidatorTransactorSession) SubmitMulti(cashiers []common.Address, tokenAddrs []common.Address, indexes []*big.Int, senders []common.Address, recipients []common.Address, amounts []*big.Int, signatures []byte) (*types.Transaction, error) {
+	return _TransferValidator.Contract.SubmitMulti(&_TransferValidator.TransactOpts, cashiers, tokenAddrs, indexes, senders, recipients, amounts, signatures)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
