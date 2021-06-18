@@ -22,64 +22,76 @@ import (
 	"go.uber.org/config"
 )
 
-type SourceChain struct {
-	URL                string `json:"url" yaml:"url"`
-	TokenListAddr      string `json:"tokenListAddr" yaml:"tokenListAddr"`
-	TokenAddr          string `json:"tokenAddr" yaml:"tokenAddr"`
-	OperatorPrivateKey string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
+type Chain struct {
+	URL                     string `json:"url" yaml:"url"`
+	StandardTokenListAddr   string `json:"standardTokenListAddr" yaml:"standardTokenListAddr"`
+	IoTeXProxyTokenListAddr string `json:"iotexProxyTokenListAddr" yaml:"iotexProxyTokenListAddr"`
+	MinterAddr              string `json:"minterAddr" yaml:"minterAddr"`
+	OperatorPrivateKey      string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
 }
 
-type TargetChain struct {
-	URL                string `json:"url" yaml:"url"`
-	TokenListAddr      string `json:"tokenListAddr" yaml:"tokenListAddr"`
-	MinterAddr         string `json:"minterAddr" yaml:"minterAddr"`
-	TokenAddr          string `json:"tokenAddr" yaml:"tokenAddr"`
-	TokenName          string `json:"tokenName" yaml:"tokenName"`
-	TokenSymbol        string `json:"tokenSymbol" yaml:"tokenSymbol"`
-	TokenDecimal       int    `json:"tokenDecimal" yaml:"tokenDecimal"`
-	OperatorPrivateKey string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
+type ChainConfig struct {
+	IoTeX  Chain            `json:"iotex" yaml:"iotex"`
+	Chains map[string]Chain `json:"chains" yaml:"chains"`
 }
 
-// Configuration defines the configuration of the witness service
-type Configuration struct {
-	MinAmount string      `json:"minAmount" yaml:"minAmount"`
-	MaxAmount string      `json:"maxAmount" yaml:"maxAmount"`
-	Source    SourceChain `json:"source" yaml:"source"`
-	Target    TargetChain `json:"target" yaml:"target"`
+// TokenConfig defines the configuration of the token
+type TokenConfig struct {
+	MinAmount          string `json:"minAmount" yaml:"minAmount"`
+	MaxAmount          string `json:"maxAmount" yaml:"maxAmount"`
+	SourceTokenAddr    string `json:"sourceTokenAddr" yaml:"sourceTokenAddr"`
+	SourceChain        string `json:"sourceChain" yaml:"sourceChain"`
+	ShadowTokenAddr    string `json:"ShadowTokenAddr" yaml:"ShadowTokenAddr"`
+	ShadowTokenName    string `json:"ShadowTokenName" yaml:"ShadowTokenName"`
+	ShadowTokenSymbol  string `json:"ShadowTokenSymbol" yaml:"ShadowTokenSymbol"`
+	ShadowTokenDecimal int    `json:"ShadowTokenDecimal" yaml:"ShadowTokenDecimal"`
 }
 
-var configFile = flag.String("config", "", "path of config file")
+var chainConfigFile = flag.String("chainConfig", "", "path of chain config file")
+var tokenPairConfigFile = flag.String("tokenPairConfig", "", "path of token pair config file")
 
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename>")
+		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-chainConfig <filename> -tokenPairConfig <filename>")
 		flag.PrintDefaults()
 	}
 }
 
 func main() {
 	flag.Parse()
-	if *configFile == "" {
-		log.Fatalln("config file is not specified")
+	if *chainConfigFile == "" {
+		log.Fatalln("chain config file is not specified")
 	}
-	opts := []config.YAMLOption{config.Expand(os.LookupEnv), config.File(*configFile)}
+	if *tokenPairConfigFile == "" {
+		log.Fatalln("token pair config file is not specified")
+	}
+	opts := []config.YAMLOption{config.Expand(os.LookupEnv), config.File(*chainConfigFile)}
 	yaml, err := config.NewYAML(opts...)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	var cfg Configuration
-	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
+	var chainConfig ChainConfig
+	if err := yaml.Get(config.Root).Populate(&chainConfig); err != nil {
 		log.Fatalln(err)
 	}
-	minAmount, ok := new(big.Int).SetString(cfg.MinAmount, 10)
-	if !ok {
-		log.Fatalln("failed to parse token min amount", cfg.MinAmount)
+	var tokenConfig TokenConfig
+	if err := yaml.Get(config.Root).Populate(&tokenConfig); err != nil {
+		log.Fatalln(err)
 	}
-	maxAmount, ok := new(big.Int).SetString(cfg.MinAmount, 10)
+	sourceChain, ok := chainConfig.Chains[tokenConfig.SourceChain]
 	if !ok {
-		log.Fatalln("failed to parse token max amount", cfg.MaxAmount)
+		log.Fatalf("source chain %s is not defined in chain configs", tokenConfig.SourceChain)
 	}
-	srcChainClient, err := ethclient.Dial(cfg.Source.URL)
+	iotexChain := chainConfig.IoTeX
+	minAmount, ok := new(big.Int).SetString(tokenConfig.MinAmount, 10)
+	if !ok {
+		log.Fatalln("failed to parse token min amount", tokenConfig.MinAmount)
+	}
+	maxAmount, ok := new(big.Int).SetString(tokenConfig.MinAmount, 10)
+	if !ok {
+		log.Fatalln("failed to parse token max amount", tokenConfig.MaxAmount)
+	}
+	srcChainClient, err := ethclient.Dial(sourceChain.URL)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -87,7 +99,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	srcPrivateKey, err := crypto.HexToECDSA(cfg.Source.OperatorPrivateKey)
+	srcPrivateKey, err := crypto.HexToECDSA(sourceChain.OperatorPrivateKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -95,10 +107,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	srcTokenAddr := common.HexToAddress(cfg.Source.TokenAddr)
+	srcTokenAddr := common.HexToAddress(tokenConfig.SourceTokenAddr)
 	if err := addTokenToList(
 		srcTokenAddr,
-		common.HexToAddress(cfg.Source.TokenListAddr),
+		common.HexToAddress(sourceChain.StandardTokenListAddr),
 		minAmount,
 		maxAmount,
 		srcChainAuth,
@@ -106,7 +118,7 @@ func main() {
 	); err != nil {
 		log.Fatalln(err)
 	}
-	targetChainClient, err := ethclient.Dial(cfg.Target.URL)
+	targetChainClient, err := ethclient.Dial(iotexChain.URL)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -114,7 +126,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	targetChainPrivateKey, err := crypto.HexToECDSA(cfg.Target.OperatorPrivateKey)
+	targetChainPrivateKey, err := crypto.HexToECDSA(iotexChain.OperatorPrivateKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -123,25 +135,25 @@ func main() {
 		log.Fatal(err)
 	}
 	var shadowTokenAddr common.Address
-	if cfg.Target.TokenAddr == "" {
+	if tokenConfig.ShadowTokenAddr == "" {
 		shadowTokenAddr, _, _, err = contract.DeployShadowToken(
 			targetChainAuth,
 			targetChainClient,
-			common.HexToAddress(cfg.Target.MinterAddr),
+			common.HexToAddress(iotexChain.MinterAddr),
 			srcTokenAddr,
-			cfg.Target.TokenName,
-			cfg.Target.TokenSymbol,
-			uint8(cfg.Target.TokenDecimal),
+			tokenConfig.ShadowTokenName,
+			tokenConfig.ShadowTokenSymbol,
+			uint8(tokenConfig.ShadowTokenDecimal),
 		)
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		shadowTokenAddr = common.HexToAddress(cfg.Target.TokenAddr)
+		shadowTokenAddr = common.HexToAddress(tokenConfig.ShadowTokenAddr)
 	}
 	if err := addTokenToList(
 		shadowTokenAddr,
-		common.HexToAddress(cfg.Target.TokenListAddr),
+		common.HexToAddress(sourceChain.IoTeXProxyTokenListAddr),
 		minAmount,
 		maxAmount,
 		targetChainAuth,
