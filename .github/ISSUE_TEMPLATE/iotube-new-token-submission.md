@@ -1,7 +1,7 @@
 ---
 name: ioTube New Token submission
 about: Use this template if you want to submit your token to be added to ioTube
-title: ''
+title: 'Token submission: <token symbol>, <token name>'
 labels: Token-Pending-Review
 assignees: guo
 
