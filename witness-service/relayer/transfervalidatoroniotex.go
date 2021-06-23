@@ -200,6 +200,25 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 				log.Print("failed to transfer iotx", err)
 			}
 		*/
+		response, err := tv.client.API().GetReceiptByAction(
+			context.Background(),
+			&iotexapi.GetReceiptByActionRequest{ActionHash: transfer.txHash.String()},
+		)
+		if err != nil {
+			return StatusOnChainUnknown, err
+		}
+		transfer.gas = response.ReceiptInfo.Receipt.GasConsumed
+		metaResponse, err := tv.client.API().GetBlockMetas(context.Background(), &iotexapi.GetBlockMetasRequest{
+			Lookup: &iotexapi.GetBlockMetasRequest_ByHash{
+				ByHash: &iotexapi.GetBlockMetaByHashRequest{
+					BlkHash: response.ReceiptInfo.BlkHash,
+				},
+			},
+		})
+		if err != nil {
+			return StatusOnChainUnknown, err
+		}
+		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
 		return StatusOnChainSettled, nil
 	}
 	response, err := tv.client.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{})

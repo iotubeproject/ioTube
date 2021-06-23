@@ -16,6 +16,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"time"
 
 	// mute lint error
 	"github.com/ethereum/go-ethereum/common"
@@ -39,6 +40,8 @@ type (
 		witnessTableName  string
 		// updateStatusQuery is a query to set status
 		updateStatusQuery string
+		// updateStatusQueryAndGas
+		updateStatusQueryAndGas string
 		// updateStatusAndTransactionQuery is a query to set status and transaction
 		updateStatusAndTransactionQuery string
 	}
@@ -51,6 +54,7 @@ func NewRecorder(store *db.SQLStore, transferTableName string, witnessTableName 
 		transferTableName:               transferTableName,
 		witnessTableName:                witnessTableName,
 		updateStatusQuery:               fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=? AND `status`=?", transferTableName),
+		updateStatusQueryAndGas:         fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=? AND `status`=?", transferTableName),
 		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `nonce`=?, `gasPrice`=? WHERE `id`=? AND `status`=?", transferTableName),
 	}
 }
@@ -88,6 +92,8 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
 			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
 			"`txHash` varchar(66) DEFAULT NULL,"+
+			"`txTimestamp` timestamp,"+
+			"`gas` bigint(20),"+
 			"`nonce` bigint(20),"+
 			"`gasPrice` varchar(78) DEFAULT NULL,"+
 			"`notes` varchar(45) DEFAULT NULL,"+
@@ -225,8 +231,9 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	var rawAmount string
 	var cashier, token, sender, recipient, id string
 	var hash, gasPrice sql.NullString
-	var nonce sql.NullInt64
-	if err := scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &id, &hash, &nonce, &gasPrice, &tx.status, &tx.updateTime); err != nil {
+	var gas, nonce sql.NullInt64
+	var timestamp sql.NullTime
+	if err := scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = common.HexToAddress(cashier)
@@ -240,6 +247,12 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	}
 	if nonce.Valid {
 		tx.nonce = uint64(nonce.Int64)
+	}
+	if gas.Valid {
+		tx.gas = uint64(gas.Int64)
+	}
+	if timestamp.Valid {
+		tx.timestamp = timestamp.Time
 	}
 	var ok bool
 	tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
@@ -260,7 +273,7 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
 		id.Hex(),
 	)
 	return recorder.assembleTransfer(row.Scan)
@@ -275,9 +288,9 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, 
 	var query string
 	if status == "" {
 		if desc {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
 		} else {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
 		}
 		rows, err = recorder.store.DB().Query(query, offset, limit)
 		if err != nil {
@@ -285,9 +298,9 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, 
 		}
 	} else {
 		if desc {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
 		} else {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `nonce`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
 		}
 		rows, err = recorder.store.DB().Query(query, status, offset, limit)
 		if err != nil {
@@ -363,11 +376,11 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, no
 }
 
 // MarkAsSettled marks a record as settled
-func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
+func (recorder *Recorder) MarkAsSettled(id common.Hash, gas uint64, ts time.Time) error {
 	log.Printf("mark transfer %s as settled\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, transferSettled, id.Hex(), validationSubmitted)
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQueryAndGas, transferSettled, gas, ts, id.Hex(), validationSubmitted)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as settled")
 	}

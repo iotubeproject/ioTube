@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
@@ -99,6 +100,10 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 		Statuses:  make([]*services.CheckResponse, len(transfers)),
 	}
 	for i, transfer := range transfers {
+		gasPrice := "0"
+		if transfer.gasPrice != nil {
+			gasPrice = transfer.gasPrice.String()
+		}
 		response.Transfers[i] = &types.Transfer{
 			Cashier:   transfer.cashier.Bytes(),
 			Token:     transfer.token.Bytes(),
@@ -106,6 +111,9 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 			Sender:    transfer.sender.Bytes(),
 			Recipient: transfer.recipient.Bytes(),
 			Amount:    transfer.amount.String(),
+			Gas:       transfer.gas,
+			GasPrice:  gasPrice,
+			Timestamp: timestamppb.New(transfer.timestamp),
 		}
 		response.Statuses[i] = s.assembleCheckResponse(transfer, witnesses)
 	}
@@ -205,7 +213,7 @@ func (s *Service) process() error {
 				return err
 			}
 		case StatusOnChainSettled:
-			if err := s.recorder.MarkAsSettled(transfer.id); err != nil {
+			if err := s.recorder.MarkAsSettled(transfer.id, transfer.gas, transfer.timestamp); err != nil {
 				return err
 			}
 		default:

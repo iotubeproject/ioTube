@@ -54,7 +54,7 @@ proto:
 	protoc -I ./proto --go_out ./ --go-grpc_out ./ --grpc-gateway_out ./ proto/services/*.proto
 	@mv github.com/iotexproject/ioTube/witness-service/grpc/types/*.go grpc/types/
 	@mv github.com/iotexproject/ioTube/witness-service/grpc/services/*.go grpc/services/
-	@rm github.com -fr
+	@rm -rf github.com
 
 gen: validate
 	swagger generate server \

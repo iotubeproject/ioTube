@@ -42,12 +42,12 @@ type Configuration struct {
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
 
-	SlackWebHook      	  string        `json:"slackWebHook" yaml:"slackWebHook"`
-	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	Database              db.Config     `json:"database" yaml:"database"`
-	TransferTableName     string        `json:"transferTableName" yaml:"transferTableName"`
-	WitnessTableName      string        `json:"witnessTableName" yaml:"witnessTableName"`
+	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
+	GrpcPort          int       `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort     int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	Database          db.Config `json:"database" yaml:"database"`
+	TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
+	WitnessTableName  string    `json:"witnessTableName" yaml:"witnessTableName"`
 }
 
 var defaultConfig = Configuration{

@@ -32,6 +32,8 @@ type (
 		amount     *big.Int
 		id         common.Hash
 		txHash     common.Hash
+		timestamp  time.Time
+		gas        uint64
 		gasPrice   *big.Int
 		nonce      uint64
 		updateTime time.Time
@@ -95,6 +97,13 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 	if !ok || amount.Sign() == -1 {
 		return nil, errors.Errorf("invalid amount %s", transfer.Amount)
 	}
+	var gasPrice *big.Int
+	if transfer.GasPrice != "" {
+		gasPrice, ok = new(big.Int).SetString(transfer.GasPrice, 10)
+		if !ok || gasPrice.Sign() == -1 {
+			return nil, errors.Errorf("invalid gas price %s", transfer.GasPrice)
+		}
+	}
 	id := crypto.Keccak256Hash(
 		validatorAddr.Bytes(),
 		cashier.Bytes(),
@@ -113,6 +122,9 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 		recipient: recipient,
 		amount:    amount,
 		id:        id,
+		gas:       transfer.Gas,
+		gasPrice:  gasPrice,
+		timestamp: transfer.Timestamp.AsTime(),
 	}, nil
 }
 

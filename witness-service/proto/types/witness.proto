@@ -4,6 +4,8 @@ package types;
 
 option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/types";
 
+import "google/protobuf/timestamp.proto";
+
 message Transfer {
     bytes cashier = 1;
     bytes token = 2;
@@ -11,6 +13,9 @@ message Transfer {
     bytes sender = 4;
     bytes recipient = 5;
     string amount = 6;
+    google.protobuf.Timestamp timestamp = 7;
+    uint64 gas = 8;
+    string gasPrice = 9;
 }
 
 message Witness {

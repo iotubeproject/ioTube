@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
@@ -122,6 +123,10 @@ func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*s
 			Transfer: nil,
 		}, nil
 	}
+	gasPrice := "0"
+	if tx.gasPrice != nil {
+		gasPrice = tx.gasPrice.String()
+	}
 
 	response := &services.QueryResponse{
 		Transfer: &types.Transfer{
@@ -131,6 +136,9 @@ func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*s
 			Sender:    tx.sender.Bytes(),
 			Recipient: tx.recipient.Bytes(),
 			Amount:    tx.amount.String(),
+			Timestamp: timestamppb.New(tx.timestamp),
+			Gas:       tx.gas,
+			GasPrice:  gasPrice,
 		},
 	}
 

@@ -9,6 +9,7 @@ package witness
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -30,6 +31,9 @@ type (
 		status      TransferStatus
 		blockHeight uint64
 		txHash      common.Hash
+		timestamp   time.Time
+		gas         uint64
+		gasPrice    *big.Int
 	}
 
 	// Service manages to exchange iotex coin to ERC20 token on ethereum
