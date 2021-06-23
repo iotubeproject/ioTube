@@ -76,37 +76,49 @@ Please fill the data below for us to review your submission and reach out to you
 for more information.
 -->
 ## Team / Developer name
+...
 
 ## Token Symbol
+XXX
 
-## Token Name
+## Token Name in full
+...
 
 ## Link to the token icon
+https://...
 
 ## Short description of your project
+Descrie your project here
 
-## What is the native blockchain for yout token
+## What is the native blockchain for your token
+* [x] IoTeX
+* [ ] Ethereum
+* [ ] Binance Smart Chain
+* [ ] Polygon
+* [ ] Huobi Eco Chain (coming soon)
 
 ## Token native contract address
+Address:
 
 ## Your project websites
+- https://...
 
 ## Your social channels
+- Telegram:
+- Twitter:
+- Discord:
 
-## If your token is native on IoTeX
-<!-- If your token is not native on IoTeX, please skip this section and move to the next one. -->
-
-<!-- Set your token contract address on the IoTeX blockchain -->
-- IoTeX Token contract address: <contract address>
+## If your token is native to IoTeX
+<!-- If your token is *not* native to IoTeX, please skip this section and move to the next one. -->
 
 <!-- Select which chains you want to bridge to -->
-**Bridge to:**
+**Bridge from IoTeX to...**
 * [x] IoTeX → Ethereum
 * [ ] IoTeX → Binance Smart Chain
 * [ ] IoTeX → Polygon
 * [ ] IoTeX → Huobi Eco Chain (coming soon)
 
-## If your token is native on a different chain
+## If your token is native to a different chain
 <!-- Please select the tokens you want to bridge to IoTeX, along with the contract address for each one -->
 
 * [x] Ethereum → IoTeX: <token contract address on Ethereum>
