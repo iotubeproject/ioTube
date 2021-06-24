@@ -17,6 +17,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
@@ -189,17 +190,6 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 	}
 
 	if settleHeight.Cmp(big.NewInt(0)) > 0 {
-		// TODO: send 0.1 iotx
-		/*
-			addr, err := address.FromBytes(transfer.recipient.Bytes())
-			if err != nil {
-				log.Panic("failed to convert address", transfer.recipient)
-			}
-			_, err = tv.client.Transfer(addr, math.BigPow(10, 17)).SetGasPrice(tv.gasPrice).SetGasLimit(10000).Call(context.Background())
-			if err != nil {
-				log.Print("failed to transfer iotx", err)
-			}
-		*/
 		response, err := tv.client.API().GetReceiptByAction(
 			context.Background(),
 			&iotexapi.GetReceiptByActionRequest{ActionHash: transfer.txHash.String()[2:]},
@@ -219,6 +209,16 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 			return StatusOnChainUnknown, err
 		}
 		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
+		// send 0.1 iotx
+		addr, err := address.FromBytes(transfer.recipient.Bytes())
+		if err != nil {
+			log.Panic("failed to convert address", transfer.recipient)
+		}
+		_, err = tv.client.Transfer(addr, math.BigPow(10, 17)).SetGasPrice(tv.gasPrice).SetGasLimit(10000).Call(context.Background())
+		if err != nil {
+			log.Print("failed to transfer iotx", err)
+		}
+
 		return StatusOnChainSettled, nil
 	}
 	response, err := tv.client.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{})
