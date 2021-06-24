@@ -202,7 +202,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		*/
 		response, err := tv.client.API().GetReceiptByAction(
 			context.Background(),
-			&iotexapi.GetReceiptByActionRequest{ActionHash: transfer.txHash.String()},
+			&iotexapi.GetReceiptByActionRequest{ActionHash: transfer.txHash.String()[2:]},
 		)
 		if err != nil {
 			return StatusOnChainUnknown, err
