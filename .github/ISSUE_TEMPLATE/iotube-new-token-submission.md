@@ -1,3 +1,8 @@
+<!--
+THIS ISSUE TEMPLATE IS DISABLED BECAUSE, CURRENTLY, WE ARE NOT ACCEPTING
+TOKENS SUBMISISONS BY THE COMMUNITY. THIS FEATURE WILL BE AVAILABLE IN
+THE FUTURE.
+
 ---
 name: ioTube New Token submission
 about: Use this template if you want to submit your token to be added to ioTube
@@ -6,6 +11,7 @@ labels: Token-Pending-Review
 assignees: guo
 
 ---
+-->
 
 # ioTube Token submission
 
