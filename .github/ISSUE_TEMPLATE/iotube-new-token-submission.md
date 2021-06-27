@@ -1,8 +1,3 @@
-<!--
-THIS ISSUE TEMPLATE IS DISABLED BECAUSE, CURRENTLY, WE ARE NOT ACCEPTING
-TOKENS SUBMISISONS BY THE COMMUNITY. THIS FEATURE WILL BE AVAILABLE IN
-THE FUTURE.
-
 ---
 name: ioTube New Token submission
 about: Use this template if you want to submit your token to be added to ioTube
@@ -11,8 +6,6 @@ labels: Token-Pending-Review
 assignees: guo
 
 ---
--->
-
 # ioTube Token submission
 
 <!--
@@ -28,10 +21,15 @@ IoTeX ecosystem, taking advantage of the 5-second tx confirmations, ultra-low fe
 and access other unique IoTeX features like real-world IoT data oracles, etc..
 
 ## Guidelines for tokens
-We will only take into consideration projects that show clear signs of activity: 
-either traffic on the network, activity on GitHub, or community buzz.
+We will only take into consideration projects that 
 
-- The icon should be small, square, but high resolution, ideally a vector/svg.
+- does not represent any type of cryptocurrency "scam" e.g. project counterfeit and others.
+- shows clear signs of activity: either traffic on the network, activity on GitHub, or community buzz.
+
+In addition:
+- Only tokens from Ethereum, Binance Smart Chain or Polygon can be bridged to IoTeX at the moment.
+- Bridging IoTeX tokens to other blockchains will be available in the future.
+- The token icon should be small, square, but high resolution, ideally a vector/svg.
 - Make sure your website includes a detailed explanation of project and the token contract address.
 - No Profanity in token name, token description, etc.
 
@@ -55,7 +53,6 @@ https://...
 Descrie your project here
 
 ## What is the native blockchain for your token
-* [x] IoTeX
 * [ ] Ethereum
 * [ ] Binance Smart Chain
 * [ ] Polygon
@@ -72,23 +69,18 @@ Address:
 - Twitter:
 - Discord:
 
-## If your token is native to IoTeX
-<!-- 
-Select which chains you want to bridge to.
-If your token is *not* native to IoTeX, please skip this section and move to the next one. 
--->
-
-**Bridge from IoTeX to...**
-* [x] IoTeX → Ethereum
-* [ ] IoTeX → Binance Smart Chain
-* [ ] IoTeX → Polygon
-* [ ] IoTeX → Huobi Eco Chain (coming soon)
-
-## If your token is native to a different chain
+## If your token is not native to IoTeX
 <!-- Please select the tokens you want to bridge to IoTeX, along with the contract address for each one -->
 
 * [x] Ethereum → IoTeX: <token contract address on Ethereum>
 * [ ] Binance Smart Chain → IoTeX: <token contract address on BSC>
 * [ ] Polygon → IoTeX: <token contract address on Polygon>
 * [ ] Huobi Eco Chain (coming soon) → IoTeX: <token contract address on HEC> 
+
+<!--
+## If your token is native to IoTeX
+ 
+Please notice that at this moment we only accept ioTube submissions for tokens native to Ethereum, Binance Smart Chain or Polygon to be bridged to IoTeX.
+Bridging IoTeX tokens to other blockchains will be available in the future.
+-->
 
