@@ -1,7 +1,7 @@
 [![tests](https://github.com/iotexproject/ioTube/workflows/tests/badge.svg)](https://github.com/iotexproject/ioTube/actions?query=workflow%3Atests)
 
 <p align="center">
-<img src="https://user-images.githubusercontent.com/989846/112756458-1e3d4700-8f9a-11eb-9af8-b51f23189b16.png" width="720">
+<img src="https://user-images.githubusercontent.com/448293/123823874-6aa66480-d8b2-11eb-9c0f-c268ae19e18c.jpg" width="720">
 </p>
 
 # ioTube - the decentralized bridge for Ethereum, Binance Smart Chain, Polygon(Matic) and IoTeX
@@ -30,6 +30,10 @@ Because of Ethereum's high gas cost, many projects and users also adopted Binanc
 
 
 Matic support is launched on Jun 10, 2021 ([Annoucement](https://iotex.medium.com/iotube-v4-iotex-polygon-matic-cross-chain-token-swaps-are-live-bb2ae5bf41b4))
+
+### V5.0 Web3 (Babel) Support + Transactions + More Assets + Crosschain Tokens
+
+Work in progress
 
 
 <h3>
