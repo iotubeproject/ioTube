@@ -98,6 +98,10 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 	if !ok || amount.Sign() == -1 {
 		return nil, errors.Errorf("invalid amount %s", transfer.Amount)
 	}
+	fee, ok := new(big.Int).SetString(transfer.Fee, 10)
+	if !ok || fee.Sign() == -1 {
+		fee = big.NewInt(0)
+	}
 	var gasPrice *big.Int
 	if transfer.GasPrice != "" {
 		gasPrice, ok = new(big.Int).SetString(transfer.GasPrice, 10)
@@ -122,6 +126,7 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 		sender:    sender,
 		recipient: recipient,
 		amount:    amount,
+		fee:       fee,
 		id:        id,
 		gas:       transfer.Gas,
 		gasPrice:  gasPrice,
