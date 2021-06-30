@@ -63,7 +63,7 @@ var (
 			it,
 			alpha.testAdd,
 			nil,
-			12 * it,
+			13 * it,
 			&alpha.sum,
 			45,
 		},

@@ -89,6 +89,7 @@ func NewTokenCashierOnEthereum(
 						sender:      common.BytesToAddress(log.Data[:32]),
 						recipient:   common.BytesToAddress(log.Data[32:64]),
 						amount:      new(big.Int).SetBytes(log.Data[64:96]),
+						fee:         new(big.Int).SetBytes(log.Data[96:128]),
 						blockHeight: log.BlockNumber,
 						txHash:      log.TxHash,
 					})

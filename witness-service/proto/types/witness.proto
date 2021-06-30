@@ -16,6 +16,7 @@ message Transfer {
     google.protobuf.Timestamp timestamp = 7;
     uint64 gas = 8;
     string gasPrice = 9;
+    string fee = 10;
 }
 
 message Witness {

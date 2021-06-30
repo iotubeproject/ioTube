@@ -87,12 +87,13 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`sender` varchar(42) NOT NULL,"+
 			"`recipient` varchar(42) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
+			"`fee` varchar(78),"+
 			"`id` varchar(66) NOT NULL,"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
 			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
 			"`txHash` varchar(66) DEFAULT NULL,"+
-			"`txTimestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
+			"`txTimestamp` timestamp DEFAULT CURRENT_TIMESTAMP,"+
 			"`gas` bigint(20),"+
 			"`nonce` bigint(20),"+
 			"`gasPrice` varchar(78) DEFAULT NULL,"+
@@ -161,13 +162,14 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 		return err
 	}
 	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, recipient, amount, id) VALUES (?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName),
+		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName),
 		transfer.cashier.Hex(),
 		transfer.token.Hex(),
 		transfer.index,
 		transfer.sender.Hex(),
 		transfer.recipient.Hex(),
 		transfer.amount.String(),
+		transfer.fee.String(),
 		transfer.id.Hex(),
 	); err != nil {
 		return errors.Wrap(err, "failed to insert into transfer table")
@@ -230,10 +232,10 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	tx := &Transfer{}
 	var rawAmount string
 	var cashier, token, sender, recipient, id string
-	var hash, gasPrice sql.NullString
+	var hash, gasPrice, fee sql.NullString
 	var gas, nonce sql.NullInt64
 	var timestamp sql.NullTime
-	if err := scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime); err != nil {
+	if err := scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = common.HexToAddress(cashier)
@@ -254,7 +256,14 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	if timestamp.Valid {
 		tx.timestamp = timestamp.Time
 	}
+	tx.fee = big.NewInt(0)
 	var ok bool
+	if fee.Valid {
+		tx.fee, ok = new(big.Int).SetString(fee.String, 10)
+		if !ok || tx.fee.Sign() == -1 {
+			return nil, errors.Errorf("invalid fee %s", fee.String)
+		}
+	}
 	tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
 	if !ok || tx.amount.Sign() != 1 {
 		return nil, errors.Errorf("invalid amount %s", rawAmount)
@@ -273,7 +282,7 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
 		id.Hex(),
 	)
 	return recorder.assembleTransfer(row.Scan)
@@ -288,9 +297,9 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, 
 	var query string
 	if status == "" {
 		if desc {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
 		} else {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
 		}
 		rows, err = recorder.store.DB().Query(query, offset, limit)
 		if err != nil {
@@ -298,9 +307,9 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, 
 		}
 	} else {
 		if desc {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
 		} else {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
 		}
 		rows, err = recorder.store.DB().Query(query, status, offset, limit)
 		if err != nil {

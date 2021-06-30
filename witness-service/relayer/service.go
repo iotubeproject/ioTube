@@ -111,6 +111,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 			Sender:    transfer.sender.Bytes(),
 			Recipient: transfer.recipient.Bytes(),
 			Amount:    transfer.amount.String(),
+			Fee:       transfer.fee.String(),
 			Gas:       transfer.gas,
 			GasPrice:  gasPrice,
 			Timestamp: timestamppb.New(transfer.timestamp),

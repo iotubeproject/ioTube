@@ -117,6 +117,7 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 					Sender:    transfer.sender.Bytes(),
 					Recipient: transfer.recipient.Bytes(),
 					Amount:    transfer.amount.String(),
+					Fee:       transfer.fee.String(),
 				},
 				Address:   witness.Bytes(),
 				Signature: signature,

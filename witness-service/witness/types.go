@@ -27,6 +27,7 @@ type (
 		sender      common.Address
 		recipient   common.Address
 		amount      *big.Int
+		fee         *big.Int
 		id          common.Hash
 		status      TransferStatus
 		blockHeight uint64

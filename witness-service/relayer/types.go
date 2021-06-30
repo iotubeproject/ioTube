@@ -30,6 +30,7 @@ type (
 		sender     common.Address
 		recipient  common.Address
 		amount     *big.Int
+		fee        *big.Int
 		id         common.Hash
 		txHash     common.Hash
 		timestamp  time.Time

@@ -59,6 +59,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`sender` varchar(42) NOT NULL,"+
 			"`recipient` varchar(42) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
+			"`fee` varchar(78),"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
 			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
@@ -98,13 +99,14 @@ func (recorder *Recorder) AddTransfer(tx *Transfer) error {
 		return errors.New("amount should be larger than 0")
 	}
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName),
+		fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName),
 		tx.cashier.Hex(),
 		tx.token.Hex(),
 		tx.index,
 		tx.sender.Hex(),
 		tx.recipient.Hex(),
 		tx.amount.String(),
+		tx.fee.String(),
 		tx.blockHeight,
 		tx.txHash.Hex(),
 	)
@@ -172,7 +174,7 @@ func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
 func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
-			"SELECT cashier, token, tidx, sender, recipient, amount, status, id "+
+			"SELECT cashier, token, tidx, sender, recipient, amount, fee, status, id "+
 				"FROM %s "+
 				"WHERE status=? "+
 				"ORDER BY creationTime",
@@ -193,8 +195,9 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		var sender string
 		var recipient string
 		var rawAmount string
+		var fee sql.NullString
 		var id sql.NullString
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &tx.status, &id); err != nil {
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &tx.status, &id); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -204,7 +207,14 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		if id.Valid {
 			tx.id = common.HexToHash(id.String)
 		}
+		tx.fee = big.NewInt(0)
 		var ok bool
+		if fee.Valid {
+			tx.fee, ok = new(big.Int).SetString(fee.String, 10)
+			if !ok || tx.fee.Sign() == -1 {
+				return nil, errors.Errorf("invalid fee %s", fee.String)
+			}
+		}
 		tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
 		if !ok || tx.amount.Sign() != 1 {
 			return nil, errors.Errorf("invalid amount %s", rawAmount)
