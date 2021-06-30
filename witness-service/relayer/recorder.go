@@ -92,7 +92,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
 			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
 			"`txHash` varchar(66) DEFAULT NULL,"+
-			"`txTimestamp` timestamp,"+
+			"`txTimestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`gas` bigint(20),"+
 			"`nonce` bigint(20),"+
 			"`gasPrice` varchar(78) DEFAULT NULL,"+
