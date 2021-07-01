@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -14,19 +15,31 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 )
 
-// Service defines the relayer service
-type Service struct {
-	services.UnimplementedRelayServiceServer
-	transferValidator TransferValidator
-	processor         dispatcher.Runner
-	recorder          *Recorder
-}
+type (
+	responseWithTimestamp struct {
+		response *services.ListResponse
+		ts       time.Time
+	}
+	// Service defines the relayer service
+	Service struct {
+		services.UnimplementedRelayServiceServer
+		transferValidator TransferValidator
+		processor         dispatcher.Runner
+		recorder          *Recorder
+		cache             *lru.Cache
+	}
+)
 
 // NewService creates a new relay service
 func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration) (*Service, error) {
+	cache, err := lru.New(100)
+	if err != nil {
+		return nil, err
+	}
 	s := &Service{
 		transferValidator: tv,
 		recorder:          recorder,
+		cache:             cache,
 	}
 	processor, err := dispatcher.NewRunner(interval, s.process)
 	if err != nil {
@@ -83,6 +96,16 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if first > 1<<8 {
 		return nil, errors.Errorf("pagination size %d is too large", first)
 	}
+	value, ok := s.cache.Get(request.String())
+	if ok {
+		randt, ok := value.(*responseWithTimestamp)
+		if ok {
+			if randt.ts.After(time.Now().Add(10 * time.Second)) {
+				return randt.response, nil
+			}
+			s.cache.Remove(request.String())
+		}
+	}
 	count, err := s.recorder.Count("")
 	if err != nil {
 		return nil, err
@@ -129,6 +152,10 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 		}
 		response.Statuses[i] = s.assembleCheckResponse(transfer, witnesses)
 	}
+	s.cache.Add(request.String(), &responseWithTimestamp{
+		response: response,
+		ts:       time.Now(),
+	})
 	return response, nil
 }
 
