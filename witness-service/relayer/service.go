@@ -83,6 +83,16 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if first > 1<<8 {
 		return nil, errors.Errorf("pagination size %d is too large", first)
 	}
+	count, err := s.recorder.Count("")
+	if err != nil {
+		return nil, err
+	}
+	if skip > int32(count) {
+		skip = int32(count)
+	}
+	if skip+first > int32(count) {
+		first = int32(count) - skip
+	}
 	transfers, err := s.recorder.Transfers("", uint32(skip), uint8(first), true)
 	if err != nil {
 		return nil, err
@@ -98,6 +108,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	response := &services.ListResponse{
 		Transfers: make([]*types.Transfer, len(transfers)),
 		Statuses:  make([]*services.CheckResponse, len(transfers)),
+		Count:     uint32(count),
 	}
 	for i, transfer := range transfers {
 		gasPrice := "0"

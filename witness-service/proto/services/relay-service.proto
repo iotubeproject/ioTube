@@ -53,6 +53,7 @@ message ListRequest {
 message ListResponse {
 	repeated types.Transfer transfers = 1;
 	repeated CheckResponse statuses = 2;
+	uint32 count = 3;
 }
 
 message WitnessSubmissionResponse {
