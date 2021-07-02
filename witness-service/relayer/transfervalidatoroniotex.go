@@ -274,7 +274,7 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 	if resubmit {
 		nonce = transfer.nonce
 	} else {
-		nonce = accountMeta.Nonce + 1
+		nonce = accountMeta.PendingNonce
 	}
 
 	actionHash, err := tv.validatorContract.Execute(
