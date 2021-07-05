@@ -49,7 +49,7 @@ func NewTokenCashierOnEthereum(
 				return 0, err
 			}
 			tipHeight := tipHeader.Number.Uint64() - uint64(confirmBlockNumber)
-			if startHeight >= tipHeight {
+			if startHeight > tipHeight {
 				return 0, errors.Errorf("query height %d is larger than chain tip height %d", startHeight, tipHeight)
 			}
 			if count == 0 {

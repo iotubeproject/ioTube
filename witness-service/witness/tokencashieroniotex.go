@@ -49,7 +49,7 @@ func NewTokenCashier(
 				return 0, err
 			}
 			tipHeight := chainMetaResponse.ChainMeta.Height
-			if startHeight >= tipHeight {
+			if startHeight > tipHeight {
 				return 0, errors.Errorf("query height %d is larger than chain tip height %d", startHeight, tipHeight)
 			}
 			if count == 0 {
