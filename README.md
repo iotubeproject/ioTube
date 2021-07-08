@@ -155,7 +155,7 @@ Contracts on IoTeX
 - Proxy Token List: io1dn8nqk3pmmll990xz6a94fpradtrljxmmx5p8j 
 - Witness List: io1hezp6d7y3246c5gklnnkh0z95qfld4zdsphhsw
 - Token Cashier: io1gsr52ahqzklaf7flqar8r0269f2utkw9349qg8
-- Transfer Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y --io1dwaxh2ml4fd2wg8cg35vhfsgdcyzrczffp3vus--
+- Transfer Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y ---io1dwaxh2ml4fd2wg8cg35vhfsgdcyzrczffp3vus---
 
 Contacts on Ethereum
 
@@ -186,7 +186,7 @@ BSC Side
 - Token Safe Address:  0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B
 - Mintable Token List Address:  0xa6ae9312D0AA3CC74d969Fcd4806d7729A321EE3
 - Standard Token List Address:  0x0d793F4D4287265B9bdA86b7a4083193E8743b34
-- Token Cashier Address:  0x797f1465796fd89ea7135e76dbc7cdb136bba1ca --0x082020Ae0B38fD1bef48895c6cFf4428e420F400--
+- Token Cashier Address:  0x797f1465796fd89ea7135e76dbc7cdb136bba1ca ---0x082020Ae0B38fD1bef48895c6cFf4428e420F400---
 - Transfer Validator Address:  0x116404F86e97846110EA08cd52fC2882d4AD3123
 
 ## Tube of IoTeX <-> Heco (Huobi Eco Chain)
