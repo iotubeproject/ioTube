@@ -23,11 +23,11 @@ import (
 )
 
 type Chain struct {
-	URL                     string `json:"url" yaml:"url"`
-	StandardTokenListAddr   string `json:"standardTokenListAddr" yaml:"standardTokenListAddr"`
-	IoTeXProxyTokenListAddr string `json:"iotexProxyTokenListAddr" yaml:"iotexProxyTokenListAddr"`
-	MinterAddr              string `json:"minterAddr" yaml:"minterAddr"`
-	OperatorPrivateKey      string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
+	URL                   string `json:"url" yaml:"url"`
+	StandardTokenListAddr string `json:"standardTokenListAddr" yaml:"standardTokenListAddr"`
+	ProxyTokenListAddr    string `json:"proxyTokenListAddr" yaml:"proxyTokenListAddr"`
+	MinterAddr            string `json:"minterAddr" yaml:"minterAddr"`
+	OperatorPrivateKey    string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
 }
 
 type ChainConfig struct {
@@ -153,7 +153,7 @@ func main() {
 	}
 	if err := addTokenToList(
 		shadowTokenAddr,
-		common.HexToAddress(sourceChain.IoTeXProxyTokenListAddr),
+		common.HexToAddress(sourceChain.ProxyTokenListAddr),
 		minAmount,
 		maxAmount,
 		targetChainAuth,

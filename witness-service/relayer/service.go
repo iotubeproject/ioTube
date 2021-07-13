@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type (
@@ -210,18 +212,26 @@ func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*s
 func (s *Service) process() error {
 	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, 1, false)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to read transfers to confirm")
 	}
 	for _, transfer := range validatedTransfers {
 		statusOnChain, err := s.transferValidator.Check(transfer)
-		if err != nil {
-			return err
+		switch errors.Cause(err) {
+		case nil:
+			break
+		case ethereum.NotFound:
+			if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
+				log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
+			}
+			fallthrough
+		default:
+			return errors.Wrapf(err, "failed to check status of transfer %s", transfer.id)
 		}
 		switch statusOnChain {
 		case StatusOnChainNeedSpeedUp:
 			witnesses, err := s.recorder.Witnesses(transfer.id)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "failed to read witnesses of %s", transfer.id)
 			}
 			if _, ok := witnesses[transfer.id]; !ok {
 				return errors.Errorf("no witness are found for %x", transfer.id)
@@ -266,13 +276,16 @@ func (s *Service) process() error {
 	for _, transfer := range newTransfers {
 		witnesses, err := s.recorder.Witnesses(transfer.id)
 		if err != nil {
-			return err
+			util.Alert("failed to fetch witness for " + transfer.id.String() + " with error" + err.Error())
+			continue
 		}
 		if _, ok := witnesses[transfer.id]; !ok {
-			return errors.Errorf("no witness are found for %x", transfer.id)
+			util.Alert("no witness are found for " + transfer.id.String())
+			continue
 		}
 		if err := s.recorder.MarkAsProcessing(transfer.id); err != nil {
-			return err
+			util.Alert("failed to mark " + transfer.id.String() + " as processing, with error" + err.Error())
+			continue
 		}
 		txHash, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses[transfer.id])
 		switch errors.Cause(err) {
