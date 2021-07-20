@@ -49,7 +49,8 @@ Work in progress
 ## Submit a token to ioTube?
 
 You can get started here: https://github.com/iotexproject/ioTube/issues/new/choose
-Feel free to reach out to @guo for further discussion.
+
+Feel free to reach out to https://github.com/guo for further discussion.
 
 ## Deployment
 Different from traditional bridges, ioTube comes with two components:
