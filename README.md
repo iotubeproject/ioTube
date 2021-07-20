@@ -46,6 +46,11 @@ Work in progress
 
 &nbsp;
 
+## Submit a token to ioTube?
+
+You can get started here: https://github.com/iotexproject/ioTube/issues/new/choose
+Feel free to reach out to @guo for further discussion.
+
 ## Deployment
 Different from traditional bridges, ioTube comes with two components:
 - **a golang service** witnessing what has happened on both changes and relay the finalized information
