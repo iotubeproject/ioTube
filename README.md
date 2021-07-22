@@ -33,7 +33,9 @@ Matic support is launched on Jun 10, 2021 ([Annoucement](https://iotex.medium.co
 
 ### V5.0 Web3 (Babel) Support + Transactions + More Assets + Crosschain Tokens
 
-Work in progress
+Beta is open to public: https://tube-v5.iotex.io/
+
+Any bug report or feedback? Please submit an issue or discuss in https://discord.gg/jRqqSyGfUD.
 
 
 <h3>
@@ -45,6 +47,12 @@ Work in progress
 </h3>
 
 &nbsp;
+
+## Submit a token to ioTube?
+
+You can get started here: https://github.com/iotexproject/ioTube/issues/new/choose
+
+Feel free to reach out to https://github.com/guo for further discussion.
 
 ## Deployment
 Different from traditional bridges, ioTube comes with two components:
