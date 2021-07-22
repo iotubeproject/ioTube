@@ -1,6 +1,5 @@
 iotex:
   url: "https://babel-api.mainnet.iotex.io"
-  standardTokenListAddr: ""
   minterAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
   operatorPrivateKey: ""
 chains:
@@ -28,3 +27,12 @@ chains:
     standardTokenListAddr: "0x7c0bef36e1b1cbeb1f1a5541300786a7b608aede"
     iotexProxyTokenListAddr: "0x6Ccf305A21DEFfF295e616bA5aa423eB563FC8dB"
     operatorPrivateKey: ""
+token:
+  minAmount:
+  maxAmount:
+  sourceChain: "ethereum"
+  sourceTokenAddr:
+  shadowTokenAddr:
+  shadowTokenName:
+  shadowTokenSymbol:
+  shadowTokenDecimal: 18

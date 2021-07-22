@@ -23,73 +23,64 @@ import (
 )
 
 type Chain struct {
-	URL                   string `json:"url" yaml:"url"`
-	StandardTokenListAddr string `json:"standardTokenListAddr" yaml:"standardTokenListAddr"`
-	ProxyTokenListAddr    string `json:"proxyTokenListAddr" yaml:"proxyTokenListAddr"`
-	MinterAddr            string `json:"minterAddr" yaml:"minterAddr"`
-	OperatorPrivateKey    string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
+	URL                     string `json:"url" yaml:"url"`
+	StandardTokenListAddr   string `json:"standardTokenListAddr" yaml:"standardTokenListAddr"`
+	IoTeXProxyTokenListAddr string `json:"iotexProxyTokenListAddr" yaml:"iotexProxyTokenListAddr"`
+	MinterAddr              string `json:"minterAddr" yaml:"minterAddr"`
+	OperatorPrivateKey      string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
 }
 
-type ChainConfig struct {
-	IoTeX  Chain            `json:"iotex" yaml:"iotex"`
-	Chains map[string]Chain `json:"chains" yaml:"chains"`
-}
-
-// TokenConfig defines the configuration of the token
 type TokenConfig struct {
 	MinAmount          string `json:"minAmount" yaml:"minAmount"`
 	MaxAmount          string `json:"maxAmount" yaml:"maxAmount"`
 	SourceTokenAddr    string `json:"sourceTokenAddr" yaml:"sourceTokenAddr"`
 	SourceChain        string `json:"sourceChain" yaml:"sourceChain"`
-	ShadowTokenAddr    string `json:"ShadowTokenAddr" yaml:"ShadowTokenAddr"`
-	ShadowTokenName    string `json:"ShadowTokenName" yaml:"ShadowTokenName"`
-	ShadowTokenSymbol  string `json:"ShadowTokenSymbol" yaml:"ShadowTokenSymbol"`
-	ShadowTokenDecimal int    `json:"ShadowTokenDecimal" yaml:"ShadowTokenDecimal"`
+	ShadowTokenAddr    string `json:"shadowTokenAddr" yaml:"shadowTokenAddr"`
+	ShadowTokenName    string `json:"shadowTokenName" yaml:"shadowTokenName"`
+	ShadowTokenSymbol  string `json:"shadowTokenSymbol" yaml:"shadowTokenSymbol"`
+	ShadowTokenDecimal int    `json:"shadowTokenDecimal" yaml:"shadowTokenDecimal"`
 }
 
-var chainConfigFile = flag.String("chainConfig", "", "path of chain config file")
-var tokenPairConfigFile = flag.String("tokenPairConfig", "", "path of token pair config file")
+type Config struct {
+	IoTeX  Chain            `json:"iotex" yaml:"iotex"`
+	Chains map[string]Chain `json:"chains" yaml:"chains"`
+	Token  TokenConfig      `json:"token" yaml:"token"`
+}
+
+var configFile = flag.String("config", "", "path of config file")
 
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-chainConfig <filename> -tokenPairConfig <filename>")
+		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename>")
 		flag.PrintDefaults()
 	}
 }
 
 func main() {
 	flag.Parse()
-	if *chainConfigFile == "" {
-		log.Fatalln("chain config file is not specified")
+	if *configFile == "" {
+		log.Fatalln("config file is not specified")
 	}
-	if *tokenPairConfigFile == "" {
-		log.Fatalln("token pair config file is not specified")
-	}
-	opts := []config.YAMLOption{config.Expand(os.LookupEnv), config.File(*chainConfigFile)}
+	opts := []config.YAMLOption{config.Expand(os.LookupEnv), config.File(*configFile)}
 	yaml, err := config.NewYAML(opts...)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	var chainConfig ChainConfig
-	if err := yaml.Get(config.Root).Populate(&chainConfig); err != nil {
+	var cfg Config
+	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	var tokenConfig TokenConfig
-	if err := yaml.Get(config.Root).Populate(&tokenConfig); err != nil {
-		log.Fatalln(err)
-	}
-	sourceChain, ok := chainConfig.Chains[tokenConfig.SourceChain]
+	sourceChain, ok := cfg.Chains[cfg.Token.SourceChain]
 	if !ok {
-		log.Fatalf("source chain %s is not defined in chain configs", tokenConfig.SourceChain)
+		log.Fatalf("source chain %s is not defined in chain configs", cfg.Token.SourceChain)
 	}
-	iotexChain := chainConfig.IoTeX
-	minAmount, ok := new(big.Int).SetString(tokenConfig.MinAmount, 10)
+	minAmount, ok := new(big.Int).SetString(cfg.Token.MinAmount, 10)
 	if !ok {
-		log.Fatalln("failed to parse token min amount", tokenConfig.MinAmount)
+		log.Fatalln("failed to parse token min amount", cfg.Token.MinAmount)
 	}
-	maxAmount, ok := new(big.Int).SetString(tokenConfig.MinAmount, 10)
+	maxAmount, ok := new(big.Int).SetString(cfg.Token.MaxAmount, 10)
 	if !ok {
-		log.Fatalln("failed to parse token max amount", tokenConfig.MaxAmount)
+		log.Fatalln("failed to parse token max amount", cfg.Token.MaxAmount)
 	}
 	srcChainClient, err := ethclient.Dial(sourceChain.URL)
 	if err != nil {
@@ -107,7 +98,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	srcTokenAddr := common.HexToAddress(tokenConfig.SourceTokenAddr)
+	srcTokenAddr := common.HexToAddress(cfg.Token.SourceTokenAddr)
 	if err := addTokenToList(
 		srcTokenAddr,
 		common.HexToAddress(sourceChain.StandardTokenListAddr),
@@ -118,6 +109,7 @@ func main() {
 	); err != nil {
 		log.Fatalln(err)
 	}
+	iotexChain := cfg.IoTeX
 	targetChainClient, err := ethclient.Dial(iotexChain.URL)
 	if err != nil {
 		log.Fatalln(err)
@@ -135,25 +127,25 @@ func main() {
 		log.Fatal(err)
 	}
 	var shadowTokenAddr common.Address
-	if tokenConfig.ShadowTokenAddr == "" {
+	if cfg.Token.ShadowTokenAddr == "" {
 		shadowTokenAddr, _, _, err = contract.DeployShadowToken(
 			targetChainAuth,
 			targetChainClient,
 			common.HexToAddress(iotexChain.MinterAddr),
 			srcTokenAddr,
-			tokenConfig.ShadowTokenName,
-			tokenConfig.ShadowTokenSymbol,
-			uint8(tokenConfig.ShadowTokenDecimal),
+			cfg.Token.ShadowTokenName,
+			cfg.Token.ShadowTokenSymbol,
+			uint8(cfg.Token.ShadowTokenDecimal),
 		)
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		shadowTokenAddr = common.HexToAddress(tokenConfig.ShadowTokenAddr)
+		shadowTokenAddr = common.HexToAddress(cfg.Token.ShadowTokenAddr)
 	}
 	if err := addTokenToList(
 		shadowTokenAddr,
-		common.HexToAddress(sourceChain.ProxyTokenListAddr),
+		common.HexToAddress(sourceChain.IoTeXProxyTokenListAddr),
 		minAmount,
 		maxAmount,
 		targetChainAuth,
