@@ -69,13 +69,21 @@ Address:
 - Twitter:
 - Discord:
 
-## If your token is not native to IoTeX
-<!-- Please select the tokens you want to bridge to IoTeX, along with the contract address for each one -->
+## Select the tokens you want to bridge to IoTeX
+<!-- 
+    Please select the tokens you want to bridge to IoTeX, along with their contract address.
+    For each one, we will add it to the respective ioTube section, and a proxy XRC20 token 
+    called XXX-sss will be created on IoTeX, where "XXX" is the symbol of your token on the 
+    source chain, and "sss" is a symbol representing the source chain. These tokens will be 
+    the "corresponding" tokens minted on IoTeX each time a user sends them to ioTube from 
+    the source chaina: there is no need for you to create any "correspnding" token on IoTeX.
+-->
 
-* [x] Ethereum → IoTeX: <token contract address on Ethereum>
-* [ ] Binance Smart Chain → IoTeX: <token contract address on BSC>
-* [ ] Polygon → IoTeX: <token contract address on Polygon>
-* [ ] Huobi Eco Chain (coming soon) → IoTeX: <token contract address on HEC> 
+* [x] Ethereum Token → IoTeX: <token contract address on Ethereum>
+* [ ] Binance Smart Chain Token → IoTeX: <token contract address on BSC>
+* [ ] Polygon Token → IoTeX: <token contract address on Polygon>
+* [ ] Huobi Eco Chain Token (coming soon) → IoTeX: <token contract address on HEC> 
+
 
 <!--
 ## If your token is native to IoTeX
