@@ -64,13 +64,14 @@ func (tc *tokenCashierBase) GetRecorder() *Recorder {
 }
 
 func (tc *tokenCashierBase) PullTransfers(count uint16) error {
-	startHeight, err := tc.recorder.TipHeight()
+	startHeight, err := tc.recorder.TipHeight(tc.id)
 	if err != nil {
 		return err
 	}
 	if startHeight < tc.lastProcessBlockHeight {
 		startHeight = tc.lastProcessBlockHeight
 	}
+	startHeight = startHeight + 1
 	endHeight, err := tc.calcEndHeight(startHeight, count)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get end height with start height %d, count %d", startHeight, count)
@@ -87,7 +88,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	}
 	tc.lastProcessBlockHeight = endHeight
 
-	return nil
+	return tc.recorder.UpdateSyncHeight(tc.id, endHeight)
 }
 
 func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error {

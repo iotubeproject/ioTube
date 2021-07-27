@@ -455,7 +455,7 @@ func (recorder *Recorder) Reset(id common.Hash) error {
 
 // ResetCausedByNonce marks a record as new
 func (recorder *Recorder) ResetCausedByNonce(id common.Hash) error {
-	log.Printf("reset transfer %s\n", id.Hex())
+	log.Printf("reset transfer %s caused by nonce\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, waitingForWitnesses, id.Hex(), validationSubmitted)

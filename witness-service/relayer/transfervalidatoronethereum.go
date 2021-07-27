@@ -174,8 +174,8 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 	r, err := tv.client.TransactionReceipt(context.Background(), transfer.txHash)
 	switch errors.Cause(err) {
 	case ethereum.NotFound:
-		if transfer.nonce < nonce+5 {
-			return StatusOnChainNonceOverwritten, nil
+		if transfer.nonce > nonce && transfer.nonce < nonce+5 {
+			// return StatusOnChainNonceOverwritten, nil
 		}
 		if transfer.updateTime.Before(time.Now().Add(-20 * time.Minute)) {
 			return StatusOnChainNeedSpeedUp, nil

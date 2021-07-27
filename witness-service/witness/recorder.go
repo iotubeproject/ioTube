@@ -27,9 +27,10 @@ import (
 type (
 	// Recorder is a logger based on sql to record exchange events
 	Recorder struct {
-		store             *db.SQLStore
-		transferTableName string
-		tokenPairs        map[common.Address]common.Address
+		store                *db.SQLStore
+		cashierMetaTableName string
+		transferTableName    string
+		tokenPairs           map[common.Address]common.Address
 	}
 )
 
@@ -40,9 +41,10 @@ func NewRecorder(
 	tokenPairs map[common.Address]common.Address,
 ) *Recorder {
 	return &Recorder{
-		store:             store,
-		transferTableName: transferTableName,
-		tokenPairs:        tokenPairs,
+		store:                store,
+		cashierMetaTableName: "cashier_meta",
+		transferTableName:    transferTableName,
+		tokenPairs:           tokenPairs,
 	}
 }
 
@@ -50,6 +52,15 @@ func NewRecorder(
 func (recorder *Recorder) Start(ctx context.Context) error {
 	if err := recorder.store.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start db")
+	}
+	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s ("+
+			"`cashier` varchar(30) PRIMARY KEY NOT NULL,"+
+			"`height` bigint(20) NOT NULL"+
+			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
+		recorder.cashierMetaTableName,
+	)); err != nil {
+		return errors.Wrapf(err, "failed to create table %s", recorder.cashierMetaTableName)
 	}
 	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s ("+
@@ -119,6 +130,25 @@ func (recorder *Recorder) AddTransfer(tx *Transfer) error {
 	}
 	if affected == 0 {
 		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
+	}
+	return nil
+}
+
+func (recorder *Recorder) UpdateSyncHeight(cashier string, height uint64) error {
+	result, err := recorder.store.DB().Exec(
+		fmt.Sprintf("REPLACE INTO %s (`cashier`, `height`) VALUES (?, ?)", recorder.cashierMetaTableName),
+		cashier,
+		height,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return errors.Errorf("failed to update sync height %d for cashier %s", height, cashier)
 	}
 	return nil
 }
@@ -269,7 +299,23 @@ func (recorder *Recorder) Transfer(_id common.Hash) (*Transfer, error) {
 }
 
 // TipHeight returns the tip height of all the transfers in the recorder
-func (recorder *Recorder) TipHeight() (uint64, error) {
+func (recorder *Recorder) TipHeight(cashier string) (uint64, error) {
+	row := recorder.store.DB().QueryRow(
+		fmt.Sprintf("SELECT height FROM %s WHERE cashier=?", recorder.cashierMetaTableName),
+		cashier,
+	)
+	var height uint64
+	switch err := row.Scan(&height); errors.Cause(err) {
+	case nil:
+		return height, nil
+	case sql.ErrNoRows:
+		return recorder.maxBlockHeight()
+	default:
+		return 0, err
+	}
+}
+
+func (recorder *Recorder) maxBlockHeight() (uint64, error) {
 	row := recorder.store.DB().QueryRow(
 		fmt.Sprintf("SELECT MAX(blockHeight) FROM %s", recorder.transferTableName),
 	)
