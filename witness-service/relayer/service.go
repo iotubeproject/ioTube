@@ -210,6 +210,13 @@ func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*s
 }
 
 func (s *Service) process() error {
+	if err := s.confirmTransfers(); err != nil {
+		util.LogErr(err)
+	}
+	return s.submitTransfers()
+}
+
+func (s *Service) confirmTransfers() error {
 	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, 1, false)
 	if err != nil {
 		return errors.Wrap(err, "failed to read transfers to confirm")
@@ -269,6 +276,10 @@ func (s *Service) process() error {
 			return errors.New("unexpected error")
 		}
 	}
+	return nil
+}
+
+func (s *Service) submitTransfers() error {
 	newTransfers, err := s.recorder.Transfers(waitingForWitnesses, 0, 1, false)
 	if err != nil {
 		return err
