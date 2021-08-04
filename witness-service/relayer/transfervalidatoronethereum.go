@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
@@ -227,10 +228,14 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
 	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
-	if err != nil {
+	switch errors.Cause(err) {
+	case nil:
+		return transaction.Hash(), transaction.Nonce(), transaction.GasPrice(), nil
+	case core.ErrUnderpriced:
+		return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+	default:
 		return common.Hash{}, 0, nil, err
 	}
-	return transaction.Hash(), transaction.Nonce(), transaction.GasPrice(), nil
 }
 
 // Submit submits validation for a transfer
