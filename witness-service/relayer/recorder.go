@@ -55,7 +55,7 @@ func NewRecorder(store *db.SQLStore, transferTableName string, witnessTableName 
 		witnessTableName:                witnessTableName,
 		updateStatusQuery:               fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=? AND `status`=?", transferTableName),
 		updateStatusQueryAndGas:         fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=? AND `status`=?", transferTableName),
-		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `nonce`=?, `gasPrice`=? WHERE `id`=? AND `status`=?", transferTableName),
+		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=? AND `status`=?", transferTableName),
 	}
 }
 
@@ -96,6 +96,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`txTimestamp` timestamp DEFAULT CURRENT_TIMESTAMP,"+
 			"`gas` bigint(20),"+
 			"`nonce` bigint(20),"+
+			"`relayer` varchar(42) DEFAULT NULL,"+
 			"`gasPrice` varchar(78) DEFAULT NULL,"+
 			"`notes` varchar(45) DEFAULT NULL,"+
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
@@ -232,10 +233,10 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	tx := &Transfer{}
 	var rawAmount string
 	var cashier, token, sender, recipient, id string
-	var hash, gasPrice, fee sql.NullString
+	var relayer, hash, gasPrice, fee sql.NullString
 	var gas, nonce sql.NullInt64
 	var timestamp sql.NullTime
-	if err := scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime); err != nil {
+	if err := scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = common.HexToAddress(cashier)
@@ -243,6 +244,9 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	tx.sender = common.HexToAddress(sender)
 	tx.recipient = common.HexToAddress(recipient)
 	tx.id = common.HexToHash(id)
+	if relayer.Valid {
+		tx.relayer = common.HexToAddress(relayer.String)
+	}
 
 	if hash.Valid {
 		tx.txHash = common.HexToHash(hash.String)
@@ -282,7 +286,7 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `id`=?", recorder.transferTableName),
 		id.Hex(),
 	)
 	return recorder.assembleTransfer(row.Scan)
@@ -314,9 +318,9 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, 
 	var query string
 	if status == "" {
 		if desc {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
 		} else {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
 		}
 		rows, err = recorder.store.DB().Query(query, offset, limit)
 		if err != nil {
@@ -324,9 +328,9 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, 
 		}
 	} else {
 		if desc {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `status`=? ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
 		} else {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime` FROM %s WHERE `status`=? ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `status`=? ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
 		}
 		rows, err = recorder.store.DB().Query(query, status, offset, limit)
 		if err != nil {
@@ -359,8 +363,8 @@ func (recorder *Recorder) MarkAsProcessing(id common.Hash) error {
 }
 
 // UpdateRecord updates a transfer gas price
-func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, nonce uint64, gasPrice *big.Int) error {
-	log.Printf("update transfer %s as validated (%s, %d)\n", id.Hex(), txhash.Hex(), nonce)
+func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, relayer common.Address, nonce uint64, gasPrice *big.Int) error {
+	log.Printf("update transfer %s as validated (%s, %s, %d)\n", id.Hex(), txhash.Hex(), relayer.Hex(), nonce)
 	// TODO: introduce new type
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
@@ -368,6 +372,7 @@ func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, nonce
 		recorder.updateStatusAndTransactionQuery,
 		validationSubmitted,
 		txhash.Hex(),
+		relayer.Hex(),
 		nonce,
 		gasPrice.String(),
 		id.Hex(),
@@ -381,14 +386,15 @@ func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, nonce
 }
 
 // MarkAsValidated marks a transfer as validated
-func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, nonce uint64, gasPrice *big.Int) error {
-	log.Printf("mark transfer %s as validated (%s, %d)\n", id.Hex(), txhash.Hex(), nonce)
+func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, relayer common.Address, nonce uint64, gasPrice *big.Int) error {
+	log.Printf("mark transfer %s as validated (%s, %s, %d)\n", id.Hex(), txhash.Hex(), relayer.Hex(), nonce)
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(
 		recorder.updateStatusAndTransactionQuery,
 		validationSubmitted,
 		txhash.Hex(),
+		relayer.Hex(),
 		nonce,
 		gasPrice.String(),
 		id.Hex(),

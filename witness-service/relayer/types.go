@@ -36,6 +36,7 @@ type (
 		timestamp  time.Time
 		gas        uint64
 		gasPrice   *big.Int
+		relayer    common.Address
 		nonce      uint64
 		updateTime time.Time
 		status     ValidationStatusType
@@ -53,9 +54,9 @@ type (
 		// Check returns transfer status on chain
 		Check(transfer *Transfer) (StatusOnChainType, error)
 		// Submit submits validation for a transfer
-		Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error)
+		Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 		// SpeedUp resubmits validation with higher gas price
-		SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error)
+		SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 	}
 )
 

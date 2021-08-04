@@ -8,7 +8,6 @@ package relayer
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"log"
 	"math/big"
 	"reflect"
@@ -18,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -37,7 +35,6 @@ type transferValidatorOnIoTeX struct {
 	gasLimit uint64
 	gasPrice *big.Int
 
-	privateKey            *ecdsa.PrivateKey
 	relayerAddr           address.Address
 	validatorContractAddr address.Address
 
@@ -52,7 +49,6 @@ type transferValidatorOnIoTeX struct {
 // NewTransferValidatorOnIoTeX creates a new TransferValidator on IoTeX
 func NewTransferValidatorOnIoTeX(
 	client iotex.AuthedClient,
-	privateKey *ecdsa.PrivateKey,
 	validatorContractAddr address.Address,
 ) (TransferValidator, error) {
 	validatorContractIoAddr, err := address.FromBytes(validatorContractAddr.Bytes())
@@ -86,17 +82,12 @@ func NewTransferValidatorOnIoTeX(
 	if err != nil {
 		return nil, err
 	}
-	relayerAddr, err := address.FromBytes(crypto.PubkeyToAddress(privateKey.PublicKey).Bytes())
-	if err != nil {
-		return nil, err
-	}
 
 	return &transferValidatorOnIoTeX{
 		gasLimit: 2000000,
 		gasPrice: big.NewInt(1000000000000),
 
-		privateKey:            privateKey,
-		relayerAddr:           relayerAddr,
+		relayerAddr:           client.Account().Address(),
 		validatorContractAddr: validatorContractIoAddr,
 
 		client:                 client,
@@ -238,9 +229,9 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 	return StatusOnChainNotConfirmed, nil
 }
 
-func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witness, resubmit bool) (common.Hash, uint64, *big.Int, error) {
+func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witness, resubmit bool) (common.Hash, common.Address, uint64, *big.Int, error) {
 	if err := tv.refresh(); err != nil {
-		return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
 	signatures := []byte{}
 	numOfValidSignatures := 0
@@ -248,7 +239,7 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		if !tv.isActiveWitness(witness.addr) {
 			addr, err := address.FromBytes(witness.addr.Bytes())
 			if err != nil {
-				return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+				return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 			}
 			log.Printf("witness %s is inactive\n", addr.String())
 			continue
@@ -257,15 +248,15 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		numOfValidSignatures++
 	}
 	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
-		return common.Hash{}, 0, nil, errInsufficientWitnesses
+		return common.Hash{}, common.Address{}, 0, nil, errInsufficientWitnesses
 	}
 	accountMeta, err := tv.relayerAccountMeta()
 	if err != nil {
-		return common.Hash{}, 0, nil, errors.Wrapf(errNoncritical, "failed to get account of %s, %v", tv.relayerAddr.String(), err)
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "failed to get account of %s, %v", tv.relayerAddr.String(), err)
 	}
 	balance, ok := big.NewInt(0).SetString(accountMeta.Balance, 10)
 	if !ok {
-		return common.Hash{}, 0, nil, errors.Wrapf(errNoncritical, "failed to convert balance %s of account %s, %v", accountMeta.Balance, tv.relayerAddr.String(), err)
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "failed to convert balance %s of account %s, %v", accountMeta.Balance, tv.relayerAddr.String(), err)
 	}
 	if balance.Cmp(new(big.Int).Mul(tv.gasPrice, new(big.Int).SetUint64(tv.gasLimit))) < 0 {
 		util.Alert("IOTX native balance has dropped to " + balance.String() + ", please refill account for gas " + tv.relayerAddr.String())
@@ -291,21 +282,21 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		SetNonce(nonce).
 		Call(context.Background())
 	if err != nil {
-		return common.Hash{}, 0, nil, err
+		return common.Hash{}, common.Address{}, 0, nil, err
 	}
 
-	return common.BytesToHash(actionHash[:]), nonce, tv.gasPrice, nil
+	return common.BytesToHash(actionHash[:]), common.BytesToAddress(tv.relayerAddr.Bytes()), nonce, tv.gasPrice, nil
 }
 
 // Submit submits validation for a transfer
-func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
+func (tv *transferValidatorOnIoTeX) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error) {
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
 
 	return tv.submit(transfer, witnesses, false)
 }
 
-func (tv *transferValidatorOnIoTeX) SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
+func (tv *transferValidatorOnIoTeX) SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error) {
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
 

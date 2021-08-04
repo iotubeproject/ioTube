@@ -8,12 +8,14 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"flag"
 	"fmt"
 	"log"
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -112,10 +114,6 @@ func main() {
 	if pk, ok := os.LookupEnv("RELAYER_PRIVATE_KEY"); ok {
 		cfg.PrivateKey = pk
 	}
-	privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
-	if err != nil {
-		log.Fatalf("failed to decode private key %v", err)
-	}
 	if validatorAddr, ok := os.LookupEnv("RELAYER_VALIDATOR_ADDRESS"); ok {
 		cfg.ValidatorAddress = validatorAddr
 	}
@@ -134,13 +132,21 @@ func main() {
 		// heco and bsc are idential to ethereum
 		fallthrough
 	case "ethereum":
+		privateKeys := []*ecdsa.PrivateKey{}
+		for _, pk := range strings.Split(cfg.PrivateKey, ",") {
+			privateKey, err := crypto.HexToECDSA(pk)
+			if err != nil {
+				log.Fatalf("failed to decode private key %v", err)
+			}
+			privateKeys = append(privateKeys, privateKey)
+		}
 		ethClient, err := ethclient.Dial(cfg.ClientURL)
 		if err != nil {
 			log.Fatalf("failed to create eth client %v\n", err)
 		}
 		if transferValidator, err = relayer.NewTransferValidatorOnEthereum(
 			ethClient,
-			privateKey,
+			privateKeys,
 			cfg.EthConfirmBlockNumber,
 			new(big.Int).SetUint64(cfg.EthGasPriceLimit),
 			new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
@@ -165,7 +171,6 @@ func main() {
 		}
 		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
 			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), acc),
-			privateKey,
 			validatorContractAddr,
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)

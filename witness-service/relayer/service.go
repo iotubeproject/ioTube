@@ -243,10 +243,10 @@ func (s *Service) confirmTransfers() error {
 			if _, ok := witnesses[transfer.id]; !ok {
 				return errors.Errorf("no witness are found for %x", transfer.id)
 			}
-			txHash, nonce, gasPrice, err := s.transferValidator.SpeedUp(transfer, witnesses[transfer.id])
+			txHash, relayer, nonce, gasPrice, err := s.transferValidator.SpeedUp(transfer, witnesses[transfer.id])
 			switch errors.Cause(err) {
 			case nil:
-				return s.recorder.UpdateRecord(transfer.id, txHash, nonce, gasPrice)
+				return s.recorder.UpdateRecord(transfer.id, txHash, relayer, nonce, gasPrice)
 			case errGasPriceTooHigh:
 				log.Printf("gas price %s is too high, %v\n", gasPrice, err)
 			case errInsufficientWitnesses:
@@ -298,10 +298,10 @@ func (s *Service) submitTransfers() error {
 			util.Alert("failed to mark " + transfer.id.String() + " as processing, with error" + err.Error())
 			continue
 		}
-		txHash, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses[transfer.id])
+		txHash, relayer, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses[transfer.id])
 		switch errors.Cause(err) {
 		case nil:
-			return s.recorder.MarkAsValidated(transfer.id, txHash, nonce, gasPrice)
+			return s.recorder.MarkAsValidated(transfer.id, txHash, relayer, nonce, gasPrice)
 		case errGasPriceTooHigh:
 			log.Printf("gas price %s is too high, %v\n", gasPrice, err)
 			return s.recorder.Reset(transfer.id)

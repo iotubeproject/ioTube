@@ -25,6 +25,8 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/contract"
 )
 
+var zeroAddress = common.Address{}
+
 // transferValidatorOnEthereum defines the transfer validator
 type transferValidatorOnEthereum struct {
 	mu                 sync.RWMutex
@@ -34,8 +36,7 @@ type transferValidatorOnEthereum struct {
 	gasPriceGap        *big.Int
 
 	chainID               *big.Int
-	privateKey            *ecdsa.PrivateKey
-	relayerAddr           common.Address
+	privateKeys           []*ecdsa.PrivateKey
 	validatorContractAddr common.Address
 
 	client              *ethclient.Client
@@ -47,7 +48,7 @@ type transferValidatorOnEthereum struct {
 // NewTransferValidatorOnEthereum creates a new TransferValidator
 func NewTransferValidatorOnEthereum(
 	client *ethclient.Client,
-	privateKey *ecdsa.PrivateKey,
+	privateKeys []*ecdsa.PrivateKey,
 	confirmBlockNumber uint8,
 	gasPriceLimit *big.Int,
 	gasPriceDeviation *big.Int,
@@ -70,8 +71,7 @@ func NewTransferValidatorOnEthereum(
 		gasPriceGap:        gasPriceGap,
 
 		chainID:               chainID,
-		privateKey:            privateKey,
-		relayerAddr:           crypto.PubkeyToAddress(privateKey.PublicKey),
+		privateKeys:           privateKeys,
 		validatorContractAddr: validatorContractAddr,
 
 		client:            client,
@@ -142,8 +142,11 @@ func (tv *transferValidatorOnEthereum) isActiveWitness(witness common.Address) b
 func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainType, error) {
 	tv.mu.RLock()
 	defer tv.mu.RUnlock()
+	if transfer.relayer == zeroAddress {
+		return StatusOnChainUnknown, errors.New("relayer is null")
+	}
 	// Fetch confirmed nonce before all the other checks
-	nonce, err := tv.nonce()
+	nonce, err := tv.client.NonceAt(context.Background(), transfer.relayer, nil)
 	if err != nil {
 		return StatusOnChainUnknown, err
 	}
@@ -197,9 +200,9 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 	return StatusOnChainRejected, nil
 }
 
-func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*Witness, isSpeedUp bool) (common.Hash, uint64, *big.Int, error) {
+func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*Witness, isSpeedUp bool) (common.Hash, common.Address, uint64, *big.Int, error) {
 	if err := tv.refresh(); err != nil {
-		return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
 	signatures := []byte{}
 	numOfValidSignatures := 0
@@ -212,34 +215,35 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		numOfValidSignatures++
 	}
 	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
-		return common.Hash{}, 0, nil, errInsufficientWitnesses
+		return common.Hash{}, common.Address{}, 0, nil, errInsufficientWitnesses
 	}
-	tOpts, err := tv.transactionOpts(300000)
+	privateKey := tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
+	tOpts, err := tv.transactionOpts(300000, privateKey)
 	if err != nil {
-		return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
 	if tv.gasPriceDeviation != nil && new(big.Int).Add(tv.gasPriceDeviation, tOpts.GasPrice).Sign() > 0 {
 		tOpts.GasPrice = new(big.Int).Add(tv.gasPriceDeviation, tOpts.GasPrice)
 	}
 	if isSpeedUp {
 		if new(big.Int).Sub(tOpts.GasPrice, transfer.gasPrice).Cmp(tv.gasPriceGap) < 0 {
-			return common.Hash{}, 0, nil, errors.Wrapf(errNoncritical, "current gas price %s is not significantly larger than old gas price %s", tOpts.GasPrice, transfer.gasPrice)
+			return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "current gas price %s is not significantly larger than old gas price %s", tOpts.GasPrice, transfer.gasPrice)
 		}
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
 	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
 	switch errors.Cause(err) {
 	case nil:
-		return transaction.Hash(), transaction.Nonce(), transaction.GasPrice(), nil
+		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil
 	case core.ErrUnderpriced:
-		return common.Hash{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	default:
-		return common.Hash{}, 0, nil, err
+		return common.Hash{}, common.Address{}, 0, nil, err
 	}
 }
 
 // Submit submits validation for a transfer
-func (tv *transferValidatorOnEthereum) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
+func (tv *transferValidatorOnEthereum) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error) {
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
 
@@ -247,18 +251,20 @@ func (tv *transferValidatorOnEthereum) Submit(transfer *Transfer, witnesses []*W
 }
 
 // SpeedUp creases the transaction gas price
-func (tv *transferValidatorOnEthereum) SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, uint64, *big.Int, error) {
+func (tv *transferValidatorOnEthereum) SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error) {
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
 	if tv.gasPriceGap == nil || tv.gasPriceGap.Cmp(big.NewInt(0)) > 0 {
-		return common.Hash{}, 0, nil, errNoncritical
+		return common.Hash{}, common.Address{}, 0, nil, errNoncritical
 	}
 
 	return tv.submit(transfer, witnesses, true)
 }
 
-func (tv *transferValidatorOnEthereum) transactionOpts(gasLimit uint64) (*bind.TransactOpts, error) {
-	opts, err := bind.NewKeyedTransactorWithChainID(tv.privateKey, tv.chainID)
+func (tv *transferValidatorOnEthereum) transactionOpts(gasLimit uint64, privateKey *ecdsa.PrivateKey) (*bind.TransactOpts, error) {
+	relayerAddr := crypto.PubkeyToAddress(privateKey.PublicKey)
+
+	opts, err := bind.NewKeyedTransactorWithChainID(privateKey, tv.chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +278,7 @@ func (tv *transferValidatorOnEthereum) transactionOpts(gasLimit uint64) (*bind.T
 		return nil, errors.Wrapf(errGasPriceTooHigh, "suggested gas price %d > limit %d", gasPrice, tv.gasPriceLimit)
 	}
 	opts.GasPrice = gasPrice
-	balance, err := tv.client.BalanceAt(context.Background(), tv.relayerAddr, nil)
+	balance, err := tv.client.BalanceAt(context.Background(), relayerAddr, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get balance of operator account")
 	}
@@ -280,21 +286,13 @@ func (tv *transferValidatorOnEthereum) transactionOpts(gasLimit uint64) (*bind.T
 	if gasFee.Cmp(balance) > 0 {
 		return nil, errors.Errorf("insuffient balance for gas fee")
 	}
-	nonce, err := tv.pendingNonce()
+	nonce, err := tv.client.PendingNonceAt(context.Background(), relayerAddr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to fetch pending nonce for %s", tv.relayerAddr)
+		return nil, errors.Wrapf(err, "failed to fetch pending nonce for %s", relayerAddr)
 	}
 	opts.Nonce = new(big.Int).SetUint64(nonce)
 
 	return opts, nil
-}
-
-func (tv *transferValidatorOnEthereum) pendingNonce() (uint64, error) {
-	return tv.client.PendingNonceAt(context.Background(), tv.relayerAddr)
-}
-
-func (tv *transferValidatorOnEthereum) nonce() (uint64, error) {
-	return tv.client.NonceAt(context.Background(), tv.relayerAddr, nil)
 }
 
 func (tv *transferValidatorOnEthereum) callOpts() (*bind.CallOpts, error) {
