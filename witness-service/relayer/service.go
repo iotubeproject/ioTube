@@ -280,7 +280,7 @@ func (s *Service) confirmTransfers() error {
 }
 
 func (s *Service) submitTransfers() error {
-	newTransfers, err := s.recorder.Transfers(waitingForWitnesses, 0, 1, false)
+	newTransfers, err := s.recorder.Transfers(waitingForWitnesses, 0, uint8(s.transferValidator.Size()), false)
 	if err != nil {
 		return err
 	}

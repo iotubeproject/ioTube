@@ -49,6 +49,8 @@ type (
 
 	// TransferValidator defines the interface of a transfer validator
 	TransferValidator interface {
+		// Size returns the number of relayers
+		Size() int
 		// Address returns the transfer validator contract address
 		Address() common.Address
 		// Check returns transfer status on chain

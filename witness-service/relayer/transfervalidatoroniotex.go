@@ -163,6 +163,10 @@ func (tv *transferValidatorOnIoTeX) isActiveWitness(witness common.Address) bool
 	return ok && val
 }
 
+func (tv *transferValidatorOnIoTeX) Size() int {
+	return 1
+}
+
 // Check returns true if a transfer has been settled
 func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType, error) {
 	tv.mu.RLock()

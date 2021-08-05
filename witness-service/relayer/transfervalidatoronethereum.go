@@ -93,6 +93,10 @@ func NewTransferValidatorOnEthereum(
 	return tv, nil
 }
 
+func (tv *transferValidatorOnEthereum) Size() int {
+	return len(tv.privateKeys)
+}
+
 func (tv *transferValidatorOnEthereum) Address() common.Address {
 	tv.mu.RLock()
 	defer tv.mu.RUnlock()
