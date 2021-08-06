@@ -204,6 +204,15 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 	return StatusOnChainRejected, nil
 }
 
+func (tv *transferValidatorOnEthereum) privateKeyOfRelayer(relayer common.Address) (*ecdsa.PrivateKey, error) {
+	for _, pk := range tv.privateKeys {
+		if relayer == crypto.PubkeyToAddress(pk.PublicKey) {
+			return pk, nil
+		}
+	}
+	return nil, errors.Errorf("no private key for relayer %s", relayer.Hex())
+}
+
 func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*Witness, isSpeedUp bool) (common.Hash, common.Address, uint64, *big.Int, error) {
 	if err := tv.refresh(); err != nil {
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
@@ -221,7 +230,16 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
 		return common.Hash{}, common.Address{}, 0, nil, errInsufficientWitnesses
 	}
-	privateKey := tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
+	var privateKey *ecdsa.PrivateKey
+	var err error
+	if isSpeedUp {
+		privateKey, err = tv.privateKeyOfRelayer(transfer.relayer)
+		if err != nil {
+			return common.Hash{}, common.Address{}, 0, nil, err
+		}
+	} else {
+		privateKey = tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
+	}
 	tOpts, err := tv.transactionOpts(300000, privateKey)
 	if err != nil {
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
