@@ -306,6 +306,9 @@ func (s *Service) submitTransfers() error {
 			log.Printf("gas price %s is too high, %v\n", gasPrice, err)
 			return s.recorder.Reset(transfer.id)
 		case errInsufficientWitnesses:
+			if transfer.timestamp.Add(5 * time.Minute).Before(time.Now()) {
+				util.Alert("At least one witness has not submitted signature for " + transfer.id.String())
+			}
 			log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
 			return s.recorder.Reset(transfer.id)
 		case errNoncritical:

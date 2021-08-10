@@ -19,16 +19,24 @@ type Payload struct {
 }
 
 var slackURL string
+var prefix string
 
 // SetSlackURL sets the slack post url
 func SetSlackURL(url string) {
 	slackURL = url
 }
 
+func SetPrefix(s string) {
+	prefix = s
+}
+
 // Alert sends alert to
 func Alert(msg string) {
 	if slackURL == "" {
 		return
+	}
+	if prefix != "" {
+		msg = prefix + ":" + msg
 	}
 	msgBytes, err := json.Marshal(Payload{Text: msg})
 	if err != nil {

@@ -9,6 +9,7 @@ package witness
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
@@ -24,6 +25,7 @@ type (
 		relayerURL             string
 		validatorContractAddr  common.Address
 		lastProcessBlockHeight uint64
+		lastPullTimestamp      time.Time
 		calcEndHeight          calcEndHeightFunc
 		pullTransfers          pullTransfersFunc
 	}
@@ -48,6 +50,7 @@ func newTokenCashierBase(
 		validatorContractAddr:  validatorContractAddr,
 		calcEndHeight:          calcEndHeight,
 		pullTransfers:          pullTransfers,
+		lastPullTimestamp:      time.Now(),
 	}
 }
 
@@ -79,8 +82,13 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
 	transfers, err := tc.pullTransfers(startHeight, endHeight)
 	if err != nil {
+		if tc.lastPullTimestamp.Add(3 * time.Minute).After(time.Now()) {
+			log.Printf("failed to pull transfers from %d to %d: %+v\n", startHeight, endHeight, err)
+			return nil
+		}
 		return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, endHeight)
 	}
+	tc.lastPullTimestamp = time.Now()
 	for _, transfer := range transfers {
 		if err := tc.recorder.AddTransfer(transfer); err != nil {
 			return errors.Wrap(err, "failed to add transfer")

@@ -121,6 +121,7 @@ func main() {
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
+	util.SetPrefix("relayer-" + cfg.Chain)
 
 	log.Println("Creating service")
 	var transferValidator relayer.TransferValidator
