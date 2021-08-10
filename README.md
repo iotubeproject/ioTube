@@ -252,3 +252,8 @@ Matic side:
 - Token Cashier Address:  0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be
 - Transfer Validator Address: 0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B
 
+
+## Crosschain IOTX (WIP)
+
+- CIOTX on IoTeX: `0x99B2B0eFb56E62E36960c20cD5ca8eC6ABD5557A`
+- CIOTX on Polygon: `0x300211Def2a644b036A9bdd3e58159bb2074d388`
