@@ -77,18 +77,18 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	startHeight = startHeight + 1
 	endHeight, err := tc.calcEndHeight(startHeight, count)
 	if err != nil {
+		if tc.lastPullTimestamp.Add(3 * time.Minute).After(time.Now()) {
+			log.Printf("failed to get end height with start height %d, count %d: %+v\n", startHeight, endHeight, err)
+			return nil
+		}
 		return errors.Wrapf(err, "failed to get end height with start height %d, count %d", startHeight, count)
 	}
+	tc.lastPullTimestamp = time.Now()
 	log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
 	transfers, err := tc.pullTransfers(startHeight, endHeight)
 	if err != nil {
-		if tc.lastPullTimestamp.Add(3 * time.Minute).After(time.Now()) {
-			log.Printf("failed to pull transfers from %d to %d: %+v\n", startHeight, endHeight, err)
-			return nil
-		}
 		return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, endHeight)
 	}
-	tc.lastPullTimestamp = time.Now()
 	for _, transfer := range transfers {
 		if err := tc.recorder.AddTransfer(transfer); err != nil {
 			return errors.Wrap(err, "failed to add transfer")
