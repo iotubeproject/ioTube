@@ -283,6 +283,7 @@ func (s *Service) confirmTransfer(transfer *Transfer) error {
 	default:
 		return errors.New("unexpected error")
 	}
+	return nil
 }
 
 func (s *Service) submitTransfers() error {
