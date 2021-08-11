@@ -222,61 +222,67 @@ func (s *Service) confirmTransfers() error {
 		return errors.Wrap(err, "failed to read transfers to confirm")
 	}
 	for _, transfer := range validatedTransfers {
-		statusOnChain, err := s.transferValidator.Check(transfer)
-		switch errors.Cause(err) {
-		case nil:
-			// do nothing
-		case ethereum.NotFound:
-			if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
-				log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
-			}
-			fallthrough
-		default:
-			return errors.Wrapf(err, "failed to check status of transfer %s", transfer.id)
-		}
-		switch statusOnChain {
-		case StatusOnChainNeedSpeedUp:
-			witnesses, err := s.recorder.Witnesses(transfer.id)
-			if err != nil {
-				return errors.Wrapf(err, "failed to read witnesses of %s", transfer.id)
-			}
-			if _, ok := witnesses[transfer.id]; !ok {
-				return errors.Errorf("no witness are found for %x", transfer.id)
-			}
-			txHash, relayer, nonce, gasPrice, err := s.transferValidator.SpeedUp(transfer, witnesses[transfer.id])
-			switch errors.Cause(err) {
-			case nil:
-				return s.recorder.UpdateRecord(transfer.id, txHash, relayer, nonce, gasPrice)
-			case errGasPriceTooHigh:
-				log.Printf("gas price %s is too high, %v\n", gasPrice, err)
-			case errInsufficientWitnesses:
-				log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
-				return s.recorder.Reset(transfer.id)
-			case errNoncritical:
-				log.Printf("failed to prepare speed up: %+v\n", err)
-			default:
-				return err
-			}
-		case StatusOnChainNotConfirmed:
-			continue
-		case StatusOnChainRejected:
-			if err := s.recorder.MarkAsRejected(transfer.id); err != nil {
-				return err
-			}
-		case StatusOnChainNonceOverwritten:
-			// nonce has been overwritten
-			if err := s.recorder.ResetCausedByNonce(transfer.id); err != nil {
-				return err
-			}
-		case StatusOnChainSettled:
-			if err := s.recorder.MarkAsSettled(transfer.id, transfer.gas, transfer.timestamp); err != nil {
-				return err
-			}
-		default:
-			return errors.New("unexpected error")
+		if err := s.confirmTransfer(transfer); err != nil {
+			log.Printf("failed to confirm transfer %s\n", transfer.id.String())
 		}
 	}
 	return nil
+}
+
+func (s *Service) confirmTransfer(transfer *Transfer) error {
+	statusOnChain, err := s.transferValidator.Check(transfer)
+	switch errors.Cause(err) {
+	case nil:
+		// do nothing
+	case ethereum.NotFound:
+		if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
+			log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
+		}
+		fallthrough
+	default:
+		return errors.Wrapf(err, "failed to check status of transfer %s", transfer.id)
+	}
+	switch statusOnChain {
+	case StatusOnChainNeedSpeedUp:
+		witnesses, err := s.recorder.Witnesses(transfer.id)
+		if err != nil {
+			return errors.Wrapf(err, "failed to read witnesses of %s", transfer.id)
+		}
+		if _, ok := witnesses[transfer.id]; !ok {
+			return errors.Errorf("no witness are found for %x", transfer.id)
+		}
+		txHash, relayer, nonce, gasPrice, err := s.transferValidator.SpeedUp(transfer, witnesses[transfer.id])
+		switch errors.Cause(err) {
+		case nil:
+			return s.recorder.UpdateRecord(transfer.id, txHash, relayer, nonce, gasPrice)
+		case errGasPriceTooHigh:
+			log.Printf("gas price %s is too high, %v\n", gasPrice, err)
+		case errInsufficientWitnesses:
+			log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
+			return s.recorder.Reset(transfer.id)
+		case errNoncritical:
+			log.Printf("failed to prepare speed up: %+v\n", err)
+		default:
+			return err
+		}
+	case StatusOnChainNotConfirmed:
+		// do nothing
+	case StatusOnChainRejected:
+		if err := s.recorder.MarkAsRejected(transfer.id); err != nil {
+			return err
+		}
+	case StatusOnChainNonceOverwritten:
+		// nonce has been overwritten
+		if err := s.recorder.ResetCausedByNonce(transfer.id); err != nil {
+			return err
+		}
+	case StatusOnChainSettled:
+		if err := s.recorder.MarkAsSettled(transfer.id, transfer.gas, transfer.timestamp); err != nil {
+			return err
+		}
+	default:
+		return errors.New("unexpected error")
+	}
 }
 
 func (s *Service) submitTransfers() error {
