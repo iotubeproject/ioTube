@@ -276,8 +276,8 @@ func (tv *transferValidatorOnEthereum) Submit(transfer *Transfer, witnesses []*W
 func (tv *transferValidatorOnEthereum) SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error) {
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
-	if tv.gasPriceGap == nil || tv.gasPriceGap.Cmp(big.NewInt(0)) > 0 {
-		return common.Hash{}, common.Address{}, 0, nil, errNoncritical
+	if tv.gasPriceGap == nil || tv.gasPriceGap.Cmp(big.NewInt(0)) < 0 {
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "gas price gas is not set")
 	}
 
 	return tv.submit(transfer, witnesses, true)

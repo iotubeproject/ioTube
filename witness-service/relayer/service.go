@@ -253,7 +253,7 @@ func (s *Service) confirmTransfers() error {
 				log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
 				return s.recorder.Reset(transfer.id)
 			case errNoncritical:
-				log.Printf("failed to prepare speed up: %v\n", err)
+				log.Printf("failed to prepare speed up: %+v\n", err)
 			default:
 				return err
 			}
