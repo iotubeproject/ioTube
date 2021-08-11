@@ -207,7 +207,7 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 			"SELECT cashier, token, tidx, sender, recipient, amount, fee, status, id "+
 				"FROM %s "+
 				"WHERE status=? "+
-				"ORDER BY updateTime",
+				"ORDER BY creationTime",
 			recorder.transferTableName,
 		),
 		status,

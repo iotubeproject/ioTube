@@ -310,17 +310,21 @@ func (recorder *Recorder) Count(status ValidationStatusType) (int, error) {
 }
 
 // Transfers returns the list of records of given status
-func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, limit uint8, desc bool) ([]*Transfer, error) {
+func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, limit uint8, byUpdateTime bool, desc bool) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	var rows *sql.Rows
 	var err error
 	var query string
+	orderBy := "creationTime"
+	if byUpdateTime {
+		orderBy = "updateTime"
+	}
 	if status == "" {
 		if desc {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s ORDER BY `%s` DESC LIMIT ?, ?", recorder.transferTableName, orderBy)
 		} else {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s ORDER BY `%s` ASC LIMIT ?, ?", recorder.transferTableName, orderBy)
 		}
 		rows, err = recorder.store.DB().Query(query, offset, limit)
 		if err != nil {
@@ -328,9 +332,9 @@ func (recorder *Recorder) Transfers(status ValidationStatusType, offset uint32, 
 		}
 	} else {
 		if desc {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `status`=? ORDER BY `creationTime` DESC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `status`=? ORDER BY `%s` DESC LIMIT ?, ?", recorder.transferTableName, orderBy)
 		} else {
-			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `status`=? ORDER BY `creationTime` ASC LIMIT ?, ?", recorder.transferTableName)
+			query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `status`=? ORDER BY `%s` ASC LIMIT ?, ?", recorder.transferTableName, orderBy)
 		}
 		rows, err = recorder.store.DB().Query(query, status, offset, limit)
 		if err != nil {

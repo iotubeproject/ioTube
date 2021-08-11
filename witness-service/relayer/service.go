@@ -118,7 +118,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if skip+first > int32(count) {
 		first = int32(count) - skip
 	}
-	transfers, err := s.recorder.Transfers("", uint32(skip), uint8(first), true)
+	transfers, err := s.recorder.Transfers("", uint32(skip), uint8(first), false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (s *Service) process() error {
 }
 
 func (s *Service) confirmTransfers() error {
-	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, 1, false)
+	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, 1, true, false)
 	if err != nil {
 		return errors.Wrap(err, "failed to read transfers to confirm")
 	}
@@ -280,7 +280,7 @@ func (s *Service) confirmTransfers() error {
 }
 
 func (s *Service) submitTransfers() error {
-	newTransfers, err := s.recorder.Transfers(waitingForWitnesses, 0, uint8(s.transferValidator.Size()), false)
+	newTransfers, err := s.recorder.Transfers(waitingForWitnesses, 0, uint8(s.transferValidator.Size()), true, false)
 	if err != nil {
 		return err
 	}
