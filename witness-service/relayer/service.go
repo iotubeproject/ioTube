@@ -217,7 +217,7 @@ func (s *Service) process() error {
 }
 
 func (s *Service) confirmTransfers() error {
-	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, 1, false, false)
+	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, uint8(s.transferValidator.Size()), false, false)
 	if err != nil {
 		return errors.Wrap(err, "failed to read transfers to confirm")
 	}
