@@ -217,7 +217,7 @@ func (s *Service) process() error {
 }
 
 func (s *Service) confirmTransfers() error {
-	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, 1, true, false)
+	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, 1, false, false)
 	if err != nil {
 		return errors.Wrap(err, "failed to read transfers to confirm")
 	}
@@ -225,7 +225,7 @@ func (s *Service) confirmTransfers() error {
 		statusOnChain, err := s.transferValidator.Check(transfer)
 		switch errors.Cause(err) {
 		case nil:
-			break
+			// do nothing
 		case ethereum.NotFound:
 			if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
 				log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
@@ -285,41 +285,44 @@ func (s *Service) submitTransfers() error {
 		return err
 	}
 	for _, transfer := range newTransfers {
-		witnesses, err := s.recorder.Witnesses(transfer.id)
-		if err != nil {
-			util.Alert("failed to fetch witness for " + transfer.id.String() + " with error" + err.Error())
-			continue
-		}
-		if _, ok := witnesses[transfer.id]; !ok {
-			util.Alert("no witness are found for " + transfer.id.String())
-			continue
-		}
-		if err := s.recorder.MarkAsProcessing(transfer.id); err != nil {
-			util.Alert("failed to mark " + transfer.id.String() + " as processing, with error" + err.Error())
-			continue
-		}
-		txHash, relayer, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses[transfer.id])
-		switch errors.Cause(err) {
-		case nil:
-			return s.recorder.MarkAsValidated(transfer.id, txHash, relayer, nonce, gasPrice)
-		case errGasPriceTooHigh:
-			log.Printf("gas price %s is too high, %v\n", gasPrice, err)
-			return s.recorder.Reset(transfer.id)
-		case errInsufficientWitnesses:
-			if transfer.timestamp.Add(5 * time.Minute).Before(time.Now()) {
-				util.Alert("At least one witness has not submitted signature for " + transfer.id.String())
-			}
-			log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
-			return s.recorder.Reset(transfer.id)
-		case errNoncritical:
-			log.Printf("failed to prepare submission: %v\n", err)
-			return s.recorder.Reset(transfer.id)
-		default:
-			if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
-				log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
-			}
-			return err
+		if err := s.submitTransfer(transfer); err != nil {
+			util.Alert("failed to submit transfer" + err.Error())
 		}
 	}
 	return nil
+}
+
+func (s *Service) submitTransfer(transfer *Transfer) error {
+	witnesses, err := s.recorder.Witnesses(transfer.id)
+	if err != nil {
+		return errors.Wrapf(err, "failed to fetch witness for %s", transfer.id.String())
+	}
+	if _, ok := witnesses[transfer.id]; !ok {
+		return errors.Wrapf(err, "no witness are found for %s", transfer.id.String())
+	}
+	if err := s.recorder.MarkAsProcessing(transfer.id); err != nil {
+		return errors.Wrapf(err, "failed to mark %s as processing", transfer.id.String())
+	}
+	txHash, relayer, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses[transfer.id])
+	switch errors.Cause(err) {
+	case nil:
+		return s.recorder.MarkAsValidated(transfer.id, txHash, relayer, nonce, gasPrice)
+	case errGasPriceTooHigh:
+		log.Printf("gas price %s is too high, %v\n", gasPrice, err)
+		return s.recorder.Reset(transfer.id)
+	case errInsufficientWitnesses:
+		if transfer.timestamp.Add(5 * time.Minute).Before(time.Now()) {
+			util.Alert("At least one witness has not submitted signature for " + transfer.id.String())
+		}
+		log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
+		return s.recorder.Reset(transfer.id)
+	case errNoncritical:
+		log.Printf("failed to prepare submission: %v\n", err)
+		return s.recorder.Reset(transfer.id)
+	default:
+		if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
+			log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
+		}
+		return err
+	}
 }
