@@ -182,8 +182,6 @@ Contacts on Ethereum
 
 ## Tube of IoTeX <-> BSC (Binance Smart Chain) 
 
-Please note this is still being added. They are not in production use yet. Please contact us if you want to use them without interfaces.
-
 IoTeX Side
 - Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y  (same for all)
 - Standard Token list: io1h2d3r0d20t58sv6h707ppc959kvs8wjsurrtnk
