@@ -189,6 +189,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 			return StatusOnChainNotConfirmed, nil
 		}
 		if transfer.updateTime.Before(time.Now().Add(-10*time.Minute)) && transfer.nonce == nonce {
+			log.Printf("transfer %s with nonce %d needs speed up, %s %s %d\n", transfer.id, transfer.nonce, transfer.updateTime.String(), time.Now(), nonce)
 			return StatusOnChainNeedSpeedUp, nil
 		}
 		return StatusOnChainNotConfirmed, nil
