@@ -30,16 +30,17 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	Chain         string        `json:"chain" yaml:"chain"`
-	ClientURL     string        `json:"clientURL" yaml:"clientURL"`
-	Database      db.Config     `json:"database" yaml:"database"`
-	PrivateKey    string        `json:"privateKey" yaml:"privateKey"`
-	SlackWebHook  string        `json:"slackWebHook" yaml:"slackWebHook"`
-	BatchSize     int           `json:"batchSize" yaml:"batchSize"`
-	Interval      time.Duration `json:"interval" yaml:"interval"`
-	GrpcPort      int           `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	Cashiers      []struct {
+	Chain              string        `json:"chain" yaml:"chain"`
+	ClientURL          string        `json:"clientURL" yaml:"clientURL"`
+	Database           db.Config     `json:"database" yaml:"database"`
+	PrivateKey         string        `json:"privateKey" yaml:"privateKey"`
+	SlackWebHook       string        `json:"slackWebHook" yaml:"slackWebHook"`
+	ConfirmBlockNumber int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
+	BatchSize          int           `json:"batchSize" yaml:"batchSize"`
+	Interval           time.Duration `json:"interval" yaml:"interval"`
+	GrpcPort           int           `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort      int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	Cashiers           []struct {
 		ID                       string `json:"id" yaml:"id"`
 		RelayerURL               string `json:"relayerURL" yaml:"relayerURL"`
 		CashierContractAddress   string `json:"cashierContractAddress" yaml:"cashierContractAddress"`
@@ -55,14 +56,15 @@ type Configuration struct {
 
 var (
 	defaultConfig = Configuration{
-		Chain:         "ethereum",
-		Interval:      time.Minute,
-		BatchSize:     100,
-		PrivateKey:    "",
-		SlackWebHook:  "",
-		ClientURL:     "",
-		GrpcPort:      9080,
-		GrpcProxyPort: 9081,
+		Chain:              "ethereum",
+		Interval:           time.Minute,
+		BatchSize:          100,
+		ConfirmBlockNumber: 20,
+		PrivateKey:         "",
+		SlackWebHook:       "",
+		ClientURL:          "",
+		GrpcPort:           9080,
+		GrpcProxyPort:      9081,
 	}
 )
 
@@ -196,7 +198,7 @@ func main() {
 					pairs,
 				),
 				uint64(cc.StartBlockHeight),
-				12,
+				uint8(cfg.ConfirmBlockNumber),
 			)
 			if err != nil {
 				log.Fatalf("failed to create cashier %v\n", err)
