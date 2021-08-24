@@ -188,7 +188,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 			}
 			return StatusOnChainNotConfirmed, nil
 		}
-		if transfer.updateTime.Before(time.Now().Add(-10*time.Minute)) && transfer.nonce == nonce+1 {
+		if transfer.updateTime.Before(time.Now().Add(-10*time.Minute)) && transfer.nonce == nonce {
 			return StatusOnChainNeedSpeedUp, nil
 		}
 		return StatusOnChainNotConfirmed, nil
