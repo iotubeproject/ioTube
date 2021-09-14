@@ -16,7 +16,7 @@ contract CrosschainTokenCashierRouter is Ownable {
     mapping(address => address) private tokenList;
     ICashier public cashier;
 
-    constructor(ICashier _cashier) {
+    constructor(ICashier _cashier) public {
         cashier = _cashier;
     }
 
@@ -32,7 +32,7 @@ contract CrosschainTokenCashierRouter is Ownable {
 
     function depositTo(address _token, address _to, uint256 _amount) public payable {
         address ct = tokenList[_token];
-        revert(ct != address(0), "invalid token");
+        require(ct != address(0), "invalid token");
         require(safeTransferFrom(_token, msg.sender, address(this), _amount), "failed to transfer token");
         ICrosschainToken(ct).deposit(_amount);
         cashier.depositTo(ct, _to, _amount);
@@ -43,5 +43,4 @@ contract CrosschainTokenCashierRouter is Ownable {
         (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0x23b872dd, _from, _to, _amount));
         return success && (data.length == 0 || abi.decode(data, (bool)));
     }
-
 }
