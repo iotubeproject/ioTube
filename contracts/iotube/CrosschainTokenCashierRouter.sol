@@ -26,8 +26,8 @@ contract CrosschainTokenCashierRouter {
     }
 
     function depositTo(address _crosschainToken, address _to, uint256 _amount) public payable {
-        ERC20 token = ICrosschainToken(_crosschainToken).coToken();
         require(_crosschainToken != address(0), "invalid token");
+        ERC20 token = ICrosschainToken(_crosschainToken).coToken();
         require(safeTransferFrom(address(token), msg.sender, address(this), _amount), "failed to transfer token");
         ICrosschainToken(_crosschainToken).deposit(_amount);
         cashier.depositTo(_crosschainToken, _to, _amount);
