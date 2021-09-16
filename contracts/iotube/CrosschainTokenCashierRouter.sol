@@ -1,6 +1,5 @@
 pragma solidity <6.0 >=0.4.24;
 
-import "../ownership/Ownable.sol";
 import "../token/ERC20.sol";
 
 interface ICashier {
@@ -9,33 +8,29 @@ interface ICashier {
 
 interface ICrosschainToken {
     function deposit(uint256 _amount) external;
+    function coToken() external view returns (ERC20);
 }
 
-contract CrosschainTokenCashierRouter is Ownable {
+contract CrosschainTokenCashierRouter {
 
-    mapping(address => address) private tokenList;
     ICashier public cashier;
 
     constructor(ICashier _cashier) public {
         cashier = _cashier;
     }
 
-    function crosschainTokenOf(address _token) public view returns (address) {
-        return tokenList[_token];
-    }
-
-    function addCrosschainToken(address _token, address _crosschainToken) public onlyOwner {
-        require(ERC20(_token).approve(_crosschainToken, uint256(-1)), "failed to approve allowance to crosschain token");
+    function approveCrosschainToken(address _crosschainToken) public {
+        ERC20 token = ICrosschainToken(_crosschainToken).coToken();
+        require(token.approve(_crosschainToken, uint256(-1)), "failed to approve allowance to crosschain token");
         require(ERC20(_crosschainToken).approve(address(cashier), uint256(-1)), "failed to approve allowance to cashier");
-        tokenList[_token] = _crosschainToken;
     }
 
-    function depositTo(address _token, address _to, uint256 _amount) public payable {
-        address ct = tokenList[_token];
-        require(ct != address(0), "invalid token");
-        require(safeTransferFrom(_token, msg.sender, address(this), _amount), "failed to transfer token");
-        ICrosschainToken(ct).deposit(_amount);
-        cashier.depositTo(ct, _to, _amount);
+    function depositTo(address _crosschainToken, address _to, uint256 _amount) public payable {
+        ERC20 token = ICrosschainToken(_crosschainToken).coToken();
+        require(_crosschainToken != address(0), "invalid token");
+        require(safeTransferFrom(address(token), msg.sender, address(this), _amount), "failed to transfer token");
+        ICrosschainToken(_crosschainToken).deposit(_amount);
+        cashier.depositTo(_crosschainToken, _to, _amount);
     }
 
     function safeTransferFrom(address _token, address _from, address _to, uint256 _amount) internal returns (bool) {
