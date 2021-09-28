@@ -41,7 +41,7 @@ for more information.
 ...
 
 ## Token Symbol
-XXX
+...
 
 ## Token Name in full
 ...
@@ -52,43 +52,41 @@ https://...
 ## Short description of your project
 Descrie your project here
 
-## What is the native blockchain for your token
-* [ ] Ethereum
+## What is the blockchain (source blockchain) that your token is issued on
+
+* [ ] Ethereum  
 * [ ] Binance Smart Chain
 * [ ] Polygon
-* [ ] Huobi Eco Chain (coming soon)
+* [ ] IoTeX
 
 ## Token native contract address
+
 Address:
 
 ## Your project websites
+
 - https://...
 
 ## Your social channels
+
 - Telegram:
 - Twitter:
 - Discord:
-
-## Select the tokens you want to bridge to IoTeX
-<!-- 
-    Please select the tokens you want to bridge to IoTeX, along with their contract address.
-    For each one, we will add it to the respective ioTube section, and a proxy XRC20 token 
-    called XXX-sss will be created on IoTeX, where "XXX" is the symbol of your token on the 
-    source chain, and "sss" is a symbol representing the source chain. These tokens will be 
-    the "corresponding" tokens minted on IoTeX each time a user sends them to ioTube from 
-    the source chaina: there is no need for you to create any "correspnding" token on IoTeX.
--->
-
-* [x] Ethereum Token → IoTeX: <token contract address on Ethereum>
-* [ ] Binance Smart Chain Token → IoTeX: <token contract address on BSC>
-* [ ] Polygon Token → IoTeX: <token contract address on Polygon>
-* [ ] Huobi Eco Chain Token (coming soon) → IoTeX: <token contract address on HEC> 
-
-
+    
+## How would you like your token to be bridged?
 <!--
-## If your token is native to IoTeX
- 
-Please notice that at this moment we only accept ioTube submissions for tokens native to Ethereum, Binance Smart Chain or Polygon to be bridged to IoTeX.
-Bridging IoTeX tokens to other blockchains will be available in the future.
+There are two options below. 
+Option 1 is preferred if your token is supported by other bridges yet. Examples are MCN, CIOTX, iMAGIC
+Option 2 is for tokens that are only need a single bridge between one blockchain and IoTeX. Examples are USDT, USDC, BUSD, etc.
 -->
+
+* [ ] Bridge Option 1. Create a crosschain token and bridge it to all different blockchains 
+* [ ] Bridge Option 2. Just bridge my token to IoTeX (from source chain to IoTeX)
+
+## What is the preferred name of your bridged token
+
+* [ ] the same as my token on source blockchain (Bridge option 1)
+* [ ] C-token (denoting the crosschain version of the token) (Bridge Option 1)
+* [ ] add a subfix denoting the source blockchain (```_b``` for bsc, ```_m``` for matic) (Bridge Option 2)
+* [ ] other, please specify:
 
