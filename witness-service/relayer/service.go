@@ -224,7 +224,7 @@ func (s *Service) confirmTransfers() error {
 	for _, transfer := range validatedTransfers {
 		speedup, err := s.confirmTransfer(transfer)
 		if err != nil {
-			log.Printf("failed to confirm transfer %s\n", transfer.id.String())
+			log.Printf("failed to confirm transfer %s, %+v\n", transfer.id.String(), err)
 		} else if speedup {
 			log.Printf("transfer %s has been speeded up, skip other transfers\n", transfer.id.String())
 			return nil
@@ -239,9 +239,9 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 	case nil:
 		// do nothing
 	case ethereum.NotFound:
-		if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
-			log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
-		}
+		// if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
+		//	log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
+		// }
 		fallthrough
 	default:
 		return false, errors.Wrapf(err, "failed to check status of transfer %s", transfer.id)
@@ -299,6 +299,7 @@ func (s *Service) submitTransfers() error {
 		if err := s.submitTransfer(transfer); err != nil {
 			util.Alert("failed to submit transfer" + err.Error())
 		}
+		time.Sleep(2 * time.Second)
 	}
 	return nil
 }
@@ -331,6 +332,7 @@ func (s *Service) submitTransfer(transfer *Transfer) error {
 		log.Printf("failed to prepare submission: %v\n", err)
 		return s.recorder.Reset(transfer.id)
 	default:
+		log.Printf("failed to submit %d, %+v", transfer.id, err)
 		if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
 			log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
 		}

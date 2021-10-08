@@ -17,7 +17,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -35,6 +34,7 @@ type transferValidatorOnIoTeX struct {
 	mu            sync.RWMutex
 	gasLimit      uint64
 	gasPrice      *big.Int
+	bonus         *big.Int
 	bonusRecorder map[string]time.Time
 
 	relayerAddr           address.Address
@@ -88,6 +88,7 @@ func NewTransferValidatorOnIoTeX(
 	return &transferValidatorOnIoTeX{
 		gasLimit:      2000000,
 		gasPrice:      big.NewInt(1000000000000),
+		bonus:         big.NewInt(200000000000000000),
 		bonusRecorder: map[string]time.Time{},
 
 		relayerAddr:           client.Account().Address(),
@@ -213,7 +214,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 			log.Panic("failed to convert address", transfer.recipient)
 		}
 		if t, ok := tv.bonusRecorder[addr.String()]; !ok || time.Now().After(t.Add(24*time.Hour)) {
-			_, err = tv.client.Transfer(addr, math.BigPow(10, 17)).SetGasPrice(tv.gasPrice).SetGasLimit(10000).Call(context.Background())
+			_, err = tv.client.Transfer(addr, tv.bonus).SetGasPrice(tv.gasPrice).SetGasLimit(10000).Call(context.Background())
 			if err != nil {
 				log.Print("failed to transfer iotx", err)
 			}
