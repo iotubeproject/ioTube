@@ -118,7 +118,17 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if skip+first > int32(count) {
 		first = int32(count) - skip
 	}
-	transfers, err := s.recorder.Transfers("", uint32(skip), uint8(first), false, true)
+	queryOpts := []TransferQueryOption{}
+	if len(request.Token) > 0 {
+		queryOpts = append(queryOpts, TokenQueryOption(common.BytesToAddress(request.Token)))
+	}
+	if len(request.Sender) > 0 {
+		queryOpts = append(queryOpts, SenderQueryOption(common.BytesToAddress(request.Sender)))
+	}
+	if len(request.Recipient) > 0 {
+		queryOpts = append(queryOpts, RecipientQueryOption(common.BytesToAddress(request.Recipient)))
+	}
+	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), false, true, queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +227,7 @@ func (s *Service) process() error {
 }
 
 func (s *Service) confirmTransfers() error {
-	validatedTransfers, err := s.recorder.Transfers(validationSubmitted, 0, uint8(s.transferValidator.Size())*2, false, false)
+	validatedTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size())*2, false, false, StatusQueryOption(validationSubmitted))
 	if err != nil {
 		return errors.Wrap(err, "failed to read transfers to confirm")
 	}
@@ -291,7 +301,7 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 }
 
 func (s *Service) submitTransfers() error {
-	newTransfers, err := s.recorder.Transfers(waitingForWitnesses, 0, uint8(s.transferValidator.Size()), true, false)
+	newTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size()), true, false, StatusQueryOption(waitingForWitnesses))
 	if err != nil {
 		return err
 	}

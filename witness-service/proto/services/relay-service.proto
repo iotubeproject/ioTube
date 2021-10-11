@@ -48,6 +48,9 @@ message CheckResponse {
 message ListRequest {
 	int32 first = 1;
 	int32 skip = 2;
+	bytes token = 3;
+	bytes sender = 4;
+	bytes recipient = 5;
 }
 
 message ListResponse {
