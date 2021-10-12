@@ -21,8 +21,8 @@ contract CrosschainTokenCashierRouter {
 
     function approveCrosschainToken(address _crosschainToken) public {
         ERC20 token = ICrosschainToken(_crosschainToken).coToken();
-        require(token.approve(_crosschainToken, uint256(-1)), "failed to approve allowance to crosschain token");
-        require(ERC20(_crosschainToken).approve(address(cashier), uint256(-1)), "failed to approve allowance to cashier");
+        require(safeApprove(address(token), _crosschainToken, uint256(-1)), "failed to approve allowance to crosschain token");
+        require(safeApprove(_crosschainToken, address(cashier), uint256(-1)), "failed to approve allowance to cashier");
     }
 
     function depositTo(address _crosschainToken, address _to, uint256 _amount) public payable {
@@ -36,6 +36,12 @@ contract CrosschainTokenCashierRouter {
     function safeTransferFrom(address _token, address _from, address _to, uint256 _amount) internal returns (bool) {
         // selector = bytes4(keccak256(bytes('transferFrom(address,address,uint256)')))
         (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0x23b872dd, _from, _to, _amount));
+        return success && (data.length == 0 || abi.decode(data, (bool)));
+    }
+
+    function safeApprove(address _token, address _spender, uint256 _amount) internal returns (bool) {
+        // selector = bytes4(keccak256(bytes('approve(address,uint256)')))
+        (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0x095ea7b3, _spender, _amount));
         return success && (data.length == 0 || abi.decode(data, (bool)));
     }
 }
