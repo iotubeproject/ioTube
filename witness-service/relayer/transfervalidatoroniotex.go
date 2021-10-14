@@ -208,17 +208,8 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 			return StatusOnChainUnknown, err
 		}
 		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
-		// send 0.1 iotx
-		addr, err := address.FromBytes(transfer.recipient.Bytes())
-		if err != nil {
-			log.Panic("failed to convert address", transfer.recipient)
-		}
-		if t, ok := tv.bonusRecorder[addr.String()]; !ok || time.Now().After(t.Add(24*time.Hour)) {
-			_, err = tv.client.Transfer(addr, tv.bonus).SetGasPrice(tv.gasPrice).SetGasLimit(10000).Call(context.Background())
-			if err != nil {
-				log.Print("failed to transfer iotx", err)
-			}
-			tv.bonusRecorder[addr.String()] = time.Now()
+		if err := tv.sendBonus(transfer.recipient); err != nil {
+			log.Printf("failed to send bonus to %s\n", transfer.recipient)
 		}
 
 		return StatusOnChainSettled, nil
@@ -238,6 +229,33 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 	}
 
 	return StatusOnChainNotConfirmed, nil
+}
+
+func (tv *transferValidatorOnIoTeX) sendBonus(recipient common.Address) error {
+	addr, err := address.FromBytes(recipient.Bytes())
+	if err != nil {
+		log.Panic("failed to convert address", recipient)
+	}
+	accountResponse, err := tv.client.API().GetAccount(context.Background(), &iotexapi.GetAccountRequest{
+		Address: addr.String(),
+	})
+	if err != nil {
+		return err
+	}
+	switch balance, ok := big.NewInt(0).SetString(accountResponse.AccountMeta.Balance, 10); {
+	case !ok:
+		return errors.Errorf("failed to get balance of %s", addr.String())
+	case balance.Cmp(big.NewInt(0)) > 0:
+		return nil
+	}
+	if t, ok := tv.bonusRecorder[addr.String()]; !ok || time.Now().After(t.Add(24*time.Hour)) {
+		_, err = tv.client.Transfer(addr, tv.bonus).SetGasPrice(tv.gasPrice).SetGasLimit(10000).Call(context.Background())
+		if err != nil {
+			return err
+		}
+		tv.bonusRecorder[addr.String()] = time.Now()
+	}
+	return nil
 }
 
 func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witness, resubmit bool) (common.Hash, common.Address, uint64, *big.Int, error) {

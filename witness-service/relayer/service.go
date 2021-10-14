@@ -342,7 +342,7 @@ func (s *Service) submitTransfer(transfer *Transfer) error {
 		log.Printf("failed to prepare submission: %v\n", err)
 		return s.recorder.Reset(transfer.id)
 	default:
-		log.Printf("failed to submit %d, %+v", transfer.id, err)
+		log.Printf("failed to submit %x, %+v", transfer.id, err)
 		if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
 			log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
 		}
