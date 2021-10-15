@@ -8,6 +8,7 @@ package relayer
 
 import (
 	"context"
+	"encoding/hex"
 	"log"
 	"math/big"
 	"reflect"
@@ -214,7 +215,9 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 
 		return StatusOnChainSettled, nil
 	}
-	response, err := tv.client.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{})
+	response, err := tv.client.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{
+		ActionHash: hex.EncodeToString(transfer.txHash.Bytes()),
+	})
 	switch status.Code(err) {
 	case codes.NotFound:
 		return StatusOnChainNeedSpeedUp, nil
