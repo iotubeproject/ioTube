@@ -319,19 +319,19 @@ func StatusQueryOption(status ValidationStatusType) TransferQueryOption {
 
 func TokenQueryOption(token common.Address) TransferQueryOption {
 	return func(query string, params []interface{}) (string, []interface{}) {
-		return query + " token = ?", append(params, token)
+		return query + " token = ?", append(params, token.String())
 	}
 }
 
 func SenderQueryOption(sender common.Address) TransferQueryOption {
 	return func(query string, params []interface{}) (string, []interface{}) {
-		return query + " sender = ?", append(params, sender)
+		return query + " sender = ?", append(params, sender.String())
 	}
 }
 
 func RecipientQueryOption(recipient common.Address) TransferQueryOption {
 	return func(query string, params []interface{}) (string, []interface{}) {
-		return query + " recipient = ?", append(params, recipient)
+		return query + " recipient = ?", append(params, recipient.String())
 	}
 }
 
@@ -468,12 +468,12 @@ func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
 
 // MarkAsRejected marks a record as failed
 func (recorder *Recorder) MarkAsRejected(id common.Hash) error {
-	log.Printf("mark transfer %s as failed\n", id.Hex())
+	log.Printf("mark transfer %s as rejected\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationRejected, id.Hex(), validationSubmitted)
 	if err != nil {
-		return errors.Wrap(err, "failed to mark as failed")
+		return errors.Wrap(err, "failed to mark as rejected")
 	}
 
 	return recorder.validateResult(result)
