@@ -292,16 +292,20 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	return recorder.assembleTransfer(row.Scan)
 }
 
-// Count returns the number of records of given status
-func (recorder *Recorder) Count(status ValidationStatusType) (int, error) {
+// Count returns the number of records of given restrictions
+func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	var row *sql.Row
-	if status == "" {
-		row = recorder.store.DB().QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", recorder.transferTableName))
-	} else {
-		row = recorder.store.DB().QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE `status`=?", recorder.transferTableName), status)
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", recorder.transferTableName)
+	params := []interface{}{}
+	if len(opts) > 0 {
+		query += " WHERE "
+		for _, opt := range opts {
+			query, params = opt(query, params)
+		}
 	}
+	row = recorder.store.DB().QueryRow(query, params...)
 	var count int
 	if err := row.Scan(&count); err != nil {
 		return 0, errors.Wrap(err, "failed to scan row")

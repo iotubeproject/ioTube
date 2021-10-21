@@ -108,16 +108,6 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 			s.cache.Remove(request.String())
 		}
 	}
-	count, err := s.recorder.Count("")
-	if err != nil {
-		return nil, err
-	}
-	if skip > int32(count) {
-		skip = int32(count)
-	}
-	if skip+first > int32(count) {
-		first = int32(count) - skip
-	}
 	queryOpts := []TransferQueryOption{}
 	if len(request.Token) > 0 {
 		queryOpts = append(queryOpts, TokenQueryOption(common.BytesToAddress(request.Token)))
@@ -127,6 +117,16 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	}
 	if len(request.Recipient) > 0 {
 		queryOpts = append(queryOpts, RecipientQueryOption(common.BytesToAddress(request.Recipient)))
+	}
+	count, err := s.recorder.Count(queryOpts...)
+	if err != nil {
+		return nil, err
+	}
+	if skip > int32(count) {
+		skip = int32(count)
+	}
+	if skip+first > int32(count) {
+		first = int32(count) - skip
 	}
 	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), false, true, queryOpts...)
 	if err != nil {
