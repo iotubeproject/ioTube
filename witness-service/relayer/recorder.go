@@ -301,8 +301,8 @@ func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 	params := []interface{}{}
 	if len(opts) > 0 {
 		query += " WHERE "
-		for _, opt := range opts {
-			query, params = opt(query, params)
+		for i, opt := range opts {
+			query, params = opt(i, query, params)
 		}
 	}
 	row = recorder.store.DB().QueryRow(query, params...)
@@ -313,29 +313,41 @@ func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 	return count, nil
 }
 
-type TransferQueryOption func(query string, params []interface{}) (string, []interface{})
+type TransferQueryOption func(i int, query string, params []interface{}) (string, []interface{})
 
 func StatusQueryOption(status ValidationStatusType) TransferQueryOption {
-	return func(query string, params []interface{}) (string, []interface{}) {
-		return query + " status = ?", append(params, status)
+	return func(i int, query string, params []interface{}) (string, []interface{}) {
+		if i == 0 {
+			return query + " status = ?", append(params, status)
+		}
+		return query + " AND status = ?", append(params, status)
 	}
 }
 
 func TokenQueryOption(token common.Address) TransferQueryOption {
-	return func(query string, params []interface{}) (string, []interface{}) {
-		return query + " token = ?", append(params, token.String())
+	return func(i int, query string, params []interface{}) (string, []interface{}) {
+		if i == 0 {
+			return query + " token = ?", append(params, token.String())
+		}
+		return query + " AND token = ?", append(params, token.String())
 	}
 }
 
 func SenderQueryOption(sender common.Address) TransferQueryOption {
-	return func(query string, params []interface{}) (string, []interface{}) {
-		return query + " sender = ?", append(params, sender.String())
+	return func(i int, query string, params []interface{}) (string, []interface{}) {
+		if i == 0 {
+			return query + " sender = ?", append(params, sender.String())
+		}
+		return query + " AND sender = ?", append(params, sender.String())
 	}
 }
 
 func RecipientQueryOption(recipient common.Address) TransferQueryOption {
-	return func(query string, params []interface{}) (string, []interface{}) {
-		return query + " recipient = ?", append(params, recipient.String())
+	return func(i int, query string, params []interface{}) (string, []interface{}) {
+		if i == 0 {
+			return query + " recipient = ?", append(params, recipient.String())
+		}
+		return query + " AND recipient = ?", append(params, recipient.String())
 	}
 }
 
@@ -358,8 +370,8 @@ func (recorder *Recorder) Transfers(
 	params := []interface{}{}
 	if len(queryOpts) > 0 {
 		query += " WHERE"
-		for _, opt := range queryOpts {
-			query, params = opt(query, params)
+		for i, opt := range queryOpts {
+			query, params = opt(i, query, params)
 		}
 	}
 	if desc {
