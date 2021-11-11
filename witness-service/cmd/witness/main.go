@@ -70,9 +70,11 @@ var (
 
 var configFile = flag.String("config", "", "path of config file")
 
+var block = flag.Uint64("block", 0, "block height")
+
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename>")
+		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename> -block <height>")
 		flag.PrintDefaults()
 	}
 }
@@ -223,6 +225,13 @@ func main() {
 	}
 	defer service.Stop(context.Background())
 
+	if *block != 0 {
+		if err := service.ProcessOneBlock(*block); err != nil {
+			log.Fatalf("failed to process block %d: %v\n", *block, err)
+		}
+		log.Println("Done")
+		return
+	}
 	witness.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort)
 
 	log.Println("Serving...")

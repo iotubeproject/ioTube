@@ -106,6 +106,15 @@ func (s *service) process() error {
 	return nil
 }
 
+func (s *service) ProcessOneBlock(height uint64) error {
+	for _, cashier := range s.cashiers {
+		if err := cashier.PullTransfersByHeight(height); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*services.QueryResponse, error) {
 	id := common.BytesToHash(request.Id)
 

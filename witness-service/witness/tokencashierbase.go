@@ -66,6 +66,19 @@ func (tc *tokenCashierBase) GetRecorder() *Recorder {
 	return tc.recorder
 }
 
+func (tc *tokenCashierBase) PullTransfersByHeight(height uint64) error {
+	transfers, err := tc.pullTransfers(height, height)
+	if err != nil {
+		return errors.Wrapf(err, "failed to pull transfers for %d", height)
+	}
+	for _, transfer := range transfers {
+		if err := tc.recorder.AddTransfer(transfer); err != nil {
+			return errors.Wrap(err, "failed to add transfer")
+		}
+	}
+	return nil
+}
+
 func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	startHeight, err := tc.recorder.TipHeight(tc.id)
 	if err != nil {
