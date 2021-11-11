@@ -32,16 +32,17 @@ message CheckRequest {
     bytes id = 1;
 }
 
+enum Status {
+    UNKNOWN = 0;
+    CREATED = 1;
+    SUBMITTED = 2;
+    SETTLED = 3;
+}
+
 message CheckResponse {
     bytes key = 1;
     repeated bytes witnesses = 2;
     bytes txHash = 3;
-    enum Status {
-        UNKNOWN = 0;
-        CREATED = 1;
-        SUBMITTED = 2;
-        SETTLED = 3;
-    }
     Status status = 4;
 }
 
@@ -51,6 +52,7 @@ message ListRequest {
 	bytes token = 3;
 	bytes sender = 4;
 	bytes recipient = 5;
+	Status status = 6;
 }
 
 message ListResponse {
