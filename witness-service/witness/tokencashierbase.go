@@ -179,7 +179,7 @@ func (tc *tokenCashierBase) CheckTransfers() error {
 		if err != nil {
 			return err
 		}
-		if response.Status == services.CheckResponse_SETTLED {
+		if response.Status == services.Status_SETTLED {
 			if err := tc.recorder.SettleTransfer(transfer); err != nil {
 				return err
 			}

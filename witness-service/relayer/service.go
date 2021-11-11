@@ -118,6 +118,16 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if len(request.Recipient) > 0 {
 		queryOpts = append(queryOpts, RecipientQueryOption(common.BytesToAddress(request.Recipient)))
 	}
+	switch request.Status {
+	case services.Status_SUBMITTED:
+		queryOpts = append(queryOpts, StatusQueryOption(validationSubmitted))
+	case services.Status_SETTLED:
+		queryOpts = append(queryOpts, StatusQueryOption(transferSettled))
+	case services.Status_CREATED:
+		queryOpts = append(queryOpts, StatusQueryOption(waitingForWitnesses))
+	case services.Status_FAILED:
+		queryOpts = append(queryOpts, StatusQueryOption(validationFailed, validationRejected))
+	}
 	count, err := s.recorder.Count(queryOpts...)
 	if err != nil {
 		return nil, err
@@ -182,17 +192,19 @@ func (s *Service) extractWitnesses(witnesses map[common.Hash][]*Witness, id comm
 	return witnessAddrs
 }
 
-func (s *Service) convertStatus(status ValidationStatusType) services.CheckResponse_Status {
+func (s *Service) convertStatus(status ValidationStatusType) services.Status {
 	switch status {
-	case waitingForWitnesses:
-		return services.CheckResponse_CREATED
+	case waitingForWitnesses, validationInProcess:
+		return services.Status_CREATED
 	case validationSubmitted:
-		return services.CheckResponse_SUBMITTED
+		return services.Status_SUBMITTED
 	case transferSettled:
-		return services.CheckResponse_SETTLED
+		return services.Status_SETTLED
+	case validationFailed, validationRejected:
+		return services.Status_FAILED
 	}
 
-	return services.CheckResponse_UNKNOWN
+	return services.Status_UNKNOWN
 }
 
 func (s *Service) assembleCheckResponse(transfer *Transfer, witnesses map[common.Hash][]*Witness) *services.CheckResponse {
@@ -301,9 +313,15 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 }
 
 func (s *Service) submitTransfers() error {
-	newTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size()), true, false, StatusQueryOption(waitingForWitnesses))
+	newTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size()), true, false, StatusQueryOption(waitingForWitnesses), ExcludeTokenQueryOption(common.HexToAddress("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")))
 	if err != nil {
 		return err
+	}
+	if len(newTransfers) == 0 {
+		newTransfers, err = s.recorder.Transfers(0, uint8(s.transferValidator.Size()), false, false, StatusQueryOption(waitingForWitnesses))
+		if err != nil {
+			return err
+		}
 	}
 	for _, transfer := range newTransfers {
 		if err := s.submitTransfer(transfer); err != nil {

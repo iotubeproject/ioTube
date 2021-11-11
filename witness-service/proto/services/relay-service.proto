@@ -37,6 +37,7 @@ enum Status {
     CREATED = 1;
     SUBMITTED = 2;
     SETTLED = 3;
+    FAILED = 4;
 }
 
 message CheckResponse {

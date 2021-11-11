@@ -300,9 +300,17 @@ func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", recorder.transferTableName)
 	params := []interface{}{}
 	if len(opts) > 0 {
-		query += " WHERE "
-		for i, opt := range opts {
-			query, params = opt(i, query, params)
+		conditions := []string{}
+		for _, opt := range opts {
+			condition, ps := opt()
+			if condition == "" {
+				continue
+			}
+			conditions = append(conditions, condition)
+			params = append(params, ps...)
+		}
+		if len(conditions) > 0 {
+			query += " WHERE " + strings.Join(conditions, " AND ")
 		}
 	}
 	row = recorder.store.DB().QueryRow(query, params...)
@@ -313,41 +321,44 @@ func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 	return count, nil
 }
 
-type TransferQueryOption func(i int, query string, params []interface{}) (string, []interface{})
+type TransferQueryOption func() (string, []interface{})
 
-func StatusQueryOption(status ValidationStatusType) TransferQueryOption {
-	return func(i int, query string, params []interface{}) (string, []interface{}) {
-		if i == 0 {
-			return query + " status = ?", append(params, status)
+func ExcludeTokenQueryOption(token common.Address) TransferQueryOption {
+	return func() (string, []interface{}) {
+		return "token <> ?", []interface{}{token.String()}
+	}
+}
+
+func StatusQueryOption(statuses ...ValidationStatusType) TransferQueryOption {
+	return func() (string, []interface{}) {
+		if len(statuses) == 0 {
+			return "", nil
 		}
-		return query + " AND status = ?", append(params, status)
+		qms := []string{}
+		params := []interface{}{}
+		for _, status := range statuses {
+			qms = append(qms, "?")
+			params = append(params, status)
+		}
+		return "status in (" + strings.Join(qms, ",") + ")", params
 	}
 }
 
 func TokenQueryOption(token common.Address) TransferQueryOption {
-	return func(i int, query string, params []interface{}) (string, []interface{}) {
-		if i == 0 {
-			return query + " token = ?", append(params, token.String())
-		}
-		return query + " AND token = ?", append(params, token.String())
+	return func() (string, []interface{}) {
+		return "token = ?", []interface{}{token.String()}
 	}
 }
 
 func SenderQueryOption(sender common.Address) TransferQueryOption {
-	return func(i int, query string, params []interface{}) (string, []interface{}) {
-		if i == 0 {
-			return query + " sender = ?", append(params, sender.String())
-		}
-		return query + " AND sender = ?", append(params, sender.String())
+	return func() (string, []interface{}) {
+		return "sender = ?", []interface{}{sender.String()}
 	}
 }
 
 func RecipientQueryOption(recipient common.Address) TransferQueryOption {
-	return func(i int, query string, params []interface{}) (string, []interface{}) {
-		if i == 0 {
-			return query + " recipient = ?", append(params, recipient.String())
-		}
-		return query + " AND recipient = ?", append(params, recipient.String())
+	return func() (string, []interface{}) {
+		return "recipient = ?", []interface{}{recipient.String()}
 	}
 }
 
@@ -369,9 +380,17 @@ func (recorder *Recorder) Transfers(
 	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
 	params := []interface{}{}
 	if len(queryOpts) > 0 {
-		query += " WHERE"
-		for i, opt := range queryOpts {
-			query, params = opt(i, query, params)
+		conditions := []string{}
+		for _, opt := range queryOpts {
+			condition, ps := opt()
+			if condition == "" {
+				continue
+			}
+			conditions = append(conditions, condition)
+			params = append(params, ps...)
+		}
+		if len(conditions) > 0 {
+			query += " WHERE " + strings.Join(conditions, " AND ")
 		}
 	}
 	if desc {
