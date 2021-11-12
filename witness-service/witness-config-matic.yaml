@@ -1,5 +1,7 @@
 chain: "matic"
 clientURL: "https://rpc-mainnet.maticvigil.com"
+grpcPort: 9082
+grpcProxyPort: 9083
 privateKey: ""
 slackWebHook: ""
 interval: 1m

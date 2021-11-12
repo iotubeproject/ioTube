@@ -1,5 +1,7 @@
 chain: "ethereum"
 clientURL: ""
+grpcPort: 9084
+grpcProxyPort: 9085
 privateKey: ""
 slackWebHook: ""
 interval: 1m

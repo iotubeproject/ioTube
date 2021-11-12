@@ -1,5 +1,7 @@
 chain: "bsc"
 clientURL: "https://bsc-dataseed.binance.org/"
+grpcPort: 9086
+grpcProxyPort: 9087
 privateKey: ""
 slackWebHook: ""
 interval: 1m

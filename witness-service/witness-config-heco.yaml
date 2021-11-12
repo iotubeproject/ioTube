@@ -1,5 +1,7 @@
 chain: "heco"
 clientURL: "https://http-mainnet-node.huobichain.com"
+grpcPort: 9088
+grpcProxyPort: 9089
 privateKey: ""
 slackWebHook: ""
 interval: 1m
