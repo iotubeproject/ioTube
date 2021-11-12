@@ -263,6 +263,8 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil
 	case core.ErrUnderpriced:
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+	case ethereum.NotFound:
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	default:
 		return common.Hash{}, common.Address{}, 0, nil, err
 	}
