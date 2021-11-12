@@ -5,6 +5,8 @@ services:
     container_name: witness-db
     image: mysql:8
     restart: always
+    ports:
+      - 13306:3306
     volumes:
       - $IOTEX_WITNESS/data/mysql:/var/lib/mysql:rw
     environment:
@@ -16,8 +18,7 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-iotex.yaml:/etc/iotube-witness/witness-config-iotex.yaml:ro
-    links:
-      - database
+    network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-iotex.yaml
 
   ethereum-witness:
@@ -26,8 +27,7 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-ethereum.yaml:/etc/iotube-witness/witness-config-ethereum.yaml:ro
-    links:
-      - database
+    network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-ethereum.yaml
 
   heco-witness:
@@ -36,8 +36,7 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-heco.yaml:/etc/iotube-witness/witness-config-heco.yaml:ro
-    links:
-      - database
+    network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-heco.yaml
 
   bsc-witness:
@@ -46,8 +45,7 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-bsc.yaml:/etc/iotube-witness/witness-config-bsc.yaml:ro
-    links:
-      - database
+    network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-bsc.yaml
 
   matic-witness:
@@ -56,8 +54,7 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-matic.yaml:/etc/iotube-witness/witness-config-matic.yaml:ro
-    links:
-      - database
+    network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-matic.yaml
 
   cron:

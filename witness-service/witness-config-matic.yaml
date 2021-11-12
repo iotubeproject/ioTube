@@ -4,8 +4,9 @@ privateKey: ""
 slackWebHook: ""
 interval: 1m
 batchSize: 40
+confirmBlockNumber: 120
 database:
-  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/witness?parseTime=true"
+  uri: "root:kdfjjrU64fjK58H@tcp(localhosst:13306)/witness?parseTime=true"
   driver: "mysql"
 cashiers:
   - id: "matic-to-iotex"
