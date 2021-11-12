@@ -13,6 +13,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -66,15 +67,17 @@ var (
 		GrpcPort:           9080,
 		GrpcProxyPort:      9081,
 	}
+
+	configFile = flag.String("config", "", "path of config file")
+
+	continuously = "continuously"
+
+	heights = flag.String("blocks", continuously, "block heights")
 )
-
-var configFile = flag.String("config", "", "path of config file")
-
-var block = flag.Uint64("block", 0, "block height")
 
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename> -block <height>")
+		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename> -blocks <height,height...>")
 		flag.PrintDefaults()
 	}
 }
@@ -225,9 +228,16 @@ func main() {
 	}
 	defer service.Stop(context.Background())
 
-	if *block != 0 {
-		if err := service.ProcessOneBlock(*block); err != nil {
-			log.Fatalf("failed to process block %d: %v\n", *block, err)
+	if *heights != continuously {
+		for _, hstr := range strings.Split(*heights, ",") {
+			log.Printf("Processing %s\n", hstr)
+			height, err := strconv.ParseUint(hstr, 10, 64)
+			if err != nil {
+				log.Fatalf("invalid height %s: %v\n", hstr, err)
+			}
+			if err := service.ProcessOneBlock(height); err != nil {
+				log.Fatalf("failed to process block %d: %v\n", height, err)
+			}
 		}
 		log.Println("Done")
 		return
