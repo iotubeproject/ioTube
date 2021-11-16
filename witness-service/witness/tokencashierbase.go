@@ -72,7 +72,7 @@ func (tc *tokenCashierBase) PullTransfersByHeight(height uint64) error {
 		return errors.Wrapf(err, "failed to pull transfers for %d", height)
 	}
 	for _, transfer := range transfers {
-		if err := tc.recorder.AddTransfer(transfer); err != nil {
+		if err := tc.recorder.UpsertTransfer(transfer); err != nil {
 			return errors.Wrap(err, "failed to add transfer")
 		}
 	}

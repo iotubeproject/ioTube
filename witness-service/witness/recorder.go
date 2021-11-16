@@ -103,14 +103,29 @@ func (recorder *Recorder) Stop(ctx context.Context) error {
 
 // AddTransfer creates a new transfer record
 func (recorder *Recorder) AddTransfer(tx *Transfer) error {
-	if err := recorder.validateID(tx.index); err != nil {
+	return recorder.addTransfer(tx, true)
+}
+
+func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
+	return recorder.addTransfer(tx, false)
+}
+
+func (recorder *Recorder) addTransfer(tx *Transfer, insertOnly bool) error {
+	err := recorder.validateID(tx.index)
+	if err != nil {
 		return err
 	}
 	if tx.amount.Sign() != 1 {
 		return errors.New("amount should be larger than 0")
 	}
+	var query string
+	if insertOnly {
+		query = fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
+	} else {
+		query = fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = '%s'", recorder.transferTableName, TransferNew)
+	}
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName),
+		query,
 		tx.cashier.Hex(),
 		tx.token.Hex(),
 		tx.index,
