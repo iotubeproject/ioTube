@@ -43,6 +43,9 @@ for more information.
 ## Token Symbol
 ...
 
+## Token Decimals
+... 
+
 ## Token Name in full
 ...
 
