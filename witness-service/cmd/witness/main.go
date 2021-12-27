@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -72,7 +73,7 @@ var (
 
 	continuously = "continuously"
 
-	heights = flag.String("blocks", continuously, "block heights")
+	blocksFlag = flag.String("blocks", continuously, "block heights")
 )
 
 func init() {
@@ -228,15 +229,32 @@ func main() {
 	}
 	defer service.Stop(context.Background())
 
-	if *heights != continuously {
-		for _, hstr := range strings.Split(*heights, ",") {
+	if *blocksFlag != continuously {
+		re := regexp.MustCompile(`^([0-9]*)-([0-9]*)$`)
+		for _, hstr := range strings.Split(*blocksFlag, ",") {
 			log.Printf("Processing %s\n", hstr)
-			height, err := strconv.ParseUint(hstr, 10, 64)
-			if err != nil {
-				log.Fatalf("invalid height %s: %v\n", hstr, err)
+			var start, end uint64
+			if re.MatchString(hstr) {
+				matches := re.FindStringSubmatch(hstr)
+				start, err = strconv.ParseUint(matches[1], 10, 64)
+				if err != nil {
+					log.Fatalf("invalid start in %s: %v\n", hstr, err)
+				}
+				end, err = strconv.ParseUint(matches[2], 10, 64)
+				if err != nil {
+					log.Fatalf("invalid end in %s: %v\n", hstr, err)
+				}
+			} else {
+				start, err = strconv.ParseUint(hstr, 10, 64)
+				if err != nil {
+					log.Fatalf("invalid height %s: %v\n", hstr, err)
+				}
+				end = start
 			}
-			if err := service.ProcessOneBlock(height); err != nil {
-				log.Fatalf("failed to process block %d: %v\n", height, err)
+			for height := start; height <= end; height++ {
+				if err := service.ProcessOneBlock(height); err != nil {
+					log.Fatalf("failed to process block %d: %v\n", height, err)
+				}
 			}
 		}
 		log.Println("Done")
