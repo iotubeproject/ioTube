@@ -93,3 +93,9 @@ Option 2 is for tokens that are only need a single bridge between one blockchain
 * [ ] add a subfix denoting the source blockchain (```_b``` for bsc, ```_m``` for matic) (Bridge Option 2)
 * [ ] other, please specify:
 
+## Verification of the token
+
+Please provide the verification of your token in one of the following ways.
+
+* [ ] Token address on your website. Please specify the link.
+* [ ] CMC / Coingecko profile link with token contract address and link to website/social
