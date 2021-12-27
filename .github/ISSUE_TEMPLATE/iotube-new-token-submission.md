@@ -89,7 +89,7 @@ Option 2 is for tokens that are only need a single bridge between one blockchain
 ## What is the preferred name of your bridged token
 
 * [ ] the same as my token on source blockchain (Bridge option 1)
-* [ ] C-token (denoting the crosschain version of the token) (Bridge Option 1)
+* [ ] C-token (denoting the crosschain version of the token, example: CABC if the token nam is ABC) (Bridge Option 1)
 * [ ] add a subfix denoting the source blockchain (```_b``` for bsc, ```_m``` for matic) (Bridge Option 2)
 * [ ] other, please specify:
 
