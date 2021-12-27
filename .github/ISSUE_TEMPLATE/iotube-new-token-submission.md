@@ -99,3 +99,24 @@ Please provide the verification of your token in one of the following ways.
 
 * [ ] Token address on your website. Please specify the link.
 * [ ] CMC / Coingecko profile link with token contract address and link to website/social
+
+<!--
+Please confirm with us about the above information and then send test tokens and make payment.
+-->
+
+## Send test tokens 
+
+Please send a few test tokens (worth $1) to our wallet address: `0x571e603e3B5c82Bd40998C538603dF4fb42bB051`.
+
+## Integration fee - a one-time fee to cover the smart contract deployment and testing
+
+Bridging from/to BSC
+- [ ] 50 USDT worth IOTX/BSC
+
+Bridging from/to Polygon
+- [ ] 50 USDT worth IOTX/MATIC
+
+Briding from/to ETH
+- [ ] 400 USDT worth IOTX/ETH
+
+Please send the payment to `0x571e603e3B5c82Bd40998C538603dF4fb42bB051` or `io12u0xq03mtjpt6sye33fcvq7lf76zhvz3yvt8q0` and post your txn link here.
