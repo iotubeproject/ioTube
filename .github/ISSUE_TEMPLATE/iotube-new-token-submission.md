@@ -79,8 +79,8 @@ Address:
 ## How would you like your token to be bridged?
 <!--
 There are two options below. 
-Option 1 is preferred if your token is supported by other bridges yet. Examples are MCN, CIOTX, iMAGIC
-Option 2 is for tokens that are only need a single bridge between one blockchain and IoTeX. Examples are USDT, USDC, BUSD, etc.
+Option 1 is preferred for project tokens that may be bridged to multiple blockchains. Examples are MCN, CIOTX, iMAGIC
+Option 2 is preferred for stable tokens or native coinds. Examples are USDT, USDC, BUSD, ETH, BNB, etc.
 -->
 
 * [ ] Bridge Option 1. Create a crosschain token and bridge it to all different blockchains 
