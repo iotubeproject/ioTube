@@ -111,12 +111,12 @@ Please send a few test tokens (worth $1) to our wallet address: `0x571e603e3B5c8
 ## Integration fee - a one-time fee to cover the smart contract deployment and testing
 
 Bridging from/to BSC
-- [ ] 50 USDT worth IOTX/BSC
+- [ ] 50 USDT worth IOTX or BSC
 
 Bridging from/to Polygon
-- [ ] 50 USDT worth IOTX/MATIC
+- [ ] 50 USDT worth IOTX or MATIC
 
 Briding from/to ETH
-- [ ] 400 USDT worth IOTX/ETH
+- [ ] 400 USDT worth IOTX or ETH
 
 Please send the payment to `0x571e603e3B5c82Bd40998C538603dF4fb42bB051` or `io12u0xq03mtjpt6sye33fcvq7lf76zhvz3yvt8q0` and post your txn link here.
