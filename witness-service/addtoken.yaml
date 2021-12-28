@@ -1,38 +1,73 @@
-iotex:
-  url: "https://babel-api.mainnet.iotex.io"
-  minterAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
-  operatorPrivateKey: ""
-chains:
-  bsc:
-    url: "https://bsc-dataseed.binance.org/"
-    minterAddr: "0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be"
-    standardTokenListAddr: "0x0d793F4D4287265B9bdA86b7a4083193E8743b34"
-    iotexProxyTokenListAddr: "0xf0Cb9Bca0B74Aa84804e0eDE74ca6dD3F577d6Ea"
-    operatorPrivateKey: ""
-  matic:
-    url: "https://rpc-mainnet.maticvigil.com"
-    minterAddr: "0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f"
-    standardTokenListAddr: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"
-    iotexProxyTokenListAddr: "0xD757adFF0eC4060e2c4A15f9777767f5Ca738Ca9"
-    operatorPrivateKey: ""
-  heco:
-    url: "https://http-mainnet-node.huobichain.com"
-    minterAddr: "0xd2165D222B3dAF2528Fc1b1Aa2DB18B8821EE623"
-    standardTokenListAddr: "0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45"
-    iotexProxyTokenListAddr: "0x3f006e67fA69637fF39dab4B2340e393A2350334"
-    operatorPrivateKey: ""
-  ethereum:
-    url: ""
-    minterAddr: "0x964f4f19bc823e72cc1f806021937cfc06f63b45"
-    standardTokenListAddr: "0x7c0bef36e1b1cbeb1f1a5541300786a7b608aede"
-    iotexProxyTokenListAddr: "0x6Ccf305A21DEFfF295e616bA5aa423eB563FC8dB"
-    operatorPrivateKey: ""
-token:
-  minAmount:
-  maxAmount:
-  sourceChain: "ethereum"
-  sourceTokenAddr:
-  shadowTokenAddr:
-  shadowTokenName:
-  shadowTokenSymbol:
-  shadowTokenDecimal: 18
+# fill in private keys
+chainPairs:
+  bsc-iotex:
+    chainA:
+      url: "https://bsc-dataseed.binance.org/"
+      minterPoolAddr: "0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be"
+      standardTokenListAddr: "0x0d793F4D4287265B9bdA86b7a4083193E8743b34"
+      proxyTokenListAddr: "0xa6ae9312D0AA3CC74d969Fcd4806d7729A321EE3"
+      operatorPrivateKey: ""
+    chainB:
+      url: "https://babel-api.mainnet.iotex.io"
+      minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
+      standardTokenListAddr: "0xBa9b11BdAA7ae8783357F3fc10E0B42d9903ba50"
+      proxyTokenListAddr: "0xf0Cb9Bca0B74Aa84804e0eDE74ca6dD3F577d6Ea"
+      operatorPrivateKey: ""
+  matic-iotex:
+    chainA:
+      url: "https://rpc-mainnet.maticvigil.com"
+      minterPoolAddr: "0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f"
+      standardTokenListAddr: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"
+      proxyTokenListAddr: "0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E"
+      operatorPrivateKey: ""
+    chainB:
+      url: "https://babel-api.mainnet.iotex.io"
+      minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
+      standardTokenListAddr: "0x2F8768cD292E94A0Da78671974B89B87a398356E"
+      proxyTokenListAddr: "0xD757adFF0eC4060e2c4A15f9777767f5Ca738Ca9"
+      operatorPrivateKey: ""
+  heco-iotex:
+    chainA:
+      url: "https://http-mainnet-node.huobichain.com"
+      minterPoolAddr: "0xd2165D222B3dAF2528Fc1b1Aa2DB18B8821EE623"
+      standardTokenListAddr: "0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45"
+      proxyTokenListAddr: "0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f"
+      operatorPrivateKey: ""
+    chainB:
+      url: "https://babel-api.mainnet.iotex.io"
+      minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
+      standardTokenListAddr: "0xB5DEc42cc4EEDB61307F623B119ffE1A83fDF837"
+      proxyTokenListAddr: "0x3f006e67fA69637fF39dab4B2340e393A2350334"
+      operatorPrivateKey: ""
+  ethereum-iotex:
+    chainA:
+      url: ""
+      minterPoolAddr: "0x964f4f19bc823e72cc1f806021937cfc06f63b45"
+      standardTokenListAddr: "0x7c0bef36e1b1cbeb1f1a5541300786a7b608aede"
+      proxyTokenListAddr: "0x73ffdfc98983ad59fb441fc5fe855c1589e35b3e"
+      operatorPrivateKey: ""
+    chainB:
+      url: "https://babel-api.mainnet.iotex.io"
+      minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
+      standardTokenListAddr: "0x59CAeb8dC448DF0E070B803062cfd9351AD39390"
+      proxyTokenListAddr: "0x6Ccf305A21DEFfF295e616bA5aa423eB563FC8dB"
+      operatorPrivateKey: ""
+# set origin token address if any
+originTokenAddr: ""
+isOriginTokenOnChainB: false
+pairName: "ethereum-iotex"
+minAmount: "1000000000000000000"
+maxAmount: "100000000000000000000"
+tokenOnChainA:
+  isProxy: true
+  # if the address is empty, no new crosschain token will be created
+  address: ""
+  name: ""
+  symbol: ""
+  decimals: 18
+tokenOnChainB:
+  isProxy: true
+  address: ""
+  name: ""
+  symbol: ""
+  decimals: 18

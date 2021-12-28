@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"flag"
 	"fmt"
 	"log"
@@ -16,35 +17,47 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/ioTube/witness-service/contract"
+	"github.com/pkg/errors"
 	"go.uber.org/config"
 )
 
+var zeroAddr = common.Address{}
+
+type ChainPair struct {
+	ChainA Chain `json:"chainA" yaml:"chainA"`
+	ChainB Chain `json:"chainB" yaml:"chainB"`
+}
+
 type Chain struct {
-	URL                     string `json:"url" yaml:"url"`
-	StandardTokenListAddr   string `json:"standardTokenListAddr" yaml:"standardTokenListAddr"`
-	IoTeXProxyTokenListAddr string `json:"iotexProxyTokenListAddr" yaml:"iotexProxyTokenListAddr"`
-	MinterAddr              string `json:"minterAddr" yaml:"minterAddr"`
-	OperatorPrivateKey      string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
+	URL                   string `json:"url" yaml:"url"`
+	MinterPoolAddr        string `json:"minterPoolAddr" yaml:"minterPoolAddr"`
+	OperatorPrivateKey    string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
+	StandardTokenListAddr string `json:"standardTokenListAddr" yaml:"standardTokenListAddr"`
+	ProxyTokenListAddr    string `json:"proxyTokenListAddr" yaml:"proxyTokenListAddr"`
+	RouterAddr            string `json:"routerAddr" yaml:"routerAddr"`
 }
 
 type TokenConfig struct {
-	MinAmount          string `json:"minAmount" yaml:"minAmount"`
-	MaxAmount          string `json:"maxAmount" yaml:"maxAmount"`
-	SourceTokenAddr    string `json:"sourceTokenAddr" yaml:"sourceTokenAddr"`
-	SourceChain        string `json:"sourceChain" yaml:"sourceChain"`
-	ShadowTokenAddr    string `json:"shadowTokenAddr" yaml:"shadowTokenAddr"`
-	ShadowTokenName    string `json:"shadowTokenName" yaml:"shadowTokenName"`
-	ShadowTokenSymbol  string `json:"shadowTokenSymbol" yaml:"shadowTokenSymbol"`
-	ShadowTokenDecimal int    `json:"shadowTokenDecimal" yaml:"shadowTokenDecimal"`
+	IsProxy  bool   `json:"isProxy" yaml:"isProxy"`
+	Address  string `json:"address" yaml:"address"`
+	Name     string `json:"name" yaml:"name"`
+	Symbol   string `json:"symbol" yaml:"symbol"`
+	Decimals uint8  `json:"decimals" yaml:"decimals"`
 }
 
 type Config struct {
-	IoTeX  Chain            `json:"iotex" yaml:"iotex"`
-	Chains map[string]Chain `json:"chains" yaml:"chains"`
-	Token  TokenConfig      `json:"token" yaml:"token"`
+	ChainPairs            map[string]ChainPair `json:"chainPairs" yaml:"chainPairs"`
+	PairName              string               `json:"pairName" yaml:"pairName"`
+	OriginTokenAddr       string               `json:"originTokenAddr" yaml:"originTokenAddr"`
+	IsOriginTokenOnChainB bool                 `json:"isOriginTokenOnChainB" yaml:"isOriginTokenOnChainB"`
+	MinAmount             string               `json:"minAmount" yaml:"minAmount"`
+	MaxAmount             string               `json:"maxAmount" yaml:"maxAmount"`
+	TokenOnChainA         TokenConfig          `json:"tokenOnChainA" yaml:"tokenOnChainA"`
+	TokenOnChainB         TokenConfig          `json:"tokenOnChainB" yaml:"tokenOnChainB"`
 }
 
 var configFile = flag.String("config", "", "path of config file")
@@ -70,89 +83,222 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	sourceChain, ok := cfg.Chains[cfg.Token.SourceChain]
+	pair, ok := cfg.ChainPairs[cfg.PairName]
 	if !ok {
-		log.Fatalf("source chain %s is not defined in chain configs", cfg.Token.SourceChain)
+		err = errors.Errorf("chain pair %s is not defined in config", cfg.PairName)
+		return
 	}
-	minAmount, ok := new(big.Int).SetString(cfg.Token.MinAmount, 10)
+	minAmount, ok := new(big.Int).SetString(cfg.MinAmount, 10)
 	if !ok {
-		log.Fatalln("failed to parse token min amount", cfg.Token.MinAmount)
+		err = errors.Errorf("failed to parse token min amount", cfg.MinAmount)
+		return
 	}
-	maxAmount, ok := new(big.Int).SetString(cfg.Token.MaxAmount, 10)
+	maxAmount, ok := new(big.Int).SetString(cfg.MaxAmount, 10)
 	if !ok {
-		log.Fatalln("failed to parse token max amount", cfg.Token.MaxAmount)
+		err = errors.Errorf("failed to parse token max amount", cfg.MaxAmount)
+		return
 	}
-	srcChainClient, err := ethclient.Dial(sourceChain.URL)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	srcChainID, err := srcChainClient.ChainID(context.Background())
-	if err != nil {
-		log.Fatalln(err)
-	}
-	srcPrivateKey, err := crypto.HexToECDSA(sourceChain.OperatorPrivateKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-	srcChainAuth, err := bind.NewKeyedTransactorWithChainID(srcPrivateKey, srcChainID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	srcTokenAddr := common.HexToAddress(cfg.Token.SourceTokenAddr)
-	if err := addTokenToList(
-		srcTokenAddr,
-		common.HexToAddress(sourceChain.StandardTokenListAddr),
-		minAmount,
-		maxAmount,
-		srcChainAuth,
-		srcChainClient,
-	); err != nil {
-		log.Fatalln(err)
-	}
-	iotexChain := cfg.IoTeX
-	targetChainClient, err := ethclient.Dial(iotexChain.URL)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	targetChainID, err := targetChainClient.ChainID(context.Background())
-	if err != nil {
-		log.Fatalln(err)
-	}
-	targetChainPrivateKey, err := crypto.HexToECDSA(iotexChain.OperatorPrivateKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-	targetChainAuth, err := bind.NewKeyedTransactorWithChainID(targetChainPrivateKey, targetChainID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var shadowTokenAddr common.Address
-	if cfg.Token.ShadowTokenAddr == "" {
-		shadowTokenAddr, _, _, err = contract.DeployShadowToken(
-			targetChainAuth,
-			targetChainClient,
-			common.HexToAddress(iotexChain.MinterAddr),
-			srcTokenAddr,
-			cfg.Token.ShadowTokenName,
-			cfg.Token.ShadowTokenSymbol,
-			uint8(cfg.Token.ShadowTokenDecimal),
+	if cfg.IsOriginTokenOnChainB {
+		err = addTokens(
+			common.HexToAddress(cfg.OriginTokenAddr),
+			pair.ChainB,
+			pair.ChainA,
+			cfg.TokenOnChainB,
+			cfg.TokenOnChainA,
+			minAmount,
+			maxAmount,
 		)
-		if err != nil {
-			log.Fatal(err)
-		}
 	} else {
-		shadowTokenAddr = common.HexToAddress(cfg.Token.ShadowTokenAddr)
+		err = addTokens(
+			common.HexToAddress(cfg.OriginTokenAddr),
+			pair.ChainA,
+			pair.ChainB,
+			cfg.TokenOnChainA,
+			cfg.TokenOnChainB,
+			minAmount,
+			maxAmount,
+		)
 	}
-	if err := addTokenToList(
-		shadowTokenAddr,
-		common.HexToAddress(sourceChain.IoTeXProxyTokenListAddr),
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func addTokens(
+	originTokenAddr common.Address,
+	nativeChain, foreignChain Chain,
+	tokenOnNativeChain, tokenOnForeignChain TokenConfig,
+	minAmount, maxAmount *big.Int,
+) error {
+	privateKey, err := crypto.HexToECDSA(nativeChain.OperatorPrivateKey)
+	if err != nil {
+		return err
+	}
+	name, symbol, decimals, err := addToken(
+		nativeChain.URL,
+		privateKey,
+		common.HexToAddress(nativeChain.MinterPoolAddr),
+		common.HexToAddress(nativeChain.StandardTokenListAddr),
+		common.HexToAddress(nativeChain.ProxyTokenListAddr),
+		common.HexToAddress(nativeChain.RouterAddr),
+		originTokenAddr,
 		minAmount,
 		maxAmount,
-		targetChainAuth,
-		targetChainClient,
-	); err != nil {
-		log.Fatal(err)
+		tokenOnNativeChain,
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to add token to source chain")
 	}
+	if tokenOnForeignChain.Name == "" {
+		tokenOnForeignChain.Name = name
+	}
+	if tokenOnForeignChain.Symbol == "" {
+		tokenOnForeignChain.Symbol = symbol
+	}
+	if tokenOnForeignChain.Decimals == 0 {
+		tokenOnForeignChain.Decimals = decimals
+	}
+	foreignChainPrivateKey, err := crypto.HexToECDSA(foreignChain.OperatorPrivateKey)
+	if err != nil {
+		return err
+	}
+
+	_, _, _, err = addToken(
+		foreignChain.URL,
+		foreignChainPrivateKey,
+		common.HexToAddress(foreignChain.MinterPoolAddr),
+		common.HexToAddress(foreignChain.StandardTokenListAddr),
+		common.HexToAddress(foreignChain.ProxyTokenListAddr),
+		common.HexToAddress(foreignChain.RouterAddr),
+		zeroAddr,
+		minAmount,
+		maxAmount,
+		tokenOnForeignChain,
+	)
+	return err
+}
+
+func addToken(
+	url string,
+	privateKey *ecdsa.PrivateKey,
+	minterPool, standardTokenList, proxyTokenList, router common.Address,
+	originTokenAddr common.Address,
+	minAmount, maxAmount *big.Int,
+	tokenConfig TokenConfig,
+) (
+	name, symbol string, decimals uint8, err error,
+) {
+	chainClient, err := ethclient.Dial(url)
+	if err != nil {
+		return
+	}
+	chainID, err := chainClient.ChainID(context.Background())
+	if err != nil {
+		return
+	}
+	chainAuth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+	if err != nil {
+		return
+	}
+	if originTokenAddr != zeroAddr {
+		// using CrosschainERC20 as ERC20 token
+		var originToken *contract.CrosschainERC20
+		originToken, err = contract.NewCrosschainERC20(originTokenAddr, chainClient)
+		if err != nil {
+			return
+		}
+		name, err = originToken.Name(nil)
+		if err != nil {
+			return
+		}
+		symbol, err = originToken.Symbol(nil)
+		if err != nil {
+			return
+		}
+		decimals, err = originToken.Decimals(nil)
+		if err != nil {
+			return
+		}
+	}
+	if tokenConfig.Name == "" {
+		if name == "" {
+			err = errors.New("invalid token name")
+			return
+		}
+		tokenConfig.Name = "Crosschain " + name
+	}
+	if tokenConfig.Symbol == "" {
+		if symbol == "" {
+			err = errors.New("invalid token symbol")
+			return
+		}
+		tokenConfig.Symbol = "C" + symbol
+	}
+	if tokenConfig.Decimals == 0 {
+		tokenConfig.Decimals = decimals
+	}
+	var tokenListAddr common.Address
+	var tokenAddr common.Address
+	if tokenConfig.IsProxy {
+		if tokenConfig.Address != "" {
+			tokenAddr = common.HexToAddress(tokenConfig.Address)
+		} else {
+			var tx *types.Transaction
+			tokenAddr, tx, _, err = contract.DeployCrosschainERC20(
+				chainAuth,
+				chainClient,
+				originTokenAddr,
+				minterPool,
+				tokenConfig.Name,
+				tokenConfig.Symbol,
+				tokenConfig.Decimals,
+			)
+			if err != nil {
+				return
+			}
+			log.Printf("deploy crosschain token %s for %s with tx %s\n", tokenAddr.String(), originTokenAddr, tx.Hash().Hex())
+		}
+		if router != zeroAddr {
+			var ct *contract.CrosschainERC20
+			ct, err = contract.NewCrosschainERC20(tokenAddr, chainClient)
+			if err != nil {
+				return
+			}
+			var coAddr common.Address
+			coAddr, err = ct.CoToken(nil)
+			if err != nil {
+				return
+			}
+			if coAddr != zeroAddr {
+				var ctcr *contract.CrosschainTokenCashierRouter
+				ctcr, err = contract.NewCrosschainTokenCashierRouter(router, chainClient)
+				if err != nil {
+					return
+				}
+				var tx *types.Transaction
+				tx, err = ctcr.ApproveCrosschainToken(chainAuth, tokenAddr)
+				if err != nil {
+					return
+				}
+				log.Printf("add %s to router via tx %s\n", tokenAddr, tx.Hash().Hex())
+			}
+		}
+		tokenListAddr = proxyTokenList
+	} else {
+		tokenAddr = originTokenAddr
+		tokenListAddr = standardTokenList
+	}
+	err = addTokenToList(
+		tokenAddr,
+		tokenListAddr,
+		minAmount,
+		maxAmount,
+		chainAuth,
+		chainClient,
+	)
+
+	return
 }
 
 func addTokenToList(
@@ -161,6 +307,9 @@ func addTokenToList(
 	auth *bind.TransactOpts,
 	backend bind.ContractBackend,
 ) error {
+	if tokenAddr == zeroAddr {
+		return errors.New("invalid token address")
+	}
 	tokenList, err := contract.NewTokenList(tokenListAddr, backend)
 	if err != nil {
 		return err
