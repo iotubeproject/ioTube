@@ -53,7 +53,7 @@ Any bug report or feedback? Please submit an issue or discuss in https://discord
 
 ## Submit a token to ioTube?
 
-You can get started here: https://github.com/iotexproject/ioTube/issues/new/choose
+Please refer to token submission guide first: https://docs.iotube.org/introduction/token-submission
 
 Feel free to reach out to https://github.com/guo for further discussion.
 
