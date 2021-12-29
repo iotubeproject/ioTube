@@ -6,12 +6,14 @@ chainPairs:
       minterPoolAddr: "0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be"
       standardTokenListAddr: "0x0d793F4D4287265B9bdA86b7a4083193E8743b34"
       proxyTokenListAddr: "0xa6ae9312D0AA3CC74d969Fcd4806d7729A321EE3"
+      routerAddr: "0x2a26feDe01BfA03E65cD3C68f421cAB83648391a"
       operatorPrivateKey: ""
     chainB:
       url: "https://babel-api.mainnet.iotex.io"
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
       standardTokenListAddr: "0xBa9b11BdAA7ae8783357F3fc10E0B42d9903ba50"
       proxyTokenListAddr: "0xf0Cb9Bca0B74Aa84804e0eDE74ca6dD3F577d6Ea"
+      routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
       operatorPrivateKey: ""
   matic-iotex:
     chainA:
@@ -25,6 +27,7 @@ chainPairs:
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
       standardTokenListAddr: "0x2F8768cD292E94A0Da78671974B89B87a398356E"
       proxyTokenListAddr: "0xD757adFF0eC4060e2c4A15f9777767f5Ca738Ca9"
+      routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
       operatorPrivateKey: ""
   heco-iotex:
     chainA:
@@ -38,6 +41,7 @@ chainPairs:
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
       standardTokenListAddr: "0xB5DEc42cc4EEDB61307F623B119ffE1A83fDF837"
       proxyTokenListAddr: "0x3f006e67fA69637fF39dab4B2340e393A2350334"
+      routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
       operatorPrivateKey: ""
   ethereum-iotex:
     chainA:
@@ -51,6 +55,7 @@ chainPairs:
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
       standardTokenListAddr: "0x59CAeb8dC448DF0E070B803062cfd9351AD39390"
       proxyTokenListAddr: "0x6Ccf305A21DEFfF295e616bA5aa423eB563FC8dB"
+      routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
       operatorPrivateKey: ""
 # set origin token address if any
 originTokenAddr: ""
@@ -60,7 +65,7 @@ minAmount: "1000000000000000000"
 maxAmount: "100000000000000000000"
 tokenOnChainA:
   isProxy: true
-  # if the address is empty, no new crosschain token will be created
+  # if the address is empty, a new crosschain token will be created
   address: ""
   name: ""
   symbol: ""
