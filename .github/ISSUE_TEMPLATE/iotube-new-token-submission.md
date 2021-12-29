@@ -8,10 +8,7 @@ assignees: guo
 ---
 # ioTube Token submission
 
-<!--
-Please read the guideline before submitting your tokens.
-
--->
+Please read the token submission guide here: https://docs.iotube.org/introduction/token-submission
 
 ## Team / Developer name
 ...
