@@ -9,32 +9,8 @@ assignees: guo
 # ioTube Token submission
 
 <!--
-## Introduction
+Please read the guideline before submitting your tokens.
 
-ioTube is a two-way, multi-asset, cross-chain protocol bridging IoTeX 
-to other blockchains such as Ethereum, Binance Smart Chain, Polygon, and others. 
-Anyone can submit their token to be added to ioTube: if you deployed a token 
-on IoTeX, you can make your dApp cross-chain and reach the audience of other 
-popular chains. Likewise, if you have deployed your token on Ethereum or any 
-blockchain other than IoTeX, thanks to ioTube you can extend your dApp to the 
-IoTeX ecosystem, taking advantage of the 5-second tx confirmations, ultra-low fees,
-and access other unique IoTeX features like real-world IoT data oracles, etc..
-
-## Guidelines for tokens
-We will only take into consideration projects that 
-
-- does not represent any type of cryptocurrency "scam" e.g. project counterfeit and others.
-- shows clear signs of activity: either traffic on the network, activity on GitHub, or community buzz.
-
-In addition:
-- Only tokens from Ethereum, Binance Smart Chain or Polygon can be bridged to IoTeX at the moment.
-- Bridging IoTeX tokens to other blockchains will be available in the future.
-- The token icon should be small, square, but high resolution, ideally a vector/svg.
-- Make sure your website includes a detailed explanation of project and the token contract address.
-- No Profanity in token name, token description, etc.
-
-Please fill the data below for us to review your submission and reach out to you 
-for more information.
 -->
 
 ## Team / Developer name
@@ -62,7 +38,7 @@ Descrie your project here
 * [ ] Polygon
 * [ ] IoTeX
 
-## Token native contract address
+## Token native contract address explorer link
 
 Address:
 
@@ -75,23 +51,6 @@ Address:
 - Telegram:
 - Twitter:
 - Discord:
-    
-## How would you like your token to be bridged?
-<!--
-There are two options below. 
-Option 1 is preferred for project tokens that may be bridged to multiple blockchains. Examples are MCN, CIOTX, iMAGIC
-Option 2 is preferred for stable tokens or native coinds. Examples are USDT, USDC, BUSD, ETH, BNB, etc.
--->
-
-* [ ] Bridge Option 1. Create a crosschain token and bridge it to all different blockchains 
-* [ ] Bridge Option 2. Just bridge my token to IoTeX (from source chain to IoTeX)
-
-## What is the preferred name of your bridged token
-
-* [ ] the same as my token on source blockchain (Bridge option 1)
-* [ ] C-token (denoting the crosschain version of the token, example: CABC if the token nam is ABC) (Bridge Option 1)
-* [ ] add a subfix denoting the source blockchain (```_b``` for bsc, ```_m``` for matic) (Bridge Option 2)
-* [ ] other, please specify:
 
 ## Verification of the token
 
@@ -100,23 +59,12 @@ Please provide the verification of your token in one of the following ways.
 * [ ] Token address on your website. Please specify the link.
 * [ ] CMC / Coingecko profile link with token contract address and link to website/social
 
-<!--
-Please confirm with us about the above information and then send test tokens and make payment.
--->
 
 ## Send test tokens 
 
-Please send a few test tokens (worth $1) to our wallet address: `0x571e603e3B5c82Bd40998C538603dF4fb42bB051`.
+Please send a few test tokens ($1-$10 worth) to our wallet address: `0x571e603e3B5c82Bd40998C538603dF4fb42bB051`.
 
-## Integration fee - a one-time fee to cover the smart contract deployment and testing
+## Integration fee 
 
-Bridging from/to BSC
-- [ ] 50 USDT worth IOTX or BSC
-
-Bridging from/to Polygon
-- [ ] 50 USDT worth IOTX or MATIC
-
-Briding from/to ETH
-- [ ] 400 USDT worth IOTX or ETH
 
 Please send the payment to `0x571e603e3B5c82Bd40998C538603dF4fb42bB051` or `io12u0xq03mtjpt6sye33fcvq7lf76zhvz3yvt8q0` and post your txn link here.
