@@ -14,7 +14,9 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -36,6 +38,7 @@ type Chain struct {
 	URL                   string `json:"url" yaml:"url"`
 	MinterPoolAddr        string `json:"minterPoolAddr" yaml:"minterPoolAddr"`
 	OperatorPrivateKey    string `json:"operatorPrivateKey" yaml:"operatorPrivateKey"`
+	CreatorPrivateKey     string `json:"creatorPrivateKey" yaml:"creatorPrivateKey"`
 	StandardTokenListAddr string `json:"standardTokenListAddr" yaml:"standardTokenListAddr"`
 	ProxyTokenListAddr    string `json:"proxyTokenListAddr" yaml:"proxyTokenListAddr"`
 	RouterAddr            string `json:"routerAddr" yaml:"routerAddr"`
@@ -130,13 +133,18 @@ func addTokens(
 	tokenOnNativeChain, tokenOnForeignChain TokenConfig,
 	minAmount, maxAmount *big.Int,
 ) error {
-	privateKey, err := crypto.HexToECDSA(nativeChain.OperatorPrivateKey)
+	operatorPrivateKey, err := crypto.HexToECDSA(nativeChain.OperatorPrivateKey)
+	if err != nil {
+		return err
+	}
+	creatorPrivateKey, err := crypto.HexToECDSA(nativeChain.CreatorPrivateKey)
 	if err != nil {
 		return err
 	}
 	name, symbol, decimals, err := addToken(
 		nativeChain.URL,
-		privateKey,
+		operatorPrivateKey,
+		creatorPrivateKey,
 		common.HexToAddress(nativeChain.MinterPoolAddr),
 		common.HexToAddress(nativeChain.StandardTokenListAddr),
 		common.HexToAddress(nativeChain.ProxyTokenListAddr),
@@ -159,14 +167,18 @@ func addTokens(
 	if tokenOnForeignChain.Decimals == 0 {
 		tokenOnForeignChain.Decimals = decimals
 	}
-	foreignChainPrivateKey, err := crypto.HexToECDSA(foreignChain.OperatorPrivateKey)
+	foreignChainOperatorPrivateKey, err := crypto.HexToECDSA(foreignChain.OperatorPrivateKey)
 	if err != nil {
 		return err
 	}
-
+	foreignChainCreatorPrivateKey, err := crypto.HexToECDSA(foreignChain.OperatorPrivateKey)
+	if err != nil {
+		return err
+	}
 	_, _, _, err = addToken(
 		foreignChain.URL,
-		foreignChainPrivateKey,
+		foreignChainOperatorPrivateKey,
+		foreignChainCreatorPrivateKey,
 		common.HexToAddress(foreignChain.MinterPoolAddr),
 		common.HexToAddress(foreignChain.StandardTokenListAddr),
 		common.HexToAddress(foreignChain.ProxyTokenListAddr),
@@ -181,9 +193,8 @@ func addTokens(
 
 func addToken(
 	url string,
-	privateKey *ecdsa.PrivateKey,
-	minterPool, standardTokenList, proxyTokenList, router common.Address,
-	originTokenAddr common.Address,
+	operatorPrivateKey, creatorPrivateKey *ecdsa.PrivateKey,
+	minterPool, standardTokenList, proxyTokenList, router, originTokenAddr common.Address,
 	minAmount, maxAmount *big.Int,
 	tokenConfig TokenConfig,
 ) (
@@ -197,7 +208,7 @@ func addToken(
 	if err != nil {
 		return
 	}
-	chainAuth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+	operatorAuth, err := bind.NewKeyedTransactorWithChainID(operatorPrivateKey, chainID)
 	if err != nil {
 		return
 	}
@@ -244,9 +255,14 @@ func addToken(
 		if tokenConfig.Address != "" {
 			tokenAddr = common.HexToAddress(tokenConfig.Address)
 		} else {
+			var creatorAuth *bind.TransactOpts
+			creatorAuth, err = bind.NewKeyedTransactorWithChainID(creatorPrivateKey, chainID)
+			if err != nil {
+				return
+			}
 			var tx *types.Transaction
 			tokenAddr, tx, _, err = contract.DeployCrosschainERC20(
-				chainAuth,
+				creatorAuth,
 				chainClient,
 				originTokenAddr,
 				minterPool,
@@ -257,7 +273,8 @@ func addToken(
 			if err != nil {
 				return
 			}
-			log.Printf("deploy crosschain token %s for %s with tx %s\n", tokenAddr.String(), originTokenAddr, tx.Hash().Hex())
+			log.Printf("Deploying crosschain token %s for %s with tx %s\n", tokenAddr.String(), originTokenAddr, tx.Hash().Hex())
+			waitUntilConfirm(chainClient, tx)
 		}
 		if router != zeroAddr {
 			var ct *contract.CrosschainERC20
@@ -277,11 +294,12 @@ func addToken(
 					return
 				}
 				var tx *types.Transaction
-				tx, err = ctcr.ApproveCrosschainToken(chainAuth, tokenAddr)
+				tx, err = ctcr.ApproveCrosschainToken(operatorAuth, tokenAddr)
 				if err != nil {
 					return
 				}
-				log.Printf("add %s to router via tx %s\n", tokenAddr, tx.Hash().Hex())
+				log.Printf("Adding %s to router via tx %s\n", tokenAddr, tx.Hash().Hex())
+				waitUntilConfirm(chainClient, tx)
 			}
 		}
 		tokenListAddr = proxyTokenList
@@ -294,7 +312,7 @@ func addToken(
 		tokenListAddr,
 		minAmount,
 		maxAmount,
-		chainAuth,
+		operatorAuth,
 		chainClient,
 	)
 
@@ -305,12 +323,12 @@ func addTokenToList(
 	tokenAddr, tokenListAddr common.Address,
 	minAmount, maxAmount *big.Int,
 	auth *bind.TransactOpts,
-	backend bind.ContractBackend,
+	client *ethclient.Client,
 ) error {
 	if tokenAddr == zeroAddr {
 		return errors.New("invalid token address")
 	}
-	tokenList, err := contract.NewTokenList(tokenListAddr, backend)
+	tokenList, err := contract.NewTokenList(tokenListAddr, client)
 	if err != nil {
 		return err
 	}
@@ -324,6 +342,35 @@ func addTokenToList(
 			return err
 		}
 		log.Printf("Adding token %x to token list %x via tx %s", tokenAddr, tokenListAddr, tx.Hash())
+		waitUntilConfirm(client, tx)
 	}
 	return nil
+}
+
+func waitUntilConfirm(client *ethclient.Client, tx *types.Transaction) error {
+	h := tx.Hash()
+	for {
+		log.Println("Wait for 5s...")
+		time.Sleep(5 * time.Second)
+		receipt, err := client.TransactionReceipt(context.Background(), h)
+		switch errors.Cause(err) {
+		case ethereum.NotFound:
+			// do nothing
+		case nil:
+			if receipt.Status != types.ReceiptStatusSuccessful {
+				return errors.Errorf("transaction %x is rejected", h)
+			}
+			for {
+				tip, err := client.BlockNumber(context.Background())
+				if err != nil {
+					return err
+				}
+				if tip > receipt.BlockNumber.Uint64()+20 {
+					return nil
+				}
+			}
+		default:
+			return err
+		}
+	}
 }

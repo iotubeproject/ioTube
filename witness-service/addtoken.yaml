@@ -8,6 +8,7 @@ chainPairs:
       proxyTokenListAddr: "0xa6ae9312D0AA3CC74d969Fcd4806d7729A321EE3"
       routerAddr: "0x2a26feDe01BfA03E65cD3C68f421cAB83648391a"
       operatorPrivateKey: ""
+      creatorPrivateKey: ""
     chainB:
       url: "https://babel-api.mainnet.iotex.io"
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
@@ -15,6 +16,7 @@ chainPairs:
       proxyTokenListAddr: "0xf0Cb9Bca0B74Aa84804e0eDE74ca6dD3F577d6Ea"
       routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
       operatorPrivateKey: ""
+      creatorPrivateKey: ""
   matic-iotex:
     chainA:
       url: "https://rpc-mainnet.maticvigil.com"
@@ -22,6 +24,7 @@ chainPairs:
       standardTokenListAddr: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"
       proxyTokenListAddr: "0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E"
       operatorPrivateKey: ""
+      creatorPrivateKey: ""
     chainB:
       url: "https://babel-api.mainnet.iotex.io"
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
@@ -29,6 +32,7 @@ chainPairs:
       proxyTokenListAddr: "0xD757adFF0eC4060e2c4A15f9777767f5Ca738Ca9"
       routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
       operatorPrivateKey: ""
+      creatorPrivateKey: ""
   heco-iotex:
     chainA:
       url: "https://http-mainnet-node.huobichain.com"
@@ -36,6 +40,7 @@ chainPairs:
       standardTokenListAddr: "0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45"
       proxyTokenListAddr: "0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f"
       operatorPrivateKey: ""
+      creatorPrivateKey: ""
     chainB:
       url: "https://babel-api.mainnet.iotex.io"
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
@@ -43,6 +48,7 @@ chainPairs:
       proxyTokenListAddr: "0x3f006e67fA69637fF39dab4B2340e393A2350334"
       routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
       operatorPrivateKey: ""
+      creatorPrivateKey: ""
   ethereum-iotex:
     chainA:
       url: ""
@@ -50,6 +56,7 @@ chainPairs:
       standardTokenListAddr: "0x7c0bef36e1b1cbeb1f1a5541300786a7b608aede"
       proxyTokenListAddr: "0x73ffdfc98983ad59fb441fc5fe855c1589e35b3e"
       operatorPrivateKey: ""
+      creatorPrivateKey: ""
     chainB:
       url: "https://babel-api.mainnet.iotex.io"
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
@@ -57,6 +64,7 @@ chainPairs:
       proxyTokenListAddr: "0x6Ccf305A21DEFfF295e616bA5aa423eB563FC8dB"
       routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
       operatorPrivateKey: ""
+      creatorPrivateKey: ""
 # set origin token address if any
 originTokenAddr: ""
 isOriginTokenOnChainB: false
