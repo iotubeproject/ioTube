@@ -272,7 +272,6 @@ func addToken(
 				tokenConfig.Decimals,
 			)
 			if err != nil {
-				log.Printf("failed to deploy crosschain token %+v\n", err)
 				return
 			}
 			log.Printf("Waiting token %s deployment for %s with tx %s\n", tokenAddr.String(), originTokenAddr, tx.Hash().Hex())
@@ -309,6 +308,7 @@ func addToken(
 		tokenAddr = originTokenAddr
 		tokenListAddr = standardTokenList
 	}
+	log.Printf(">> C-Token address on %d: %s\n", chainID, tokenAddr)
 	err = addTokenToList(
 		tokenAddr,
 		tokenListAddr,
