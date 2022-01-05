@@ -260,6 +260,7 @@ func addToken(
 			if err != nil {
 				return
 			}
+			log.Printf("Deploying crosschain token (%s, %s, %s, %s, %d)\n", originTokenAddr.String(), minterPool.String(), tokenConfig.Name, tokenConfig.Symbol, tokenConfig.Decimals)
 			var tx *types.Transaction
 			tokenAddr, tx, _, err = contract.DeployCrosschainERC20(
 				creatorAuth,
@@ -271,9 +272,10 @@ func addToken(
 				tokenConfig.Decimals,
 			)
 			if err != nil {
+				log.Printf("failed to deploy crosschain token %+v\n", err)
 				return
 			}
-			log.Printf("Deploying crosschain token %s for %s with tx %s\n", tokenAddr.String(), originTokenAddr, tx.Hash().Hex())
+			log.Printf("Waiting token %s deployment for %s with tx %s\n", tokenAddr.String(), originTokenAddr, tx.Hash().Hex())
 			waitUntilConfirm(chainClient, tx)
 		}
 		if router != zeroAddr {
