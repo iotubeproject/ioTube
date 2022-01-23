@@ -24,7 +24,9 @@ type (
 		recorder               *Recorder
 		relayerURL             string
 		validatorContractAddr  common.Address
+		startBlockHeight       uint64
 		lastProcessBlockHeight uint64
+		lastPatrolBlockHeight  uint64
 		lastPullTimestamp      time.Time
 		calcEndHeight          calcEndHeightFunc
 		pullTransfers          pullTransfersFunc
@@ -46,6 +48,7 @@ func newTokenCashierBase(
 		id:                     id,
 		recorder:               recorder,
 		relayerURL:             relayerURL,
+		startBlockHeight:       startBlockHeight,
 		lastProcessBlockHeight: startBlockHeight,
 		validatorContractAddr:  validatorContractAddr,
 		calcEndHeight:          calcEndHeight,
@@ -87,6 +90,16 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	if startHeight < tc.lastProcessBlockHeight {
 		startHeight = tc.lastProcessBlockHeight
 	}
+	if count == 0 {
+		count = 1
+	}
+	patrolSize := uint64(count) * 3
+	if tc.lastPatrolBlockHeight == 0 && startHeight > patrolSize {
+		tc.lastPatrolBlockHeight = startHeight - patrolSize
+		if tc.lastPatrolBlockHeight < tc.startBlockHeight {
+			tc.lastPatrolBlockHeight = tc.startBlockHeight
+		}
+	}
 	startHeight = startHeight + 1
 	endHeight, err := tc.calcEndHeight(startHeight, count)
 	if err != nil {
@@ -96,9 +109,16 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		}
 		return errors.Wrapf(err, "failed to get end height with start height %d, count %d", startHeight, count)
 	}
+	var transfers []*Transfer
 	tc.lastPullTimestamp = time.Now()
-	log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
-	transfers, err := tc.pullTransfers(startHeight, endHeight)
+	if startHeight > tc.lastPatrolBlockHeight+patrolSize {
+		log.Printf("fetching events from block %d to %d for %s with patrol\n", startHeight, endHeight, tc.id)
+		transfers, err = tc.pullTransfers(tc.lastPatrolBlockHeight, endHeight)
+		tc.lastPatrolBlockHeight = startHeight
+	} else {
+		log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
+		transfers, err = tc.pullTransfers(startHeight, endHeight)
+	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, endHeight)
 	}
