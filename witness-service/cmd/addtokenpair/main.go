@@ -93,12 +93,12 @@ func main() {
 	}
 	minAmount, ok := new(big.Int).SetString(cfg.MinAmount, 10)
 	if !ok {
-		err = errors.Errorf("failed to parse token min amount", cfg.MinAmount)
+		err = errors.Errorf("failed to parse token min amount %s", cfg.MinAmount)
 		return
 	}
 	maxAmount, ok := new(big.Int).SetString(cfg.MaxAmount, 10)
 	if !ok {
-		err = errors.Errorf("failed to parse token max amount", cfg.MaxAmount)
+		err = errors.Errorf("failed to parse token max amount %s", cfg.MaxAmount)
 		return
 	}
 	if cfg.IsOriginTokenOnChainB {

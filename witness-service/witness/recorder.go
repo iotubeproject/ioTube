@@ -110,6 +110,33 @@ func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
 	return recorder.addTransfer(tx, false)
 }
 
+func (recorder *Recorder) AmountOfTransferred(cashier, token common.Address) (*big.Int, error) {
+	rows, err := recorder.store.DB().Query(
+		fmt.Sprintf(
+			"SELECT amount FROM %s WHERE cashier = ? AND token = ? AND status='settled'",
+			recorder.transferTableName,
+		),
+		cashier.String(),
+		token.String(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	totalAmount := big.NewInt(0)
+	for rows.Next() {
+		var rawAmount string
+		if err := rows.Scan(&rawAmount); err != nil {
+			return nil, err
+		}
+		amount, ok := new(big.Int).SetString(rawAmount, 10)
+		if !ok || amount.Sign() != 1 {
+			return nil, errors.Errorf("invalid amount %s", rawAmount)
+		}
+		totalAmount = big.NewInt(0).Add(totalAmount, amount)
+	}
+	return totalAmount, nil
+}
+
 func (recorder *Recorder) addTransfer(tx *Transfer, insertOnly bool) error {
 	err := recorder.validateID(tx.index)
 	if err != nil {
@@ -208,7 +235,6 @@ func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
 // TransfersToSettle returns the list of transfers to confirm
 func (recorder *Recorder) TransfersToSettle() ([]*Transfer, error) {
 	return recorder.transfers(SubmissionConfirmed)
-
 }
 
 // TransfersToSubmit returns the list of transfers to submit

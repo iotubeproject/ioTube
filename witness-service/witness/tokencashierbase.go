@@ -9,6 +9,7 @@ package witness
 import (
 	"context"
 	"log"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -20,19 +21,22 @@ import (
 
 type (
 	tokenCashierBase struct {
-		id                     string
-		recorder               *Recorder
-		relayerURL             string
-		validatorContractAddr  common.Address
-		startBlockHeight       uint64
-		lastProcessBlockHeight uint64
-		lastPatrolBlockHeight  uint64
-		lastPullTimestamp      time.Time
-		calcEndHeight          calcEndHeightFunc
-		pullTransfers          pullTransfersFunc
+		id                         string
+		recorder                   *Recorder
+		relayerURL                 string
+		validatorContractAddr      common.Address
+		reverseCashierContractAddr common.Address
+		startBlockHeight           uint64
+		lastProcessBlockHeight     uint64
+		lastPatrolBlockHeight      uint64
+		lastPullTimestamp          time.Time
+		calcEndHeight              calcEndHeightFunc
+		pullTransfers              pullTransfersFunc
+		hasEnoughBalance           hasEnoughBalanceFunc
 	}
-	calcEndHeightFunc func(startHeight uint64, count uint16) (uint64, error)
-	pullTransfersFunc func(startHeight uint64, endHeight uint64) ([]*Transfer, error)
+	calcEndHeightFunc    func(startHeight uint64, count uint16) (uint64, error)
+	pullTransfersFunc    func(startHeight uint64, endHeight uint64) ([]*Transfer, error)
+	hasEnoughBalanceFunc func(token common.Address, amount *big.Int) bool
 )
 
 func newTokenCashierBase(
@@ -43,6 +47,7 @@ func newTokenCashierBase(
 	startBlockHeight uint64,
 	calcEndHeight calcEndHeightFunc,
 	pullTransfers pullTransfersFunc,
+	hasEnoughBalance hasEnoughBalanceFunc,
 ) TokenCashier {
 	return &tokenCashierBase{
 		id:                     id,
@@ -53,6 +58,7 @@ func newTokenCashierBase(
 		validatorContractAddr:  validatorContractAddr,
 		calcEndHeight:          calcEndHeight,
 		pullTransfers:          pullTransfers,
+		hasEnoughBalance:       hasEnoughBalance,
 		lastPullTimestamp:      time.Now(),
 	}
 }
@@ -144,6 +150,9 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
 	for _, transfer := range transfersToSubmit {
+		if !tc.hasEnoughBalance(transfer.token, transfer.amount) {
+			return errors.Errorf("not enough balance for token %s", transfer.token)
+		}
 		id, witness, signature, err := sign(transfer, tc.validatorContractAddr)
 		if err != nil {
 			return err

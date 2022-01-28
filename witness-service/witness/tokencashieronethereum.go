@@ -31,6 +31,8 @@ func NewTokenCashierOnEthereum(
 	recorder *Recorder,
 	startBlockHeight uint64,
 	confirmBlockNumber uint8,
+	reverseRecorder *Recorder,
+	reverseCashierContractAddr common.Address,
 ) (TokenCashier, error) {
 	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierABI))
 	if err != nil {
@@ -96,6 +98,24 @@ func NewTokenCashierOnEthereum(
 				}
 			}
 			return transfers, nil
+		},
+		func(token common.Address, amountToTransfer *big.Int) bool {
+			if reverseRecorder == nil {
+				return true
+			}
+			coToken, ok := recorder.tokenPairs[token]
+			if !ok {
+				return false
+			}
+			inAmount, err := reverseRecorder.AmountOfTransferred(reverseCashierContractAddr, coToken)
+			if err != nil {
+				return false
+			}
+			outAmount, err := recorder.AmountOfTransferred(cashierContractAddr, token)
+			if err != nil {
+				return false
+			}
+			return inAmount.Cmp(big.NewInt(0).Add(outAmount, amountToTransfer)) >= 0
 		},
 	), nil
 }

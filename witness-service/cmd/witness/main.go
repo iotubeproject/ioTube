@@ -52,7 +52,9 @@ type Configuration struct {
 			Token1 string `json:"token1" yaml:"token1"`
 			Token2 string `json:"token2" yaml:"token2"`
 		} `json:"tokenPairs" yaml:"tokenPairs"`
-		StartBlockHeight int `json:"startBlockHeight" yaml:"startBlockHeight"`
+		StartBlockHeight              int    `json:"startBlockHeight" yaml:"startBlockHeight"`
+		ReverseTransferTableName      string `json:"reverseTransferTableName" yaml:"reverseTransferTableName"`
+		ReverseCashierContractAddress string `json:"reverseCashierContractAddress" yaml:"reverseCashierContractAddress"`
 	} `json:"cashiers" yaml:"cashiers"`
 }
 
@@ -192,6 +194,14 @@ func main() {
 				}
 				pairs[common.HexToAddress(pair.Token1)] = common.BytesToAddress(ioAddr.Bytes())
 			}
+			var reverseRecorder *witness.Recorder
+			if cc.ReverseTransferTableName != "" && cc.ReverseCashierContractAddress != "" {
+				reverseRecorder = witness.NewRecorder(
+					db.NewStore(cfg.Database),
+					cc.ReverseTransferTableName,
+					nil,
+				)
+			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
 				cc.ID,
 				cc.RelayerURL,
@@ -205,6 +215,8 @@ func main() {
 				),
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
+				reverseRecorder,
+				common.HexToAddress(cc.ReverseCashierContractAddress),
 			)
 			if err != nil {
 				log.Fatalf("failed to create cashier %v\n", err)

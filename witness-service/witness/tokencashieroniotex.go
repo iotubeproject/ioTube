@@ -113,5 +113,8 @@ func NewTokenCashier(
 			}
 			return transfers, nil
 		},
+		func(common.Address, *big.Int) bool {
+			return true
+		},
 	), nil
 }
