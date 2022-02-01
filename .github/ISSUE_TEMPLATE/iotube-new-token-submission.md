@@ -35,6 +35,15 @@ Descrie your project here
 * [ ] Polygon
 * [ ] IoTeX
 
+## What blockchains (destination blockchain) would you like your token is bridged to
+
+* [ ] Ethereum  
+* [ ] Binance Smart Chain
+* [ ] Polygon
+* [ ] IoTeX
+
+(Please check https://docs.iotube.org/introduction/token-submission#integration-fee for integration fees of different blockchains)
+
 ## Token native contract address explorer link
 
 Address:
