@@ -49,6 +49,22 @@ chainPairs:
       routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
       operatorPrivateKey: ""
       creatorPrivateKey: ""
+  polis-iotex:
+    chainA:
+      url: "https://rpc.polis.tech"
+      minterPoolAddr: "0x3d1f4954D61469F3fF74b1D16a0E6E5F91083944"
+      standardTokenListAddr: "0x5FF66388298660F06Eaa3167C909b671176929A8"
+      proxyTokenListAddr: "0xDc64F219b3Da2f4789991B0bc0DDD0cd6127c77d"
+      operatorPrivateKey: ""
+      creatorPrivateKey: ""
+    chainB:
+      url: "https://babel-api.mainnet.iotex.io"
+      minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
+      standardTokenListAddr: "0x5def71Bd53d43fAD8FB3BD232A1634aaE48E3aeF"
+      proxyTokenListAddr: "0x1e6Ea73060B761cFeed65022Ae47659F689d1f7F"
+      routerAddr: ""
+      operatorPrivateKey: ""
+      creatorPrivateKey: ""
   ethereum-iotex:
     chainA:
       url: ""

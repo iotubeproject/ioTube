@@ -1,0 +1,15 @@
+chain: "polis"
+interval: 1m
+clientURL: "https://rpc.polis.tech"
+ethConfirmBlockNumber: 2
+ethGasPriceLimit: 10
+grpcPort: 7005
+grpcProxyPort: 8005
+privateKey: ""
+slackWebHook: "" 
+validatorAddress: "0xBa6DB98f32e66ad3eC20d79F062Eed50c6cb9F9f"
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+  driver: "mysql"
+transferTableName: "polis_transfers"
+witnessTableName: "polis_witnesses"

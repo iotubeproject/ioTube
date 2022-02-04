@@ -49,6 +49,19 @@ services:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-heco.yaml
 
+  polis-relayer:
+    container_name: polis-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7005:7005
+      - 8005:8005
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-polis.yaml:/etc/iotube-relayer/relayer-config-polis.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-polis.yaml
+
   bsc-relayer:
     container_name: bsc-relayer
     image: relayer:latest

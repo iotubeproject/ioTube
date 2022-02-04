@@ -84,6 +84,13 @@ function downloadConfigFile() {
             exit 2
         fi
     fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-polis.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/relayer-config-polis.yaml ${IOTEX_RELAYER}/etc/relayer-config-polis.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-bsc.yaml ]];then
         cp -f $PROJECT_ABS_DIR/relayer-config-bsc.yaml ${IOTEX_RELAYER}/etc/relayer-config-bsc.yaml
         if [ $? -ne 0 ];then

@@ -39,6 +39,15 @@ services:
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-heco.yaml
 
+  polis-witness:
+    container_name: polis-witness
+    image: witness:latest
+    restart: on-failure
+    volumes:
+      - $IOTEX_WITNESS/etc/witness-config-polis.yaml:/etc/iotube-witness/witness-config-polis.yaml:ro
+    network_mode: host
+    command: witness -config=/etc/iotube-witness/witness-config-polis.yaml
+
   bsc-witness:
     container_name: bsc-witness
     image: witness:latest
