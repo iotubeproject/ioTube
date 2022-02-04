@@ -88,7 +88,7 @@ func NewTokenCashier(
 			if len(response.Logs) > 0 {
 				log.Printf("\t%d transfers fetched", len(response.Logs))
 				for _, log := range response.Logs {
-					if bytes.Compare(eventTopic, log.Topics[0]) != 0 {
+					if !bytes.Equal(eventTopic, log.Topics[0]) {
 						return nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], eventTopic)
 					}
 					if len(log.Data) != 128 {
@@ -115,6 +115,12 @@ func NewTokenCashier(
 		},
 		func(common.Address, *big.Int) bool {
 			return true
+		},
+		func(context.Context) error {
+			return nil
+		},
+		func(context.Context) error {
+			return nil
 		},
 	), nil
 }

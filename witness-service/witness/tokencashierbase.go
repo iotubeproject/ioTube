@@ -21,22 +21,24 @@ import (
 
 type (
 	tokenCashierBase struct {
-		id                         string
-		recorder                   *Recorder
-		relayerURL                 string
-		validatorContractAddr      common.Address
-		reverseCashierContractAddr common.Address
-		startBlockHeight           uint64
-		lastProcessBlockHeight     uint64
-		lastPatrolBlockHeight      uint64
-		lastPullTimestamp          time.Time
-		calcEndHeight              calcEndHeightFunc
-		pullTransfers              pullTransfersFunc
-		hasEnoughBalance           hasEnoughBalanceFunc
+		id                     string
+		recorder               *Recorder
+		relayerURL             string
+		validatorContractAddr  common.Address
+		startBlockHeight       uint64
+		lastProcessBlockHeight uint64
+		lastPatrolBlockHeight  uint64
+		lastPullTimestamp      time.Time
+		calcEndHeight          calcEndHeightFunc
+		pullTransfers          pullTransfersFunc
+		hasEnoughBalance       hasEnoughBalanceFunc
+		start                  startStopFunc
+		stop                   startStopFunc
 	}
 	calcEndHeightFunc    func(startHeight uint64, count uint16) (uint64, error)
 	pullTransfersFunc    func(startHeight uint64, endHeight uint64) ([]*Transfer, error)
 	hasEnoughBalanceFunc func(token common.Address, amount *big.Int) bool
+	startStopFunc        func(context.Context) error
 )
 
 func newTokenCashierBase(
@@ -48,6 +50,8 @@ func newTokenCashierBase(
 	calcEndHeight calcEndHeightFunc,
 	pullTransfers pullTransfersFunc,
 	hasEnoughBalance hasEnoughBalanceFunc,
+	start startStopFunc,
+	stop startStopFunc,
 ) TokenCashier {
 	return &tokenCashierBase{
 		id:                     id,
@@ -60,14 +64,22 @@ func newTokenCashierBase(
 		pullTransfers:          pullTransfers,
 		hasEnoughBalance:       hasEnoughBalance,
 		lastPullTimestamp:      time.Now(),
+		start:                  start,
+		stop:                   stop,
 	}
 }
 
 func (tc *tokenCashierBase) Start(ctx context.Context) error {
-	return tc.recorder.Start(ctx)
+	if err := tc.recorder.Start(ctx); err != nil {
+		return err
+	}
+	return tc.start(ctx)
 }
 
 func (tc *tokenCashierBase) Stop(ctx context.Context) error {
+	if err := tc.stop(ctx); err != nil {
+		return err
+	}
 	return tc.recorder.Stop(ctx)
 }
 

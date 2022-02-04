@@ -117,5 +117,17 @@ func NewTokenCashierOnEthereum(
 			}
 			return inAmount.Cmp(big.NewInt(0).Add(outAmount, amountToTransfer)) >= 0
 		},
+		func(ctx context.Context) error {
+			if reverseRecorder != nil {
+				return reverseRecorder.Start(ctx)
+			}
+			return nil
+		},
+		func(ctx context.Context) error {
+			if reverseRecorder != nil {
+				return reverseRecorder.Stop(ctx)
+			}
+			return nil
+		},
 	), nil
 }
