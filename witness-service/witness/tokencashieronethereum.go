@@ -107,6 +107,9 @@ func NewTokenCashierOnEthereum(
 			if !ok {
 				return false
 			}
+			if _, ok := reverseRecorder.tokenPairs[coToken]; !ok {
+				return true
+			}
 			inAmount, err := reverseRecorder.AmountOfTransferred(reverseCashierContractAddr, coToken)
 			if err != nil {
 				return false

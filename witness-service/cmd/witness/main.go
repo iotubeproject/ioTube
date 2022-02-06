@@ -52,9 +52,12 @@ type Configuration struct {
 			Token1 string `json:"token1" yaml:"token1"`
 			Token2 string `json:"token2" yaml:"token2"`
 		} `json:"tokenPairs" yaml:"tokenPairs"`
-		StartBlockHeight              int    `json:"startBlockHeight" yaml:"startBlockHeight"`
-		ReverseTransferTableName      string `json:"reverseTransferTableName" yaml:"reverseTransferTableName"`
-		ReverseCashierContractAddress string `json:"reverseCashierContractAddress" yaml:"reverseCashierContractAddress"`
+		StartBlockHeight int `json:"startBlockHeight" yaml:"startBlockHeight"`
+		Reverse          struct {
+			TransferTableName      string   `json:"transferTableName" yaml:"transferTableName"`
+			CashierContractAddress string   `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+			Tokens                 []string `json:"tokens" yaml:"tokens"`
+		}
 	} `json:"cashiers" yaml:"cashiers"`
 }
 
@@ -195,11 +198,15 @@ func main() {
 				pairs[common.HexToAddress(pair.Token1)] = common.BytesToAddress(ioAddr.Bytes())
 			}
 			var reverseRecorder *witness.Recorder
-			if cc.ReverseTransferTableName != "" && cc.ReverseCashierContractAddress != "" {
+			if cc.Reverse.CashierContractAddress != "" && cc.Reverse.TransferTableName != "" {
+				pairs := make(map[common.Address]common.Address)
+				for _, token := range cc.Reverse.Tokens {
+					pairs[common.HexToAddress(token)] = common.HexToAddress(token)
+				}
 				reverseRecorder = witness.NewRecorder(
 					db.NewStore(cfg.Database),
-					cc.ReverseTransferTableName,
-					nil,
+					cc.Reverse.TransferTableName,
+					pairs,
 				)
 			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
@@ -216,7 +223,7 @@ func main() {
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
 				reverseRecorder,
-				common.HexToAddress(cc.ReverseCashierContractAddress),
+				common.HexToAddress(cc.Reverse.CashierContractAddress),
 			)
 			if err != nil {
 				log.Fatalf("failed to create cashier %v\n", err)
