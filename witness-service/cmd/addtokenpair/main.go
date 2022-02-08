@@ -294,13 +294,25 @@ func addToken(
 				if err != nil {
 					return
 				}
-				var tx *types.Transaction
-				tx, err = ctcr.ApproveCrosschainToken(operatorAuth, tokenAddr)
+				var cashier common.Address
+				cashier, err = ctcr.Cashier(nil)
 				if err != nil {
 					return
 				}
-				log.Printf("Adding %s to router via tx %s\n", tokenAddr, tx.Hash().Hex())
-				waitUntilConfirm(chainClient, tx)
+				var allowance *big.Int
+				allowance, err = ct.Allowance(nil, router, cashier)
+				if err != nil {
+					return
+				}
+				if allowance.Sign() == 0 {
+					var tx *types.Transaction
+					tx, err = ctcr.ApproveCrosschainToken(operatorAuth, tokenAddr)
+					if err != nil {
+						return
+					}
+					log.Printf("Adding %s to router via tx %s\n", tokenAddr, tx.Hash().Hex())
+					waitUntilConfirm(chainClient, tx)
+				}
 			}
 		}
 		tokenListAddr = proxyTokenList
