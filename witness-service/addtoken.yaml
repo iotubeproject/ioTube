@@ -30,7 +30,7 @@ chainPairs:
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
       standardTokenListAddr: "0x2F8768cD292E94A0Da78671974B89B87a398356E"
       proxyTokenListAddr: "0xD757adFF0eC4060e2c4A15f9777767f5Ca738Ca9"
-      routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
+      routerAddr: "0xfdf1d22478019f7275A5Bac4a538df8be6B1fd8E"
       operatorPrivateKey: ""
       creatorPrivateKey: ""
   heco-iotex:
@@ -46,7 +46,7 @@ chainPairs:
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
       standardTokenListAddr: "0xB5DEc42cc4EEDB61307F623B119ffE1A83fDF837"
       proxyTokenListAddr: "0x3f006e67fA69637fF39dab4B2340e393A2350334"
-      routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
+      routerAddr: ""
       operatorPrivateKey: ""
       creatorPrivateKey: ""
   polis-iotex:
@@ -62,7 +62,7 @@ chainPairs:
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
       standardTokenListAddr: "0x5def71Bd53d43fAD8FB3BD232A1634aaE48E3aeF"
       proxyTokenListAddr: "0x1e6Ea73060B761cFeed65022Ae47659F689d1f7F"
-      routerAddr: ""
+      routerAddr: "0x27f3659B7235eDf2b856e627933ee0B1A5f46B31"
       operatorPrivateKey: ""
       creatorPrivateKey: ""
   ethereum-iotex:
@@ -78,7 +78,7 @@ chainPairs:
       minterPoolAddr: "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454"
       standardTokenListAddr: "0x59CAeb8dC448DF0E070B803062cfd9351AD39390"
       proxyTokenListAddr: "0x6Ccf305A21DEFfF295e616bA5aa423eB563FC8dB"
-      routerAddr: "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
+      routerAddr: ""
       operatorPrivateKey: ""
       creatorPrivateKey: ""
 # set origin token address if any
