@@ -5,7 +5,7 @@ grpcProxyPort: 9087
 privateKey: ""
 slackWebHook: ""
 interval: 1m
-batchSize: 40
+batchSize: 1000
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
   driver: "mysql"
@@ -13,7 +13,25 @@ cashiers:
   - id: "bsc-to-iotex"
     relayerURL: "localhost:7001"
     startBlockHeight: 5177821
-    cashierContractAddress: "0x082020Ae0B38fD1bef48895c6cFf4428e420F400"
+    cashierContractAddress: "0x797f1465796fd89ea7135e76dbc7cdb136bba1ca"
     validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
     transferTableName: "bsc_transfers"
     tokenPairs:
+      - token1: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+        token2: "io1jlnvfzr8lhper2xla8gknmxsqhgajq5ravu4wr"
+      - token1: "0xe9e7cea3dedca5984780bafc599bd69add087d56"
+        token2: "io1sj4uk2pjhesxxsd9qy52avwmgw4qzazfrypm04"
+      - token1: "0x810ee35443639348adbbc467b33310d2ab43c168"
+        token2: "io1f4acssp65t6s90egjkzpvrdsrjjyysnvxgqjrh"
+      - token1: "0x2aaF50869739e317AB80A57Bf87cAA35F5b60598"
+        token2: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
+      - token1: "0x55d398326f99059ff775485246999027b3197955"
+        token2: "io1gtyj2h272ghg8vtw5ydrhgzv95a0egre4zemtf"
+      - token1: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"
+        token2: "io1qde5ded9wg540tpv4dkwhrr5lsvva2ga3hf6ry"
+      - token1: "0x7e544f2fEDDc69b1cB12555779c824CFe100ee34"
+        token2: "io1p00c9unkxz0zal2fglhguz3y3vnjd6xlx24h8m"
+      - token1: "0x049Dd7532148826CdE956c7B45fec8c30b514052"
+        token2: "io19zrne65vymmq8v2exluesk5g33w6tlvskfj3c9"
+      - token1: "0xa0CB9c8e470EC591dd7f5De650af9468EE6f7d5A"
+        token2: "io1cx6cvg9dswfc83nzhl5qmdz3gdzda3khtt6asw"

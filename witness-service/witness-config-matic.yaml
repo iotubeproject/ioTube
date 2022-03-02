@@ -1,11 +1,11 @@
 chain: "matic"
 clientURL: "https://rpc-mainnet.maticvigil.com"
-grpcPort: 9082
-grpcProxyPort: 9083
+grpcPort: 9084
+grpcProxyPort: 9085
 privateKey: ""
 slackWebHook: ""
 interval: 1m
-batchSize: 40
+batchSize: 1000
 confirmBlockNumber: 120
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhosst:13306)/witness?parseTime=true"
@@ -18,3 +18,27 @@ cashiers:
     validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
     transferTableName: "matic_transfers"
     tokenPairs:
+      - token2: "io13envp44hps9j85ulfvs6r6k99wagaky60pzl2c"
+        token1: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
+      - token2: "io1v5m9d7zrs852xkdzdresqf3phwc5cchc5crylc"
+        token1: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"
+      - token2: "io10u9dv0ys93nmr7smzyptpkhlhzylt4wtqzrvld"
+        token1: "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6"
+      - token2: "io1v25anp7t7nz954gdam2m27eqp4arr93jly4maa"
+        token1: "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"
+      - token2: "io18ndhcj88pwz5a5h68yhzz6r4q8vykwhugq45ns"
+        token1: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+      - token2: "io1cpx682vazuf4s4amjd7jlwejr5akc65plgmdru"
+        token1: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+      - token2: "io1990thrrc9cvxhjmsmx5pysznqs734h6uhxfxkq"
+        token1: "0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a"
+      - token2: "io1u346nz58mj5cjuj7ng3cn96upwam37v9axtju2"
+        token1: "0x831753DD7087CaC61aB5644b308642cc1c33Dc13"
+      - token2: "io14tw8gyn3p8v5fcmvh4c0w8797ryjrlrvnsr6zf"
+        token1: "0xD6DF932A45C0f255f85145f286eA0b292B21C90B"
+      - token2: "io1f4acssp65t6s90egjkzpvrdsrjjyysnvxgqjrh"
+        token1: "0xcFb54a6D2dA14ABeCD231174FC5735B4436965D8"
+      - token2: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
+        token1: "0x300211Def2a644b036A9bdd3e58159bb2074d388"
+      - token2: "io1g29kuat5d727cqcjv5ta8607ys9kdp5fx702ua"
+        token1: "0xe04E81331bDcBfBF2D1342714812d546a55CB6DC"

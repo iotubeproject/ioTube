@@ -5,7 +5,7 @@ grpcProxyPort: 9091
 privateKey: ""
 slackWebHook: ""
 interval: 1m
-batchSize: 40
+batchSize: 1000
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
   driver: "mysql"
@@ -17,3 +17,11 @@ cashiers:
     cashierContractAddress: "0x089B44FDBC953fe80Ad1f5059573b96a4713e4b4"
     transferTableName: "polis_transfers"
     tokenPairs:
+      - token2: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
+        token1: "0xe55AcA08126342eE1c70f218d26e553986687227"
+      - token2: "io1d77dcytfk5fsck089eg7669gfpqunrx35ue5ln"
+        token1: "0x56704Fb558527DD7FeE2CaBa541d87Bf2c8cc6Ea"
+      - token2: "io18v4l9dfr74xyu320pz4zsmgrz9d07vnvy20yrh"
+        token1: "0x673Be93F4862D1d1F1B0E5Db62Aa853156DFb932"
+      - token2: "io1rjadsk4xdleuztwgf3vgrzrwav5urwumaakt0w"
+        token1: "0x3bAe1e38F6e1E7E29C11cC735334cFd9f881EED7"

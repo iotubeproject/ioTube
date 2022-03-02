@@ -1,7 +1,7 @@
 chain: "ethereum"
 clientURL: ""
-grpcPort: 9084
-grpcProxyPort: 9085
+grpcPort: 9082
+grpcProxyPort: 9083
 privateKey: ""
 slackWebHook: ""
 interval: 1m
@@ -38,3 +38,27 @@ cashiers:
       # W-IOTX
       - token2: "io15qr5fzpxsnp7garl4m7k355rafzqn8grrm0grz"
         token1: "0x6fB3e0A217407EFFf7Ca062D46c26E5d60a14d69"
+      # MIST
+      - token2: "io14xuv3gq2yzmcug9t0uwhate99djyux5zwdurtm"
+        token1: "0x88ACDd2a6425c3FaAE4Bc9650Fd7E27e0Bebb7aB"
+      # MCN
+      - token2: "io18lsyxgygtesjggcj2nyqyqzgwxlxsysc9lgmg8"
+        token1: "0xD227c3e4f3F8dE94180269eF9DC221a6efc1F4C4"
+      # USDT
+      - token2: "io1d77dcytfk5fsck089eg7669gfpqunrx35ue5ln"
+        token1: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+      # USDC
+      - token2: "io18v4l9dfr74xyu320pz4zsmgrz9d07vnvy20yrh"
+        token1: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+      # DAI
+      - token2: "io1rjadsk4xdleuztwgf3vgrzrwav5urwumaakt0w"
+        token1: "0x6b175474e89094c44da98b954eedeac495271d0f"
+      # iMagic
+      - token2: "io1cxfj43hs44nqhc6pkhycpezd7vdrpafgxnnzdt"
+        token1: "0xb0Ed1F44833C6b2Afa39a6a85ff62C8ad96F5275"
+      # CIOTX
+      - token2: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
+        token1: "0x300211Def2a644b036A9bdd3e58159bb2074d388"
+      # CCCS
+      - token2: "io1daejpenv38639dw8xplp7c9zr4ff0c9p9kfx3g"
+        token1: "0xf79deaBc1406a3AD07c70877fBaEb90777B77E68"
