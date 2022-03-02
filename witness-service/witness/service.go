@@ -45,7 +45,9 @@ func NewService(
 		processInterval: processInterval,
 		batchSize:       batchSize,
 		privateKey:      privateKey,
-		witnessAddress:  crypto.PubkeyToAddress(privateKey.PublicKey),
+	}
+	if privateKey != nil {
+		s.witnessAddress = crypto.PubkeyToAddress(privateKey.PublicKey)
 	}
 	var err error
 	if s.processor, err = dispatcher.NewRunner(processInterval, s.process); err != nil {
@@ -86,6 +88,9 @@ func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address)
 		transfer.recipient.Bytes(),
 		math.U256Bytes(transfer.amount),
 	)
+	if s.privateKey == nil {
+		return id, common.Address{}, nil, nil
+	}
 	signature, err := crypto.Sign(id.Bytes(), s.privateKey)
 
 	return id, s.witnessAddress, signature, err
@@ -96,8 +101,10 @@ func (s *service) process() error {
 		if err := cashier.PullTransfers(s.batchSize); err != nil {
 			return err
 		}
-		if err := cashier.SubmitTransfers(s.sign); err != nil {
-			return err
+		if s.privateKey != nil {
+			if err := cashier.SubmitTransfers(s.sign); err != nil {
+				return err
+			}
 		}
 		if err := cashier.CheckTransfers(); err != nil {
 			return err

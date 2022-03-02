@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"flag"
 	"fmt"
 	"log"
@@ -120,15 +121,18 @@ func main() {
 		}
 	}
 
-	privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
-	if err != nil {
-		log.Fatalf("failed to decode private key %v\n", err)
-	}
 	// TODO: load more parameters from env
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
-	util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
+	var privateKey *ecdsa.PrivateKey
+	if cfg.PrivateKey != "" {
+		privateKey, err = crypto.HexToECDSA(cfg.PrivateKey)
+		if err != nil {
+			log.Fatalf("failed to decode private key %v\n", err)
+		}
+		util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
+	}
 
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
 	switch cfg.Chain {
