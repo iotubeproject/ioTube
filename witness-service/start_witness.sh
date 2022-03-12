@@ -56,6 +56,7 @@ function confirmEnvironmentVariable() {
 
 function downloadConfigFile() {
     if [[ ! -f ${IOTEX_WITNESS}/etc/docker-compose-witness.yml ]];then
+	cp -f $PROJECT_ABS_DIR/common.env ${IOTEX_WITNESS}/etc/common.env
         cp -f $PROJECT_ABS_DIR/docker-compose-witness.yml ${IOTEX_WITNESS}/etc/docker-compose.yml
         if [ $? -ne 0 ];then
             echo "Get docker-compose config error"
