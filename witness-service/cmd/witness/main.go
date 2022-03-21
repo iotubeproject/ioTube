@@ -38,6 +38,7 @@ type Configuration struct {
 	Database           db.Config     `json:"database" yaml:"database"`
 	PrivateKey         string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook       string        `json:"slackWebHook" yaml:"slackWebHook"`
+	LarkWebHook        string        `json:"larkWebHook" yaml:"larkWebHook"`
 	ConfirmBlockNumber int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
 	BatchSize          int           `json:"batchSize" yaml:"batchSize"`
 	Interval           time.Duration `json:"interval" yaml:"interval"`
@@ -70,6 +71,7 @@ var (
 		ConfirmBlockNumber: 20,
 		PrivateKey:         "",
 		SlackWebHook:       "",
+		LarkWebHook:        "",
 		ClientURL:          "",
 		GrpcPort:           9080,
 		GrpcProxyPort:      9081,
@@ -124,6 +126,9 @@ func main() {
 	// TODO: load more parameters from env
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
+	}
+	if cfg.LarkWebHook != "" {
+		util.SetLarkURL(cfg.LarkWebHook)
 	}
 	var privateKey *ecdsa.PrivateKey
 	if cfg.PrivateKey != "" {

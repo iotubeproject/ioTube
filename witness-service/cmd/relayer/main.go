@@ -45,6 +45,7 @@ type Configuration struct {
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
 
 	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
+	LarkWebHook       string    `json:"larkWebHook" yaml:"larkWebHook"`
 	GrpcPort          int       `json:"grpcPort" yaml:"grpcPort"`
 	GrpcProxyPort     int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	Database          db.Config `json:"database" yaml:"database"`
@@ -64,6 +65,7 @@ var defaultConfig = Configuration{
 	GrpcProxyPort:         8081,
 	PrivateKey:            "",
 	SlackWebHook:          "",
+	LarkWebHook:           "",
 	TransferTableName:     "relayer.transfers",
 	WitnessTableName:      "relayer.witnesses",
 }
@@ -120,6 +122,9 @@ func main() {
 	// TODO: load more parameters from env
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
+	}
+	if cfg.LarkWebHook != "" {
+		util.SetLarkURL(cfg.LarkWebHook)
 	}
 	util.SetPrefix("relayer-" + cfg.Chain)
 

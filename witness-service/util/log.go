@@ -18,8 +18,16 @@ type Payload struct {
 	Text string `json:"text,omitempty"`
 }
 
-var slackURL string
-var prefix string
+var (
+	larkURL  string
+	slackURL string
+	prefix   string
+)
+
+// SetLarkURL sets the lark post url
+func SetLarkURL(url string) {
+	larkURL = url
+}
 
 // SetSlackURL sets the slack post url
 func SetSlackURL(url string) {
@@ -32,6 +40,35 @@ func SetPrefix(s string) {
 
 // Alert sends alert to
 func Alert(msg string) {
+	SendSlackAlert(msg)
+	SendLarkAlert(msg)
+}
+
+func SendLarkAlert(msg string) {
+	if larkURL == "" {
+		return
+	}
+	if prefix != "" {
+		msg = prefix + ":" + msg
+	}
+	msgBytes, err := json.Marshal(struct {
+		MsgType string  `json:"msg_type"`
+		Content Payload `json:"content"`
+	}{
+		MsgType: "text",
+		Content: Payload{Text: msg},
+	})
+	if err != nil {
+		log.Printf("failed to construct lark message %+v\n", err)
+		return
+	}
+	_, err = http.Post(larkURL, "application/json", bytes.NewReader(msgBytes))
+	if err != nil {
+		log.Printf("failed to send lark message %+v", err)
+	}
+}
+
+func SendSlackAlert(msg string) {
 	if slackURL == "" {
 		return
 	}
