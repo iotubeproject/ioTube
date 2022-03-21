@@ -11,6 +11,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
+
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // Payload is the message struct for slack
@@ -22,7 +25,16 @@ var (
 	larkURL  string
 	slackURL string
 	prefix   string
+	cache    *lru.Cache
 )
+
+func init() {
+	var err error
+	cache, err = lru.New(10)
+	if err != nil {
+		panic(err)
+	}
+}
 
 // SetLarkURL sets the lark post url
 func SetLarkURL(url string) {
@@ -40,6 +52,18 @@ func SetPrefix(s string) {
 
 // Alert sends alert to
 func Alert(msg string) {
+	value, ok := cache.Get(msg)
+	if ok {
+		ts, ok := value.(time.Time)
+		if !ok {
+			panic(value)
+		}
+		if ts.After(time.Now().Add(-time.Hour)) {
+			return
+		}
+	} else {
+		cache.Add(msg, time.Now())
+	}
 	SendSlackAlert(msg)
 	SendLarkAlert(msg)
 }
