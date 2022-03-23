@@ -89,7 +89,7 @@ func NewTransferValidatorOnIoTeX(
 	return &transferValidatorOnIoTeX{
 		gasLimit:      2000000,
 		gasPrice:      big.NewInt(1000000000000),
-		bonus:         big.NewInt(200000000000000000),
+		bonus:         big.NewInt(500000000000000000),
 		bonusRecorder: map[string]time.Time{},
 
 		relayerAddr:           client.Account().Address(),
@@ -244,6 +244,9 @@ func (tv *transferValidatorOnIoTeX) sendBonus(recipient common.Address) error {
 	})
 	if err != nil {
 		return err
+	}
+	if accountResponse.AccountMeta.IsContract || accountResponse.AccountMeta.PendingNonce <= 1 {
+		return nil
 	}
 	switch balance, ok := big.NewInt(0).SetString(accountResponse.AccountMeta.Balance, 10); {
 	case !ok:
