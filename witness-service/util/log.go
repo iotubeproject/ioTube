@@ -61,9 +61,8 @@ func Alert(msg string) {
 		if ts.After(time.Now().Add(-time.Hour)) {
 			return
 		}
-	} else {
-		cache.Add(msg, time.Now())
 	}
+	cache.Add(msg, time.Now())
 	SendSlackAlert(msg)
 	SendLarkAlert(msg)
 }

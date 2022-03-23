@@ -111,7 +111,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	if count == 0 {
 		count = 1
 	}
-	patrolSize := uint64(count) * 3
+	patrolSize := uint64(count) * 6
 	if tc.lastPatrolBlockHeight == 0 && startHeight > patrolSize {
 		tc.lastPatrolBlockHeight = startHeight - patrolSize
 		if tc.lastPatrolBlockHeight < tc.startBlockHeight {
@@ -130,15 +130,18 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	var transfers []*Transfer
 	tc.lastPullTimestamp = time.Now()
 	if startHeight > tc.lastPatrolBlockHeight+patrolSize {
-		log.Printf("fetching events from block %d to %d for %s with patrol\n", startHeight, endHeight, tc.id)
+		log.Printf("fetching events from block %d to %d for %s with patrol\n", tc.lastPatrolBlockHeight, endHeight, tc.id)
 		transfers, err = tc.pullTransfers(tc.lastPatrolBlockHeight, endHeight)
+		if err != nil {
+			return errors.Wrapf(err, "failed to pull transfers from %d to %d with patrol", tc.lastPatrolBlockHeight, endHeight)
+		}
 		tc.lastPatrolBlockHeight = startHeight
 	} else {
 		log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
 		transfers, err = tc.pullTransfers(startHeight, endHeight)
-	}
-	if err != nil {
-		return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, endHeight)
+		if err != nil {
+			return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, endHeight)
+		}
 	}
 	for _, transfer := range transfers {
 		if err := tc.recorder.AddTransfer(transfer); err != nil {
