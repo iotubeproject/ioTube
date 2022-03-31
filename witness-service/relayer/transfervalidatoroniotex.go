@@ -295,6 +295,7 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 	}
 	if balance.Cmp(new(big.Int).Mul(tv.gasPrice, new(big.Int).SetUint64(tv.gasLimit))) < 0 {
 		util.Alert("IOTX native balance has dropped to " + balance.String() + ", please refill account for gas " + tv.relayerAddr.String())
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "insufficient balance %s of account %s", balance, tv.relayerAddr)
 	}
 	var nonce uint64
 	if resubmit {
