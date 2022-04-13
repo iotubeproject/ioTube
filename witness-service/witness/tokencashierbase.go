@@ -173,31 +173,33 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 			return err
 		}
 		transfer.id = id
-		response, err := relayer.Submit(
-			context.Background(),
-			&types.Witness{
-				Transfer: &types.Transfer{
-					Cashier:   transfer.cashier.Bytes(),
-					Token:     transfer.coToken.Bytes(),
-					Index:     int64(transfer.index),
-					Sender:    transfer.sender.Bytes(),
-					Recipient: transfer.recipient.Bytes(),
-					Amount:    transfer.amount.String(),
-					Fee:       transfer.fee.String(),
+		if signature != nil {
+			response, err := relayer.Submit(
+				context.Background(),
+				&types.Witness{
+					Transfer: &types.Transfer{
+						Cashier:   transfer.cashier.Bytes(),
+						Token:     transfer.coToken.Bytes(),
+						Index:     int64(transfer.index),
+						Sender:    transfer.sender.Bytes(),
+						Recipient: transfer.recipient.Bytes(),
+						Amount:    transfer.amount.String(),
+						Fee:       transfer.fee.String(),
+					},
+					Address:   witness.Bytes(),
+					Signature: signature,
 				},
-				Address:   witness.Bytes(),
-				Signature: signature,
-			},
-		)
-		if err != nil {
-			return err
-		}
-		if response.Success {
-			if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
+			)
+			if err != nil {
 				return err
 			}
-		} else {
-			log.Printf("something went wrong when submitting transfer (%s, %s, %d) for %s\n", transfer.cashier, transfer.token, transfer.index, tc.id)
+			if !response.Success {
+				log.Printf("something went wrong when submitting transfer (%s, %s, %d) for %s\n", transfer.cashier, transfer.token, transfer.index, tc.id)
+				continue
+			}
+		}
+		if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
+			return err
 		}
 	}
 	return nil
