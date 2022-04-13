@@ -12,6 +12,7 @@ require (
 	github.com/iotexproject/iotex-address v0.2.4
 	github.com/iotexproject/iotex-antenna-go/v2 v2.5.0
 	github.com/iotexproject/iotex-proto v0.4.4-0.20201029172022-a8466422b0f1
+	github.com/lib/pq v1.10.5
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/tsdb v0.10.0 // indirect
