@@ -135,7 +135,7 @@ func (recorder *Recorder) initStore(
 			"KEY `txHash_index` (`txHash`)"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
 		transferTableName,
-		waitingForWitnesses,
+		WaitingForWitnesses,
 	)); err != nil {
 		return errors.Wrap(err, "failed to create transfer table")
 	}
@@ -433,6 +433,18 @@ func RecipientQueryOption(recipient common.Address) TransferQueryOption {
 	}
 }
 
+func CashiersQueryOption(cashiers []common.Address) TransferQueryOption {
+	return func() (string, []interface{}) {
+		questions := make([]string, len(cashiers))
+		params := make([]interface{}, len(cashiers))
+		for i, cashier := range cashiers {
+			questions[i] = "?"
+			params[i] = cashier.Hex()
+		}
+		return "cashier in (" + strings.Join(questions, ",") + ")", params
+	}
+}
+
 // Transfers returns the list of records of given status
 func (recorder *Recorder) Transfers(
 	offset uint32,
@@ -493,13 +505,13 @@ func (recorder *Recorder) MarkAsProcessing(id common.Hash) error {
 	log.Printf("processing %s\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationInProcess, id.Hex(), waitingForWitnesses)
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, ValidationInProcess, id.Hex(), WaitingForWitnesses)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as processing")
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, validationInProcess, id.Hex())
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, ValidationInProcess, id.Hex())
 			if err == nil {
 				break
 			}
@@ -518,13 +530,13 @@ func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, relay
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(
 		recorder.updateStatusAndTransactionQuery,
-		validationSubmitted,
+		ValidationSubmitted,
 		txhash.Hex(),
 		relayer.Hex(),
 		nonce,
 		gasPrice.String(),
 		id.Hex(),
-		validationSubmitted,
+		ValidationSubmitted,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as validated")
@@ -533,7 +545,7 @@ func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, relay
 		for {
 			_, err := recorder.explorerStore.DB().Exec(
 				recorder.updateStatusAndTransactionQueryForExplorer,
-				validationSubmitted,
+				ValidationSubmitted,
 				txhash.Hex(),
 				relayer.Hex(),
 				nonce,
@@ -557,13 +569,13 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, re
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(
 		recorder.updateStatusAndTransactionQuery,
-		validationSubmitted,
+		ValidationSubmitted,
 		txhash.Hex(),
 		relayer.Hex(),
 		nonce,
 		gasPrice.String(),
 		id.Hex(),
-		validationInProcess,
+		ValidationInProcess,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as validated")
@@ -572,7 +584,7 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, re
 		for {
 			_, err := recorder.explorerStore.DB().Exec(
 				recorder.updateStatusAndTransactionQueryForExplorer,
-				validationSubmitted,
+				ValidationSubmitted,
 				txhash.Hex(),
 				relayer.Hex(),
 				nonce,
@@ -596,11 +608,11 @@ func (recorder *Recorder) MarkAsSettled(id common.Hash, gas uint64, ts time.Time
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=? AND `status`=?", recorder.transferTableName),
-		transferSettled,
+		TransferSettled,
 		gas,
 		ts,
 		id.Hex(),
-		validationSubmitted,
+		ValidationSubmitted,
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as settled")
@@ -609,7 +621,7 @@ func (recorder *Recorder) MarkAsSettled(id common.Hash, gas uint64, ts time.Time
 		for {
 			_, err := recorder.explorerStore.DB().Exec(
 				fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=?", recorder.explorerTableName),
-				transferSettled,
+				TransferSettled,
 				gas,
 				ts,
 				id.Hex(),
@@ -629,13 +641,13 @@ func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
 	log.Printf("mark transfer %s as failed\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationFailed, id.Hex(), validationInProcess)
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, ValidationFailed, id.Hex(), ValidationInProcess)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as failed")
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, validationFailed, id.Hex())
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, ValidationFailed, id.Hex())
 			if err == nil {
 				break
 			}
@@ -651,13 +663,13 @@ func (recorder *Recorder) MarkAsRejected(id common.Hash) error {
 	log.Printf("mark transfer %s as rejected\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, validationRejected, id.Hex(), validationSubmitted)
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, ValidationRejected, id.Hex(), ValidationSubmitted)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as rejected")
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, validationRejected, id.Hex())
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, ValidationRejected, id.Hex())
 			if err == nil {
 				break
 			}
@@ -673,13 +685,13 @@ func (recorder *Recorder) Reset(id common.Hash) error {
 	log.Printf("reset transfer %s\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, waitingForWitnesses, id.Hex(), validationInProcess)
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, WaitingForWitnesses, id.Hex(), ValidationInProcess)
 	if err != nil {
 		return errors.Wrap(err, "failed to reset")
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, waitingForWitnesses, id.Hex())
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, WaitingForWitnesses, id.Hex())
 			if err == nil {
 				break
 			}
@@ -695,13 +707,13 @@ func (recorder *Recorder) ResetCausedByNonce(id common.Hash) error {
 	log.Printf("reset transfer %s caused by nonce\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, waitingForWitnesses, id.Hex(), validationSubmitted)
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, WaitingForWitnesses, id.Hex(), ValidationSubmitted)
 	if err != nil {
 		return errors.Wrap(err, "failed to reset")
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, waitingForWitnesses, id.Hex())
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, WaitingForWitnesses, id.Hex())
 			if err == nil {
 				break
 			}

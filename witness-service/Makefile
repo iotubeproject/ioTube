@@ -32,7 +32,10 @@ build-witness:
 build-relayer:
 	$(GOBUILD) -o ./bin/relayer cmd/relayer/main.go
 
-build-all: build-addtokenpair build-witness build-relayer
+build-explorer:
+	$(GOBUILD) -o ./bin/explorer cmd/explorer/main.go
+
+build-all: build-addtokenpair build-witness build-relayer build-explorer
 
 all: clean build-all test
 

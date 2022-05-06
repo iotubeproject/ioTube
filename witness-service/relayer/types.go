@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type (
@@ -63,18 +64,18 @@ type (
 )
 
 const (
-	// waitingForWitnesses stands for a transfer which needs more valid witnesses
-	waitingForWitnesses ValidationStatusType = "new"
-	// validationInProcess stands for a transfer in process
-	validationInProcess = "processing"
-	// validationSubmitted stands for a transfer with validation submitted
-	validationSubmitted = "validated"
-	// transferSettled stands for a transfer which has been settled
-	transferSettled = "settled"
-	// validationFailed stands for the validation of a transfer failed
-	validationFailed = "failed"
-	// validationRejected stands for the validation of a transfer is rejected
-	validationRejected = "rejected"
+	// WaitingForWitnesses stands for a transfer which needs more valid witnesses
+	WaitingForWitnesses ValidationStatusType = "new"
+	// ValidationInProcess stands for a transfer in process
+	ValidationInProcess = "processing"
+	// ValidationSubmitted stands for a transfer with validation submitted
+	ValidationSubmitted = "validated"
+	// TransferSettled stands for a transfer which has been settled
+	TransferSettled = "settled"
+	// ValidationFailed stands for the validation of a transfer failed
+	ValidationFailed = "failed"
+	// ValidationRejected stands for the validation of a transfer is rejected
+	ValidationRejected = "rejected"
 )
 
 const (
@@ -146,4 +147,40 @@ func NewWitness(witnessAddr common.Address, signature []byte) (*Witness, error) 
 		addr:      witnessAddr,
 		signature: signature,
 	}, nil
+}
+
+func (transfer *Transfer) ID() common.Hash {
+	return transfer.id
+}
+
+func (transfer *Transfer) TxHash() common.Hash {
+	return transfer.txHash
+}
+
+func (transfer *Transfer) Status() ValidationStatusType {
+	return transfer.status
+}
+
+func (transfer *Transfer) ToTypesTransfer() *types.Transfer {
+	gasPrice := "0"
+	if transfer.gasPrice != nil {
+		gasPrice = transfer.gasPrice.String()
+	}
+
+	return &types.Transfer{
+		Cashier:   transfer.cashier.Bytes(),
+		Token:     transfer.token.Bytes(),
+		Index:     int64(transfer.index),
+		Sender:    transfer.sender.Bytes(),
+		Recipient: transfer.recipient.Bytes(),
+		Amount:    transfer.amount.String(),
+		Fee:       transfer.fee.String(),
+		Gas:       transfer.gas,
+		GasPrice:  gasPrice,
+		Timestamp: timestamppb.New(transfer.timestamp),
+	}
+}
+
+func (w *Witness) Address() common.Address {
+	return w.addr
 }

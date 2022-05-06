@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package services;
+
+import "google/api/annotations.proto";
+import "types/witness.proto";
+import "services/relay-service.proto";
+
+option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/services";
+
+service ExplorerService {
+    rpc Query(ExplorerQueryRequest) returns (ExplorerQueryResponse) {
+        option (google.api.http) = {
+            post: "/list"
+            body: "*"
+        };
+    };
+}
+
+message ExplorerQueryRequest {
+	int32 first = 1;
+	int32 skip = 2;
+	bytes token = 3;
+	bytes sender = 4;
+	bytes recipient = 5;
+	Status status = 6;
+    repeated bytes cashiers = 7;
+}
+
+message ExplorerQueryResponse {
+	repeated types.Transfer transfers = 1;
+	repeated CheckResponse statuses = 2;
+	uint32 count = 3;
+}

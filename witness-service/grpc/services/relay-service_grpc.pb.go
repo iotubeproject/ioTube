@@ -12,7 +12,6 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // RelayServiceClient is the client API for RelayService service.
@@ -91,8 +90,8 @@ type UnsafeRelayServiceServer interface {
 	mustEmbedUnimplementedRelayServiceServer()
 }
 
-func RegisterRelayServiceServer(s grpc.ServiceRegistrar, srv RelayServiceServer) {
-	s.RegisterService(&RelayService_ServiceDesc, srv)
+func RegisterRelayServiceServer(s *grpc.Server, srv RelayServiceServer) {
+	s.RegisterService(&_RelayService_serviceDesc, srv)
 }
 
 func _RelayService_Submit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -149,10 +148,7 @@ func _RelayService_List_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-// RelayService_ServiceDesc is the grpc.ServiceDesc for RelayService service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var RelayService_ServiceDesc = grpc.ServiceDesc{
+var _RelayService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "services.RelayService",
 	HandlerType: (*RelayServiceServer)(nil),
 	Methods: []grpc.MethodDesc{

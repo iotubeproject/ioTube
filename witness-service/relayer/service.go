@@ -123,13 +123,13 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	}
 	switch request.Status {
 	case services.Status_SUBMITTED:
-		queryOpts = append(queryOpts, StatusQueryOption(validationSubmitted))
+		queryOpts = append(queryOpts, StatusQueryOption(ValidationSubmitted))
 	case services.Status_SETTLED:
-		queryOpts = append(queryOpts, StatusQueryOption(transferSettled))
+		queryOpts = append(queryOpts, StatusQueryOption(TransferSettled))
 	case services.Status_CREATED:
-		queryOpts = append(queryOpts, StatusQueryOption(waitingForWitnesses))
+		queryOpts = append(queryOpts, StatusQueryOption(WaitingForWitnesses))
 	case services.Status_FAILED:
-		queryOpts = append(queryOpts, StatusQueryOption(validationFailed, validationRejected))
+		queryOpts = append(queryOpts, StatusQueryOption(ValidationFailed, ValidationRejected))
 	}
 	count, err := s.recorder.Count(queryOpts...)
 	if err != nil {
@@ -197,13 +197,13 @@ func (s *Service) extractWitnesses(witnesses map[common.Hash][]*Witness, id comm
 
 func (s *Service) convertStatus(status ValidationStatusType) services.Status {
 	switch status {
-	case waitingForWitnesses, validationInProcess:
+	case WaitingForWitnesses, ValidationInProcess:
 		return services.Status_CREATED
-	case validationSubmitted:
+	case ValidationSubmitted:
 		return services.Status_SUBMITTED
-	case transferSettled:
+	case TransferSettled:
 		return services.Status_SETTLED
-	case validationFailed, validationRejected:
+	case ValidationFailed, ValidationRejected:
 		return services.Status_FAILED
 	}
 
@@ -242,7 +242,7 @@ func (s *Service) process() error {
 }
 
 func (s *Service) confirmTransfers() error {
-	validatedTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size())*2, false, false, StatusQueryOption(validationSubmitted))
+	validatedTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size())*2, false, false, StatusQueryOption(ValidationSubmitted))
 	if err != nil {
 		return errors.Wrap(err, "failed to read transfers to confirm")
 	}
@@ -316,12 +316,12 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 }
 
 func (s *Service) submitTransfers() error {
-	newTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size()), true, false, StatusQueryOption(waitingForWitnesses), ExcludeTokenQueryOption(common.HexToAddress("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")))
+	newTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size()), true, false, StatusQueryOption(WaitingForWitnesses), ExcludeTokenQueryOption(common.HexToAddress("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")))
 	if err != nil {
 		return err
 	}
 	if len(newTransfers) == 0 {
-		newTransfers, err = s.recorder.Transfers(0, uint8(s.transferValidator.Size()), false, false, StatusQueryOption(waitingForWitnesses))
+		newTransfers, err = s.recorder.Transfers(0, uint8(s.transferValidator.Size()), false, false, StatusQueryOption(WaitingForWitnesses))
 		if err != nil {
 			return err
 		}
