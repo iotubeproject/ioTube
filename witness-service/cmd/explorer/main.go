@@ -233,6 +233,9 @@ func main() {
 	if uri, ok := os.LookupEnv("DATABASE_URI"); ok {
 		cfg.Database.URI = uri
 	}
+	if driver, ok := os.LookupEnv("DATABASE_DRIVER"); ok {
+		cfg.Database.Driver = driver
+	}
 	log.Println("Creating service")
 
 	service, err := NewService(
