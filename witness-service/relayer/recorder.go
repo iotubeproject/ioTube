@@ -40,12 +40,13 @@ type (
 		mutex             sync.RWMutex
 		transferTableName string
 		witnessTableName  string
+		explorerTableName string
 		// updateStatusQuery is a query to set status
-		updateStatusQuery string
-		// updateStatusQueryAndGas
-		updateStatusQueryAndGas string
+		updateStatusQuery            string
+		updateStatusQueryForExplorer string
 		// updateStatusAndTransactionQuery is a query to set status and transaction
-		updateStatusAndTransactionQuery string
+		updateStatusAndTransactionQuery            string
+		updateStatusAndTransactionQueryForExplorer string
 	}
 )
 
@@ -55,15 +56,18 @@ func NewRecorder(
 	explorerStore *db.SQLStore,
 	transferTableName string,
 	witnessTableName string,
+	explorerTableName string,
 ) *Recorder {
 	return &Recorder{
 		store:                           store,
 		explorerStore:                   explorerStore,
 		transferTableName:               transferTableName,
 		witnessTableName:                witnessTableName,
+		explorerTableName:               explorerTableName,
 		updateStatusQuery:               fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=? AND `status`=?", transferTableName),
-		updateStatusQueryAndGas:         fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=? AND `status`=?", transferTableName),
+		updateStatusQueryForExplorer:    fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=?", explorerTableName),
 		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=? AND `status`=?", transferTableName),
+		updateStatusAndTransactionQueryForExplorer: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=?", explorerTableName),
 	}
 }
 
@@ -85,14 +89,18 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 	defer recorder.mutex.Unlock()
 
 	if recorder.explorerStore != nil {
-		if err := recorder.initStore(ctx, recorder.explorerStore); err != nil {
+		if err := recorder.initStore(ctx, recorder.explorerStore, recorder.explorerTableName, ""); err != nil {
 			return errors.Wrap(err, "failed to init explorer db")
 		}
 	}
-	return recorder.initStore(ctx, recorder.store)
+	return recorder.initStore(ctx, recorder.store, recorder.transferTableName, recorder.witnessTableName)
 }
 
-func (recorder *Recorder) initStore(ctx context.Context, store *db.SQLStore) error {
+func (recorder *Recorder) initStore(
+	ctx context.Context,
+	store *db.SQLStore,
+	transferTableName, witnessTableName string,
+) error {
 	if err := store.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start db")
 	}
@@ -126,26 +134,28 @@ func (recorder *Recorder) initStore(ctx context.Context, store *db.SQLStore) err
 			"KEY `status_index` (`status`),"+
 			"KEY `txHash_index` (`txHash`)"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
-		recorder.transferTableName,
+		transferTableName,
 		waitingForWitnesses,
 	)); err != nil {
 		return errors.Wrap(err, "failed to create transfer table")
 	}
-	if _, err := store.DB().Exec(fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s ("+
-			"`transferId` varchar(66) NOT NULL,"+
-			"`witness` varchar(42) NOT NULL,"+
-			"`signature` varchar(132) NOT NULL,"+
-			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
-			"PRIMARY KEY (`transferId`, `witness`),"+
-			"KEY `witness_index` (`witness`),"+
-			"CONSTRAINT %s_id FOREIGN KEY (`transferId`) REFERENCES %s (`id`) ON DELETE CASCADE ON UPDATE NO ACTION"+
-			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
-		recorder.witnessTableName,
-		recorder.transferTableName,
-		recorder.transferTableName,
-	)); err != nil {
-		return errors.Wrap(err, "failed to create witness table")
+	if witnessTableName != "" {
+		if _, err := store.DB().Exec(fmt.Sprintf(
+			"CREATE TABLE IF NOT EXISTS %s ("+
+				"`transferId` varchar(66) NOT NULL,"+
+				"`witness` varchar(42) NOT NULL,"+
+				"`signature` varchar(132) NOT NULL,"+
+				"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
+				"PRIMARY KEY (`transferId`, `witness`),"+
+				"KEY `witness_index` (`witness`),"+
+				"CONSTRAINT %s_id FOREIGN KEY (`transferId`) REFERENCES %s (`id`) ON DELETE CASCADE ON UPDATE NO ACTION"+
+				") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
+			witnessTableName,
+			transferTableName,
+			transferTableName,
+		)); err != nil {
+			return errors.Wrap(err, "failed to create witness table")
+		}
 	}
 
 	return nil
@@ -186,7 +196,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 	if err != nil {
 		return err
 	}
-	if err := recorder.addWitness(tx, transfer, witness); err != nil {
+	if err := recorder.addWitness(tx, transfer, witness, recorder.transferTableName, recorder.witnessTableName); err != nil {
 		return err
 	}
 	var explorerTx *sql.Tx
@@ -195,7 +205,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 		if err != nil {
 			return err
 		}
-		if err := recorder.addWitness(explorerTx, transfer, witness); err != nil {
+		if err := recorder.addWitness(explorerTx, transfer, witness, recorder.explorerTableName, ""); err != nil {
 			return err
 		}
 	}
@@ -214,9 +224,14 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 	return nil
 }
 
-func (recorder *Recorder) addWitness(tx *sql.Tx, transfer *Transfer, witness *Witness) error {
+func (recorder *Recorder) addWitness(
+	tx *sql.Tx,
+	transfer *Transfer,
+	witness *Witness,
+	transferTableName, witnessTableName string,
+) error {
 	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName),
+		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
 		transfer.cashier.Hex(),
 		transfer.token.Hex(),
 		transfer.index,
@@ -228,13 +243,15 @@ func (recorder *Recorder) addWitness(tx *sql.Tx, transfer *Transfer, witness *Wi
 	); err != nil {
 		return errors.Wrap(err, "failed to insert into transfer table")
 	}
-	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (`transferId`, `witness`, `signature`) VALUES (?, ?, ?)", recorder.witnessTableName),
-		transfer.id.Hex(),
-		witness.addr.Hex(),
-		hex.EncodeToString(witness.signature),
-	); err != nil {
-		return errors.Wrap(err, "failed to insert into witness table")
+	if witnessTableName != "" {
+		if _, err := tx.Exec(
+			fmt.Sprintf("INSERT IGNORE INTO %s (`transferId`, `witness`, `signature`) VALUES (?, ?, ?)", witnessTableName),
+			transfer.id.Hex(),
+			witness.addr.Hex(),
+			hex.EncodeToString(witness.signature),
+		); err != nil {
+			return errors.Wrap(err, "failed to insert into witness table")
+		}
 	}
 
 	return nil
@@ -482,7 +499,7 @@ func (recorder *Recorder) MarkAsProcessing(id common.Hash) error {
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQuery, validationInProcess, id.Hex(), waitingForWitnesses)
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, validationInProcess, id.Hex())
 			if err == nil {
 				break
 			}
@@ -515,14 +532,13 @@ func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, relay
 	if recorder.explorerStore != nil {
 		for {
 			_, err := recorder.explorerStore.DB().Exec(
-				recorder.updateStatusAndTransactionQuery,
+				recorder.updateStatusAndTransactionQueryForExplorer,
 				validationSubmitted,
 				txhash.Hex(),
 				relayer.Hex(),
 				nonce,
 				gasPrice.String(),
 				id.Hex(),
-				validationSubmitted,
 			)
 			if err == nil {
 				break
@@ -555,14 +571,13 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, re
 	if recorder.explorerStore != nil {
 		for {
 			_, err := recorder.explorerStore.DB().Exec(
-				recorder.updateStatusAndTransactionQuery,
+				recorder.updateStatusAndTransactionQueryForExplorer,
 				validationSubmitted,
 				txhash.Hex(),
 				relayer.Hex(),
 				nonce,
 				gasPrice.String(),
 				id.Hex(),
-				validationInProcess,
 			)
 			if err == nil {
 				break
@@ -579,13 +594,26 @@ func (recorder *Recorder) MarkAsSettled(id common.Hash, gas uint64, ts time.Time
 	log.Printf("mark transfer %s as settled\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQueryAndGas, transferSettled, gas, ts, id.Hex(), validationSubmitted)
+	result, err := recorder.store.DB().Exec(
+		fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=? AND `status`=?", recorder.transferTableName),
+		transferSettled,
+		gas,
+		ts,
+		id.Hex(),
+		validationSubmitted,
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as settled")
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryAndGas, transferSettled, gas, ts, id.Hex(), validationSubmitted)
+			_, err := recorder.explorerStore.DB().Exec(
+				fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=?", recorder.explorerTableName),
+				transferSettled,
+				gas,
+				ts,
+				id.Hex(),
+			)
 			if err == nil {
 				break
 			}
@@ -607,7 +635,7 @@ func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQuery, validationFailed, id.Hex(), validationInProcess)
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, validationFailed, id.Hex())
 			if err == nil {
 				break
 			}
@@ -629,7 +657,7 @@ func (recorder *Recorder) MarkAsRejected(id common.Hash) error {
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQuery, validationRejected, id.Hex(), validationSubmitted)
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, validationRejected, id.Hex())
 			if err == nil {
 				break
 			}
@@ -651,7 +679,7 @@ func (recorder *Recorder) Reset(id common.Hash) error {
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQuery, waitingForWitnesses, id.Hex(), validationInProcess)
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, waitingForWitnesses, id.Hex())
 			if err == nil {
 				break
 			}
@@ -673,7 +701,7 @@ func (recorder *Recorder) ResetCausedByNonce(id common.Hash) error {
 	}
 	if recorder.explorerStore != nil {
 		for {
-			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQuery, waitingForWitnesses, id.Hex(), validationSubmitted)
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, waitingForWitnesses, id.Hex())
 			if err == nil {
 				break
 			}

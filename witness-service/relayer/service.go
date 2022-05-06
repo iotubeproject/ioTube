@@ -76,6 +76,9 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 		return nil, err
 	}
 	witness, err := NewWitness(common.BytesToAddress(w.Address), w.Signature)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.recorder.AddWitness(transfer, witness); err != nil {
 		return nil, err
 	}
