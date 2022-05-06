@@ -49,6 +49,7 @@ type Configuration struct {
 	GrpcPort          int       `json:"grpcPort" yaml:"grpcPort"`
 	GrpcProxyPort     int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	Database          db.Config `json:"database" yaml:"database"`
+	ExplorerDatabase  db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
 	TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
 	WitnessTableName  string    `json:"witnessTableName" yaml:"witnessTableName"`
 }
@@ -188,6 +189,7 @@ func main() {
 		transferValidator,
 		relayer.NewRecorder(
 			db.NewStore(cfg.Database),
+			db.NewStore(cfg.ExplorerDatabase),
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
 		),

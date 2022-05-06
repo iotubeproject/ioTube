@@ -28,6 +28,9 @@ type (
 
 // NewStore instantiates a store
 func NewStore(cfg Config) *SQLStore {
+	if cfg.URI == "" && cfg.Driver == "" {
+		return nil
+	}
 	return &SQLStore{db: nil, cfg: cfg}
 }
 
