@@ -55,6 +55,8 @@ type (
 		services.UnimplementedExplorerServiceServer
 		cache    *lru.Cache
 		recorder *relayer.Recorder
+		hits     uint64
+		queries  uint64
 	}
 
 	// Configuration defines the configuration of the witness service
@@ -101,11 +103,16 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 	if first > 1<<8 {
 		return nil, errors.Errorf("pagination size %d is too large", first)
 	}
+	if s.queries%100 == 1 {
+		fmt.Printf("cache hit rate: %f%%\n", float64(s.hits*10000/s.queries)/100)
+	}
+	s.queries++
 	value, ok := s.cache.Get(request.String())
 	if ok {
 		randt, ok := value.(*responseWithTimestamp)
 		if ok {
-			if randt.ts.After(time.Now().Add(10 * time.Second)) {
+			if randt.ts.Add(10 * time.Second).After(time.Now()) {
+				s.hits++
 				return randt.response, nil
 			}
 			s.cache.Remove(request.String())
