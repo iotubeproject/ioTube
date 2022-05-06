@@ -152,10 +152,6 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 	if err != nil {
 		return nil, err
 	}
-	ids := []common.Hash{}
-	for _, transfer := range transfers {
-		ids = append(ids, transfer.ID())
-	}
 	response := &services.ExplorerQueryResponse{
 		Transfers: make([]*types.Transfer, len(transfers)),
 		Statuses:  make([]*services.CheckResponse, len(transfers)),
@@ -227,7 +223,9 @@ func main() {
 			log.Fatalln(err)
 		}
 	}
-
+	if uri, ok := os.LookupEnv("DATABASE_URI"); ok {
+		cfg.Database.URI = uri
+	}
 	log.Println("Creating service")
 
 	service, err := NewService(
