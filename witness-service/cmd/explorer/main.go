@@ -33,7 +33,7 @@ import (
 
 var defaultConfig = Configuration{
 	GrpcPort:          8080,
-	GrpcProxyPort:     8081,
+	GrpcProxyPort:     80,
 	TransferTableName: "transfers",
 }
 
@@ -218,13 +218,13 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	if port, ok := os.LookupEnv("RELAYER_GRPC_PORT"); ok {
+	if port, ok := os.LookupEnv("GRPC_PORT"); ok {
 		cfg.GrpcPort, err = strconv.Atoi(port)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
-	if port, ok := os.LookupEnv("RELAYER_GRPC_PROXY_PORT"); ok {
+	if port, ok := os.LookupEnv("GRPC_PROXY_PORT"); ok {
 		cfg.GrpcProxyPort, err = strconv.Atoi(port)
 		if err != nil {
 			log.Fatalln(err)
