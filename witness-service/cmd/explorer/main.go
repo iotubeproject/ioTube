@@ -33,7 +33,7 @@ import (
 
 var defaultConfig = Configuration{
 	GrpcPort:          8080,
-	GrpcProxyPort:     80,
+	GrpcProxyPort:     8081,
 	TransferTableName: "transfers",
 }
 
