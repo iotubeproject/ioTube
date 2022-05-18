@@ -92,6 +92,13 @@ func (tc *tokenCashierBase) PullTransfersByHeight(height uint64) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to pull transfers for %d", height)
 	}
+	tip, err := tc.recorder.TipHeight(tc.id)
+	if err != nil {
+		return err
+	}
+	if tip < height {
+		return errors.Errorf("invalid height %d is larger than tip %d", height, tip)
+	}
 	for _, transfer := range transfers {
 		if err := tc.recorder.UpsertTransfer(transfer); err != nil {
 			return errors.Wrap(err, "failed to add transfer")
