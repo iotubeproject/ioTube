@@ -25,13 +25,13 @@ import (
 
 type service struct {
 	services.UnimplementedWitnessServiceServer
-	cashiers              []TokenCashier
-	processor             dispatcher.Runner
-	batchSize             uint16
-	processInterval       time.Duration
-	privateKey            *ecdsa.PrivateKey
-	witnessAddress        common.Address
-	disableTransferSubmit bool
+	cashiers        []TokenCashier
+	processor       dispatcher.Runner
+	batchSize       uint16
+	processInterval time.Duration
+	privateKey      *ecdsa.PrivateKey
+	witnessAddress  common.Address
+	disableSubmit   bool
 }
 
 // NewService creates a new witness service
@@ -40,14 +40,14 @@ func NewService(
 	cashiers []TokenCashier,
 	batchSize uint16,
 	processInterval time.Duration,
-	disableTransferSubmit bool,
+	disableSubmit bool,
 ) (*service, error) {
 	s := &service{
-		cashiers:              cashiers,
-		processInterval:       processInterval,
-		batchSize:             batchSize,
-		privateKey:            privateKey,
-		disableTransferSubmit: disableTransferSubmit,
+		cashiers:        cashiers,
+		processInterval: processInterval,
+		batchSize:       batchSize,
+		privateKey:      privateKey,
+		disableSubmit:   disableSubmit,
 	}
 	if privateKey != nil {
 		s.witnessAddress = crypto.PubkeyToAddress(privateKey.PublicKey)
@@ -104,7 +104,7 @@ func (s *service) process() error {
 		if err := cashier.PullTransfers(s.batchSize); err != nil {
 			return err
 		}
-		if s.disableTransferSubmit {
+		if s.disableSubmit {
 			continue
 		}
 		if s.privateKey != nil {
