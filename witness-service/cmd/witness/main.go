@@ -33,18 +33,19 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	Chain              string        `json:"chain" yaml:"chain"`
-	ClientURL          string        `json:"clientURL" yaml:"clientURL"`
-	Database           db.Config     `json:"database" yaml:"database"`
-	PrivateKey         string        `json:"privateKey" yaml:"privateKey"`
-	SlackWebHook       string        `json:"slackWebHook" yaml:"slackWebHook"`
-	LarkWebHook        string        `json:"larkWebHook" yaml:"larkWebHook"`
-	ConfirmBlockNumber int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
-	BatchSize          int           `json:"batchSize" yaml:"batchSize"`
-	Interval           time.Duration `json:"interval" yaml:"interval"`
-	GrpcPort           int           `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort      int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	Cashiers           []struct {
+	Chain                 string        `json:"chain" yaml:"chain"`
+	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
+	Database              db.Config     `json:"database" yaml:"database"`
+	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
+	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
+	LarkWebHook           string        `json:"larkWebHook" yaml:"larkWebHook"`
+	ConfirmBlockNumber    int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
+	BatchSize             int           `json:"batchSize" yaml:"batchSize"`
+	Interval              time.Duration `json:"interval" yaml:"interval"`
+	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
+	Cashiers              []struct {
 		ID                       string `json:"id" yaml:"id"`
 		RelayerURL               string `json:"relayerURL" yaml:"relayerURL"`
 		CashierContractAddress   string `json:"cashierContractAddress" yaml:"cashierContractAddress"`
@@ -248,6 +249,7 @@ func main() {
 		cashiers,
 		uint16(cfg.BatchSize),
 		cfg.Interval,
+		cfg.DisableTransferSubmit,
 	)
 	if err != nil {
 		log.Fatalf("failed to create witness service: %v\n", err)
