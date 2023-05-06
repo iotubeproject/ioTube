@@ -20,6 +20,8 @@ services:
       - $IOTEX_WITNESS/etc/witness-config-iotex.yaml:/etc/iotube-witness/witness-config-iotex.yaml:ro
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-iotex.yaml
+    env_file:
+      - 'common.env'
 
   ethereum-witness:
     container_name: ethereum-witness
@@ -29,6 +31,8 @@ services:
       - $IOTEX_WITNESS/etc/witness-config-ethereum.yaml:/etc/iotube-witness/witness-config-ethereum.yaml:ro
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-ethereum.yaml
+    env_file:
+      - 'common.env'
 
   heco-witness:
     container_name: heco-witness
@@ -38,6 +42,8 @@ services:
       - $IOTEX_WITNESS/etc/witness-config-heco.yaml:/etc/iotube-witness/witness-config-heco.yaml:ro
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-heco.yaml
+    env_file:
+      - 'common.env'
 
   polis-witness:
     container_name: polis-witness
@@ -47,6 +53,8 @@ services:
       - $IOTEX_WITNESS/etc/witness-config-polis.yaml:/etc/iotube-witness/witness-config-polis.yaml:ro
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-polis.yaml
+    env_file:
+      - 'common.env'
 
   bsc-witness:
     container_name: bsc-witness
@@ -56,6 +64,8 @@ services:
       - $IOTEX_WITNESS/etc/witness-config-bsc.yaml:/etc/iotube-witness/witness-config-bsc.yaml:ro
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-bsc.yaml
+    env_file:
+      - 'common.env'
 
   matic-witness:
     container_name: matic-witness
@@ -65,6 +75,8 @@ services:
       - $IOTEX_WITNESS/etc/witness-config-matic.yaml:/etc/iotube-witness/witness-config-matic.yaml:ro
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-matic.yaml
+    env_file:
+      - 'common.env'
 
   cron:
     image: schnitzler/mysqldump
