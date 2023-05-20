@@ -54,57 +54,35 @@ function confirmEnvironmentVariable() {
     echo -e "IOTEX_WITNESS directory: ${RED} ${IOTEX_WITNESS} ${NC}, Service witness will copy config file into this dir."
 }
 
+function copyFile() {
+    srcFile=$1
+    tgtFile=$2
+    if [[ ! -f ${IOTEX_WITNESS}/etc/$tgtFile ]] || [[ $# -ge 3 ]] && [ $3 == 1 ]; then
+        echo -e "copy file ${srcFile} to ${tgtFile}"
+        cp -f $PROJECT_ABS_DIR/$srcFile ${IOTEX_WITNESS}/etc/$tgtFile
+         if [ $? -ne 0 ];then
+             echo "Get config error"
+             exit 2
+         fi
+    else
+       echo "skip copy file ${srcFile} to ${tgtFile}"
+    fi
+}
+
 function downloadConfigFile() {
-    if [[ ! -f ${IOTEX_WITNESS}/etc/docker-compose-witness.yml ]];then
-        cp -f $PROJECT_ABS_DIR/docker-compose-witness.yml ${IOTEX_WITNESS}/etc/docker-compose.yml
-        if [ $? -ne 0 ];then
-            echo "Get docker-compose config error"
-            exit 2
-        fi
-    fi
-    
-    if [[ ! -f ${IOTEX_WITNESS}/etc/witness-config-iotex.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/witness-config-iotex.yaml ${IOTEX_WITNESS}/etc/witness-config-iotex.yaml
-        if [ $? -ne 0 ];then
-            echo "Get config error"
-            exit 2
-        fi
-    fi
-    if [[ ! -f ${IOTEX_WITNESS}/etc/witness-config-ethereum.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/witness-config-ethereum.yaml ${IOTEX_WITNESS}/etc/witness-config-ethereum.yaml
-        if [ $? -ne 0 ];then
-            echo "Get config error"
-            exit 2
-        fi
-    fi
-    if [[ ! -f ${IOTEX_WITNESS}/etc/witness-config-heco.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/witness-config-heco.yaml ${IOTEX_WITNESS}/etc/witness-config-heco.yaml
-        if [ $? -ne 0 ];then
-            echo "Get config error"
-            exit 2
-        fi
-    fi
-    if [[ ! -f ${IOTEX_WITNESS}/etc/witness-config-polis.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/witness-config-polis.yaml ${IOTEX_WITNESS}/etc/witness-config-polis.yaml
-        if [ $? -ne 0 ];then
-            echo "Get config error"
-            exit 2
-        fi
-    fi
-    if [[ ! -f ${IOTEX_WITNESS}/etc/witness-config-bsc.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/witness-config-bsc.yaml ${IOTEX_WITNESS}/etc/witness-config-bsc.yaml
-        if [ $? -ne 0 ];then
-            echo "Get config error"
-            exit 2
-        fi
-    fi
-    if [[ ! -f ${IOTEX_WITNESS}/etc/witness-config-matic.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/witness-config-matic.yaml ${IOTEX_WITNESS}/etc/witness-config-matic.yaml
-        if [ $? -ne 0 ];then
-            echo "Get config error"
-            exit 2
-        fi
-    fi
+    copyFile "docker-compose-witness.yml" "docker-compose.yml" 1
+    copyFile "witness-config-iotex.yaml" "witness-config-iotex.yaml" 1
+    copyFile "witness-config-iotex.secret.yaml" "witness-config-iotex.secret.yaml" 0
+    copyFile "witness-config-ethereum.yaml" "witness-config-ethereum.yaml" 1
+    copyFile "witness-config-ethereum.secret.yaml" "witness-config-ethereum.secret.yaml" 0
+    copyFile "witness-config-heco.yaml" "witness-config-heco.yaml" 1
+    copyFile "witness-config-heco.secret.yaml" "witness-config-heco.secret.yaml" 0
+    copyFile "witness-config-polis.yaml" "witness-config-polis.yaml" 1
+    copyFile "witness-config-polis.secret.yaml" "witness-config-polis.secret.yaml" 0
+    copyFile "witness-config-bsc.yaml" "witness-config-bsc.yaml" 1
+    copyFile "witness-config-bsc.secret.yaml" "witness-config-bsc.secret.yaml" 0
+    copyFile "witness-config-matic.yaml" "witness-config-matic.yaml" 1
+    copyFile "witness-config-matic.secret.yaml" "witness-config-matic.secret.yaml" 0
 
     [[ -f ${IOTEX_WITNESS}/etc/.env ]] || (echo "IOTEX_WITNESS=$IOTEX_WITNESS" > ${IOTEX_WITNESS}/etc/.env;echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${IOTEX_WITNESS}/etc/.env)
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_WITNESS}/etc/crontab

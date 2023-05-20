@@ -1,9 +1,6 @@
 chain: "ethereum"
-clientURL: ""
 grpcPort: 9082
 grpcProxyPort: 9083
-privateKey: ""
-slackWebHook: ""
 interval: 1m
 batchSize: 40
 database:
@@ -58,7 +55,10 @@ cashiers:
         token1: "0xb0Ed1F44833C6b2Afa39a6a85ff62C8ad96F5275"
       # CIOTX
       - token2: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
-        token1: "0x300211Def2a644b036A9bdd3e58159bb2074d388"
+        token1: "0x9f90b457dea25ef802e38d470dda7343691d8fe1"
       # CCCS
       - token2: "io1daejpenv38639dw8xplp7c9zr4ff0c9p9kfx3g"
         token1: "0xf79deaBc1406a3AD07c70877fBaEb90777B77E68"
+      # CTSI
+      - token2: "io16ajfjch2hlm56vnhlwvs7g7aptnvx40ksyvrz5"
+        token1: "0x30e68fACB9D4E04FEdc12A8Cc539639f90F40c63"

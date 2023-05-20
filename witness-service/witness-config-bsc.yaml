@@ -1,17 +1,14 @@
 chain: "bsc"
-clientURL: "https://bsc-dataseed.binance.org/"
 grpcPort: 9086
 grpcProxyPort: 9087
-privateKey: ""
-slackWebHook: ""
 interval: 1m
-batchSize: 1000
+batchSize: 100
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
   driver: "mysql"
 cashiers:
   - id: "bsc-to-iotex"
-    relayerURL: "localhost:7001"
+    relayerURL: ":7001"
     startBlockHeight: 5177821
     cashierContractAddress: "0x797f1465796fd89ea7135e76dbc7cdb136bba1ca"
     validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"

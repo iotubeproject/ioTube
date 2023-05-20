@@ -150,7 +150,10 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	}
 	tc.lastProcessBlockHeight = endHeight
 
-	return tc.recorder.UpdateSyncHeight(tc.id, endHeight)
+	if err := tc.recorder.UpdateSyncHeight(tc.id, endHeight); err != nil {
+		return errors.Wrap(err, "failed to update sync height")
+	}
+	return nil
 }
 
 func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error {
@@ -208,11 +211,11 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 func (tc *tokenCashierBase) CheckTransfers() error {
 	transfersToSettle, err := tc.recorder.TransfersToSettle()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to fetch transfers to settle")
 	}
 	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create connection")
 	}
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
@@ -223,11 +226,11 @@ func (tc *tokenCashierBase) CheckTransfers() error {
 			&services.CheckRequest{Id: transfer.id.Bytes()},
 		)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to check with relayer")
 		}
 		if response.Status == services.Status_SETTLED {
 			if err := tc.recorder.SettleTransfer(transfer); err != nil {
-				return err
+				return errors.Wrap(err, "failed to settle transfer")
 			}
 		}
 	}

@@ -18,8 +18,11 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-iotex.yaml:/etc/iotube-witness/witness-config-iotex.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-iotex.secret.yaml:/etc/iotube-witness/witness-config-iotex.secret.yaml:ro
     network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-iotex.yaml
+    command: witness -config=/etc/iotube-witness/witness-config-iotex.yaml -secret=/etc/iotube-witness/witness-config-iotex.secret.yaml
+    environment:
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
 
   ethereum-witness:
     container_name: ethereum-witness
@@ -27,8 +30,11 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-ethereum.yaml:/etc/iotube-witness/witness-config-ethereum.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-ethereum.secret.yaml:/etc/iotube-witness/witness-config-ethereum.secret.yaml:ro
     network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-ethereum.yaml
+    command: witness -config=/etc/iotube-witness/witness-config-ethereum.yaml -secret=/etc/iotube-witness/witness-config-ethereum.secret.yaml
+    environment:
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
 
   heco-witness:
     container_name: heco-witness
@@ -36,8 +42,11 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-heco.yaml:/etc/iotube-witness/witness-config-heco.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-heco.secret.yaml:/etc/iotube-witness/witness-config-heco.secret.yaml:ro
     network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-heco.yaml
+    command: witness -config=/etc/iotube-witness/witness-config-heco.yaml -secret=/etc/iotube-witness/witness-config-heco.secret.yaml
+    environment:
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
 
   polis-witness:
     container_name: polis-witness
@@ -45,8 +54,11 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-polis.yaml:/etc/iotube-witness/witness-config-polis.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-polis.secret.yaml:/etc/iotube-witness/witness-config-polis.secret.yaml:ro
     network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-polis.yaml
+    command: witness -config=/etc/iotube-witness/witness-config-polis.yaml -secret=/etc/iotube-witness/witness-config-polis.secret.yaml
+    environment:
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
 
   bsc-witness:
     container_name: bsc-witness
@@ -54,8 +66,11 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-bsc.yaml:/etc/iotube-witness/witness-config-bsc.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-bsc.secret.yaml:/etc/iotube-witness/witness-config-bsc.secret.yaml:ro
     network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-bsc.yaml
+    command: witness -config=/etc/iotube-witness/witness-config-bsc.yaml -secret=/etc/iotube-witness/witness-config-bsc.secret.yaml
+    environment:
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
 
   matic-witness:
     container_name: matic-witness
@@ -63,8 +78,11 @@ services:
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-matic.yaml:/etc/iotube-witness/witness-config-matic.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-matic.secret.yaml:/etc/iotube-witness/witness-config-matic.secret.yaml:ro
     network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-matic.yaml
+    command: witness -config=/etc/iotube-witness/witness-config-matic.yaml -secret=/etc/iotube-witness/witness-config-matic.secret.yaml
+    environment:
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
 
   cron:
     image: schnitzler/mysqldump

@@ -1,9 +1,6 @@
 chain: "heco"
-clientURL: "https://http-mainnet-node.huobichain.com"
 grpcPort: 9088
 grpcProxyPort: 9089
-privateKey: ""
-slackWebHook: ""
 interval: 1m
 batchSize: 40
 database:
@@ -11,7 +8,7 @@ database:
   driver: "mysql"
 cashiers:
   - id: "heco-to-iotex"
-    relayerURL: "localhost:7001"
+    relayerURL: ":7001"
     startBlockHeight: 2431000
     validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
     cashierContractAddress: "0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E"

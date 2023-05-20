@@ -35,6 +35,7 @@ import (
 type Configuration struct {
 	Chain                 string        `json:"chain" yaml:"chain"`
 	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
+	RelayerURL            string        `jsong:"relayerURL" yaml:"relayerURL"`
 	Database              db.Config     `json:"database" yaml:"database"`
 	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
@@ -78,7 +79,8 @@ var (
 		GrpcProxyPort:      9081,
 	}
 
-	configFile = flag.String("config", "", "path of config file")
+	configFile       = flag.String("config", "", "path of config file")
+	secretConfigFile = flag.String("secret", "", "path of secret config file")
 
 	continuously = "continuously"
 
@@ -87,7 +89,7 @@ var (
 
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename> -blocks <height,height...>")
+		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename> -secret <filename> -blocks <height,height...>")
 		flag.PrintDefaults()
 	}
 }
@@ -98,6 +100,9 @@ func main() {
 	if *configFile != "" {
 		opts = append(opts, config.File(*configFile))
 	}
+	if *secretConfigFile != "" {
+		opts = append(opts, config.File(*secretConfigFile))
+	}
 	yaml, err := config.NewYAML(opts...)
 	if err != nil {
 		log.Fatalln(err)
@@ -105,6 +110,16 @@ func main() {
 	var cfg Configuration
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
+	}
+	if cfg.RelayerURL != "" {
+		for i, cc := range cfg.Cashiers {
+			switch {
+			case strings.HasPrefix(cc.RelayerURL, ":"):
+				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL + cc.RelayerURL
+			case cc.RelayerURL == "":
+				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL
+			}
+		}
 	}
 	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok {
 		cfg.PrivateKey = pk
@@ -138,6 +153,9 @@ func main() {
 			log.Fatalf("failed to decode private key %v\n", err)
 		}
 		util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
+		log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
+	} else {
+		log.Println("No Private Key")
 	}
 
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
