@@ -57,7 +57,7 @@ function confirmEnvironmentVariable() {
 function copyFile() {
     srcFile=$1
     tgtFile=$2
-    if [[ ! -f ${IOTEX_WITNESS}/etc/$tgtFile ]] || [[ $# -ge 3 ]] && [ $3 == 1 ]; then
+    if [[ ! -f ${IOTEX_WITNESS}/etc/$tgtFile || $# -ge 3 && $3 == 1 ]]; then
         echo -e "copy file ${srcFile} to ${tgtFile}"
         cp -f $PROJECT_ABS_DIR/$srcFile ${IOTEX_WITNESS}/etc/$tgtFile
          if [ $? -ne 0 ];then
