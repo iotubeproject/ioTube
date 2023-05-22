@@ -111,16 +111,6 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	if cfg.RelayerURL != "" {
-		for i, cc := range cfg.Cashiers {
-			switch {
-			case strings.HasPrefix(cc.RelayerURL, ":"):
-				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL + cc.RelayerURL
-			case cc.RelayerURL == "":
-				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL
-			}
-		}
-	}
 	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok {
 		cfg.PrivateKey = pk
 	}
@@ -137,6 +127,9 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
+	}
+	if relayerURL, ok := os.LookupEnv("RELAYER_URL"); ok {
+		cfg.RelayerURL = relayerURL
 	}
 
 	// TODO: load more parameters from env
@@ -156,6 +149,16 @@ func main() {
 		log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
 	} else {
 		log.Println("No Private Key")
+	}
+	if cfg.RelayerURL != "" {
+		for i, cc := range cfg.Cashiers {
+			switch {
+			case strings.HasPrefix(cc.RelayerURL, ":"):
+				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL + cc.RelayerURL
+			case cc.RelayerURL == "":
+				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL
+			}
+		}
 	}
 
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))

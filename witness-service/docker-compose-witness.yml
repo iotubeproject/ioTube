@@ -23,6 +23,7 @@ services:
     command: witness -config=/etc/iotube-witness/witness-config-iotex.yaml -secret=/etc/iotube-witness/witness-config-iotex.secret.yaml
     environment:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+      RELAYER_URL: ${RELAYER_URL}
 
   ethereum-witness:
     container_name: ethereum-witness
@@ -35,6 +36,7 @@ services:
     command: witness -config=/etc/iotube-witness/witness-config-ethereum.yaml -secret=/etc/iotube-witness/witness-config-ethereum.secret.yaml
     environment:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+      RELAYER_URL: ${RELAYER_URL}
 
   heco-witness:
     container_name: heco-witness
@@ -47,6 +49,7 @@ services:
     command: witness -config=/etc/iotube-witness/witness-config-heco.yaml -secret=/etc/iotube-witness/witness-config-heco.secret.yaml
     environment:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+      RELAYER_URL: ${RELAYER_URL}
 
   polis-witness:
     container_name: polis-witness
@@ -59,6 +62,7 @@ services:
     command: witness -config=/etc/iotube-witness/witness-config-polis.yaml -secret=/etc/iotube-witness/witness-config-polis.secret.yaml
     environment:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+      RELAYER_URL: ${RELAYER_URL}
 
   bsc-witness:
     container_name: bsc-witness
@@ -71,6 +75,7 @@ services:
     command: witness -config=/etc/iotube-witness/witness-config-bsc.yaml -secret=/etc/iotube-witness/witness-config-bsc.secret.yaml
     environment:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+      RELAYER_URL: ${RELAYER_URL}
 
   matic-witness:
     container_name: matic-witness
@@ -83,6 +88,7 @@ services:
     command: witness -config=/etc/iotube-witness/witness-config-matic.yaml -secret=/etc/iotube-witness/witness-config-matic.secret.yaml
     environment:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+      RELAYER_URL: ${RELAYER_URL}
 
   cron:
     image: schnitzler/mysqldump
