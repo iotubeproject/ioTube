@@ -196,6 +196,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 	if err := recorder.addWitness(tx, transfer, witness, recorder.transferTableName, recorder.witnessTableName); err != nil {
 		return err
 	}
@@ -205,6 +206,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 		if err != nil {
 			return err
 		}
+		defer explorerTx.Rollback()
 		if err := recorder.addWitness(explorerTx, transfer, witness, recorder.explorerTableName, ""); err != nil {
 			return err
 		}
