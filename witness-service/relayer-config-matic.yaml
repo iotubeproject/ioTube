@@ -1,7 +1,7 @@
 chain: "matic"
 interval: 1m
 clientURL: "https://rpc-mainnet.maticvigil.com"
-ethConfirmBlockNumber: 2
+ethConfirmBlockNumber: 255
 ethGasPriceLimit: 5
 grpcPort: 7004
 grpcProxyPort: 8004
