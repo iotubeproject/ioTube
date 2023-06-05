@@ -30,9 +30,6 @@ cashiers:
       # CYC
       - token1: "io1f4acssp65t6s90egjkzpvrdsrjjyysnvxgqjrh"
         token2: "0x8861cfF2366C1128fd699B68304aD99a0764Ef9a"
-      # W-IOTX
-      - token1: "io15qr5fzpxsnp7garl4m7k355rafzqn8grrm0grz"
-        token2: "0x6fB3e0A217407EFFf7Ca062D46c26E5d60a14d69"
       # MIST
       - token1: "io14xuv3gq2yzmcug9t0uwhate99djyux5zwdurtm"
         token2: "0x88ACDd2a6425c3FaAE4Bc9650Fd7E27e0Bebb7aB"

@@ -3,7 +3,7 @@ grpcPort: 9084
 grpcProxyPort: 9085
 interval: 1m
 batchSize: 100
-confirmBlockNumber: 120
+confirmBlockNumber: 255
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
   driver: "mysql"
