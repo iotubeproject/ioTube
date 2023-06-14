@@ -47,7 +47,7 @@ async function main() {
     `cToken[${name}, ${symbol}, ${decimals}] deployed to ${cToken.target}`
   );
   
-  if (tubeAddress.proxy_token_list) {
+  if (tubeAddress.proxy_token_list !== "") {
     console.log(`Add cToken ${cToken.target} to proxy token list...`);
     const proxyTokenList = await hre.ethers.getContractAt("TokenList", tubeAddress.proxy_token_list);
     let tx = await proxyTokenList.addToken(
@@ -60,9 +60,11 @@ async function main() {
       console.log(`Add cToken to proxy token tx fail, txHash: ${tx.hash}`);
       return;
     }
+  } else {
+    console.log(`Skip add proxy token list`);
   }
 
-  console.log(`Add cToken ${cToken.target} successful`)
+  console.log(`Add cToken ${cToken.target} successful`);
 }
 
 main().catch((error) => {
