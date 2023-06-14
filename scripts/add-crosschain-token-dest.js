@@ -25,12 +25,12 @@ async function main() {
   }
   const max = process.env.TOKEN_MAX;
   if (max === undefined || max === "") {
-    console.log("Must use env variable to provide token max: export TOKEN_MAX=10000000000000000000");
+    console.log("Must use env variable to provide token max: export TOKEN_MAX=1.5");
     return;
   }
   const min = process.env.TOKEN_MIN;
   if (min === undefined || min === "") {
-    console.log("Must use env variable to provide token min: export TOKEN_MIN=1000000000000000000");
+    console.log("Must use env variable to provide token min: export TOKEN_MIN=1");
     return;
   }
 
@@ -46,14 +46,20 @@ async function main() {
   console.log(
     `cToken[${name}, ${symbol}, ${decimals}] deployed to ${cToken.target}`
   );
-
-  console.log(`Add cToken ${cToken.target} to proxy token list...`);
-  const proxyTokenList = await hre.ethers.getContractAt("TokenList", tubeAddress.proxy_token_list);
-  let tx = await proxyTokenList.addToken(cToken.target, min, max);
-  let receipt = await tx.wait();
-  if (receipt.status !== 0) {
-    console.log(`Add cToken to proxy token tx fail, txHash: ${tx.hash}`);
-    return;
+  
+  if (tubeAddress.proxy_token_list) {
+    console.log(`Add cToken ${cToken.target} to proxy token list...`);
+    const proxyTokenList = await hre.ethers.getContractAt("TokenList", tubeAddress.proxy_token_list);
+    let tx = await proxyTokenList.addToken(
+      cToken.target,
+      hre.ethers.FixedNumber.fromString(min, {decimals: Number(decimals)}).value,
+      hre.ethers.FixedNumber.fromString(max, {decimals: Number(decimals)}).value
+    );
+    let receipt = await tx.wait();
+    if (receipt.status !== 0) {
+      console.log(`Add cToken to proxy token tx fail, txHash: ${tx.hash}`);
+      return;
+    }
   }
 
   console.log(`Add cToken ${cToken.target} successful`)

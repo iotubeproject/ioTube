@@ -44,7 +44,6 @@ module.exports = {
     mainnet: {
       url: process.env.MAINNET_RPC_URL,
       accounts: accounts,
-      saveDeployments: true,
       chainId: 1,
     },
     iotex: {
