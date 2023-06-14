@@ -1,4 +1,4 @@
-pragma solidity <6.0 >=0.4.18;
+pragma solidity ^0.5.0;
 
 contract WIOTX {
     string public name     = "Wrapped IOTX";
