@@ -24,6 +24,7 @@ import (
 
 var (
 	_ReceiptEventTopic, _TransferEventTopic common.Hash
+	_ZeroHash                               = common.Hash{}
 )
 
 func init() {

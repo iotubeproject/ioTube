@@ -108,7 +108,7 @@ func NewTokenCashier(
 					var realAmount *big.Int
 					for _, l := range receipt.ReceiptInfo.Receipt.Logs {
 						if tokenIoAddr.String() == l.ContractAddress && common.BytesToHash(l.Topics[0]) == _TransferEventTopic && (common.BytesToAddress(l.Topics[1]) == senderAddr || cashier == common.BytesToAddress(l.Topics[1])) {
-							if realAmount != nil {
+							if realAmount != nil && common.BytesToHash(l.Topics[2]) != _ZeroHash {
 								return nil, errors.Errorf("two transfers in one transaction %x", transferLog.ActHash)
 							}
 							realAmount = new(big.Int).SetBytes(l.Data)
