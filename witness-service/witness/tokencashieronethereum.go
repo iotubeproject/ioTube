@@ -85,7 +85,7 @@ func NewTokenCashierOnEthereum(
 					}
 					var realAmount *big.Int
 					for _, l := range receipt.Logs {
-						if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && l.Topics[1] == senderAddress.Hash() {
+						if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && (l.Topics[1] == senderAddress.Hash() || l.Topics[1] == transferLog.Address.Hash()) {
 							if realAmount != nil {
 								return nil, errors.Errorf("two transfers in one transaction %x", transferLog.TxHash)
 							}

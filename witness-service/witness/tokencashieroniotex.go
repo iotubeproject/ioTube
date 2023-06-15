@@ -100,9 +100,14 @@ func NewTokenCashier(
 					if err != nil {
 						return nil, err
 					}
+					cashierAddr, err := address.FromString(transferLog.ContractAddress)
+					if err != nil {
+						return nil, err
+					}
+					cashier := common.BytesToAddress(cashierAddr.Bytes())
 					var realAmount *big.Int
 					for _, l := range receipt.ReceiptInfo.Receipt.Logs {
-						if tokenIoAddr.String() == l.ContractAddress && common.BytesToHash(l.Topics[0]) == _TransferEventTopic && common.BytesToAddress(l.Topics[1]) == senderAddr {
+						if tokenIoAddr.String() == l.ContractAddress && common.BytesToHash(l.Topics[0]) == _TransferEventTopic && (common.BytesToAddress(l.Topics[1]) == senderAddr || cashier == common.BytesToAddress(l.Topics[1])) {
 							if realAmount != nil {
 								return nil, errors.Errorf("two transfers in one transaction %x", transferLog.ActHash)
 							}
@@ -121,12 +126,8 @@ func NewTokenCashier(
 						log.Printf("\tAmount %d is the same as real amount %d\n", amount, realAmount)
 					}
 
-					cashier, err := address.FromString(transferLog.ContractAddress)
-					if err != nil {
-						return nil, err
-					}
 					transfers = append(transfers, &Transfer{
-						cashier:     common.BytesToAddress(cashier.Bytes()),
+						cashier:     cashier,
 						token:       tokenAddr,
 						index:       new(big.Int).SetBytes(transferLog.Topics[2]).Uint64(),
 						sender:      senderAddr,
