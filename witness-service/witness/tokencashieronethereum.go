@@ -92,6 +92,9 @@ func NewTokenCashierOnEthereum(
 							realAmount = new(big.Int).SetBytes(l.Data)
 						}
 					}
+					if realAmount == nil {
+						return nil, errors.Errorf("failed to get the amount from transfer event for %x", transferLog.TxHash)
+					}
 					switch realAmount.Cmp(amount) {
 					case 1:
 						return nil, errors.Errorf("Invalid amount: %d < %d", amount, realAmount)
