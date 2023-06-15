@@ -3,6 +3,18 @@ const addresses = require("./addresses");
 
 async function main() {
   const tubeAddress = addresses[hre.network.name];
+  const owner = new ethers.Wallet(process.env[`PRIVATE_KEY_${hre.network.name.toUpperCase()}`], ethers.provider)
+
+  const max = process.env.TOKEN_MAX;
+  if (max === undefined || max === "") {
+    console.log("Must use env variable to provide token max: export TOKEN_MAX=1.5");
+    return;
+  }
+  const min = process.env.TOKEN_MIN;
+  if (min === undefined || min === "") {
+    console.log("Must use env variable to provide token min: export TOKEN_MIN=1");
+    return;
+  }
   let c_token = process.env.C_TOKEN;
   if (c_token === undefined || c_token === "") {
     const co_token = process.env.CO_TOKEN;
@@ -25,16 +37,6 @@ async function main() {
       console.log("Must use env variable to provide token decimals: export TOKEN_DECIMALS=18");
       return;
     }
-    const max = process.env.TOKEN_MAX;
-    if (max === undefined || max === "") {
-      console.log("Must use env variable to provide token max: export TOKEN_MAX=1.5");
-      return;
-    }
-    const min = process.env.TOKEN_MIN;
-    if (min === undefined || min === "") {
-      console.log("Must use env variable to provide token min: export TOKEN_MIN=1");
-      return;
-    }
 
     console.log(`Deploy cToken[${name}, ${symbol}, ${decimals}]...`);
     const cToken = await hre.ethers.deployContract("CrosschainERC20", [
@@ -43,7 +45,7 @@ async function main() {
       name,
       symbol,
       decimals
-    ]);
+    ], owner);
     await cToken.waitForDeployment();
     console.log(
       `cToken[${name}, ${symbol}, ${decimals}] deployed to ${cToken.target}`
@@ -53,6 +55,7 @@ async function main() {
     console.log("cToken:", c_token);
   }
   
+
   if (tubeAddress.proxy_token_list !== "") {
     console.log(`Add cToken ${c_token} to proxy token list...`);
     const proxyTokenList = await hre.ethers.getContractAt("TokenList", tubeAddress.proxy_token_list);
@@ -61,7 +64,7 @@ async function main() {
       console.log("Must use env variable to provide token decimals: export TOKEN_DECIMALS=18");
       return;
     }
-    let tx = await proxyTokenList.addToken(
+    let tx = await proxyTokenList.connect(owner).addToken(
       c_token,
       hre.ethers.FixedNumber.fromString(min, {decimals: Number(decimals)}).value,
       hre.ethers.FixedNumber.fromString(max, {decimals: Number(decimals)}).value
