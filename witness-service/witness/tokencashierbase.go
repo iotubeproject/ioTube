@@ -10,14 +10,34 @@ import (
 	"context"
 	"log"
 	"math/big"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
+
+var (
+	_ReceiptEventTopic, _TransferEventTopic common.Hash
+)
+
+func init() {
+	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierABI))
+	if err != nil {
+		log.Panicf("failed to decode token cashier abi, %+v", err)
+	}
+	_ReceiptEventTopic = tokenCashierABI.Events["Receipt"].ID
+	erc20ABI, err := abi.JSON(strings.NewReader(contract.CrosschainERC20ABI))
+	if err != nil {
+		log.Panicf("failed to decode erc20 abi, %+v", err)
+	}
+	_TransferEventTopic = erc20ABI.Events["Transfer"].ID
+}
 
 type (
 	tokenCashierBase struct {

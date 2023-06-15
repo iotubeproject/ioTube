@@ -11,13 +11,10 @@ import (
 	"context"
 	"log"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/pkg/errors"
 )
 
@@ -34,11 +31,6 @@ func NewTokenCashierOnEthereum(
 	reverseRecorder *Recorder,
 	reverseCashierContractAddr common.Address,
 ) (TokenCashier, error) {
-	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierABI))
-	if err != nil {
-		return nil, err
-	}
-	eventTopic := tokenCashierABI.Events[eventName].ID
 	return newTokenCashierBase(
 		id,
 		recorder,
@@ -70,7 +62,7 @@ func NewTokenCashierOnEthereum(
 				Addresses: []common.Address{cashierContractAddr},
 				Topics: [][]common.Hash{
 					{
-						eventTopic,
+						_ReceiptEventTopic,
 					},
 				},
 			})
@@ -79,21 +71,45 @@ func NewTokenCashierOnEthereum(
 			}
 			transfers := []*Transfer{}
 			if len(logs) > 0 {
-				log.Printf("\t%d transfers fetched", len(logs))
-				for _, log := range logs {
-					if !bytes.Equal(eventTopic[:], log.Topics[0][:]) {
-						return nil, errors.Errorf("Wrong event topic %x, %x expected", log.Topics[0], eventTopic)
+				log.Printf("\t%d transfers fetched\n", len(logs))
+				for _, transferLog := range logs {
+					if !bytes.Equal(_ReceiptEventTopic[:], transferLog.Topics[0][:]) {
+						return nil, errors.Errorf("Wrong event topic %x, %x expected", transferLog.Topics[0], _ReceiptEventTopic)
+					}
+					tokenAddress := common.BytesToAddress(transferLog.Topics[1][:])
+					senderAddress := common.BytesToAddress(transferLog.Data[:32])
+					amount := new(big.Int).SetBytes(transferLog.Data[64:96])
+					receipt, err := ethereumClient.TransactionReceipt(context.Background(), transferLog.TxHash)
+					if err != nil {
+						return nil, err
+					}
+					var realAmount *big.Int
+					for _, l := range receipt.Logs {
+						if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && l.Topics[1] == senderAddress.Hash() {
+							if realAmount != nil {
+								return nil, errors.Errorf("two transfers in one transaction %x", transferLog.TxHash)
+							}
+							realAmount = new(big.Int).SetBytes(l.Data)
+						}
+					}
+					switch realAmount.Cmp(amount) {
+					case 1:
+						return nil, errors.Errorf("Invalid amount: %d < %d", amount, realAmount)
+					case -1:
+						log.Printf("\tAmount %d is reduced %d after tax\n", amount, realAmount)
+					case 0:
+						log.Printf("\tAmount %d is the same as real amount %d\n", amount, realAmount)
 					}
 					transfers = append(transfers, &Transfer{
-						cashier:     log.Address,
-						token:       common.BytesToAddress(log.Topics[1][:]),
-						index:       new(big.Int).SetBytes(log.Topics[2][:]).Uint64(),
-						sender:      common.BytesToAddress(log.Data[:32]),
-						recipient:   common.BytesToAddress(log.Data[32:64]),
-						amount:      new(big.Int).SetBytes(log.Data[64:96]),
-						fee:         new(big.Int).SetBytes(log.Data[96:128]),
-						blockHeight: log.BlockNumber,
-						txHash:      log.TxHash,
+						cashier:     transferLog.Address,
+						token:       tokenAddress,
+						index:       new(big.Int).SetBytes(transferLog.Topics[2][:]).Uint64(),
+						sender:      senderAddress,
+						recipient:   common.BytesToAddress(transferLog.Data[32:64]),
+						amount:      amount,
+						fee:         new(big.Int).SetBytes(transferLog.Data[96:128]),
+						blockHeight: transferLog.BlockNumber,
+						txHash:      transferLog.TxHash,
 					})
 				}
 			}

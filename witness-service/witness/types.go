@@ -58,8 +58,6 @@ type (
 )
 
 const (
-	eventName = "Receipt"
-
 	// TransferNew stands for a new transfer
 	TransferNew TransferStatus = "new"
 	// WitnessSubmitted stands for a witnessed transfer

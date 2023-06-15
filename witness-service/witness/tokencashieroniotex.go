@@ -9,13 +9,11 @@ package witness
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"log"
 	"math/big"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
@@ -32,11 +30,6 @@ func NewTokenCashier(
 	recorder *Recorder,
 	startBlockHeight uint64,
 ) (TokenCashier, error) {
-	tokenCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierABI))
-	if err != nil {
-		return nil, err
-	}
-	eventTopic := tokenCashierABI.Events[eventName].ID.Bytes()
 	return newTokenCashierBase(
 		id,
 		recorder,
@@ -68,7 +61,7 @@ func NewTokenCashier(
 					Topics: []*iotexapi.Topics{
 						{
 							Topic: [][]byte{
-								eventTopic,
+								_ReceiptEventTopic.Bytes(),
 							},
 						},
 					},
@@ -86,28 +79,58 @@ func NewTokenCashier(
 			}
 			transfers := []*Transfer{}
 			if len(response.Logs) > 0 {
-				log.Printf("\t%d transfers fetched", len(response.Logs))
-				for _, log := range response.Logs {
-					if !bytes.Equal(eventTopic, log.Topics[0]) {
-						return nil, errors.Errorf("Wrong event topic %s, %s expected", log.Topics[0], eventTopic)
+				log.Printf("\t%d transfers fetched\n", len(response.Logs))
+				for _, transferLog := range response.Logs {
+					if !bytes.Equal(_ReceiptEventTopic.Bytes(), transferLog.Topics[0]) {
+						return nil, errors.Errorf("Wrong event topic %s, %s expected", transferLog.Topics[0], _ReceiptEventTopic)
 					}
-					if len(log.Data) != 128 {
-						return nil, errors.Errorf("Invalid data length %d, 128 expected", len(log.Data))
+					if len(transferLog.Data) != 128 {
+						return nil, errors.Errorf("Invalid data length %d, 128 expected", len(transferLog.Data))
 					}
-					cashier, err := address.FromString(log.ContractAddress)
+					senderAddr := common.BytesToAddress(transferLog.Data[:32])
+					amount := new(big.Int).SetBytes(transferLog.Data[64:96])
+					receipt, err := iotexClient.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{
+						ActionHash: hex.EncodeToString(transferLog.ActHash),
+					})
+					if err != nil {
+						return nil, err
+					}
+					tokenAddr, err := address.FromBytes(transferLog.Topics[1])
+					if err != nil {
+						return nil, err
+					}
+					var realAmount *big.Int
+					for _, l := range receipt.ReceiptInfo.Receipt.Logs {
+						if tokenAddr.String() == l.ContractAddress && common.BytesToHash(l.Topics[0]) == _TransferEventTopic && common.BytesToAddress(l.Topics[1]) == senderAddr {
+							if realAmount != nil {
+								return nil, errors.Errorf("two transfers in one transaction %x", transferLog.ActHash)
+							}
+							realAmount = new(big.Int).SetBytes(l.Data)
+						}
+					}
+					switch realAmount.Cmp(amount) {
+					case 1:
+						return nil, errors.Errorf("Invalid amount: %d < %d", amount, realAmount)
+					case -1:
+						log.Printf("\tAmount %d is reduced %d after tax\n", amount, realAmount)
+					case 0:
+						log.Printf("\tAmount %d is the same as real amount %d\n", amount, realAmount)
+					}
+
+					cashier, err := address.FromString(transferLog.ContractAddress)
 					if err != nil {
 						return nil, err
 					}
 					transfers = append(transfers, &Transfer{
 						cashier:     common.BytesToAddress(cashier.Bytes()),
-						token:       common.BytesToAddress(log.Topics[1]),
-						index:       new(big.Int).SetBytes(log.Topics[2]).Uint64(),
-						sender:      common.BytesToAddress(log.Data[:32]),
-						recipient:   common.BytesToAddress(log.Data[32:64]),
-						amount:      new(big.Int).SetBytes(log.Data[64:96]),
-						fee:         new(big.Int).SetBytes(log.Data[96:128]),
-						blockHeight: log.BlkHeight,
-						txHash:      common.BytesToHash(log.ActHash),
+						token:       common.BytesToAddress(transferLog.Topics[1]),
+						index:       new(big.Int).SetBytes(transferLog.Topics[2]).Uint64(),
+						sender:      senderAddr,
+						recipient:   common.BytesToAddress(transferLog.Data[32:64]),
+						amount:      amount,
+						fee:         new(big.Int).SetBytes(transferLog.Data[96:128]),
+						blockHeight: transferLog.BlkHeight,
+						txHash:      common.BytesToHash(transferLog.ActHash),
 					})
 				}
 			}
