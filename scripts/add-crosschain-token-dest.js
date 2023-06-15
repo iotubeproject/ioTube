@@ -3,7 +3,11 @@ const addresses = require("./addresses");
 
 async function main() {
   const tubeAddress = addresses[hre.network.name];
-  const owner = new ethers.Wallet(process.env[`PRIVATE_KEY_${hre.network.name.toUpperCase()}`], ethers.provider)
+
+  const owner = new hre.ethers.Wallet(
+    process.env[`PRIVATE_KEY_${hre.network.name.toUpperCase()}`],
+    hre.ethers.provider
+  )
 
   const max = process.env.TOKEN_MAX;
   if (max === undefined || max === "") {
@@ -17,11 +21,6 @@ async function main() {
   }
   let c_token = process.env.C_TOKEN;
   if (c_token === undefined || c_token === "") {
-    const co_token = process.env.CO_TOKEN;
-    if (co_token === undefined || co_token === "") {
-      console.log("Must use env variable to provide co-token address: export CO_TOKEN=0x...");
-      return;
-    }
     const name = process.env.TOKEN_NAME;
     if (name === undefined || name === "") {
       console.log("Must use env variable to provide token name: export TOKEN_NAME=Crosschain ABC");

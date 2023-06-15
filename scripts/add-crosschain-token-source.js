@@ -3,7 +3,11 @@ const addresses = require("./addresses");
 
 async function main() {
   const tubeAddress = addresses[hre.network.name];
-  const owner = new ethers.Wallet(process.env[`PRIVATE_KEY_${hre.network.name.toUpperCase()}`], ethers.provider)
+
+  const owner = new hre.ethers.Wallet(
+    process.env[`PRIVATE_KEY_${hre.network.name.toUpperCase()}`],
+    hre.ethers.provider
+  )
 
   const max = process.env.TOKEN_MAX;
   if (max === undefined || max === "") {
