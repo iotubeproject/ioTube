@@ -32,3 +32,6 @@ cashiers:
         token2: "io19zrne65vymmq8v2exluesk5g33w6tlvskfj3c9"
       - token1: "0xa0CB9c8e470EC591dd7f5De650af9468EE6f7d5A"
         token2: "io1cx6cvg9dswfc83nzhl5qmdz3gdzda3khtt6asw"
+      # THC
+      - token1: "0x8Dfb1099C53f634BEcf3C98aE19eB1BAA1b37D43"
+        token2: "io1kn9axz8g08qv8gafj6kkcatkky362ph5jntc9r"
