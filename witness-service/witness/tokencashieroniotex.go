@@ -79,7 +79,7 @@ func NewTokenCashier(
 			}
 			transfers := []*Transfer{}
 			if len(response.Logs) > 0 {
-				log.Printf("\t%d transfers fetched\n", len(response.Logs))
+				log.Printf("\t%d transfers fetched from %d to %d\n", len(response.Logs), startHeight, endHeight)
 				for _, transferLog := range response.Logs {
 					if !bytes.Equal(_ReceiptEventTopic.Bytes(), transferLog.Topics[0]) {
 						return nil, errors.Errorf("Wrong event topic %s, %s expected", transferLog.Topics[0], _ReceiptEventTopic)

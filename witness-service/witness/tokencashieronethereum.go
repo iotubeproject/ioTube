@@ -71,7 +71,7 @@ func NewTokenCashierOnEthereum(
 			}
 			transfers := []*Transfer{}
 			if len(logs) > 0 {
-				log.Printf("\t%d transfers fetched\n", len(logs))
+				log.Printf("\t%d transfers fetched from %d to %d\n", len(logs), startHeight, endHeight)
 				for _, transferLog := range logs {
 					if !bytes.Equal(_ReceiptEventTopic[:], transferLog.Topics[0][:]) {
 						return nil, errors.Errorf("Wrong event topic %x, %x expected", transferLog.Topics[0], _ReceiptEventTopic)

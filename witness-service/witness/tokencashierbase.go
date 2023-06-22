@@ -165,7 +165,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		}
 		tc.lastPatrolBlockHeight = startHeight
 	} else {
-		log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
+		// log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
 		transfers, err = tc.pullTransfers(startHeight, endHeight)
 		if err != nil {
 			return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, endHeight)
