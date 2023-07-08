@@ -39,10 +39,3 @@ cashiers:
         token1: "0x300211Def2a644b036A9bdd3e58159bb2074d388"
       - token2: "io1g29kuat5d727cqcjv5ta8607ys9kdp5fx702ua"
         token1: "0xe04E81331bDcBfBF2D1342714812d546a55CB6DC"
-    reverse:
-      cashierContractAddress: "0x540a92Dd951407Ee6c94b997a43ecF30Ea6D04Cd"
-      transferTableName: "iotex_to_matic_transfers"
-      tokens:
-        - "0x99B2B0eFb56E62E36960c20cD5ca8eC6ABD5557A"
-        - "0x4D7b88403AA2F502bf289584160db01ca442426c"
-        - "0x428b6e75746f95eC03126517d3E9fe240B668689"
