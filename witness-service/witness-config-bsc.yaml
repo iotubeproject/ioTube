@@ -35,3 +35,6 @@ cashiers:
       # THC
       - token1: "0x8Dfb1099C53f634BEcf3C98aE19eB1BAA1b37D43"
         token2: "io1kn9axz8g08qv8gafj6kkcatkky362ph5jntc9r"
+      # IoTexShiba
+      - token1: "0x52702a7301be185cc97bf3fe6d497a83e7772fde"
+        token2: "io1ld5l9sxecjzkftkn9tcudu6z5qmvjj2zfamvcw"

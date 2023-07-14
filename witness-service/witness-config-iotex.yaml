@@ -107,6 +107,9 @@ cashiers:
       # THC
       - token1: "io1kn9axz8g08qv8gafj6kkcatkky362ph5jntc9r"
         token2: "0x8Dfb1099C53f634BEcf3C98aE19eB1BAA1b37D43"
+      # IoTexShiba
+      - token1: "io1ld5l9sxecjzkftkn9tcudu6z5qmvjj2zfamvcw"
+        token2: "0x52702a7301be185cc97bf3fe6d497a83e7772fde"
   - id: "iotex-to-matic"
     relayerURL: ":7004"
     cashierContractAddress: "io12s9f9hv4zsr7umy5hxt6g0k0xr4x6pxdp5w998"
