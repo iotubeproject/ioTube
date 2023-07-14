@@ -142,6 +142,8 @@ function startup() {
     echo -e "$YELLOW Start witness and it's database. $NC"
     pushd $IOTEX_WITNESS/etc
     docker-compose up -d
+    docker-compose restart
+    docker system prune -a
     if [ $? -eq 0 ];then
         echo -e "${YELLOW} Service on. ${NC}"
     fi
