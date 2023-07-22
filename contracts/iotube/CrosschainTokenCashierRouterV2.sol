@@ -9,6 +9,7 @@ interface IERC20 {
 }
 
 interface ICrosschainToken {
+    function balanceOf(address _account) external returns (uint256);
     function deposit(uint256 _amount) external;
     function coToken() external view returns (address);
 }
@@ -37,9 +38,13 @@ contract CrosschainTokenCashierRouterV2 {
     }
 
     function _depositToCashier(address _token, address _cashier, address _to, uint256 _amount, uint256 _value) private {
-        ICrosschainToken(_token).deposit(_amount);
-        require(safeApprove(_token, _cashier, _amount), "failed to approve allowance to cashier");
-        ICashier(_cashier).depositTo{value: _value}(_token, _to, _amount);
+        ICrosschainToken ctoken = ICrosschainToken(_token);
+        uint256 originBalance = ctoken.balanceOf(address(this));
+        ctoken.deposit(_amount);
+        uint256 newBalance = ctoken.balanceOf(address(this));
+        require(newBalance > originBalance, "invalid balance");
+        require(safeApprove(_token, _cashier, newBalance - originBalance), "failed to approve allowance to cashier");
+        ICashier(_cashier).depositTo{value: _value}(_token, _to, newBalance - originBalance);
     }
 
     function depositCoinTo(address _cashier, address _to, uint256 _amount) public payable {
