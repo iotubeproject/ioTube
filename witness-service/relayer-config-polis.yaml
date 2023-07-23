@@ -1,6 +1,6 @@
 chain: "polis"
 interval: 1m
-clientURL: "https://rpc.polis.tech"
+clientURL: ""
 ethConfirmBlockNumber: 2
 ethGasPriceLimit: 10
 grpcPort: 7005
