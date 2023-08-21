@@ -12,6 +12,7 @@ cashiers:
     startBlockHeight: 11827636
     validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
     cashierContractAddress: "0xa0fd7430852361931b23a31f84374ba3314e1682"
+    tokenSafeContractAddress: "0xc2e0f31d739cb3153ba5760a203b3bd7c27f0d7a"
     transferTableName: "ethereum_transfers"
     tokenPairs:
       # WETH

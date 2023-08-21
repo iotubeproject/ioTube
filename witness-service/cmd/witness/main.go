@@ -50,6 +50,7 @@ type Configuration struct {
 		ID                       string `json:"id" yaml:"id"`
 		RelayerURL               string `json:"relayerURL" yaml:"relayerURL"`
 		CashierContractAddress   string `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+		TokenSafeContractAddress string `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
 		ValidatorContractAddress string `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
 		TransferTableName        string `json:"transferTableName" yaml:"transferTableName"`
 		TokenPairs               []struct {
@@ -208,7 +209,7 @@ func main() {
 		// heco and bsc are identical to ethereum
 		fallthrough
 	case "ethereum":
-		ethClient, err := ethclient.DialContext(context.Background(), cfg.ClientURL)
+		ethClient, err := ethclient.Dial(cfg.ClientURL)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -245,6 +246,7 @@ func main() {
 				cc.RelayerURL,
 				ethClient,
 				common.HexToAddress(cc.CashierContractAddress),
+				common.HexToAddress(cc.TokenSafeContractAddress),
 				common.BytesToAddress(addr.Bytes()),
 				witness.NewRecorder(
 					db.NewStore(cfg.Database),

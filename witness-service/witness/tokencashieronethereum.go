@@ -24,6 +24,7 @@ func NewTokenCashierOnEthereum(
 	relayerURL string,
 	ethereumClient *ethclient.Client,
 	cashierContractAddr common.Address,
+	tokenSafeContractAddr common.Address,
 	validatorContractAddr common.Address,
 	recorder *Recorder,
 	startBlockHeight uint64,
@@ -86,10 +87,12 @@ func NewTokenCashierOnEthereum(
 					var realAmount *big.Int
 					for _, l := range receipt.Logs {
 						if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && (l.Topics[1] == senderAddress.Hash() || l.Topics[1] == transferLog.Address.Hash()) {
-							if realAmount != nil && l.Topics[2] != _ZeroHash {
-								return nil, errors.Errorf("two transfers in one transaction %x", transferLog.TxHash)
+							if l.Topics[2] == cashierContractAddr.Hash() || l.Topics[2] != _ZeroHash && l.Topics[2] == tokenSafeContractAddr.Hash() {
+								if realAmount != nil {
+									return nil, errors.Errorf("two transfers in one transaction %x", transferLog.TxHash)
+								}
+								realAmount = new(big.Int).SetBytes(l.Data)
 							}
-							realAmount = new(big.Int).SetBytes(l.Data)
 						}
 					}
 					if realAmount == nil {
