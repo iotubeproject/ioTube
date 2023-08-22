@@ -12,6 +12,7 @@ cashiers:
     relayerURL: ":7001"
     startBlockHeight: 15246000
     cashierContractAddress: "0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be"
+    tokenSafeContractAddress: "0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45"
     validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
     transferTableName: "matic_transfers"
     tokenPairs:
