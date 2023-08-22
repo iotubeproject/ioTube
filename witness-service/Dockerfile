@@ -12,14 +12,14 @@ RUN go mod download
 COPY . .
 
 RUN mkdir -p $GOPATH/pkg/linux_amd64/github.com/iotubeproject/ && \
-    make clean build-all
+    make clean build-witness build-explorer build-addtokenpair
 
 FROM alpine:latest
 
 RUN apk add --no-cache ca-certificates
 RUN mkdir -p /etc/iotube/
 COPY --from=build /go/apps/iotube-witness/bin/witness /usr/local/bin/witness
-COPY --from=build /go/apps/iotube-witness/bin/relayer /usr/local/bin/relayer
+# COPY --from=build /go/apps/iotube-witness/bin/relayer /usr/local/bin/relayer
 COPY --from=build /go/apps/iotube-witness/bin/explorer /usr/local/bin/explorer
 COPY --from=build /go/apps/iotube-witness/bin/addtokenpair /usr/local/bin/addtokenpair
 
