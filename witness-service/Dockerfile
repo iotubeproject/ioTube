@@ -11,7 +11,7 @@ RUN go mod download
 
 COPY . .
 
-RUN mkdir -p $GOPATH/pkg/linux_amd64/github.com/iotexproject/ && \
+RUN mkdir -p $GOPATH/pkg/linux_amd64/github.com/iotubeproject/ && \
     make clean build-all
 
 FROM alpine:latest
