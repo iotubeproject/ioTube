@@ -30,7 +30,7 @@ var zeroAddress = common.Address{}
 // transferValidatorOnEthereum defines the transfer validator
 type transferValidatorOnEthereum struct {
 	mu                 sync.RWMutex
-	confirmBlockNumber uint8
+	confirmBlockNumber uint16
 	gasPriceLimit      *big.Int
 	gasPriceDeviation  *big.Int
 	gasPriceGap        *big.Int
@@ -49,7 +49,7 @@ type transferValidatorOnEthereum struct {
 func NewTransferValidatorOnEthereum(
 	client *ethclient.Client,
 	privateKeys []*ecdsa.PrivateKey,
-	confirmBlockNumber uint8,
+	confirmBlockNumber uint16,
 	gasPriceLimit *big.Int,
 	gasPriceDeviation *big.Int,
 	gasPriceGap *big.Int,

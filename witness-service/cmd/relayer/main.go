@@ -36,7 +36,7 @@ import (
 type Configuration struct {
 	Chain                 string        `json:"chain" yaml:"chain"`
 	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
-	EthConfirmBlockNumber uint8         `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+	EthConfirmBlockNumber uint16        `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
 	EthGasPriceLimit      uint64        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
 	EthGasPriceDeviation  int64         `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
 	EthGasPriceGap        uint64        `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
@@ -82,10 +82,10 @@ func init() {
 }
 
 // main performs the main routine of the application:
-//	1.	parses the args;
-//	2.	analyzes the declaration of the API
-//	3.	sets the implementation of the handlers
-//	4.	listens on the port we want
+//  1. parses the args;
+//  2. analyzes the declaration of the API
+//  3. sets the implementation of the handlers
+//  4. listens on the port we want
 func main() {
 	flag.Parse()
 	opts := []config.YAMLOption{config.Static(defaultConfig), config.Expand(os.LookupEnv)}
@@ -178,7 +178,7 @@ func main() {
 			log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
 		}
 		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
-			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), acc),
+			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
 			validatorContractAddr,
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
