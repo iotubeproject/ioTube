@@ -37,6 +37,7 @@ type Configuration struct {
 	Chain                 string        `json:"chain" yaml:"chain"`
 	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
 	EthConfirmBlockNumber uint16        `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+	EthDefaultGasPrice    uint64        `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
 	EthGasPriceLimit      uint64        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
 	EthGasPriceDeviation  int64         `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
 	EthGasPriceGap        uint64        `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
@@ -140,6 +141,9 @@ func main() {
 		// heco and bsc are idential to ethereum
 		fallthrough
 	case "ethereum":
+		if cfg.ClientURL == "" {
+			break
+		}
 		privateKeys := []*ecdsa.PrivateKey{}
 		for _, pk := range strings.Split(cfg.PrivateKey, ",") {
 			privateKey, err := crypto.HexToECDSA(pk)
@@ -156,6 +160,7 @@ func main() {
 			ethClient,
 			privateKeys,
 			cfg.EthConfirmBlockNumber,
+			new(big.Int).SetUint64(cfg.EthDefaultGasPrice),
 			new(big.Int).SetUint64(cfg.EthGasPriceLimit),
 			new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
 			new(big.Int).SetUint64(cfg.EthGasPriceGap),

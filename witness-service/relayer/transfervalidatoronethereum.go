@@ -31,6 +31,7 @@ var zeroAddress = common.Address{}
 type transferValidatorOnEthereum struct {
 	mu                 sync.RWMutex
 	confirmBlockNumber uint16
+	defaultGasPrice    *big.Int
 	gasPriceLimit      *big.Int
 	gasPriceDeviation  *big.Int
 	gasPriceGap        *big.Int
@@ -50,6 +51,7 @@ func NewTransferValidatorOnEthereum(
 	client *ethclient.Client,
 	privateKeys []*ecdsa.PrivateKey,
 	confirmBlockNumber uint16,
+	defaultGasPrice *big.Int,
 	gasPriceLimit *big.Int,
 	gasPriceDeviation *big.Int,
 	gasPriceGap *big.Int,
@@ -66,6 +68,7 @@ func NewTransferValidatorOnEthereum(
 	log.Printf("Create transfer validator for chain %d\n", chainID)
 	tv := &transferValidatorOnEthereum{
 		confirmBlockNumber: confirmBlockNumber,
+		defaultGasPrice:    defaultGasPrice,
 		gasPriceLimit:      gasPriceLimit,
 		gasPriceDeviation:  gasPriceDeviation,
 		gasPriceGap:        gasPriceGap,
@@ -304,6 +307,9 @@ func (tv *transferValidatorOnEthereum) transactionOpts(gasLimit uint64, privateK
 	}
 	if gasPrice.Cmp(tv.gasPriceLimit) >= 0 {
 		return nil, errors.Wrapf(errGasPriceTooHigh, "suggested gas price %d > limit %d", gasPrice, tv.gasPriceLimit)
+	}
+	if gasPrice.Cmp(big.NewInt(0)) == 0 {
+		gasPrice = tv.defaultGasPrice
 	}
 	opts.GasPrice = gasPrice
 	balance, err := tv.client.BalanceAt(context.Background(), relayerAddr, nil)

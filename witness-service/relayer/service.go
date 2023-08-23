@@ -70,6 +70,9 @@ func (s *Service) Stop(ctx context.Context) error {
 
 // Submit accepts a submission of witness
 func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
+	if s.transferValidator == nil {
+		return nil, errors.New("cannot accept new submission")
+	}
 	log.Printf("receive a witness from %x\n", w.Address)
 	transfer, err := UnmarshalTransferProto(s.transferValidator.Address(), w.Transfer)
 	if err != nil {
@@ -105,7 +108,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if ok {
 		randt, ok := value.(*responseWithTimestamp)
 		if ok {
-			if randt.ts.After(time.Now().Add(10 * time.Second)) {
+			if randt.ts.Add(10 * time.Second).After(time.Now()) {
 				return randt.response, nil
 			}
 			s.cache.Remove(request.String())
@@ -210,6 +213,15 @@ func (s *Service) convertStatus(status ValidationStatusType) services.Status {
 	return services.Status_UNKNOWN
 }
 
+func (s *Service) assembleDummyCheckResponse() *services.CheckResponse {
+	return &services.CheckResponse{
+		Key:       []byte{},
+		Witnesses: [][]byte{},
+		TxHash:    []byte{},
+		Status:    services.Status_FAILED,
+	}
+}
+
 func (s *Service) assembleCheckResponse(transfer *Transfer, witnesses map[common.Hash][]*Witness) *services.CheckResponse {
 	return &services.CheckResponse{
 		Key:       transfer.id[:],
@@ -235,6 +247,9 @@ func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*s
 }
 
 func (s *Service) process() error {
+	if s.transferValidator == nil {
+		return nil
+	}
 	if err := s.confirmTransfers(); err != nil {
 		util.LogErr(err)
 	}

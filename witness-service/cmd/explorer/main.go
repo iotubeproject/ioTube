@@ -200,10 +200,10 @@ func (s *Service) assembleCheckResponse(transfer *relayer.Transfer) *services.Ch
 }
 
 // main performs the main routine of the application:
-//	1.	parses the args;
-//	2.	analyzes the declaration of the API
-//	3.	sets the implementation of the handlers
-//	4.	listens on the port we want
+//  1. parses the args;
+//  2. analyzes the declaration of the API
+//  3. sets the implementation of the handlers
+//  4. listens on the port we want
 func main() {
 	flag.Parse()
 	opts := []config.YAMLOption{config.Static(defaultConfig), config.Expand(os.LookupEnv)}

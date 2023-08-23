@@ -198,7 +198,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 	}
 	defer tx.Rollback()
 	if err := recorder.addWitness(tx, transfer, witness, recorder.transferTableName, recorder.witnessTableName); err != nil {
-		return err
+		return errors.Wrap(err, "failed to add witness")
 	}
 	var explorerTx *sql.Tx
 	if recorder.explorerStore != nil {
@@ -212,7 +212,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return err
+		return errors.Wrap(err, "failed to commit transaction")
 	}
 	if explorerTx != nil {
 		for {
