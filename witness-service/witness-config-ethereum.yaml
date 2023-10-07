@@ -60,3 +60,6 @@ cashiers:
       # CTSI
       - token2: "io16ajfjch2hlm56vnhlwvs7g7aptnvx40ksyvrz5"
         token1: "0x30e68fACB9D4E04FEdc12A8Cc539639f90F40c63"
+      # WIFI
+      - token2: "io109zxcevpsxxc2ez6lycesjmu5yrasmdprg8wwm"
+        token1: "0xacf461ccec9c011f90252f04c4ce42c089378751"

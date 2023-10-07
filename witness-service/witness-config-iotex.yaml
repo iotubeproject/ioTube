@@ -57,6 +57,9 @@ cashiers:
       # CTSI
       - token1: "io16ajfjch2hlm56vnhlwvs7g7aptnvx40ksyvrz5"
         token2: "0x30e68fACB9D4E04FEdc12A8Cc539639f90F40c63"
+      # WIFI
+      - token1: "io109zxcevpsxxc2ez6lycesjmu5yrasmdprg8wwm"
+        token2: "0xacf461ccec9c011f90252f04c4ce42c089378751"
   - id: "iotex-to-heco"
     relayerURL: ":7002"
     cashierContractAddress: "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
@@ -141,3 +144,12 @@ cashiers:
         token2: "0x300211Def2a644b036A9bdd3e58159bb2074d388"
       - token1: "io1g29kuat5d727cqcjv5ta8607ys9kdp5fx702ua"
         token2: "0xe04E81331bDcBfBF2D1342714812d546a55CB6DC"
+      # GEOD
+      - token1: "io1w6dljt0q3mtcuh4a6l3wqncm09afhqx59vgcrl"
+        token2: "0xf53224ec685b674eb4f5c365d30876efb05fbfe5"
+      # DIMO
+      - token1: "io1rzvkqqwqkqzxgsq0w2qcgalw0vqurk7f428dqp"
+        token2: "0x7c09a86b761bfd9d996fe0d7ff8390c4ee7b3aec"
+      # XNET
+      - token1: "io1zhpgfnwyy9avcd87cpxy3z3rfrwpcqrnlujxhu"
+        token2: "0x1524b9de9aa259633a2e1dad37476f24898e3aaa"
