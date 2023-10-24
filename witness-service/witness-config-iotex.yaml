@@ -153,3 +153,6 @@ cashiers:
       # XNET
       - token1: "io12t04n0staz4a4wafuwrzerq0r79nl6w2cphpeh"
         token2: "0x1524b9de9aa259633a2e1dad37476f24898e3aaa"
+      # WNT
+      - token1: "io12falqd0u5fje0jtx23n535egfzkl2gtwes6r58"
+        token2: "0xFBcAA472E25994E96889ae33C1b185DaD7bFf3Ef"
