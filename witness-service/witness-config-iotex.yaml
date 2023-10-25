@@ -153,3 +153,6 @@ cashiers:
       # WNT
       - token1: "io12falqd0u5fje0jtx23n535egfzkl2gtwes6r58"
         token2: "0xFBcAA472E25994E96889ae33C1b185DaD7bFf3Ef"
+      # WIFI
+      - token1: "io1em553udth5j85hjp4z9j3xgdhq00qz7uq5egha"
+        token2: "0x8F26b442B6681567f6EaA75828140712f939Fb9e"
