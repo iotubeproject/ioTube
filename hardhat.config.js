@@ -36,13 +36,13 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: process.env.MAINNET_RPC_URL,
-        blockNumber: Number(process.env.FORKING_BLOCK_NUMBER),
+        url: process.env.MAINNET_RPC_URL || "https://babel-api.mainnet.iotex.io",
+        blockNumber: Number(process.env.FORKING_BLOCK_NUMBER) || 25492351,
         enabled: false,
       },
     },
     mainnet: {
-      url: process.env.MAINNET_RPC_URL,
+      url: process.env.MAINNET_RPC_URL || "https://www.ankr.com/rpc/eth/",
       chainId: 1,
     },
     iotex: {
