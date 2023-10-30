@@ -144,7 +144,7 @@ func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
 	if tx.amount.Sign() != 1 {
 		return errors.New("amount should be larger than 0")
 	}
-	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
+	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
 		tx.cashier.Hex(),
@@ -156,6 +156,7 @@ func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
 		tx.fee.String(),
 		tx.blockHeight,
 		tx.txHash.Hex(),
+		TransferReady,
 		TransferNew,
 		TransferReady,
 	)
