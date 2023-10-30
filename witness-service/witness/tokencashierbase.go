@@ -50,16 +50,16 @@ type (
 		lastProcessBlockHeight uint64
 		lastPatrolBlockHeight  uint64
 		lastPullTimestamp      time.Time
-		calcEndHeight          calcEndHeightFunc
+		calcConfirmHeight      calcConfirmHeightFunc
 		pullTransfers          pullTransfersFunc
 		hasEnoughBalance       hasEnoughBalanceFunc
 		start                  startStopFunc
 		stop                   startStopFunc
 	}
-	calcEndHeightFunc    func(startHeight uint64, count uint16) (uint64, error)
-	pullTransfersFunc    func(startHeight uint64, endHeight uint64) ([]*Transfer, error)
-	hasEnoughBalanceFunc func(token common.Address, amount *big.Int) bool
-	startStopFunc        func(context.Context) error
+	calcConfirmHeightFunc func(startHeight uint64, count uint16) (uint64, uint64, error)
+	pullTransfersFunc     func(startHeight uint64, endHeight uint64) ([]*Transfer, error)
+	hasEnoughBalanceFunc  func(token common.Address, amount *big.Int) bool
+	startStopFunc         func(context.Context) error
 )
 
 func newTokenCashierBase(
@@ -68,7 +68,7 @@ func newTokenCashierBase(
 	relayerURL string,
 	validatorContractAddr common.Address,
 	startBlockHeight uint64,
-	calcEndHeight calcEndHeightFunc,
+	calcConfirmHeight calcConfirmHeightFunc,
 	pullTransfers pullTransfersFunc,
 	hasEnoughBalance hasEnoughBalanceFunc,
 	start startStopFunc,
@@ -81,7 +81,7 @@ func newTokenCashierBase(
 		startBlockHeight:       startBlockHeight,
 		lastProcessBlockHeight: startBlockHeight,
 		validatorContractAddr:  validatorContractAddr,
-		calcEndHeight:          calcEndHeight,
+		calcConfirmHeight:      calcConfirmHeight,
 		pullTransfers:          pullTransfers,
 		hasEnoughBalance:       hasEnoughBalance,
 		lastPullTimestamp:      time.Now(),
@@ -147,38 +147,47 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		}
 	}
 	startHeight = startHeight + 1
-	endHeight, err := tc.calcEndHeight(startHeight, count)
+	confirmHeight, tipHeight, err := tc.calcConfirmHeight(startHeight, count)
 	if err != nil {
 		if tc.lastPullTimestamp.Add(3 * time.Minute).After(time.Now()) {
-			log.Printf("failed to get end height with start height %d, count %d: %+v\n", startHeight, endHeight, err)
+			log.Printf("failed to get end height with start height %d, count %d: %+v\n", startHeight, confirmHeight, err)
 			return nil
 		}
-		return errors.Wrapf(err, "failed to get end height with start height %d, count %d", startHeight, count)
+		return errors.Wrapf(err, "failed to get end height and tip height with start height %d, count %d", startHeight, count)
+	}
+	if confirmHeight < startHeight {
+		return errors.Wrapf(err, "failed to get end height with start height %d, count %d, confirm height %d", startHeight, count, confirmHeight)
 	}
 	var transfers []*Transfer
 	tc.lastPullTimestamp = time.Now()
 	if startHeight > tc.lastPatrolBlockHeight+patrolSize {
-		log.Printf("fetching events from block %d to %d for %s with patrol\n", tc.lastPatrolBlockHeight, endHeight, tc.id)
-		transfers, err = tc.pullTransfers(tc.lastPatrolBlockHeight, endHeight)
+		log.Printf("fetching events from block %d to %d for %s with patrol\n", tc.lastPatrolBlockHeight, confirmHeight, tc.id)
+		transfers, err = tc.pullTransfers(tc.lastPatrolBlockHeight, confirmHeight)
 		if err != nil {
-			return errors.Wrapf(err, "failed to pull transfers from %d to %d with patrol", tc.lastPatrolBlockHeight, endHeight)
+			return errors.Wrapf(err, "failed to pull transfers from %d to %d with patrol", tc.lastPatrolBlockHeight, confirmHeight)
 		}
 		tc.lastPatrolBlockHeight = startHeight
 	} else {
 		// log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
-		transfers, err = tc.pullTransfers(startHeight, endHeight)
+		transfers, err = tc.pullTransfers(startHeight, tipHeight)
 		if err != nil {
-			return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, endHeight)
+			return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, tipHeight)
 		}
 	}
 	for _, transfer := range transfers {
-		if err := tc.recorder.AddTransfer(transfer); err != nil {
-			return errors.Wrap(err, "failed to add transfer")
+		if transfer.blockHeight <= confirmHeight {
+			if err := tc.recorder.UpsertTransfer(transfer); err != nil {
+				return errors.Wrap(err, "failed to add transfer")
+			}
+		} else {
+			if err := tc.recorder.AddTransfer(transfer, TransferNew); err != nil {
+				return errors.Wrap(err, "failed to add transfer")
+			}
 		}
 	}
-	tc.lastProcessBlockHeight = endHeight
+	tc.lastProcessBlockHeight = confirmHeight
 
-	if err := tc.recorder.UpdateSyncHeight(tc.id, endHeight); err != nil {
+	if err := tc.recorder.UpdateSyncHeight(tc.id, confirmHeight); err != nil {
 		return errors.Wrap(err, "failed to update sync height")
 	}
 	return nil

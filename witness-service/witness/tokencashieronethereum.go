@@ -38,23 +38,24 @@ func NewTokenCashierOnEthereum(
 		relayerURL,
 		validatorContractAddr,
 		startBlockHeight,
-		func(startHeight uint64, count uint16) (uint64, error) {
+		func(startHeight uint64, count uint16) (uint64, uint64, error) {
 			tipHeader, err := ethereumClient.HeaderByNumber(context.Background(), nil)
 			if err != nil {
-				return 0, err
+				return 0, 0, errors.Wrap(err, "failed to query tip block header")
 			}
-			tipHeight := tipHeader.Number.Uint64() - uint64(confirmBlockNumber)
-			if startHeight > tipHeight {
-				return 0, errors.Errorf("query height %d is larger than chain tip height %d", startHeight, tipHeight)
+			tipHeight := tipHeader.Number.Uint64()
+			confirmHeight := tipHeight - uint64(confirmBlockNumber)
+			if startHeight > confirmHeight {
+				return confirmHeight, tipHeight, nil
 			}
 			if count == 0 {
 				count = 1
 			}
 			endHeight := startHeight + uint64(count) - 1
-			if endHeight > tipHeight {
-				endHeight = tipHeight
+			if endHeight > confirmHeight {
+				endHeight = confirmHeight
 			}
-			return endHeight, nil
+			return endHeight, tipHeight, nil
 		},
 		func(startHeight uint64, endHeight uint64) ([]*Transfer, error) {
 			logs, err := ethereumClient.FilterLogs(context.Background(), ethereum.FilterQuery{

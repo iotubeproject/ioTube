@@ -129,7 +129,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 		queryOpts = append(queryOpts, StatusQueryOption(ValidationSubmitted))
 	case services.Status_SETTLED:
 		queryOpts = append(queryOpts, StatusQueryOption(TransferSettled))
-	case services.Status_CREATED:
+	case services.Status_CREATED, services.Status_CONFIRMING:
 		queryOpts = append(queryOpts, StatusQueryOption(WaitingForWitnesses))
 	case services.Status_FAILED:
 		queryOpts = append(queryOpts, StatusQueryOption(ValidationFailed, ValidationRejected))
@@ -179,6 +179,9 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 			Timestamp: timestamppb.New(transfer.timestamp),
 		}
 		response.Statuses[i] = s.assembleCheckResponse(transfer, witnesses)
+		if len(witnesses) == 0 && transfer.status == WaitingForWitnesses {
+			response.Statuses[i].Status = services.Status_CONFIRMING
+		}
 	}
 	s.cache.Add(request.String(), &responseWithTimestamp{
 		response: response,
@@ -213,6 +216,7 @@ func (s *Service) convertStatus(status ValidationStatusType) services.Status {
 	return services.Status_UNKNOWN
 }
 
+/*
 func (s *Service) assembleDummyCheckResponse() *services.CheckResponse {
 	return &services.CheckResponse{
 		Key:       []byte{},
@@ -221,6 +225,7 @@ func (s *Service) assembleDummyCheckResponse() *services.CheckResponse {
 		Status:    services.Status_FAILED,
 	}
 }
+*/
 
 func (s *Service) assembleCheckResponse(transfer *Transfer, witnesses map[common.Hash][]*Witness) *services.CheckResponse {
 	return &services.CheckResponse{

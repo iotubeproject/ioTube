@@ -38,6 +38,7 @@ enum Status {
     SUBMITTED = 2;
     SETTLED = 3;
     FAILED = 4;
+    CONFIRMING = 5;
 }
 
 message CheckResponse {

@@ -179,18 +179,19 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	recorder.validateID(uint64(transfer.index))
-	rpk, err := crypto.Ecrecover(transfer.id.Bytes(), witness.signature)
-	if err != nil {
-		return err
+	if len(witness.signature) != 0 {
+		rpk, err := crypto.Ecrecover(transfer.id.Bytes(), witness.signature)
+		if err != nil {
+			return err
+		}
+		pk, err := crypto.UnmarshalPubkey(rpk)
+		if err != nil {
+			return errors.Wrap(err, "failed to unmarshal public key")
+		}
+		if crypto.PubkeyToAddress(*pk) != witness.addr {
+			return errors.New("invalid signature")
+		}
 	}
-	pk, err := crypto.UnmarshalPubkey(rpk)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal public key")
-	}
-	if crypto.PubkeyToAddress(*pk) != witness.addr {
-		return errors.New("invalid signature")
-	}
-
 	recorder.metric("new", transfer.amount)
 	tx, err := recorder.store.DB().Begin()
 	if err != nil {
@@ -245,7 +246,7 @@ func (recorder *Recorder) addWitness(
 	); err != nil {
 		return errors.Wrap(err, "failed to insert into transfer table")
 	}
-	if witnessTableName != "" {
+	if witnessTableName != "" && len(witness.signature) != 0 {
 		if _, err := tx.Exec(
 			fmt.Sprintf("INSERT IGNORE INTO %s (`transferId`, `witness`, `signature`) VALUES (?, ?, ?)", witnessTableName),
 			transfer.id.Hex(),

@@ -103,12 +103,74 @@ func (recorder *Recorder) Stop(ctx context.Context) error {
 }
 
 // AddTransfer creates a new transfer record
-func (recorder *Recorder) AddTransfer(tx *Transfer) error {
-	return recorder.addTransfer(tx, true)
+func (recorder *Recorder) AddTransfer(tx *Transfer, status TransferStatus) error {
+	if err := recorder.validateID(tx.index); err != nil {
+		return err
+	}
+	if tx.amount.Sign() != 1 {
+		return errors.New("amount should be larger than 0")
+	}
+	query := fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
+	result, err := recorder.store.DB().Exec(
+		query,
+		tx.cashier.Hex(),
+		tx.token.Hex(),
+		tx.index,
+		tx.sender.Hex(),
+		tx.recipient.Hex(),
+		tx.amount.String(),
+		tx.fee.String(),
+		tx.blockHeight,
+		tx.txHash.Hex(),
+		status,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
+	}
+	return nil
 }
 
 func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
-	return recorder.addTransfer(tx, false)
+	if err := recorder.validateID(tx.index); err != nil {
+		return err
+	}
+	if tx.amount.Sign() != 1 {
+		return errors.New("amount should be larger than 0")
+	}
+	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
+	result, err := recorder.store.DB().Exec(
+		query,
+		tx.cashier.Hex(),
+		tx.token.Hex(),
+		tx.index,
+		tx.sender.Hex(),
+		tx.recipient.Hex(),
+		tx.amount.String(),
+		tx.fee.String(),
+		tx.blockHeight,
+		tx.txHash.Hex(),
+		TransferNew,
+		TransferReady,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
+	}
+	return nil
+
 }
 
 func (recorder *Recorder) AmountOfTransferred(cashier, token common.Address) (*big.Int, error) {
@@ -138,45 +200,6 @@ func (recorder *Recorder) AmountOfTransferred(cashier, token common.Address) (*b
 	return totalAmount, nil
 }
 
-func (recorder *Recorder) addTransfer(tx *Transfer, insertOnly bool) error {
-	err := recorder.validateID(tx.index)
-	if err != nil {
-		return err
-	}
-	if tx.amount.Sign() != 1 {
-		return errors.New("amount should be larger than 0")
-	}
-	var query string
-	if insertOnly {
-		query = fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
-	} else {
-		query = fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = '%s'", recorder.transferTableName, TransferNew)
-	}
-	result, err := recorder.store.DB().Exec(
-		query,
-		tx.cashier.Hex(),
-		tx.token.Hex(),
-		tx.index,
-		tx.sender.Hex(),
-		tx.recipient.Hex(),
-		tx.amount.String(),
-		tx.fee.String(),
-		tx.blockHeight,
-		tx.txHash.Hex(),
-	)
-	if err != nil {
-		return err
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
-	}
-	return nil
-}
-
 func (recorder *Recorder) UpdateSyncHeight(cashier string, height uint64) error {
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("REPLACE INTO %s (`cashier`, `height`) VALUES (?, ?)", recorder.cashierMetaTableName),
@@ -196,7 +219,7 @@ func (recorder *Recorder) UpdateSyncHeight(cashier string, height uint64) error 
 	return nil
 }
 
-// SettleTransfer marks a record as submitted
+// SettleTransfer marks a record as settled
 func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
 	log.Printf("mark transfer %s as settled", tx.id.Hex())
 	result, err := recorder.store.DB().Exec(
@@ -214,7 +237,7 @@ func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
 	return recorder.validateResult(result)
 }
 
-// ConfirmTransfer marks a record as settled
+// ConfirmTransfer marks a record as confirmed
 func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
 	log.Printf("mark transfer %s as confirmed", tx.id.Hex())
 	result, err := recorder.store.DB().Exec(
@@ -224,7 +247,7 @@ func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
 		tx.cashier.Hex(),
 		tx.token.Hex(),
 		tx.index,
-		TransferNew,
+		TransferReady,
 	)
 	if err != nil {
 		return err
@@ -240,7 +263,7 @@ func (recorder *Recorder) TransfersToSettle() ([]*Transfer, error) {
 
 // TransfersToSubmit returns the list of transfers to submit
 func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
-	return recorder.transfers(TransferNew)
+	return recorder.transfers(TransferReady)
 }
 
 func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
