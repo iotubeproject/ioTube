@@ -140,7 +140,7 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 		queryOpts = append(queryOpts, relayer.StatusQueryOption(relayer.ValidationSubmitted))
 	case services.Status_SETTLED:
 		queryOpts = append(queryOpts, relayer.StatusQueryOption(relayer.TransferSettled))
-	case services.Status_CREATED:
+	case services.Status_CONFIRMING, services.Status_CREATED:
 		queryOpts = append(queryOpts, relayer.StatusQueryOption(relayer.WaitingForWitnesses))
 	case services.Status_FAILED:
 		queryOpts = append(queryOpts, relayer.StatusQueryOption(relayer.ValidationFailed, relayer.ValidationRejected))
