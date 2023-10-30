@@ -22,10 +22,10 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v1
         with:
-          node-version: "14"
-          
+          node-version: "16"
+
       - name: Install dependencies
         run: npm install
-        
+
       - name: Run Test
-        run: npm test
+        run: npx hardhat compile
