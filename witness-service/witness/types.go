@@ -60,6 +60,8 @@ type (
 const (
 	// TransferNew stands for a new transfer
 	TransferNew TransferStatus = "new"
+	// TransferReady stands for a new transfer ready to sign
+	TransferReady = "ready"
 	// WitnessSubmitted stands for a witnessed transfer
 	WitnessSubmitted = "submitted"
 	// SubmissionConfirmed stands for a confirmed witness
