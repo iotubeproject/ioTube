@@ -4,7 +4,8 @@
 
 0. install docker
 
-1. create a path at `~/iotex-witness`
-2. copy and edit files under `~/iotex-witness/etc/`. files needed are `witness-config-CHAINNAME.yaml`
-3. run `/start_witness.sh` to build and start running services.
-
+1. go to the working directory of this repo, and then go into `witness-service` directory
+2. create a path at `~/iotex-witness/etc`
+3. copy .env.template `~/iotex-witness/etc/.env`, and set values
+4. set `clientURL` in `witness-config-ethereum.secret.yaml`
+5. run `./start_witness.sh` to build and start running services.
