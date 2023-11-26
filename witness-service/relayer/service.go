@@ -91,6 +91,14 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	}, nil
 }
 
+// Reset resets a transfer status from failed to new
+func (s *Service) Reset(ctx context.Context, request *services.ResetTransferRequest) (*services.ResetTransferResponse, error) {
+	if err := s.recorder.ResetFailedTransfer(common.BytesToHash(request.Id)); err != nil {
+		return nil, err
+	}
+	return &services.ResetTransferResponse{Success: true}, nil
+}
+
 // List lists the recent transfers
 func (s *Service) List(ctx context.Context, request *services.ListRequest) (*services.ListResponse, error) {
 	first := request.First
@@ -308,7 +316,7 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 			log.Printf("gas price %s is too high, %v\n", gasPrice, err)
 		case errInsufficientWitnesses:
 			log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
-			return false, s.recorder.Reset(transfer.id)
+			return false, s.recorder.ResetTransferInProcess(transfer.id)
 		case errNoncritical:
 			log.Printf("failed to prepare speed up: %+v\n", err)
 		default:
@@ -372,16 +380,16 @@ func (s *Service) submitTransfer(transfer *Transfer) error {
 		return s.recorder.MarkAsValidated(transfer.id, txHash, relayer, nonce, gasPrice)
 	case errGasPriceTooHigh:
 		log.Printf("gas price %s is too high, %v\n", gasPrice, err)
-		return s.recorder.Reset(transfer.id)
+		return s.recorder.ResetTransferInProcess(transfer.id)
 	case errInsufficientWitnesses:
 		if transfer.timestamp.Add(5 * time.Minute).Before(time.Now()) {
 			util.Alert("At least one witness has not submitted signature for " + transfer.id.String())
 		}
 		log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
-		return s.recorder.Reset(transfer.id)
+		return s.recorder.ResetTransferInProcess(transfer.id)
 	case errNoncritical:
 		log.Printf("failed to prepare submission: %v\n", err)
-		return s.recorder.Reset(transfer.id)
+		return s.recorder.ResetTransferInProcess(transfer.id)
 	default:
 		log.Printf("failed to submit %x, %+v", transfer.id, err)
 		if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {

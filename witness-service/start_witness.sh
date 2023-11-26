@@ -83,8 +83,23 @@ function downloadConfigFile() {
     copyFile "witness-config-bsc.secret.yaml" "witness-config-bsc.secret.yaml" 0
     copyFile "witness-config-matic.yaml" "witness-config-matic.yaml" 1
     copyFile "witness-config-matic.secret.yaml" "witness-config-matic.secret.yaml" 0
-
-    [[ -f ${IOTEX_WITNESS}/etc/.env ]] || (echo "IOTEX_WITNESS=$IOTEX_WITNESS" > ${IOTEX_WITNESS}/etc/.env;echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${IOTEX_WITNESS}/etc/.env)
+    envFile = ${IOTEX_WITNESS}/etc/.env
+    if [[ ! -f ${envFile} ]]; then
+        touch ${envFile}
+    fi
+    if grep -q "^IOTEX_WITNESS=" ${envFile}; then
+        sed "s/^IOTEX_WITNESS=.*//" ${envFile} > ${envFile}.tmp
+        mv ${envFile}.tmp ${envFile}
+    fi
+    echo "" >> $envFile
+    echo "IOTEX_WITNESS=$IOTEX_WITNESS" >> ${envFile}
+    if grep -q "/^DB_ROOT_PASSWORD=" ${envFile}; then
+        sed "/^DB_ROOT_PASSWORD=.*//" ${envFile} > ${envFile}.tmp
+        mv ${envFile}.tmp $envFile
+    fi
+    echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${envFile}
+    sed "/^$/d" ${envFile} > ${envFile}.tmp
+    mv ${envFile}.tmp $envFile
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_WITNESS}/etc/crontab
     cp -f $PROJECT_ABS_DIR/backup_witness ${IOTEX_WITNESS}/etc/backup
 }
