@@ -683,12 +683,21 @@ func (recorder *Recorder) MarkAsRejected(id common.Hash) error {
 	return recorder.validateResult(result)
 }
 
-// Reset marks a record as new
-func (recorder *Recorder) Reset(id common.Hash) error {
+// ResetTransferInProcess marks a record as new
+func (recorder *Recorder) ResetTransferInProcess(id common.Hash) error {
+	return recorder.reset(id, ValidationInProcess)
+}
+
+// ResetFailedTransfer marks a record as new
+func (recorder *Recorder) ResetFailedTransfer(id common.Hash) error {
+	return recorder.reset(id, ValidationInProcess)
+}
+
+func (recorder *Recorder) reset(id common.Hash, status ValidationStatusType) error {
 	log.Printf("reset transfer %s\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, WaitingForWitnesses, id.Hex(), ValidationInProcess)
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, WaitingForWitnesses, id.Hex(), status)
 	if err != nil {
 		return errors.Wrap(err, "failed to reset")
 	}

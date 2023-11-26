@@ -14,6 +14,12 @@ service RelayService {
             body: "*"
         };
     };
+    rpc Reset(ResetTransferRequest) returns (ResetTransferResponse) {
+        option (google.api.http) = {
+            post: "/reset"
+            body: "*"
+        };
+    };
     rpc Check(CheckRequest) returns (CheckResponse) {
         option (google.api.http) = {
             post: "/check"
@@ -61,6 +67,14 @@ message ListResponse {
 	repeated types.Transfer transfers = 1;
 	repeated CheckResponse statuses = 2;
 	uint32 count = 3;
+}
+
+message ResetTransferRequest {
+    bytes id = 1;
+}
+
+message ResetTransferResponse {
+    bool success = 1;
 }
 
 message WitnessSubmissionResponse {
