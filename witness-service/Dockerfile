@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine as build
+FROM golang:1.19-alpine as build
 
 WORKDIR apps/iotube-witness
 
@@ -12,7 +12,7 @@ RUN go mod download
 COPY . .
 
 RUN mkdir -p $GOPATH/pkg/linux_amd64/github.com/iotubeproject/ && \
-    make clean build-witness build-explorer build-addtokenpair
+  make clean build-witness build-explorer build-addtokenpair
 
 FROM alpine:latest
 
