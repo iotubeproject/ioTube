@@ -39,6 +39,7 @@ type Configuration struct {
 	EthConfirmBlockNumber uint16        `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
 	EthDefaultGasPrice    uint64        `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
 	EthGasPriceLimit      uint64        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+	EthGasPriceHardLimit  uint64        `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
 	EthGasPriceDeviation  int64         `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
 	EthGasPriceGap        uint64        `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
 	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
@@ -162,6 +163,7 @@ func main() {
 			cfg.EthConfirmBlockNumber,
 			new(big.Int).SetUint64(cfg.EthDefaultGasPrice),
 			new(big.Int).SetUint64(cfg.EthGasPriceLimit),
+			new(big.Int).SetUint64(cfg.EthGasPriceHardLimit),
 			new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
 			new(big.Int).SetUint64(cfg.EthGasPriceGap),
 			common.HexToAddress(cfg.ValidatorAddress),
