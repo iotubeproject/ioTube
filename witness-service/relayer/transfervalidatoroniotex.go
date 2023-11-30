@@ -245,7 +245,7 @@ func (tv *transferValidatorOnIoTeX) sendBonus(recipient common.Address) error {
 	if err != nil {
 		return err
 	}
-	if accountResponse.AccountMeta.IsContract || accountResponse.AccountMeta.PendingNonce <= 1 {
+	if accountResponse.AccountMeta.IsContract || accountResponse.AccountMeta.PendingNonce >= 1 {
 		return nil
 	}
 	switch balance, ok := big.NewInt(0).SetString(accountResponse.AccountMeta.Balance, 10); {
