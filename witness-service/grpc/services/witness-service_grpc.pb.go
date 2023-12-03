@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -23,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WitnessServiceClient interface {
 	Query(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*QueryResponse, error)
+	FetchByHeights(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type witnessServiceClient struct {
@@ -42,11 +44,21 @@ func (c *witnessServiceClient) Query(ctx context.Context, in *QueryRequest, opts
 	return out, nil
 }
 
+func (c *witnessServiceClient) FetchByHeights(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/services.WitnessService/FetchByHeights", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WitnessServiceServer is the server API for WitnessService service.
 // All implementations must embed UnimplementedWitnessServiceServer
 // for forward compatibility
 type WitnessServiceServer interface {
 	Query(context.Context, *QueryRequest) (*QueryResponse, error)
+	FetchByHeights(context.Context, *FetchRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedWitnessServiceServer()
 }
 
@@ -56,6 +68,9 @@ type UnimplementedWitnessServiceServer struct {
 
 func (UnimplementedWitnessServiceServer) Query(context.Context, *QueryRequest) (*QueryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Query not implemented")
+}
+func (UnimplementedWitnessServiceServer) FetchByHeights(context.Context, *FetchRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchByHeights not implemented")
 }
 func (UnimplementedWitnessServiceServer) mustEmbedUnimplementedWitnessServiceServer() {}
 
@@ -88,6 +103,24 @@ func _WitnessService_Query_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WitnessService_FetchByHeights_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WitnessServiceServer).FetchByHeights(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/services.WitnessService/FetchByHeights",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WitnessServiceServer).FetchByHeights(ctx, req.(*FetchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WitnessService_ServiceDesc is the grpc.ServiceDesc for WitnessService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -98,6 +131,10 @@ var WitnessService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Query",
 			Handler:    _WitnessService_Query_Handler,
+		},
+		{
+			MethodName: "FetchByHeights",
+			Handler:    _WitnessService_FetchByHeights_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

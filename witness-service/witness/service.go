@@ -9,13 +9,18 @@ package witness
 import (
 	"context"
 	"crypto/ecdsa"
+	"log"
 	"math/big"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
@@ -126,6 +131,38 @@ func (s *service) ProcessOneBlock(height uint64) error {
 		}
 	}
 	return nil
+}
+
+func (s *service) FetchByHeights(ctx context.Context, request *services.FetchRequest) (*emptypb.Empty, error) {
+	re := regexp.MustCompile(`^([0-9]*)-([0-9]*)$`)
+	var start, end uint64
+	var err error
+	for _, hstr := range strings.Split(request.Heights, ",") {
+		log.Printf("Processing %s\n", hstr)
+		if re.MatchString(hstr) {
+			matches := re.FindStringSubmatch(hstr)
+			start, err = strconv.ParseUint(matches[1], 10, 64)
+			if err != nil {
+				return nil, errors.Wrapf(err, "invalid start in %s", hstr)
+			}
+			end, err = strconv.ParseUint(matches[2], 10, 64)
+			if err != nil {
+				return nil, errors.Wrapf(err, "invalid end in %s", hstr)
+			}
+		} else {
+			start, err = strconv.ParseUint(hstr, 10, 64)
+			if err != nil {
+				return nil, errors.Wrapf(err, "invalid height %s", hstr)
+			}
+			end = start
+		}
+		for height := start; height <= end; height++ {
+			if err := s.ProcessOneBlock(height); err != nil {
+				return nil, errors.Wrapf(err, "failed to process block %d", height)
+			}
+		}
+	}
+	return nil, nil
 }
 
 func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*services.QueryResponse, error) {

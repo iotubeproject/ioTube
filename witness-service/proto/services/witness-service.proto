@@ -1,7 +1,9 @@
 syntax = "proto3";
 
 package services;
+
 import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
 import "types/witness.proto";
 
 option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/services";
@@ -13,6 +15,13 @@ service WitnessService {
             body: "*"
         };
     };
+
+    rpc FetchByHeights(FetchRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/fetch"
+            body: "*"
+        };
+    };
 }
 
 message QueryRequest {
@@ -21,4 +30,8 @@ message QueryRequest {
 
 message QueryResponse {
     types.Transfer transfer = 1;
+}
+
+message FetchRequest {
+    string heights = 1;
 }
