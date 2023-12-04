@@ -46,6 +46,7 @@ type Configuration struct {
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
 
+	AlwaysReset       bool      `json:"alwaysReset" yaml:"alwaysReset"`
 	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
 	LarkWebHook       string    `json:"larkWebHook" yaml:"larkWebHook"`
 	GrpcPort          int       `json:"grpcPort" yaml:"grpcPort"`
@@ -203,6 +204,7 @@ func main() {
 			cfg.ExplorerTableName,
 		),
 		cfg.Interval,
+		cfg.AlwaysReset,
 	)
 	if err != nil {
 		log.Fatalf("failed to create relay service: %v\n", err)
