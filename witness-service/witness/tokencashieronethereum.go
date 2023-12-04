@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 )
@@ -107,9 +108,13 @@ func NewTokenCashierOnEthereum(
 					case 0:
 						log.Printf("\tAmount %d is the same as real amount %d\n", amount, realAmount)
 					}
-					txSender, err := ethereumClient.TransactionSender(context.Background(), nil, transferLog.BlockHash, transferLog.TxIndex)
+					tx, err := ethereumClient.TransactionInBlock(context.Background(), transferLog.BlockHash, transferLog.TxIndex)
 					if err != nil {
-						return nil, errors.Wrap(err, "failed to fetch transaction sender")
+						return nil, errors.Wrap(err, "failed to fetch transaction")
+					}
+					from, err := types.Sender(types.LatestSignerForChainID(tx.ChainId()), tx)
+					if err != nil {
+						return nil, errors.Wrap(err, "failed to extract sender")
 					}
 					transfers = append(transfers, &Transfer{
 						cashier:     transferLog.Address,
@@ -121,7 +126,7 @@ func NewTokenCashierOnEthereum(
 						fee:         new(big.Int).SetBytes(transferLog.Data[96:128]),
 						blockHeight: transferLog.BlockNumber,
 						txHash:      transferLog.TxHash,
-						txSender:    txSender,
+						txSender:    from,
 					})
 				}
 			}
