@@ -17,6 +17,7 @@ message Transfer {
     uint64 gas = 8;
     string gasPrice = 9;
     string fee = 10;
+    bytes txSender = 11;
 }
 
 message Witness {

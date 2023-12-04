@@ -78,6 +78,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`id` varchar(132),"+
 			"`blockHeight` bigint(20) NOT NULL,"+
 			"`txHash` varchar(66) NOT NULL,"+
+			"`txSender` varchar(42),"+
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
 			"KEY `id_index` (`id`),"+
 			"KEY `cashier_index` (`cashier`),"+
@@ -110,7 +111,7 @@ func (recorder *Recorder) AddTransfer(tx *Transfer, status TransferStatus) error
 	if tx.amount.Sign() != 1 {
 		return errors.New("amount should be larger than 0")
 	}
-	query := fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
+	query := fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
 		tx.cashier.Hex(),
@@ -122,6 +123,7 @@ func (recorder *Recorder) AddTransfer(tx *Transfer, status TransferStatus) error
 		tx.fee.String(),
 		tx.blockHeight,
 		tx.txHash.Hex(),
+		tx.txSender.Hex(),
 		status,
 	)
 	if err != nil {
@@ -144,7 +146,7 @@ func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
 	if tx.amount.Sign() != 1 {
 		return errors.New("amount should be larger than 0")
 	}
-	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
+	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txHash`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
 		tx.cashier.Hex(),
@@ -156,6 +158,7 @@ func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
 		tx.fee.String(),
 		tx.blockHeight,
 		tx.txHash.Hex(),
+		tx.txSender.Hex(),
 		TransferReady,
 		TransferNew,
 		TransferReady,
@@ -270,7 +273,7 @@ func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
 func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
-			"SELECT cashier, token, tidx, sender, recipient, amount, fee, status, id "+
+			"SELECT cashier, token, tidx, sender, recipient, amount, fee, status, id, txSender "+
 				"FROM %s "+
 				"WHERE status=? "+
 				"ORDER BY creationTime",
@@ -293,7 +296,8 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		var rawAmount string
 		var fee sql.NullString
 		var id sql.NullString
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &tx.status, &id); err != nil {
+		var txSender sql.NullString
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &tx.status, &id, &txSender); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -302,6 +306,9 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		tx.recipient = common.HexToAddress(recipient)
 		if id.Valid {
 			tx.id = common.HexToHash(id.String)
+		}
+		if txSender.Valid {
+			tx.txSender = common.HexToAddress(txSender.String)
 		}
 		tx.fee = big.NewInt(0)
 		var ok bool
@@ -328,7 +335,7 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 
 func (recorder *Recorder) Transfer(_id common.Hash) (*Transfer, error) {
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `status`, `id` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `status`, `id`, `txSender` FROM %s WHERE `id`=?", recorder.transferTableName),
 		_id.Hex(),
 	)
 
@@ -339,7 +346,8 @@ func (recorder *Recorder) Transfer(_id common.Hash) (*Transfer, error) {
 	var recipient string
 	var rawAmount string
 	var id sql.NullString
-	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &tx.status, &id); err != nil {
+	var txSender sql.NullString
+	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &tx.status, &id, &txSender); err != nil {
 		return nil, err
 	}
 
@@ -354,6 +362,9 @@ func (recorder *Recorder) Transfer(_id common.Hash) (*Transfer, error) {
 	tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
 	if !ok || tx.amount.Sign() != 1 {
 		return nil, errors.Errorf("invalid amount %s", rawAmount)
+	}
+	if txSender.Valid {
+		tx.txSender = common.HexToAddress(txSender.String)
 	}
 	if toToken, ok := recorder.tokenPairs[tx.token]; ok {
 		tx.coToken = toToken

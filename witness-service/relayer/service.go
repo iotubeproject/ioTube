@@ -187,6 +187,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 			Gas:       transfer.gas,
 			GasPrice:  gasPrice,
 			Timestamp: timestamppb.New(transfer.timestamp),
+			TxSender:  transfer.txSender.Bytes(),
 		}
 		response.Statuses[i] = s.assembleCheckResponse(transfer, witnesses)
 		if len(witnesses) == 0 && transfer.status == WaitingForWitnesses {

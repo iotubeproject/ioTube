@@ -177,7 +177,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	for _, transfer := range transfers {
 		if transfer.blockHeight <= confirmHeight {
 			if err := tc.recorder.UpsertTransfer(transfer); err != nil {
-				return errors.Wrap(err, "failed to add transfer")
+				return errors.Wrap(err, "failed to upsert transfer")
 			}
 		} else {
 			if err := tc.recorder.AddTransfer(transfer, TransferNew); err != nil {
@@ -225,6 +225,7 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 						Recipient: transfer.recipient.Bytes(),
 						Amount:    transfer.amount.String(),
 						Fee:       transfer.fee.String(),
+						TxSender:  transfer.txSender.Bytes(),
 					},
 					Address:   witness.Bytes(),
 					Signature: signature,

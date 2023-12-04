@@ -29,6 +29,7 @@ type (
 		token      common.Address
 		index      uint64
 		sender     common.Address
+		txSender   common.Address
 		recipient  common.Address
 		amount     *big.Int
 		fee        *big.Int

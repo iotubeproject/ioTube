@@ -35,6 +35,7 @@ type (
 		timestamp   time.Time
 		gas         uint64
 		gasPrice    *big.Int
+		txSender    common.Address
 	}
 
 	// Service manages to exchange iotex coin to ERC20 token on ethereum
