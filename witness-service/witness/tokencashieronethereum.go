@@ -107,6 +107,10 @@ func NewTokenCashierOnEthereum(
 					case 0:
 						log.Printf("\tAmount %d is the same as real amount %d\n", amount, realAmount)
 					}
+					txSender, err := ethereumClient.TransactionSender(context.Background(), nil, transferLog.BlockHash, transferLog.TxIndex)
+					if err != nil {
+						return nil, errors.Wrap(err, "failed to fetch transaction sender")
+					}
 					transfers = append(transfers, &Transfer{
 						cashier:     transferLog.Address,
 						token:       tokenAddress,
@@ -117,6 +121,7 @@ func NewTokenCashierOnEthereum(
 						fee:         new(big.Int).SetBytes(transferLog.Data[96:128]),
 						blockHeight: transferLog.BlockNumber,
 						txHash:      transferLog.TxHash,
+						txSender:    txSender,
 					})
 				}
 			}
