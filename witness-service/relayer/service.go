@@ -29,11 +29,12 @@ type (
 		processor         dispatcher.Runner
 		recorder          *Recorder
 		cache             *lru.Cache
+		alwaysReset       bool
 	}
 )
 
 // NewService creates a new relay service
-func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration) (*Service, error) {
+func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration, alwaysReset bool) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
 		return nil, err
@@ -42,6 +43,7 @@ func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration
 		transferValidator: tv,
 		recorder:          recorder,
 		cache:             cache,
+		alwaysReset:       alwaysReset,
 	}
 	processor, err := dispatcher.NewRunner(interval, s.process)
 	if err != nil {
@@ -224,17 +226,6 @@ func (s *Service) convertStatus(status ValidationStatusType) services.Status {
 	return services.Status_UNKNOWN
 }
 
-/*
-func (s *Service) assembleDummyCheckResponse() *services.CheckResponse {
-	return &services.CheckResponse{
-		Key:       []byte{},
-		Witnesses: [][]byte{},
-		TxHash:    []byte{},
-		Status:    services.Status_FAILED,
-	}
-}
-*/
-
 func (s *Service) assembleCheckResponse(transfer *Transfer, witnesses map[common.Hash][]*Witness) *services.CheckResponse {
 	return &services.CheckResponse{
 		Key:       transfer.id[:],
@@ -392,8 +383,14 @@ func (s *Service) submitTransfer(transfer *Transfer) error {
 		return s.recorder.ResetTransferInProcess(transfer.id)
 	default:
 		log.Printf("failed to submit %x, %+v", transfer.id, err)
-		if recorderErr := s.recorder.MarkAsFailed(transfer.id); recorderErr != nil {
-			log.Printf("failed to mark transfer %x as failed, %v\n", transfer.id, recorderErr)
+		var recorderErr error
+		if s.alwaysReset {
+			recorderErr = s.recorder.ResetTransferInProcess(transfer.id)
+		} else {
+			recorderErr = s.recorder.MarkAsFailed(transfer.id)
+		}
+		if recorderErr != nil {
+			log.Printf("failed to mark transfer %x, %v\n", transfer.id, recorderErr)
 		}
 		return err
 	}
