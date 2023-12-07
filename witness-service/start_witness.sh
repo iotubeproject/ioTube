@@ -29,9 +29,9 @@ function checkDockerPermissions() {
 }
 
 function checkDockerCompose() {
-    docker-compose --version > /dev/null 2>&1
+    docker compose --version > /dev/null 2>&1
     if [ $? -eq 127 ];then
-        echo -e "$RED docker-compose command not found $NC"
+        echo -e "$RED docker compose command not found $NC"
         echo -e "Please install it first"
         exit 1
     fi
@@ -123,8 +123,8 @@ function grantPrivileges() {
         retryTimes=0
         maxRetryTime=10
         pushd $IOTEX_WITNESS/etc
-        docker-compose up -d database
-    
+        docker compose up -d database
+
         echo -e "$YELLOW Waiting for the mysqld daemon in the witness-db container to successful... $NC"
         while true;do
             if [ $retryTimes -gt $maxRetryTime ];then
@@ -156,8 +156,8 @@ function buildService() {
 function startup() {
     echo -e "$YELLOW Start witness and it's database. $NC"
     pushd $IOTEX_WITNESS/etc
-    docker-compose up -d
-    docker-compose restart
+    docker compose up -d
+    docker compose restart
     docker system prune -a
     if [ $? -eq 0 ];then
         echo -e "${YELLOW} Service on. ${NC}"
@@ -168,7 +168,7 @@ function startup() {
 function cleanAll() {
     echo -e "$YELLOW Starting clean all containers... $NC"
     pushd $IOTEX_WITNESS/etc
-    docker-compose rm -s -f -v
+    docker compose rm -s -f -v
     popd
     echo -e "${YELLOW} Done. ${NC}"
 
