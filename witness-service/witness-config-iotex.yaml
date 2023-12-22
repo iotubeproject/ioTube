@@ -110,6 +110,9 @@ cashiers:
       # IoTexShiba
       - token1: "io1ld5l9sxecjzkftkn9tcudu6z5qmvjj2zfamvcw"
         token2: "0x52702a7301be185cc97bf3fe6d497a83e7772fde"
+      # DRF
+      - token1: "io1mm5eya89mz3dmp0lqtlfuydf67nrdhnwg92dy4"
+        token2: "0x02dF5253Bc4EfC9F8f744133Ff99981b18Df0473"
   - id: "iotex-to-matic"
     relayerURL: ":7004"
     cashierContractAddress: "io12s9f9hv4zsr7umy5hxt6g0k0xr4x6pxdp5w998"
@@ -158,4 +161,4 @@ cashiers:
         token2: "0x8F26b442B6681567f6EaA75828140712f939Fb9e"
       # DATA
       - token1: "io1rt3y6jfg4ph64txhrn6pf54n5jv6mv5mjlp37u"
-        token2: "0x03F353dd6a5d65d533f4746AEBc927E7FEa34284"
+        token2: "0x89296ac2bd6ba6be9ca0b6ead6dc263e65b7d20b"
