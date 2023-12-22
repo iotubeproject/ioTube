@@ -60,9 +60,3 @@ cashiers:
       # CTSI
       - token2: "io16ajfjch2hlm56vnhlwvs7g7aptnvx40ksyvrz5"
         token1: "0x30e68fACB9D4E04FEdc12A8Cc539639f90F40c63"
-      # DATA
-      - token2: "io1rt3y6jfg4ph64txhrn6pf54n5jv6mv5mjlp37u"
-        token1: "0x03F353dd6a5d65d533f4746AEBc927E7FEa34284"
-      # DRF
-      - token1: "io1mm5eya89mz3dmp0lqtlfuydf67nrdhnwg92dy4"
-        token2: "0x02dF5253Bc4EfC9F8f744133Ff99981b18Df0473"
