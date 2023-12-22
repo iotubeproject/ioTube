@@ -88,7 +88,7 @@ func NewTransferValidatorOnIoTeX(
 
 	return &transferValidatorOnIoTeX{
 		gasLimit:      2000000,
-		gasPrice:      big.NewInt(1000000000000),
+		gasPrice:      big.NewInt(5100000000000),
 		bonus:         big.NewInt(500000000000000000),
 		bonusRecorder: map[string]time.Time{},
 
@@ -210,7 +210,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		}
 		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
 		if err := tv.sendBonus(transfer.recipient); err != nil {
-			log.Printf("failed to send bonus to %s\n", transfer.recipient)
+			log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
 		}
 
 		return StatusOnChainSettled, nil
@@ -318,6 +318,9 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		SetNonce(nonce).
 		Call(context.Background())
 	if err != nil {
+		if errors.Cause(err).Error() == "rpc error: code = Internal desc = exceeds block gas limit" {
+			err = errors.Wrap(errNoncritical, err.Error())
+		}
 		return common.Hash{}, common.Address{}, 0, nil, err
 	}
 

@@ -26,6 +26,7 @@ import (
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
 	"go.uber.org/config"
+	"google.golang.org/grpc"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/relayer"
@@ -172,9 +173,11 @@ func main() {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}
 	case "iotex":
-		conn, err := iotex.NewDefaultGRPCConn(cfg.ClientURL)
-		if err != nil {
-			log.Fatal(err)
+		var conn *grpc.ClientConn
+		if strings.HasSuffix(cfg.ClientURL, ":443") {
+			conn, err = iotex.NewDefaultGRPCConn(cfg.ClientURL)
+		} else {
+			conn, err = iotex.NewGRPCConnWithoutTLS(cfg.ClientURL)
 		}
 		// defer conn.Close()
 		acc, err := account.HexStringToAccount(cfg.PrivateKey)

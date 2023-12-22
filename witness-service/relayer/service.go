@@ -30,6 +30,7 @@ type (
 		recorder          *Recorder
 		cache             *lru.Cache
 		alwaysReset       bool
+		nonceTooLow       map[common.Hash]uint64
 	}
 )
 
@@ -44,6 +45,7 @@ func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration
 		recorder:          recorder,
 		cache:             cache,
 		alwaysReset:       alwaysReset,
+		nonceTooLow:       map[common.Hash]uint64{},
 	}
 	processor, err := dispatcher.NewRunner(interval, s.process)
 	if err != nil {
@@ -270,6 +272,18 @@ func (s *Service) confirmTransfers() error {
 		speedup, err := s.confirmTransfer(transfer)
 		if err != nil {
 			log.Printf("failed to confirm transfer %s, %+v\n", transfer.id.String(), err)
+			if errors.Cause(err).Error() == "rpc error: code = Internal desc = nonce too low" {
+				if _, ok := s.nonceTooLow[transfer.id]; !ok {
+					s.nonceTooLow[transfer.id] = 0
+				}
+				s.nonceTooLow[transfer.id]++
+				if s.nonceTooLow[transfer.id] > 10 {
+					if err := s.recorder.ResetCausedByNonce(transfer.id); err != nil {
+						log.Printf("failed to reset transfer %s, %+v\n", transfer.id.String(), err)
+					}
+					delete(s.nonceTooLow, transfer.id)
+				}
+			}
 		} else if speedup {
 			log.Printf("transfer %s has been speeded up, skip other transfers\n", transfer.id.String())
 			return nil
