@@ -9,7 +9,7 @@ database:
 cashiers:
   - id: "bsc-to-iotex"
     relayerURL: ":7001"
-    startBlockHeight: 5177821
+    startBlockHeight: 34560000
     cashierContractAddress: "0x797f1465796fd89ea7135e76dbc7cdb136bba1ca"
     tokenSafeContractAddress: "0xfbe9a4138afdf1fa639a8c2818a0c4513fc4ce4b"
     validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
@@ -39,3 +39,6 @@ cashiers:
       # IoTexShiba
       - token1: "0x52702a7301be185cc97bf3fe6d497a83e7772fde"
         token2: "io1ld5l9sxecjzkftkn9tcudu6z5qmvjj2zfamvcw"
+      # DRF
+      - token2: "io1mm5eya89mz3dmp0lqtlfuydf67nrdhnwg92dy4"
+        token1: "0x02dF5253Bc4EfC9F8f744133Ff99981b18Df0473"

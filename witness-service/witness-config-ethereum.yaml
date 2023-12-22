@@ -9,7 +9,7 @@ database:
 cashiers:
   - id: "ethereum-to-iotex"
     relayerURL: ":7001"
-    startBlockHeight: 11827636
+    startBlockHeight: 18800000
     validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
     cashierContractAddress: "0xa0fd7430852361931b23a31f84374ba3314e1682"
     tokenSafeContractAddress: "0xc2e0f31d739cb3153ba5760a203b3bd7c27f0d7a"
@@ -60,3 +60,9 @@ cashiers:
       # CTSI
       - token2: "io16ajfjch2hlm56vnhlwvs7g7aptnvx40ksyvrz5"
         token1: "0x30e68fACB9D4E04FEdc12A8Cc539639f90F40c63"
+      # DATA
+      - token2: "io1rt3y6jfg4ph64txhrn6pf54n5jv6mv5mjlp37u"
+        token1: "0x03F353dd6a5d65d533f4746AEBc927E7FEa34284"
+      # DRF
+      - token1: "io1mm5eya89mz3dmp0lqtlfuydf67nrdhnwg92dy4"
+        token2: "0x02dF5253Bc4EfC9F8f744133Ff99981b18Df0473"

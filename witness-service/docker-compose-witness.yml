@@ -38,31 +38,31 @@ services:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
       RELAYER_URL: ${RELAYER_URL}
 
-  heco-witness:
-    container_name: heco-witness
-    image: witness:latest
-    restart: on-failure
-    volumes:
-      - $IOTEX_WITNESS/etc/witness-config-heco.yaml:/etc/iotube-witness/witness-config-heco.yaml:ro
-      - $IOTEX_WITNESS/etc/witness-config-heco.secret.yaml:/etc/iotube-witness/witness-config-heco.secret.yaml:ro
-    network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-heco.yaml -secret=/etc/iotube-witness/witness-config-heco.secret.yaml
-    environment:
-      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-      RELAYER_URL: ${RELAYER_URL}
+#  heco-witness:
+#    container_name: heco-witness
+#    image: witness:latest
+#    restart: on-failure
+#    volumes:
+#      - $IOTEX_WITNESS/etc/witness-config-heco.yaml:/etc/iotube-witness/witness-config-heco.yaml:ro
+#      - $IOTEX_WITNESS/etc/witness-config-heco.secret.yaml:/etc/iotube-witness/witness-config-heco.secret.yaml:ro
+#    network_mode: host
+#    command: witness -config=/etc/iotube-witness/witness-config-heco.yaml -secret=/etc/iotube-witness/witness-config-heco.secret.yaml
+#    environment:
+#      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+#      RELAYER_URL: ${RELAYER_URL}
 
-  polis-witness:
-    container_name: polis-witness
-    image: witness:latest
-    restart: on-failure
-    volumes:
-      - $IOTEX_WITNESS/etc/witness-config-polis.yaml:/etc/iotube-witness/witness-config-polis.yaml:ro
-      - $IOTEX_WITNESS/etc/witness-config-polis.secret.yaml:/etc/iotube-witness/witness-config-polis.secret.yaml:ro
-    network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-polis.yaml -secret=/etc/iotube-witness/witness-config-polis.secret.yaml
-    environment:
-      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-      RELAYER_URL: ${RELAYER_URL}
+#  polis-witness:
+#    container_name: polis-witness
+#    image: witness:latest
+#    restart: on-failure
+#    volumes:
+#      - $IOTEX_WITNESS/etc/witness-config-polis.yaml:/etc/iotube-witness/witness-config-polis.yaml:ro
+#      - $IOTEX_WITNESS/etc/witness-config-polis.secret.yaml:/etc/iotube-witness/witness-config-polis.secret.yaml:ro
+#    network_mode: host
+#    command: witness -config=/etc/iotube-witness/witness-config-polis.yaml -secret=/etc/iotube-witness/witness-config-polis.secret.yaml
+#    environment:
+#      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+#      RELAYER_URL: ${RELAYER_URL}
 
   bsc-witness:
     container_name: bsc-witness

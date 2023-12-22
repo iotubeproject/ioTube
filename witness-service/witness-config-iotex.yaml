@@ -156,3 +156,6 @@ cashiers:
       # WIFI
       - token1: "io1em553udth5j85hjp4z9j3xgdhq00qz7uq5egha"
         token2: "0x8F26b442B6681567f6EaA75828140712f939Fb9e"
+      # DATA
+      - token1: "io1rt3y6jfg4ph64txhrn6pf54n5jv6mv5mjlp37u"
+        token2: "0x03F353dd6a5d65d533f4746AEBc927E7FEa34284"
