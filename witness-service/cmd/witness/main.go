@@ -18,6 +18,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/rpcclient"
+	btcchain "github.com/btcsuite/btcwallet/chain"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -51,7 +54,7 @@ type Configuration struct {
 		RelayerURL               string `json:"relayerURL" yaml:"relayerURL"`
 		CashierContractAddress   string `json:"cashierContractAddress" yaml:"cashierContractAddress"`
 		TokenSafeContractAddress string `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
-		ValidatorContractAddress string `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
+		ValidatorContractAddress string `json:"validatorContractAddress" yaml:"validatorContractAddress"`
 		TransferTableName        string `json:"transferTableName" yaml:"transferTableName"`
 		TokenPairs               []struct {
 			Token1 string `json:"token1" yaml:"token1"`
@@ -63,7 +66,15 @@ type Configuration struct {
 			CashierContractAddress string   `json:"cashierContractAddress" yaml:"cashierContractAddress"`
 			Tokens                 []string `json:"tokens" yaml:"tokens"`
 		}
+		SupportBitcoinRecipient bool   `json:"supportBitcoinRecipient" yaml:"supportBitcoinRecipient"`
+		MinTipFee               uint64 `json:"minTipFee" yaml:"minTipFee"`
 	} `json:"cashiers" yaml:"cashiers"`
+	BitcoinConfig struct {
+		RPCHost   string `json:"rpcHost" yaml:"rpcHost"`
+		RPCUser   string `json:"rpcUser" yaml:"rpcUser"`
+		RPCPass   string `json:"rpcPass" yaml:"rpcPass"`
+		EnableTLS bool   `json:"enableTLS" yaml:"enableTLS"`
+	} `json:"bitcoinConfig" yaml:"bitcoinConfig"`
 }
 
 var (
@@ -96,6 +107,8 @@ func init() {
 }
 
 func main() {
+	log.SetOutput(os.Stdout)
+
 	flag.Parse()
 	opts := []config.YAMLOption{config.Static(defaultConfig), config.Expand(os.LookupEnv)}
 	if *configFile != "" {
@@ -162,6 +175,7 @@ func main() {
 		}
 	}
 
+	var bTCValidator *witness.BTCValidator
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
 	switch cfg.Chain {
 	case "iotex":
@@ -187,18 +201,58 @@ func main() {
 				}
 				pairs[common.BytesToAddress(ioAddr.Bytes())] = common.HexToAddress(pair.Token2)
 			}
+			var addrDecoder util.AddressDecoder
+			if cc.SupportBitcoinRecipient {
+				addrDecoder = util.NewBTCAddressDecoder(&chaincfg.TestNet3Params)
+			} else {
+				addrDecoder = util.NewETHAddressDecoder()
+			}
+			recorder := witness.NewRecorder(
+				db.NewStore(cfg.Database),
+				cc.TransferTableName,
+				pairs,
+				addrDecoder,
+			)
+
+			if cc.SupportBitcoinRecipient {
+				if bTCValidator != nil {
+					log.Fatalf("only one btc casiher is supported in source chain")
+				}
+				cli, err := rpcclient.New(&rpcclient.ConnConfig{
+					Host:         cfg.BitcoinConfig.RPCHost,
+					User:         cfg.BitcoinConfig.RPCUser,
+					Pass:         cfg.BitcoinConfig.RPCPass,
+					HTTPPostMode: true,
+					DisableTLS:   !cfg.BitcoinConfig.EnableTLS,
+				}, nil)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer cli.Shutdown()
+
+				bTCValidator = witness.NewBTCTransferValidator(
+					privateKey,
+					cli,
+					cfg.Interval,
+					cc.RelayerURL,
+					recorder,
+				)
+			}
+
+			validatorContractAddress := common.HexToAddress(cc.ValidatorContractAddress).Bytes()
+			if cc.SupportBitcoinRecipient {
+				validatorContractAddress = []byte{}
+			}
+
 			cashier, err := witness.NewTokenCashier(
 				cc.ID,
 				cc.RelayerURL,
 				iotexClient,
 				cashierContractAddr,
-				common.HexToAddress(cc.ValidatorContractAddress),
-				witness.NewRecorder(
-					db.NewStore(cfg.Database),
-					cc.TransferTableName,
-					pairs,
-				),
+				validatorContractAddress,
+				recorder,
 				uint64(cc.StartBlockHeight),
+				addrDecoder,
 			)
 			if err != nil {
 				log.Fatalf("failed to create cashier %v\n", err)
@@ -239,6 +293,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.Reverse.TransferTableName,
 					pairs,
+					util.NewETHAddressDecoder(),
 				)
 			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
@@ -252,6 +307,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
+					util.NewETHAddressDecoder(),
 				),
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
@@ -263,6 +319,61 @@ func main() {
 			}
 			cashiers = append(cashiers, cashier)
 		}
+	case "bitcoin-testnet":
+		if len(cfg.Cashiers) != 1 {
+			log.Fatalln("only one cashier is supported for bitcoin")
+		}
+
+		// Testnet
+		testnetParam := &chaincfg.TestNet3Params
+		btcCfg := &btcchain.BitcoindConfig{
+			ChainParams: testnetParam,
+			Host:        cfg.BitcoinConfig.RPCHost,
+			User:        cfg.BitcoinConfig.RPCUser,
+			Pass:        cfg.BitcoinConfig.RPCPass,
+			PollingConfig: &btcchain.PollingConfig{
+				BlockPollingInterval: time.Millisecond * 100,
+				TxPollingInterval:    time.Millisecond * 100,
+			},
+		}
+
+		chainConn, err := btcchain.NewBitcoindConn(btcCfg)
+		if err != nil {
+			log.Fatalf("failed to create bitcoind connection %v\n", err)
+		}
+		chainConn.Start()
+		defer chainConn.Stop()
+		btcClient := chainConn.NewBitcoindClient()
+		btcClient.Start()
+		defer btcClient.Stop()
+
+		// the string of CashierContractAddress is also used as the musig pubkey for bitcoin
+		cashierPubkey, err := util.HexToPubkey(cfg.Cashiers[0].CashierContractAddress)
+		if err != nil {
+			log.Fatalf("failed to parse cashier contract address %s, error %v\n", cfg.Cashiers[0].CashierContractAddress, err)
+		}
+
+		cc := cfg.Cashiers[0]
+		cashier, err := witness.NewTokenCashierOnBitcoin(
+			cc.ID,
+			cc.RelayerURL,
+			btcClient,
+			testnetParam,
+			cashierPubkey,
+			common.HexToAddress(cc.TokenSafeContractAddress),
+			common.HexToAddress(cc.ValidatorContractAddress),
+			witness.NewBTCRecorder(
+				db.NewStore(cfg.Database),
+				cc.TransferTableName,
+			),
+			uint64(cc.StartBlockHeight),
+			uint8(cfg.ConfirmBlockNumber),
+			cc.MinTipFee,
+		)
+		if err != nil {
+			log.Fatalf("failed to create cashier %v\n", err)
+		}
+		cashiers = append(cashiers, cashier)
 	default:
 		log.Fatalf("unknown chain name %s", cfg.Chain)
 	}
@@ -270,6 +381,7 @@ func main() {
 	service, err := witness.NewService(
 		privateKey,
 		cashiers,
+		bTCValidator,
 		uint16(cfg.BatchSize),
 		cfg.Interval,
 		cfg.DisableTransferSubmit,

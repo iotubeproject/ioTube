@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -56,6 +58,17 @@ type Configuration struct {
 	TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
 	WitnessTableName  string    `json:"witnessTableName" yaml:"witnessTableName"`
 	ExplorerTableName string    `json:"explorerTableName" yaml:"explorerTableName"`
+
+	BitcoinConfig struct {
+		RPCHost                    string   `json:"rpcHost" yaml:"rpcHost"`
+		RPCUser                    string   `json:"rpcUser" yaml:"rpcUser"`
+		RPCPass                    string   `json:"rpcPass" yaml:"rpcPass"`
+		EnableTLS                  bool     `json:"enableTLS" yaml:"enableTLS"`
+		BTCRawTransactionTableName string   `json:"btcRawTransactionTableName" yaml:"btcRawTransactionTableName"`
+		TransferMappingTableName   string   `json:"transferMappingTableName" yaml:"transferMappingTableName"`
+		WitnessPubkey              []string `json:"witnessPubkey" yaml:"witnessPubkey"`
+		TransferLimitPerDay        uint64   `json:"transferLimitPerDay" yaml:"transferLimitPerDay"`
+	} `json:"bitcoinConfig" yaml:"bitcoinConfig"`
 }
 
 var defaultConfig = Configuration{
@@ -90,6 +103,8 @@ func init() {
 //  3. sets the implementation of the handlers
 //  4. listens on the port we want
 func main() {
+	log.SetOutput(os.Stdout)
+
 	flag.Parse()
 	opts := []config.YAMLOption{config.Static(defaultConfig), config.Expand(os.LookupEnv)}
 	if *configFile != "" {
@@ -138,6 +153,25 @@ func main() {
 	if chain, ok := os.LookupEnv("RELAYER_CHAIN"); ok {
 		cfg.Chain = chain
 	}
+
+	var addrDecoder util.AddressDecoder
+	switch cfg.Chain {
+	case "bitcoin-testnet":
+		addrDecoder = util.NewBTCAddressDecoder(&chaincfg.TestNet3Params)
+	default:
+		addrDecoder = util.NewETHAddressDecoder()
+	}
+
+	recorder := relayer.NewRecorder(
+		db.NewStore(cfg.Database),
+		db.NewStore(cfg.ExplorerDatabase),
+		cfg.TransferTableName,
+		cfg.WitnessTableName,
+		cfg.ExplorerTableName,
+		addrDecoder,
+	)
+
+	var btcProcessor *relayer.BTCProcessor
 	switch cfg.Chain {
 	case "heco", "bsc", "matic", "polis":
 		// heco and bsc are idential to ethereum
@@ -186,25 +220,55 @@ func main() {
 			log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
 		}
 		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
-			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
+			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 2, acc),
 			validatorContractAddr,
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}
+	case "bitcoin-testnet":
+		btcRecorder := relayer.NewBTCRecorder(
+			db.NewStore(cfg.Database),
+			cfg.BitcoinConfig.BTCRawTransactionTableName,
+			cfg.BitcoinConfig.TransferMappingTableName,
+		)
+
+		cli, err := rpcclient.New(&rpcclient.ConnConfig{
+			Host:         cfg.BitcoinConfig.RPCHost,
+			User:         cfg.BitcoinConfig.RPCUser,
+			Pass:         cfg.BitcoinConfig.RPCPass,
+			HTTPPostMode: true,
+			DisableTLS:   !cfg.BitcoinConfig.EnableTLS,
+		}, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer cli.Shutdown()
+
+		// Only support transfer 1 BTC at maximum when testing
+		var ratelimiter *util.DailyResetCounter
+		if cfg.BitcoinConfig.TransferLimitPerDay > 0 {
+			ratelimiter = util.NewDailyResetCounter(cfg.BitcoinConfig.TransferLimitPerDay)
+		}
+
+		btcProcessor = relayer.NewBTCProcessor(
+			btcRecorder,
+			recorder,
+			cli,
+			&chaincfg.TestNet3Params,
+			cfg.Interval,
+			cfg.BitcoinConfig.WitnessPubkey,
+			ratelimiter,
+		)
 	default:
 		log.Fatalf("unknown chain name '%s'\n", cfg.Chain)
 	}
 	service, err := relayer.NewService(
 		transferValidator,
-		relayer.NewRecorder(
-			db.NewStore(cfg.Database),
-			db.NewStore(cfg.ExplorerDatabase),
-			cfg.TransferTableName,
-			cfg.WitnessTableName,
-			cfg.ExplorerTableName,
-		),
+		recorder,
+		btcProcessor,
 		cfg.Interval,
 		cfg.AlwaysReset,
+		addrDecoder,
 	)
 	if err != nil {
 		log.Fatalf("failed to create relay service: %v\n", err)

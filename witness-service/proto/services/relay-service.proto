@@ -4,6 +4,8 @@ package services;
 
 import "google/api/annotations.proto";
 import "types/witness.proto";
+import "google/protobuf/empty.proto";
+import "types/btctx.proto";
 
 option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/services";
 
@@ -32,6 +34,15 @@ service RelayService {
             body: "*"
         };
     };
+
+    // rpcs below are BTC validation related
+    rpc ListUnsignedBTCTXWithoutNonces(ExcludedTransactions)  returns (ListUnsignedBTCTXWithoutNoncesResponse);
+
+    rpc SubmitMusigNonces(MusigNonceMessage) returns (google.protobuf.Empty);
+
+    rpc ListUnsignedBTCTXWithNonces(ExcludedTransactions)  returns (ListUnsignedBTCTXWithNoncesResponse);
+     
+    rpc SubmitMusigSignatures(MusigSignatureMessage) returns (google.protobuf.Empty);
 }
 
 message CheckRequest {
@@ -80,4 +91,38 @@ message ResetTransferResponse {
 message WitnessSubmissionResponse {
     bytes id = 1;
     bool success = 2;
+}
+
+message ExcludedTransactions {
+    repeated string tx_hash = 1;
+}
+
+message ListUnsignedBTCTXWithoutNoncesResponse {
+    repeated types.BTCTransaction transactions = 1;
+}
+
+message MusigNonceMessage {
+    MusigNonces message = 1;
+    bytes pubkey = 2;
+    bytes signature = 3; // to validate the identity of the sender
+}
+
+message MusigNonces {
+    repeated types.TransactionNonces nonces = 1;
+}
+
+message ListUnsignedBTCTXWithNoncesResponse {
+    repeated bytes pubkeys = 1;
+    repeated types.TransactionWithCombinedNonces transactions = 2;
+}
+
+message MusigSignatureMessage {
+    MusigSignatures message = 1;
+    bytes pubkey = 2;
+    bytes signature = 3; // to validate the identity of the sender
+}
+
+
+message MusigSignatures {
+    repeated types.TransactionSignatures signatures = 1;
 }

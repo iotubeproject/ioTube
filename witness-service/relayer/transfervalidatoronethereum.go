@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
@@ -251,7 +251,10 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 			return common.Hash{}, common.Address{}, 0, nil, err
 		}
 	} else {
-		privateKey = tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
+		// transfer.index % len(tv.privateKeys)
+		res := new(big.Int).Mod(transfer.index,
+			new(big.Int).SetUint64(uint64(len(tv.privateKeys))))
+		privateKey = tv.privateKeys[res.Uint64()]
 	}
 	tOpts, err := tv.transactionOpts(300000, privateKey, transfer.timestamp)
 	if err != nil {
@@ -266,11 +269,11 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		}
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
-	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
+	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token, transfer.index, transfer.sender, transfer.recipient.Address().(common.Address), transfer.amount, signatures)
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil
-	case core.ErrUnderpriced:
+	case txpool.ErrUnderpriced:
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	case ethereum.NotFound:
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())

@@ -210,8 +210,8 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		}
 		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
 		if transfer.amount.Cmp(big.NewInt(0)) > 0 {
-			if err := tv.sendBonus(transfer.recipient); err != nil {
-				log.Printf("failed to send bonus to %s\n", transfer.recipient)
+			if err := tv.sendBonus(transfer.recipient.Address().(common.Address)); err != nil {
+				log.Printf("failed to send bonus to %s\n", transfer.recipient.String())
 			}
 		}
 
@@ -310,9 +310,9 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		"submit",
 		transfer.cashier,
 		transfer.token,
-		new(big.Int).SetUint64(transfer.index),
+		transfer.index,
 		transfer.sender,
-		transfer.recipient,
+		transfer.recipient.Address().(common.Address),
 		transfer.amount,
 		signatures,
 	).SetGasPrice(tv.gasPrice).
