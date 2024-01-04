@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type (
@@ -47,6 +48,7 @@ type (
 		// updateStatusAndTransactionQuery is a query to set status and transaction
 		updateStatusAndTransactionQuery            string
 		updateStatusAndTransactionQueryForExplorer string
+		addrDecoder                                util.AddressDecoder
 	}
 )
 
@@ -57,6 +59,7 @@ func NewRecorder(
 	transferTableName string,
 	witnessTableName string,
 	explorerTableName string,
+	addrDecoder util.AddressDecoder,
 ) *Recorder {
 	return &Recorder{
 		store:                           store,
@@ -68,6 +71,7 @@ func NewRecorder(
 		updateStatusQueryForExplorer:    fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=?", explorerTableName),
 		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=? AND `status`=?", transferTableName),
 		updateStatusAndTransactionQueryForExplorer: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=?", explorerTableName),
+		addrDecoder: addrDecoder,
 	}
 }
 
@@ -110,9 +114,10 @@ func (recorder *Recorder) initStore(
 			"`cashier` varchar(42) NOT NULL,"+
 			"`token` varchar(42) NOT NULL,"+
 			"`tidx` bigint(20) NOT NULL,"+
+			"`btcIndex` varchar(78) NOT NULL,"+
 			"`sender` varchar(42) NOT NULL,"+
 			"`txSender` varchar(42),"+
-			"`recipient` varchar(42) NOT NULL,"+
+			"`recipient` varchar(256) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
 			"`fee` varchar(78),"+
 			"`id` varchar(66) NOT NULL,"+
@@ -126,7 +131,7 @@ func (recorder *Recorder) initStore(
 			"`relayer` varchar(42) DEFAULT NULL,"+
 			"`gasPrice` varchar(78) DEFAULT NULL,"+
 			"`notes` varchar(45) DEFAULT NULL,"+
-			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
+			"PRIMARY KEY (`cashier`,`token`,`tidx`, `btcIndex`),"+
 			"UNIQUE KEY `id_UNIQUE` (`id`),"+
 			"KEY `cashier_index` (`cashier`),"+
 			"KEY `token_index` (`token`),"+
@@ -140,6 +145,10 @@ func (recorder *Recorder) initStore(
 	)); err != nil {
 		return errors.Wrap(err, "failed to create transfer table")
 	}
+
+	// ALTER TABLE transferTableName ADD COLUMN btcIndex VARCHAR(78) DEFAULT NULL;
+	// UPDATE PRIMARY KEY
+
 	if witnessTableName != "" {
 		if _, err := store.DB().Exec(fmt.Sprintf(
 			"CREATE TABLE IF NOT EXISTS %s ("+
@@ -179,7 +188,9 @@ func (recorder *Recorder) Stop(ctx context.Context) error {
 func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	recorder.validateID(uint64(transfer.index))
+	if transfer.indexType == LegacyIndex {
+		recorder.validateID(transfer.index.Uint64())
+	}
 	if len(witness.signature) != 0 {
 		rpk, err := crypto.Ecrecover(transfer.id.Bytes(), witness.signature)
 		if err != nil {
@@ -234,14 +245,18 @@ func (recorder *Recorder) addWitness(
 	witness *Witness,
 	transferTableName, witnessTableName string,
 ) error {
+	var legacyIndex uint64 = 0
+	if transfer.indexType == LegacyIndex {
+		legacyIndex = transfer.index.Uint64()
+	}
 	if _, err := tx.Exec(
 		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
 		transfer.cashier.Hex(),
 		transfer.token.Hex(),
-		transfer.index,
+		legacyIndex,
 		transfer.sender.Hex(),
 		transfer.txSender.Hex(),
-		transfer.recipient.Hex(),
+		transfer.recipient.String(),
 		transfer.amount.String(),
 		transfer.fee.String(),
 		transfer.id.Hex(),
@@ -255,6 +270,15 @@ func (recorder *Recorder) addWitness(
 			transfer.id.Hex(),
 		); err != nil {
 			return errors.Wrap(err, "failed to update tx sender")
+		}
+	}
+	if transfer.indexType == BTCIndex {
+		if _, err := tx.Exec(
+			fmt.Sprintf("UPDATE `%s` SET `btcIndex`=? WHERE `id`=?", transferTableName),
+			transfer.index.String(),
+			transfer.id.Hex(),
+		); err != nil {
+			return errors.Wrap(err, "failed to update btc_index")
 		}
 	}
 	if witnessTableName != "" && len(witness.signature) != 0 {
@@ -317,20 +341,38 @@ func (recorder *Recorder) Witnesses(ids ...common.Hash) (map[common.Hash][]*Witn
 func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error) (*Transfer, error) {
 	tx := &Transfer{}
 	var rawAmount string
-	var cashier, token, sender, recipient, id string
+	var cashier, token, btcIndex, recipient, sender, id string
 	var relayer, hash, gasPrice, fee, txSender sql.NullString
+	var index uint64
 	var gas, nonce sql.NullInt64
 	var timestamp sql.NullTime
-	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
+	if err := scan(&cashier, &token, &index, &btcIndex, &sender, &txSender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = common.HexToAddress(cashier)
 	tx.token = common.HexToAddress(token)
 	tx.sender = common.HexToAddress(sender)
+	if index > 0 && len(btcIndex) > 0 {
+		return nil, errors.New("invalid transfer index")
+	} else if len(btcIndex) > 0 {
+		var ok bool
+		tx.index, ok = new(big.Int).SetString(btcIndex, 10)
+		if !ok || tx.index.Sign() == -1 {
+			return nil, errors.New("failed to decode btc index")
+		}
+		tx.indexType = BTCIndex
+	} else {
+		tx.index = new(big.Int).SetUint64(index)
+		tx.indexType = LegacyIndex
+	}
 	if txSender.Valid {
 		tx.txSender = common.HexToAddress(txSender.String)
 	}
-	tx.recipient = common.HexToAddress(recipient)
+	var err error
+	tx.recipient, err = util.NewETHAddressDecoder().DecodeString(recipient)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode recipient")
+	}
 	tx.id = common.HexToHash(id)
 	if relayer.Valid {
 		tx.relayer = common.HexToAddress(relayer.String)
@@ -362,7 +404,7 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	}
 	if gasPrice.Valid {
 		tx.gasPrice, ok = new(big.Int).SetString(gasPrice.String, 10)
-		if !ok || tx.gasPrice.Sign() != 1 {
+		if !ok || tx.gasPrice.Sign() == -1 {
 			return nil, errors.Errorf("invalid gas price %s", gasPrice.String)
 		}
 	}
@@ -374,7 +416,7 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `btcIndex`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `id`=?", recorder.transferTableName),
 		id.Hex(),
 	)
 	return recorder.assembleTransfer(row.Scan)
@@ -482,7 +524,7 @@ func (recorder *Recorder) Transfers(
 	if byUpdateTime {
 		orderBy = "updateTime"
 	}
-	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
+	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `btcIndex`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
 	conditions := []string{}
@@ -540,7 +582,7 @@ func (recorder *Recorder) MarkAsProcessing(id common.Hash) error {
 		}
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 // UpdateRecord updates a transfer gas price
@@ -580,7 +622,7 @@ func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, relay
 		}
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 // MarkAsValidated marks a transfer as validated
@@ -619,7 +661,7 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, re
 		}
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 // MarkAsSettled marks a record as settled
@@ -654,7 +696,7 @@ func (recorder *Recorder) MarkAsSettled(id common.Hash, gas uint64, ts time.Time
 		}
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 // MarkAsFailed marks a record as failed
@@ -676,7 +718,7 @@ func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
 		}
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 // MarkAsRejected marks a record as failed
@@ -698,7 +740,7 @@ func (recorder *Recorder) MarkAsRejected(id common.Hash) error {
 		}
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 // ResetTransferInProcess marks a record as new
@@ -708,7 +750,7 @@ func (recorder *Recorder) ResetTransferInProcess(id common.Hash) error {
 
 // ResetFailedTransfer marks a record as new
 func (recorder *Recorder) ResetFailedTransfer(id common.Hash) error {
-	return recorder.reset(id, ValidationInProcess)
+	return recorder.reset(id, WaitingForWitnesses)
 }
 
 func (recorder *Recorder) reset(id common.Hash, status ValidationStatusType) error {
@@ -729,7 +771,7 @@ func (recorder *Recorder) reset(id common.Hash, status ValidationStatusType) err
 		}
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 // ResetCausedByNonce marks a record as new
@@ -751,14 +793,14 @@ func (recorder *Recorder) ResetCausedByNonce(id common.Hash) error {
 		}
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 /////////////////////////////////
 // Private functions
 /////////////////////////////////
 
-func (recorder *Recorder) validateResult(res sql.Result) error {
+func validateResult(res sql.Result) error {
 	affected, err := res.RowsAffected()
 	if err != nil {
 		return err

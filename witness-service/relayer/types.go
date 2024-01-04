@@ -10,12 +10,16 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/iotexproject/ioTube/witness-service/grpc/types"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type (
@@ -25,12 +29,14 @@ type (
 	StatusOnChainType int
 	// Transfer defines a transfer structure
 	Transfer struct {
-		cashier    common.Address
-		token      common.Address
-		index      uint64
+		cashier common.Address
+		token   common.Address
+		// index type is changed to big.Int from u64 to support both u64 and [32]byte(U256)
+		index      *big.Int
+		indexType  IndexType
 		sender     common.Address
 		txSender   common.Address
-		recipient  common.Address
+		recipient  util.Address
 		amount     *big.Int
 		fee        *big.Int
 		id         common.Hash
@@ -62,6 +68,22 @@ type (
 		// SpeedUp resubmits validation with higher gas price
 		SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 	}
+
+	IndexType uint8
+
+	BTCRawTransaction struct {
+		txHash       chainhash.Hash
+		txSerialized []byte
+		status       ValidationStatusType
+		transferID   map[uint64]common.Hash // transfer linked to
+		retryTimes   uint8
+	}
+
+	BTCAddress struct {
+		pubKey  *btcec.PublicKey
+		btcAddr []byte
+		ethAddr common.Address
+	}
 )
 
 const (
@@ -71,6 +93,8 @@ const (
 	ValidationInProcess = "processing"
 	// ValidationSubmitted stands for a transfer with validation submitted
 	ValidationSubmitted = "validated"
+	// TransferSigned stands for a transfer which has been signed
+	TransferSigned = "signed"
 	// TransferSettled stands for a transfer which has been settled
 	TransferSettled = "settled"
 	// ValidationFailed stands for the validation of a transfer failed
@@ -88,17 +112,41 @@ const (
 	StatusOnChainSettled
 )
 
+const (
+	LegacyIndex IndexType = iota
+	BTCIndex
+)
+
 var errInsufficientWitnesses = errors.New("insufficient witnesses")
 var errGasPriceTooHigh = errors.New("gas price is too high")
 var errNoncritical = errors.New("error before submission")
 
 // UnmarshalTransferProto unmarshals a transfer proto
-func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transfer) (*Transfer, error) {
+func UnmarshalTransferProto(validatorAddr []byte, transfer *types.Transfer, addrDecoder util.AddressDecoder) (*Transfer, error) {
 	cashier := common.BytesToAddress(transfer.Cashier)
 	token := common.BytesToAddress(transfer.Token)
-	index := uint64(transfer.Index)
+	var (
+		index     *big.Int
+		indexType IndexType
+	)
+	if transfer.Index != 0 && len(transfer.BtcIndex) > 0 {
+		return nil, errors.Errorf("invalid index %d and btc index %s", transfer.Index, transfer.BtcIndex)
+	} else if transfer.Index != 0 {
+		index = new(big.Int).SetInt64(transfer.Index)
+		indexType = LegacyIndex
+	} else {
+		var ok bool
+		index, ok = new(big.Int).SetString(transfer.BtcIndex, 10)
+		if !ok {
+			return nil, errors.Errorf("invalid btc index %s", transfer.BtcIndex)
+		}
+		indexType = BTCIndex
+	}
 	sender := common.BytesToAddress(transfer.Sender)
-	recipient := common.BytesToAddress(transfer.Recipient)
+	recipient, err := addrDecoder.DecodeBytes(transfer.Recipient)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode recipient")
+	}
 	amount, ok := new(big.Int).SetString(transfer.Amount, 10)
 	if !ok || amount.Sign() == -1 {
 		return nil, errors.Errorf("invalid amount %s", transfer.Amount)
@@ -115,10 +163,10 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 		}
 	}
 	id := crypto.Keccak256Hash(
-		validatorAddr.Bytes(),
+		validatorAddr,
 		cashier.Bytes(),
 		token.Bytes(),
-		math.U256Bytes(new(big.Int).SetUint64(index)),
+		math.U256Bytes(index),
 		sender.Bytes(),
 		recipient.Bytes(),
 		math.U256Bytes(amount),
@@ -127,7 +175,8 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 	return &Transfer{
 		cashier:   cashier,
 		token:     token,
-		index:     index,
+		index:     new(big.Int).Set(index),
+		indexType: indexType,
 		sender:    sender,
 		recipient: recipient,
 		amount:    amount,
@@ -171,7 +220,7 @@ func (transfer *Transfer) ToTypesTransfer() *types.Transfer {
 	return &types.Transfer{
 		Cashier:   transfer.cashier.Bytes(),
 		Token:     transfer.token.Bytes(),
-		Index:     int64(transfer.index),
+		Index:     transfer.index.Int64(),
 		Sender:    transfer.sender.Bytes(),
 		Recipient: transfer.recipient.Bytes(),
 		Amount:    transfer.amount.String(),

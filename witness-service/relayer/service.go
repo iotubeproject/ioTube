@@ -25,16 +25,20 @@ type (
 	// Service defines the relayer service
 	Service struct {
 		services.UnimplementedRelayServiceServer
-		transferValidator TransferValidator
-		processor         dispatcher.Runner
-		recorder          *Recorder
-		cache             *lru.Cache
-		alwaysReset       bool
+		transferValidator     TransferValidator
+		transferValidatorAddr []byte
+		processor             dispatcher.Runner
+		recorder              *Recorder
+		cache                 *lru.Cache
+		alwaysReset           bool
+		addrDecoder           util.AddressDecoder
 	}
 )
 
 // NewService creates a new relay service
-func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration, alwaysReset bool) (*Service, error) {
+func NewService(tv TransferValidator, recorder *Recorder, btcProcessor *BTCProcessor,
+	interval time.Duration, alwaysReset bool, addrDecoder util.AddressDecoder,
+) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
 		return nil, err
@@ -44,12 +48,20 @@ func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration
 		recorder:          recorder,
 		cache:             cache,
 		alwaysReset:       alwaysReset,
+		addrDecoder:       addrDecoder,
 	}
-	processor, err := dispatcher.NewRunner(interval, s.process)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create runner")
+	// TODO: move the implementation of s.process out of Service class
+	if btcProcessor != nil {
+		s.processor = btcProcessor
+		s.transferValidatorAddr = []byte{}
+	} else {
+		var err error
+		s.processor, err = dispatcher.NewRunner(interval, s.process)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create runner")
+		}
+		s.transferValidatorAddr = tv.Address().Bytes()
 	}
-	s.processor = processor
 
 	return s, nil
 }
@@ -75,8 +87,7 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	if s.transferValidator == nil {
 		return nil, errors.New("cannot accept new submission")
 	}
-	log.Printf("receive a witness from %x\n", w.Address)
-	transfer, err := UnmarshalTransferProto(s.transferValidator.Address(), w.Transfer)
+	transfer, err := UnmarshalTransferProto(s.transferValidatorAddr, w.Transfer, s.addrDecoder)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +98,7 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	if err := s.recorder.AddWitness(transfer, witness); err != nil {
 		return nil, err
 	}
+	log.Printf("received a transfer %s from witness %x\n", transfer.id.String(), witness.addr)
 	return &services.WitnessSubmissionResponse{
 		Id:      transfer.id.Bytes(),
 		Success: true,
@@ -179,7 +191,6 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 		response.Transfers[i] = &types.Transfer{
 			Cashier:   transfer.cashier.Bytes(),
 			Token:     transfer.token.Bytes(),
-			Index:     int64(transfer.index),
 			Sender:    transfer.sender.Bytes(),
 			Recipient: transfer.recipient.Bytes(),
 			Amount:    transfer.amount.String(),
@@ -188,6 +199,14 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 			GasPrice:  gasPrice,
 			Timestamp: timestamppb.New(transfer.timestamp),
 			TxSender:  transfer.txSender.Bytes(),
+		}
+		switch transfer.indexType {
+		case LegacyIndex:
+			response.Transfers[i].Index = transfer.index.Int64()
+		case BTCIndex:
+			response.Transfers[i].BtcIndex = transfer.index.String()
+		default:
+			return nil, errors.Errorf("unexpected index type %d", transfer.indexType)
 		}
 		response.Statuses[i] = s.assembleCheckResponse(transfer, witnesses)
 		if len(witnesses) == 0 && transfer.status == WaitingForWitnesses {
@@ -258,7 +277,10 @@ func (s *Service) process() error {
 	if err := s.confirmTransfers(); err != nil {
 		util.LogErr(err)
 	}
-	return s.submitTransfers()
+	if err := s.submitTransfers(); err != nil {
+		util.LogErr(err)
+	}
+	return nil
 }
 
 func (s *Service) confirmTransfers() error {

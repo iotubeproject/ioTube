@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package types;
+
+option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/types";
+
+message BTCTransaction {
+    bytes data = 1;
+}
+
+message TransactionNonces  {
+    string tx_hash = 1;
+    repeated MusigNonce nonces = 2;
+}
+
+message MusigNonce {
+    string tx_hash = 1;
+    uint64 txin_index = 2;
+    bytes pub_nonce = 3;
+}
+
+message TransactionWithCombinedNonces {
+    BTCTransaction tx = 1;
+    repeated bytes combined_nonces = 2;
+    repeated TransferMap transfer_map = 3;
+}
+
+message TransferMap {
+    uint64 vout = 1;
+    string transfer_id = 2;
+}
+
+message TransactionSignatures {
+    string tx_hash = 1;
+    repeated MusigPartialSignature signatures = 2;
+}
+
+message MusigPartialSignature {
+    string tx_hash = 1;
+    uint64 txin_index = 2;
+    bytes signature = 3;
+    bytes combined_nonce = 4;
+}

@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type (
@@ -32,6 +33,7 @@ type (
 		cashierMetaTableName string
 		transferTableName    string
 		tokenPairs           map[common.Address]common.Address
+		addrDecoder          util.AddressDecoder
 	}
 )
 
@@ -40,12 +42,14 @@ func NewRecorder(
 	store *db.SQLStore,
 	transferTableName string,
 	tokenPairs map[common.Address]common.Address,
+	addrDecoder util.AddressDecoder,
 ) *Recorder {
 	return &Recorder{
 		store:                store,
 		cashierMetaTableName: "cashier_meta",
 		transferTableName:    transferTableName,
 		tokenPairs:           tokenPairs,
+		addrDecoder:          addrDecoder,
 	}
 }
 
@@ -69,7 +73,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`token` varchar(42) NOT NULL,"+
 			"`tidx` bigint(20) NOT NULL,"+
 			"`sender` varchar(42) NOT NULL,"+
-			"`recipient` varchar(42) NOT NULL,"+
+			"`recipient` varchar(256) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
 			"`fee` varchar(78),"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
@@ -104,7 +108,11 @@ func (recorder *Recorder) Stop(ctx context.Context) error {
 }
 
 // AddTransfer creates a new transfer record
-func (recorder *Recorder) AddTransfer(tx *Transfer, status TransferStatus) error {
+func (recorder *Recorder) AddTransfer(at AbstractTransfer, status TransferStatus) error {
+	tx, ok := at.(*Transfer)
+	if !ok {
+		return errors.Errorf("invalid transfer type %T", at)
+	}
 	if err := recorder.validateID(tx.index); err != nil {
 		return err
 	}
@@ -118,7 +126,7 @@ func (recorder *Recorder) AddTransfer(tx *Transfer, status TransferStatus) error
 		tx.token.Hex(),
 		tx.index,
 		tx.sender.Hex(),
-		tx.recipient.Hex(),
+		tx.recipient.String(),
 		tx.amount.String(),
 		tx.fee.String(),
 		tx.blockHeight,
@@ -139,7 +147,11 @@ func (recorder *Recorder) AddTransfer(tx *Transfer, status TransferStatus) error
 	return nil
 }
 
-func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
+func (recorder *Recorder) UpsertTransfer(at AbstractTransfer) error {
+	tx, ok := at.(*Transfer)
+	if !ok {
+		return errors.Errorf("invalid transfer type %T", at)
+	}
 	if err := recorder.validateID(tx.index); err != nil {
 		return err
 	}
@@ -153,7 +165,7 @@ func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
 		tx.token.Hex(),
 		tx.index,
 		tx.sender.Hex(),
-		tx.recipient.Hex(),
+		tx.recipient.String(),
 		tx.amount.String(),
 		tx.fee.String(),
 		tx.blockHeight,
@@ -224,7 +236,11 @@ func (recorder *Recorder) UpdateSyncHeight(cashier string, height uint64) error 
 }
 
 // SettleTransfer marks a record as settled
-func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
+func (recorder *Recorder) SettleTransfer(at AbstractTransfer) error {
+	tx, ok := at.(*Transfer)
+	if !ok {
+		return errors.Errorf("invalid transfer type %T", at)
+	}
 	log.Printf("mark transfer %s as settled", tx.id.Hex())
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
@@ -238,11 +254,15 @@ func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
 		return err
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 // ConfirmTransfer marks a record as confirmed
-func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
+func (recorder *Recorder) ConfirmTransfer(at AbstractTransfer) error {
+	tx, ok := at.(*Transfer)
+	if !ok {
+		return errors.Errorf("invalid transfer type %T", at)
+	}
 	log.Printf("mark transfer %s as confirmed", tx.id.Hex())
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
@@ -257,20 +277,20 @@ func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
 		return err
 	}
 
-	return recorder.validateResult(result)
+	return validateResult(result)
 }
 
 // TransfersToSettle returns the list of transfers to confirm
-func (recorder *Recorder) TransfersToSettle() ([]*Transfer, error) {
+func (recorder *Recorder) TransfersToSettle() ([]AbstractTransfer, error) {
 	return recorder.transfers(SubmissionConfirmed)
 }
 
 // TransfersToSubmit returns the list of transfers to submit
-func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
+func (recorder *Recorder) TransfersToSubmit() ([]AbstractTransfer, error) {
 	return recorder.transfers(TransferReady)
 }
 
-func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
+func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
 			"SELECT cashier, token, tidx, sender, recipient, amount, fee, status, id, txSender "+
@@ -286,7 +306,7 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 	}
 	defer rows.Close()
 
-	var rec []*Transfer
+	var rec []AbstractTransfer
 	for rows.Next() {
 		tx := &Transfer{}
 		var cashier string
@@ -303,7 +323,10 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		tx.cashier = common.HexToAddress(cashier)
 		tx.token = common.HexToAddress(token)
 		tx.sender = common.HexToAddress(sender)
-		tx.recipient = common.HexToAddress(recipient)
+		tx.recipient, err = recorder.addrDecoder.DecodeString(recipient)
+		if err != nil {
+			return nil, err
+		}
 		if id.Valid {
 			tx.id = common.HexToHash(id.String)
 		}
@@ -333,7 +356,7 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 	return rec, nil
 }
 
-func (recorder *Recorder) Transfer(_id common.Hash) (*Transfer, error) {
+func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	row := recorder.store.DB().QueryRow(
 		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `status`, `id`, `txSender` FROM %s WHERE `id`=?", recorder.transferTableName),
 		_id.Hex(),
@@ -354,7 +377,11 @@ func (recorder *Recorder) Transfer(_id common.Hash) (*Transfer, error) {
 	tx.cashier = common.HexToAddress(cashier)
 	tx.token = common.HexToAddress(token)
 	tx.sender = common.HexToAddress(sender)
-	tx.recipient = common.HexToAddress(recipient)
+	var err error
+	tx.recipient, err = recorder.addrDecoder.DecodeString(recipient)
+	if err != nil {
+		return nil, err
+	}
 	if id.Valid {
 		tx.id = common.HexToHash(id.String)
 	}
@@ -406,7 +433,7 @@ func (recorder *Recorder) maxBlockHeight() (uint64, error) {
 	return 0, nil
 }
 
-func (recorder *Recorder) validateResult(res sql.Result) error {
+func validateResult(res sql.Result) error {
 	affected, err := res.RowsAffected()
 	if err != nil {
 		return err
