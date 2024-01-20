@@ -57,6 +57,12 @@ cashiers:
       # CTSI
       - token1: "io16ajfjch2hlm56vnhlwvs7g7aptnvx40ksyvrz5"
         token2: "0x30e68fACB9D4E04FEdc12A8Cc539639f90F40c63"
+      # ELA
+      - token1: "io18l9s83sftn2t727wa2qh0ze7c5jm5ru58832se"
+        token2: "0x77480e1E8441FAdf4D67dAb68249F08129d3dcA4"
+      # CRU
+      - token1: "io1mrm6dm4mudkau3sk9as0v9prysg5670vcx6rl8"
+        token2: "0x9c3af6ffccac8a4ccb31a4b769b84a517c6c13b5"
   - id: "iotex-to-heco"
     relayerURL: ":7002"
     cashierContractAddress: "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
