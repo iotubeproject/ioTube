@@ -60,3 +60,9 @@ cashiers:
       # CTSI
       - token2: "io16ajfjch2hlm56vnhlwvs7g7aptnvx40ksyvrz5"
         token1: "0x30e68fACB9D4E04FEdc12A8Cc539639f90F40c63"
+      # ELA
+      - token2: "io18l9s83sftn2t727wa2qh0ze7c5jm5ru58832se"
+        token1: "0x77480e1E8441FAdf4D67dAb68249F08129d3dcA4"
+      # CRU
+      - token2: "io1mrm6dm4mudkau3sk9as0v9prysg5670vcx6rl8"
+        token1: "0x9c3af6ffccac8a4ccb31a4b769b84a517c6c13b5"
