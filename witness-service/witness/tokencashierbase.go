@@ -147,7 +147,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		}
 	}
 	startHeight = startHeight + 1
-	confirmHeight, tipHeight, err := tc.calcConfirmHeight(startHeight, count)
+	confirmHeight, _, err := tc.calcConfirmHeight(startHeight, count)
 	if err != nil {
 		if tc.lastPullTimestamp.Add(3 * time.Minute).After(time.Now()) {
 			log.Printf("failed to get end height with start height %d, count %d: %+v\n", startHeight, confirmHeight, err)
@@ -169,9 +169,9 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		tc.lastPatrolBlockHeight = startHeight
 	} else {
 		// log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
-		transfers, err = tc.pullTransfers(startHeight, tipHeight)
+		transfers, err = tc.pullTransfers(startHeight, confirmHeight)
 		if err != nil {
-			return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, tipHeight)
+			return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, confirmHeight)
 		}
 	}
 	for _, transfer := range transfers {
