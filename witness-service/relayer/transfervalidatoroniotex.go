@@ -209,8 +209,10 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 			return StatusOnChainUnknown, err
 		}
 		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
-		if err := tv.sendBonus(transfer.recipient); err != nil {
-			log.Printf("failed to send bonus to %s\n", transfer.recipient)
+		if transfer.amount.Cmp(big.NewInt(0)) > 0 {
+			if err := tv.sendBonus(transfer.recipient); err != nil {
+				log.Printf("failed to send bonus to %s\n", transfer.recipient)
+			}
 		}
 
 		return StatusOnChainSettled, nil

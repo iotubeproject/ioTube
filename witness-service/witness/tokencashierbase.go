@@ -140,6 +140,9 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		count = 1
 	}
 	patrolSize := uint64(count) * 6
+	if patrolSize > 1000 {
+		patrolSize = 1000
+	}
 	if tc.lastPatrolBlockHeight == 0 && startHeight > patrolSize {
 		tc.lastPatrolBlockHeight = startHeight - patrolSize
 		if tc.lastPatrolBlockHeight < tc.startBlockHeight {
@@ -161,10 +164,10 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	var transfers []*Transfer
 	tc.lastPullTimestamp = time.Now()
 	if startHeight > tc.lastPatrolBlockHeight+patrolSize {
-		log.Printf("fetching events from block %d to %d for %s with patrol\n", tc.lastPatrolBlockHeight, confirmHeight, tc.id)
-		transfers, err = tc.pullTransfers(tc.lastPatrolBlockHeight, confirmHeight)
+		log.Printf("fetching events from block %d to %d for %s with patrol\n", tc.lastPatrolBlockHeight, startHeight, tc.id)
+		transfers, err = tc.pullTransfers(tc.lastPatrolBlockHeight, startHeight)
 		if err != nil {
-			return errors.Wrapf(err, "failed to pull transfers from %d to %d with patrol", tc.lastPatrolBlockHeight, confirmHeight)
+			return errors.Wrapf(err, "failed to pull transfers from %d to %d with patrol", tc.lastPatrolBlockHeight, startHeight)
 		}
 		tc.lastPatrolBlockHeight = startHeight
 	} else {
