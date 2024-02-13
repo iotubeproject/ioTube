@@ -387,19 +387,18 @@ func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 	var row *sql.Row
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", recorder.transferTableName)
 	params := []interface{}{}
-	if len(opts) > 0 {
-		conditions := []string{}
-		for _, opt := range opts {
-			condition, ps := opt()
-			if condition == "" {
-				continue
-			}
-			conditions = append(conditions, condition)
-			params = append(params, ps...)
+	opts = append(opts, ExcludeAmountZeroOption())
+	conditions := []string{}
+	for _, opt := range opts {
+		condition, ps := opt()
+		if condition == "" {
+			continue
 		}
-		if len(conditions) > 0 {
-			query += " WHERE " + strings.Join(conditions, " AND ")
-		}
+		conditions = append(conditions, condition)
+		params = append(params, ps...)
+	}
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
 	row = recorder.store.DB().QueryRow(query, params...)
 	var count int
@@ -410,6 +409,12 @@ func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 }
 
 type TransferQueryOption func() (string, []interface{})
+
+func ExcludeAmountZeroOption() TransferQueryOption {
+	return func() (string, []interface{}) {
+		return "amount <> '0'", []interface{}{}
+	}
+}
 
 func ExcludeTokenQueryOption(token common.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
@@ -479,19 +484,18 @@ func (recorder *Recorder) Transfers(
 	}
 	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
 	params := []interface{}{}
-	if len(queryOpts) > 0 {
-		conditions := []string{}
-		for _, opt := range queryOpts {
-			condition, ps := opt()
-			if condition == "" {
-				continue
-			}
-			conditions = append(conditions, condition)
-			params = append(params, ps...)
+	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
+	conditions := []string{}
+	for _, opt := range queryOpts {
+		condition, ps := opt()
+		if condition == "" {
+			continue
 		}
-		if len(conditions) > 0 {
-			query += " WHERE " + strings.Join(conditions, " AND ")
-		}
+		conditions = append(conditions, condition)
+		params = append(params, ps...)
+	}
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
 	if desc {
 		query += fmt.Sprintf(" ORDER BY `%s` DESC", orderBy)

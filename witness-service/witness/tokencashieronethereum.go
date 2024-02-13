@@ -45,18 +45,17 @@ func NewTokenCashierOnEthereum(
 				return 0, 0, errors.Wrap(err, "failed to query tip block header")
 			}
 			tipHeight := tipHeader.Number.Uint64()
-			confirmHeight := tipHeight - uint64(confirmBlockNumber)
-			if startHeight > confirmHeight {
-				return confirmHeight, tipHeight, nil
-			}
 			if count == 0 {
 				count = 1
 			}
-			endHeight := startHeight + uint64(count) - 1
-			if endHeight > confirmHeight {
-				endHeight = confirmHeight
+			if tipHeight <= uint64(confirmBlockNumber) {
+				return 0, 0, errors.Errorf("tip height %d is smaller than confirm block number %d", tipHeight, confirmBlockNumber)
 			}
-			return endHeight, tipHeight, nil
+			endHeight := startHeight + uint64(count) - 1
+			if tipHeight < endHeight {
+				endHeight = tipHeight
+			}
+			return tipHeight - uint64(confirmBlockNumber), endHeight, nil
 		},
 		func(startHeight uint64, endHeight uint64) ([]*Transfer, error) {
 			logs, err := ethereumClient.FilterLogs(context.Background(), ethereum.FilterQuery{
