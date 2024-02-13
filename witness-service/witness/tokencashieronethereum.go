@@ -55,6 +55,7 @@ func NewTokenCashierOnEthereum(
 			if tipHeight < endHeight {
 				endHeight = tipHeight
 			}
+			log.Printf(">> calculate heights << start height: %d, count: %d, end height: %d\n", startHeight, count, endHeight)
 			return tipHeight - uint64(confirmBlockNumber), endHeight, nil
 		},
 		func(startHeight uint64, endHeight uint64) ([]*Transfer, error) {
