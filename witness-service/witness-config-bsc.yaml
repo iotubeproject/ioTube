@@ -1,7 +1,7 @@
 chain: "bsc"
 grpcPort: 9086
 grpcProxyPort: 9087
-interval: 1m
+interval: 30s
 batchSize: 100
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
