@@ -7,4 +7,6 @@
 1. create a working path at `~/iotex-witness/` with `~/iotex-witness/etc`. 
 2. copy `ioTube/witness-service/.env.template` to `~/iotex-witness/etc/.env`, and set `RELAYER_URL` and `WITNESS_PRIVATE_KEY`
 3. `cd ioTube/witness-service/ && ./start_witness.sh` to build and start service.
-4. [optional, recommended] update `clientURL` to your own RPC in `witness-config-[chainname].secret.yaml` （currently eth, bsc, matic, iotex are in effective.)
+4. update `witness-config-[chainname].secret.yaml`  （currently eth, bsc, matic, iotex are in effective.):  
+(a) `startBlockHeight` to the tip of the blockchain. (only fetch new data onwards.)
+(b) `clientURL` to your own RPC
