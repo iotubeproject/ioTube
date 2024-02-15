@@ -1,7 +1,7 @@
 chain: "matic"
 grpcPort: 9084
 grpcProxyPort: 9085
-interval: 1m
+interval: 20s
 batchSize: 100
 confirmBlockNumber: 255
 database:
