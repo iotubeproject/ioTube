@@ -52,7 +52,7 @@ func NewTokenCashier(
 			if endHeight > tipHeight {
 				endHeight = tipHeight
 			}
-			return endHeight, tipHeight, nil
+			return endHeight, endHeight, nil
 		},
 		func(startHeight uint64, endHeight uint64) ([]*Transfer, error) {
 			response, err := iotexClient.API().GetLogs(context.Background(), &iotexapi.GetLogsRequest{
