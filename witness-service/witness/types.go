@@ -61,6 +61,7 @@ type (
 		Amount() *big.Int
 		ID() ([]byte, error)
 		SetID(common.Hash)
+		Status() TransferStatus
 		BlockHeight() uint64
 		DataToSign() []byte
 		ToTypesTransfer() *types.Transfer

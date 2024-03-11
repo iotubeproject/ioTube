@@ -70,9 +70,10 @@ type Configuration struct {
 		MinTipFee               uint64 `json:"minTipFee" yaml:"minTipFee"`
 	} `json:"cashiers" yaml:"cashiers"`
 	BitcoinConfig struct {
-		RPCHost string `json:"rpcHost" yaml:"rpcHost"`
-		RPCUser string `json:"rpcUser" yaml:"rpcUser"`
-		RPCPass string `json:"rpcPass" yaml:"rpcPass"`
+		RPCHost   string `json:"rpcHost" yaml:"rpcHost"`
+		RPCUser   string `json:"rpcUser" yaml:"rpcUser"`
+		RPCPass   string `json:"rpcPass" yaml:"rpcPass"`
+		EnableTLS bool   `json:"enableTLS" yaml:"enableTLS"`
 	} `json:"bitcoinConfig" yaml:"bitcoinConfig"`
 }
 
@@ -222,7 +223,7 @@ func main() {
 					User:         cfg.BitcoinConfig.RPCUser,
 					Pass:         cfg.BitcoinConfig.RPCPass,
 					HTTPPostMode: true,
-					// DisableTLS:   true,
+					DisableTLS:   !cfg.BitcoinConfig.EnableTLS,
 				}, nil)
 				if err != nil {
 					log.Fatal(err)
@@ -257,7 +258,6 @@ func main() {
 				log.Fatalf("failed to create cashier %v\n", err)
 			}
 			cashiers = append(cashiers, cashier)
-
 		}
 	case "heco", "bsc", "matic", "polis":
 		// heco and bsc are identical to ethereum

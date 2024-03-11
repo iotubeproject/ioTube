@@ -39,6 +39,8 @@ type BTCValidator struct {
 
 	noncesSet *lru.Cache[chainhash.Hash, map[uint64]*musig2.Nonces]
 	sigsCache *lru.Cache[chainhash.Hash, map[uint64]*musig2.PartialSignature]
+	// TODO: persist
+	signedTransfer *lru.Cache[common.Hash, util.NonceID]
 }
 
 const (
@@ -60,14 +62,19 @@ func NewBTCTransferValidator(pvk *ecdsa.PrivateKey, btcClient *rpcclient.Client,
 	if err != nil {
 		log.Fatalln(err)
 	}
+	signedTransferLRU, err := lru.New[common.Hash, util.NonceID](100 * lruSize)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	bv := &BTCValidator{
-		privateKey: secpPvk,
-		relayerURL: relayerURL,
-		btcClient:  btcClient,
-		recorder:   recorder,
-		noncesSet:  noncesSetLRU,
-		sigsCache:  sigsCacheLRU,
+		privateKey:     secpPvk,
+		relayerURL:     relayerURL,
+		btcClient:      btcClient,
+		recorder:       recorder,
+		noncesSet:      noncesSetLRU,
+		sigsCache:      sigsCacheLRU,
+		signedTransfer: signedTransferLRU,
 	}
 
 	if bv.processor, err = dispatcher.NewRunner(processInterval, bv.process); err != nil {
@@ -97,7 +104,6 @@ func (b *BTCValidator) process() error {
 }
 
 func (b *BTCValidator) SyncMusigNonces() error {
-	log.Println("BTC Validator Syncing MusigNonces...")
 	txs, err := b.fetchUnsignedBTCTransactionsWithoutNonces()
 	if err != nil {
 		return err
@@ -220,12 +226,18 @@ func (b *BTCValidator) SignBTCTransactions() error {
 	if err != nil {
 		return err
 	}
+	if len(txs) == 0 {
+		return nil
+	}
 	log.Printf("BTC Validator Signing %d btc transactions\n", len(txs))
-	sigs, err := b.muSig2(txs, nonceMap, transferMap, pubkeys)
+	sigs, signedTsf, err := b.muSig2(txs, nonceMap, transferMap, pubkeys)
 	if err != nil {
 		return err
 	}
-	return b.submitMusigSigs(sigs)
+	if err := b.submitMusigSigs(sigs); err != nil {
+		return err
+	}
+	return b.addSignedTransfer(signedTsf)
 }
 
 func (b *BTCValidator) fetchUnsignedBTCTransactionsWithNonces() (
@@ -286,17 +298,24 @@ func (b *BTCValidator) fetchUnsignedBTCTransactionsWithNonces() (
 
 func (b *BTCValidator) muSig2(txs []*wire.MsgTx,
 	combinedNonceMap map[util.NonceID][musig2.PubNonceSize]byte,
-	transferMap map[util.NonceID]common.Hash, pubKeys []*btcec.PublicKey,
-) ([]*types.TransactionSignatures, error) {
-	res := make([]*types.TransactionSignatures, 0)
+	transferMap map[util.NonceID]common.Hash,
+	pubKeys []*btcec.PublicKey,
+) ([]*types.TransactionSignatures,
+	map[common.Hash]util.NonceID,
+	error) {
+	var (
+		sigResp   = make([]*types.TransactionSignatures, 0)
+		signedTsf = make(map[common.Hash]util.NonceID)
+	)
 	for _, msgTx := range txs {
 		prevOutputFetcher, err := util.NewPrevOutFetcher(msgTx, b.btcClient)
 		if err != nil {
 			log.Printf("failed to create prev output fetcher for transaction %s, error %+v\n", msgTx.TxHash().String(), err)
-			return nil, err
+			return nil, nil, err
 		}
 
-		if !b.validateTx(msgTx, prevOutputFetcher, transferMap) {
+		validatedTsfs, ok := b.validateTx(msgTx, prevOutputFetcher, transferMap)
+		if !ok {
 			log.Printf("invalid transaction %s\n", msgTx.TxHash().String())
 			continue
 		}
@@ -351,7 +370,7 @@ func (b *BTCValidator) muSig2(txs []*wire.MsgTx,
 			sig := sigMap[uint64(j)]
 			var buf bytes.Buffer
 			if err := sig.Encode(&buf); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			sigs = append(sigs, &types.MusigPartialSignature{
 				TxHash:        txHash.String(),
@@ -362,13 +381,16 @@ func (b *BTCValidator) muSig2(txs []*wire.MsgTx,
 		}
 		if !failedFlag {
 			log.Printf("transaction %s is signed\n", txHash.String())
-			res = append(res, &types.TransactionSignatures{
+			sigResp = append(sigResp, &types.TransactionSignatures{
 				TxHash:     txHash.String(),
 				Signatures: sigs,
 			})
+			for _, nonceID := range validatedTsfs {
+				signedTsf[transferMap[nonceID]] = nonceID
+			}
 		}
 	}
-	return res, nil
+	return sigResp, signedTsf, nil
 }
 
 // TODO: move to config
@@ -380,53 +402,71 @@ func (b *BTCValidator) validateTx(
 	tx *wire.MsgTx,
 	prevOutputFetcher *txscript.MultiPrevOutFetcher,
 	transferMap map[util.NonceID]common.Hash,
-) bool {
-	if len(tx.TxOut) != len(transferMap) && len(tx.TxOut) != len(transferMap)+1 {
-		log.Printf("invalid transaction %s, txout length %d, transferMap length %d\n", tx.TxHash().String(), len(tx.TxOut), len(transferMap))
-		return false
-	}
-	var totalSatoshiOut uint64
+) ([]util.NonceID, bool) {
+	var (
+		totalSatoshiOut       uint64
+		changeCount           uint32 = 0
+		validatedTransferIdxs        = make([]util.NonceID, 0)
+	)
 	for idx, txOut := range tx.TxOut {
 		nonceID := util.NonceIDFromTx(tx.TxHash(), uint64(idx))
 		if transferID, exist := transferMap[nonceID]; exist {
-			// validate amount matching transfers in the local db
 			tsf, err := b.recorder.Transfer(transferID)
 			if err != nil {
 				log.Printf("failed to get transfer %s, error %+v\n", transferID.String(), err)
-				return false
+				return nil, false
 			}
+			if tsf.Status() != SubmissionConfirmed {
+				log.Printf("invalid transfer %s, status %s\n", transferID.String(), tsf.Status())
+				return nil, false
+			}
+			if transferIdx, exist := b.signedTransfer.Get(transferID); exist {
+				if nonceID != transferIdx {
+					log.Printf("invalid transfer %s, nonceID %d, signed nonceID %d\n", transferID.String(), nonceID, transferIdx)
+					return nil, false
+				}
+			}
+			// validate amount matching transfers in the local db
 			if tsf.Amount().Cmp(big.NewInt(txOut.Value)) != 0 {
 				log.Printf("invalid transaction %s, txout value %d, transfer amount %d\n", tx.TxHash().String(), txOut.Value, tsf.Amount())
-				return false
+				return nil, false
 			}
 			// validate dest matching transfers in the local db
 			addr, ok := tsf.Recipient().Address().(btcutil.Address)
 			if !ok {
 				log.Printf("invalid address type %T\n", tsf.Recipient().Address())
-				return false
+				return nil, false
 			}
 			pkscript, err := txscript.PayToAddrScript(addr)
 			if err != nil {
 				log.Printf("failed to get pkscript for address %s, error %+v\n", addr.String(), err)
-				return false
+				return nil, false
 			}
 			if !bytes.Equal(pkscript, txOut.PkScript) {
 				log.Printf("invalid transaction %s, txout pkscript %s, transfer pkscript %s\n", tx.TxHash().String(), txOut.PkScript, pkscript)
-				return false
+				return nil, false
 			}
+			validatedTransferIdxs = append(validatedTransferIdxs, nonceID)
 		} else {
 			// validate the change back to the sender
 			if len(tx.TxIn) < 1 {
-				return false
+				return nil, false
 			}
 			prevTxOut := prevOutputFetcher.FetchPrevOutput(tx.TxIn[0].PreviousOutPoint)
 			if !bytes.Equal(prevTxOut.PkScript, txOut.PkScript) {
 				log.Printf("invalid transaction %s, txout pkscript %s, prevTxOut pkscript %s\n", tx.TxHash().String(), txOut.PkScript, prevTxOut.PkScript)
-				return false
+				return nil, false
 			}
+			changeCount++
 		}
 		totalSatoshiOut += uint64(txOut.Value)
 	}
+	// validate one change back to the sender at most
+	if changeCount > 1 {
+		log.Printf("invalid transaction %s, txout length %d, transferMap length %d\n", tx.TxHash().String(), len(tx.TxOut), len(transferMap))
+		return nil, false
+	}
+
 	// validate the reasonable miner fee
 	var totalSatoshiIn uint64
 	for _, txIn := range tx.TxIn {
@@ -437,10 +477,10 @@ func (b *BTCValidator) validateTx(
 	FeePerKB := txFeeInSatoshi * 1000 / uint64(mempool.GetTxVirtualSize(btcutil.NewTx(tx)))
 	if FeePerKB > uint64(_maxTxFeeRate) {
 		log.Printf("invalid transaction %s, fee per kb %d\n", tx.TxHash().String(), FeePerKB)
-		return false
+		return nil, false
 	}
 
-	return true
+	return validatedTransferIdxs, true
 }
 
 func (b *BTCValidator) submitMusigSigs(sigs []*types.TransactionSignatures) error {
@@ -468,4 +508,14 @@ func (b *BTCValidator) submitMusigSigs(sigs []*types.TransactionSignatures) erro
 		Signature: sig,
 	})
 	return err
+}
+
+func (b *BTCValidator) addSignedTransfer(tsf map[common.Hash]util.NonceID) error {
+	for k, v := range tsf {
+		if b.signedTransfer.Contains(k) {
+			log.Panicln("duplicated signed transfer")
+		}
+		b.signedTransfer.Add(k, v)
+	}
+	return nil
 }

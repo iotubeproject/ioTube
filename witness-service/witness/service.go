@@ -106,8 +106,6 @@ func (s *service) sign(data []byte) (common.Hash, common.Address, []byte, error)
 }
 
 func (s *service) process() error {
-	// DEBUG
-	log.Println("Processing fired!")
 	for _, cashier := range s.cashiers {
 		if err := cashier.PullTransfers(s.batchSize); err != nil {
 			return errors.Wrap(err, "failed to pull transfers")

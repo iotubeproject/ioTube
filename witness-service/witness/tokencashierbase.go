@@ -57,7 +57,7 @@ type (
 		start                  startStopFunc
 		stop                   startStopFunc
 	}
-	calcConfirmHeightFunc func(startHeight uint64, count uint16) (uint64, uint64, uint64, error)
+	calcConfirmHeightFunc func(startHeight uint64, count uint16) (uint64, uint64, error)
 	pullTransfersFunc     func(startHeight uint64, endHeight uint64) ([]AbstractTransfer, error)
 	hasEnoughBalanceFunc  func(token common.Address, amount *big.Int) bool
 	startStopFunc         func(context.Context) error
@@ -159,7 +159,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		}
 		return errors.Wrapf(err, "failed to get end height and tip height with start height %d, count %d", startHeight, count)
 	}
-	if targetHeight < startHeight {
+	if confirmHeight < startHeight {
 		return errors.Wrapf(err, "failed to get end height with start height %d, count %d, confirm height %d", startHeight, count, confirmHeight)
 	}
 	var transfers []AbstractTransfer

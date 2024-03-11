@@ -84,9 +84,6 @@ func (s *Service) Stop(ctx context.Context) error {
 
 // Submit accepts a submission of witness
 func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
-	if s.transferValidator == nil {
-		return nil, errors.New("cannot accept new submission")
-	}
 	transfer, err := UnmarshalTransferProto(s.transferValidatorAddr, w.Transfer, s.addrDecoder)
 	if err != nil {
 		return nil, err

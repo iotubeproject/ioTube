@@ -40,10 +40,10 @@ func NewTokenCashierOnEthereum(
 		relayerURL,
 		validatorContractAddr.Bytes(),
 		startBlockHeight,
-		func(startHeight uint64, count uint16) (uint64, uint64, uint64, error) {
+		func(startHeight uint64, count uint16) (uint64, uint64, error) {
 			tipHeader, err := ethereumClient.HeaderByNumber(context.Background(), nil)
 			if err != nil {
-				return 0, 0, 0, errors.Wrap(err, "failed to query tip block header")
+				return 0, 0, errors.Wrap(err, "failed to query tip block header")
 			}
 			tipHeight := tipHeader.Number.Uint64()
 			if count == 0 {

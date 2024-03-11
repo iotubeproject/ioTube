@@ -173,7 +173,6 @@ func (p *BTCProcessor) Close() error {
 }
 
 func (p *BTCProcessor) process() error {
-	fmt.Println("btc process fired!")
 	if err := p.ConfirmTransfers(); err != nil {
 		util.LogErr(err)
 	}

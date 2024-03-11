@@ -70,14 +70,14 @@ func NewTokenCashier(
 		relayerURL,
 		validatorContractAddr,
 		startBlockHeight,
-		func(startHeight uint64, count uint16) (uint64, uint64, uint64, error) {
+		func(startHeight uint64, count uint16) (uint64, uint64, error) {
 			chainMetaResponse, err := iotexClient.API().GetChainMeta(context.Background(), &iotexapi.GetChainMetaRequest{})
 			if err != nil {
-				return 0, 0, 0, err
+				return 0, 0, err
 			}
 			tipHeight := chainMetaResponse.ChainMeta.Height
 			if startHeight > tipHeight {
-				return 0, 0, 0, errors.Errorf("query height %d is larger than chain tip height %d", startHeight, tipHeight)
+				return 0, 0, errors.Errorf("query height %d is larger than chain tip height %d", startHeight, tipHeight)
 			}
 			if count == 0 {
 				count = 1
@@ -158,6 +158,7 @@ func NewTokenCashier(
 					case 0:
 						log.Printf("\tAmount %d is the same as real amount %d\n", amount, realAmount)
 					}
+
 					transfers = append(transfers, &Transfer{
 						cashier:     cashier,
 						token:       tokenAddr,

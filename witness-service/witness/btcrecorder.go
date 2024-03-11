@@ -8,7 +8,6 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -99,14 +98,6 @@ func (recorder *BTCRecorder) AddTransfer(at AbstractTransfer, status TransferSta
 		return errors.Errorf("invalid transfer type %T", at)
 	}
 
-	// DEBUG
-	testnetParam := &chaincfg.TestNet3Params
-	senderAddr, _, err := util.TaprootAddrFromPubkey(tx.sender, testnetParam)
-	if err != nil {
-		return err
-	}
-	fmt.Println("sender", senderAddr.EncodeAddress(), "recipient", tx.recipient.Hex())
-
 	query := fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `version`, `sender`, `recipient`, `amount`, `fee`,`status`, `blockHeight`, `txHash`, `vout`, `pkScript`, `metadata`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
@@ -144,14 +135,6 @@ func (recorder *BTCRecorder) UpsertTransfer(at AbstractTransfer) error {
 	if !ok {
 		return errors.Errorf("invalid transfer type %T", at)
 	}
-
-	// DEBUG
-	testnetParam := &chaincfg.TestNet3Params
-	senderAddr, _, err := util.TaprootAddrFromPubkey(tx.sender, testnetParam)
-	if err != nil {
-		return err
-	}
-	fmt.Println("sender", senderAddr.EncodeAddress(), "recipient", tx.recipient.Hex())
 
 	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `version`, `sender`, `recipient`, `amount`, `fee`,`status`, `blockHeight`, `txHash`, `vout`, `pkScript`, `metadata`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(

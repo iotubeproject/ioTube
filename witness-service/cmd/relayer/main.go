@@ -63,6 +63,7 @@ type Configuration struct {
 		RPCHost                    string   `json:"rpcHost" yaml:"rpcHost"`
 		RPCUser                    string   `json:"rpcUser" yaml:"rpcUser"`
 		RPCPass                    string   `json:"rpcPass" yaml:"rpcPass"`
+		EnableTLS                  bool     `json:"enableTLS" yaml:"enableTLS"`
 		BTCRawTransactionTableName string   `json:"btcRawTransactionTableName" yaml:"btcRawTransactionTableName"`
 		TransferMappingTableName   string   `json:"transferMappingTableName" yaml:"transferMappingTableName"`
 		WitnessPubkey              []string `json:"witnessPubkey" yaml:"witnessPubkey"`
@@ -236,7 +237,7 @@ func main() {
 			User:         cfg.BitcoinConfig.RPCUser,
 			Pass:         cfg.BitcoinConfig.RPCPass,
 			HTTPPostMode: true,
-			// DisableTLS:   true,
+			DisableTLS:   !cfg.BitcoinConfig.EnableTLS,
 		}, nil)
 		if err != nil {
 			log.Fatal(err)

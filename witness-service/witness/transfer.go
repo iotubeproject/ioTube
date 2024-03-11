@@ -108,6 +108,10 @@ func (t *Transfer) Amount() *big.Int {
 	return t.amount
 }
 
+func (t *Transfer) Status() TransferStatus {
+	return t.status
+}
+
 // bTCTransfer defines a BTC record
 type bTCTransfer struct {
 	version     uint32
@@ -198,4 +202,8 @@ func (t *bTCTransfer) Recipient() util.Address {
 
 func (t *bTCTransfer) Amount() *big.Int {
 	return big.NewInt(int64(t.amount))
+}
+
+func (t *bTCTransfer) Status() TransferStatus {
+	return t.status
 }

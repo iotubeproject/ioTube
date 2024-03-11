@@ -369,7 +369,7 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 		tx.txSender = common.HexToAddress(txSender.String)
 	}
 	var err error
-	tx.recipient, err = util.NewETHAddressDecoder().DecodeString(recipient)
+	tx.recipient, err = recorder.addrDecoder.DecodeString(recipient)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode recipient")
 	}

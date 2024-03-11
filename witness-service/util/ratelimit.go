@@ -27,12 +27,18 @@ func NewDailyResetCounter(limit uint64) *DailyResetCounter {
 
 // Start starts the counter incrementing and resetting.
 func (d *DailyResetCounter) Start() {
+	if d == nil {
+		return
+	}
 	d.wg.Add(1)
 	go d.resetCounter()
 }
 
 // Stop stops the counter and waits for goroutines to finish.
 func (d *DailyResetCounter) Stop() {
+	if d == nil {
+		return
+	}
 	close(d.stop)
 	d.wg.Wait()
 }
