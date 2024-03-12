@@ -168,3 +168,13 @@ cashiers:
       # DATA
       - token1: "io1rt3y6jfg4ph64txhrn6pf54n5jv6mv5mjlp37u"
         token2: "0x72F30B99C6bc3681508950b47A50fe0b18eF4BE6"
+  - id: "iotex-to-bitcoin-testnet"
+    relayerURL: ":7006"
+    cashierContractAddress: ""
+    startBlockHeight:
+    transferTableName: "iotex_to_bitcoin_testnet_transfers"
+    supportBitcoinRecipient: true
+    tokenPairs:
+      # tbtc
+      - token1: ""
+        token2: ""

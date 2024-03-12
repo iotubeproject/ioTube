@@ -87,6 +87,19 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-matic.yaml
+  
+  bitcoin-testnet-relayer:
+    container_name: bitcoin-testnet-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7006:7006
+      - 8006:8006
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-bitcoin-testnet.yaml:/etc/iotube-relayer/relayer-config-bitcoin-testnet.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-bitcoin-testnet.yaml
 
   cron:
     image: schnitzler/mysqldump

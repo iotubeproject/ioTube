@@ -1,0 +1,19 @@
+chain: "bitcoin-testnet"
+interval: 1m
+grpcPort: 7006
+grpcProxyPort: 8006
+slackWebHook: ""
+database:
+  uri: ""
+  driver: "mysql"
+transferTableName: "bitcoin_testnet_transfers"
+witnessTableName: "bitcoin_testnet_witnesses"
+bitcoinConfig:
+  rpcHost: ""
+  rpcUser: ""
+  rpcPass: ""
+  enableTLS: false
+  btcRawTransactionTableName: "bitcoin_testnet_raw_transactions"
+  transferMappingTableName: "bitcoin_testnet_transfer_mapping"
+  witnessPubkey:
+    - ""

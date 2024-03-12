@@ -90,6 +90,19 @@ services:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
       RELAYER_URL: ${RELAYER_URL}
 
+  bitcoin-testnet-witness:
+    container_name: bitcoin-testnet-witness
+    image: witness:latest
+    restart: on-failure
+    volumes:
+      - $IOTEX_WITNESS/etc/witness-config-bitcoin-testnet.yaml:/etc/iotube-witness/witness-config-bitcoin-testnet.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-bitcoin-testnet.secret.yaml:/etc/iotube-witness/witness-config-bitcoin-testnet.secret.yaml:ro
+    network_mode: host
+    command: witness -config=/etc/iotube-witness/witness-config-bitcoin-testnet.yaml -secret=/etc/iotube-witness/witness-config-bitcoin-testnet.secret.yaml
+    environment:
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+      RELAYER_URL: ${RELAYER_URL}
+
   cron:
     image: schnitzler/mysqldump
     restart: always
