@@ -1,0 +1,19 @@
+chain: "bitcoin-testnet"
+interval: 30s
+grpcPort: 7006
+grpcProxyPort: 8006
+slackWebHook: ""
+database:
+  uri: ""
+  driver: "mysql"
+transferTableName: "iotex_transfers"
+witnessTableName: "iotex_witnesses"
+bitcoinConfig:
+  rpcHost: ""
+  rpcUser: ""
+  rpcPass: ""
+  enableTLS: false
+  btcRawTransactionTableName: "bitcoin_raw_transactions"
+  transferMappingTableName: "bitcoin_transfer_mapping"
+  witnessPubkey:
+    - ""

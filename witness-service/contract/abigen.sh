@@ -16,3 +16,4 @@ abigen --abi $DIR/TokenCashier.abi --bin $DIR/TokenCashier.bin --pkg contract --
 abigen --abi $DIR/TokenList.abi --bin $DIR/TokenList.bin --pkg contract --type TokenList --out $DIR/tokenlist.go
 abigen --abi $DIR/ShadowToken.abi --bin $DIR/ShadowToken.bin --pkg contract --type ShadowToken --out $DIR/shadowtoken.go
 abigen --abi $DIR/addresslist.abi --bin $DIR/addresslist.bin --pkg contract --type AddressList --out $DIR/addresslist.go
+abigen --abi $DIR/TokenCashierBitcoin.abi --pkg contract --type TokenCashierBitcoin --out $DIR/tokencashierbitcoin.go

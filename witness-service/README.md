@@ -9,3 +9,9 @@
 3. copy .env.template `~/iotex-witness/etc/.env`, and set values
 4. set `clientURL` in `witness-config-ethereum.secret.yaml`
 5. run `./start_witness.sh` to build and start running services.
+
+## How to setup a Bitcoin node for Bitcoin Bridge
+
+1. Follow the instructions in https://bitcoin.org/en/full-node
+
+2. connect ioTube service with the node by filling `rpcHost`, `rpcUser`, `rpcPass`, `enableTLS` fields in bitcoinConfig

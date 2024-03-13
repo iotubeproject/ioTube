@@ -1,0 +1,18 @@
+chain: "bitcoin-testnet"
+grpcPort: 9093
+grpcProxyPort: 9094
+interval: 30s
+batchSize: 10
+database:
+  uri: ""
+  driver: "mysql"
+cashiers:
+  - id: "bitcoin-to-iotex"
+    relayerURL: ":7001"
+    startBlockHeight:
+    validatorContractAddress: ""
+    cashierContractAddress: ""
+    tokenSafeContractAddress: ""
+    transferTableName: "bitcoin_transfers"
+    minTipFee: 100
+confirmBlockNumber: 3

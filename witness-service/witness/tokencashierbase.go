@@ -8,6 +8,7 @@ package witness
 
 import (
 	"context"
+	"encoding/hex"
 	"log"
 	"math/big"
 	"strings"
@@ -43,9 +44,9 @@ func init() {
 type (
 	tokenCashierBase struct {
 		id                     string
-		recorder               *Recorder
+		recorder               AbstractRecorder
 		relayerURL             string
-		validatorContractAddr  common.Address
+		validatorContractAddr  []byte
 		startBlockHeight       uint64
 		lastProcessBlockHeight uint64
 		lastPatrolBlockHeight  uint64
@@ -57,16 +58,16 @@ type (
 		stop                   startStopFunc
 	}
 	calcConfirmHeightFunc func(startHeight uint64, count uint16) (uint64, uint64, error)
-	pullTransfersFunc     func(startHeight uint64, endHeight uint64) ([]*Transfer, error)
+	pullTransfersFunc     func(startHeight uint64, endHeight uint64) ([]AbstractTransfer, error)
 	hasEnoughBalanceFunc  func(token common.Address, amount *big.Int) bool
 	startStopFunc         func(context.Context) error
 )
 
 func newTokenCashierBase(
 	id string,
-	recorder *Recorder,
+	recorder AbstractRecorder,
 	relayerURL string,
-	validatorContractAddr common.Address,
+	validatorContractAddr []byte,
 	startBlockHeight uint64,
 	calcConfirmHeight calcConfirmHeightFunc,
 	pullTransfers pullTransfersFunc,
@@ -104,7 +105,7 @@ func (tc *tokenCashierBase) Stop(ctx context.Context) error {
 	return tc.recorder.Stop(ctx)
 }
 
-func (tc *tokenCashierBase) GetRecorder() *Recorder {
+func (tc *tokenCashierBase) GetRecorder() AbstractRecorder {
 	return tc.recorder
 }
 
@@ -161,7 +162,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	if confirmHeight < startHeight {
 		return errors.Wrapf(err, "failed to get end height with start height %d, count %d, confirm height %d", startHeight, count, confirmHeight)
 	}
-	var transfers []*Transfer
+	var transfers []AbstractTransfer
 	tc.lastPullTimestamp = time.Now()
 	if startHeight > tc.lastPatrolBlockHeight+patrolSize {
 		log.Printf("fetching events from block %d to %d for %s with patrol\n", tc.lastPatrolBlockHeight, startHeight, tc.id)
@@ -179,7 +180,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		}
 	}
 	for _, transfer := range transfers {
-		if transfer.blockHeight <= confirmHeight {
+		if transfer.BlockHeight() <= confirmHeight {
 			if err := tc.recorder.UpsertTransfer(transfer); err != nil {
 				return errors.Wrap(err, "failed to upsert transfer")
 			}
@@ -200,7 +201,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	return nil
 }
 
-func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error {
+func (tc *tokenCashierBase) SubmitTransfers(sign func([]byte) (common.Hash, common.Address, []byte, error)) error {
 	transfersToSubmit, err := tc.recorder.TransfersToSubmit()
 	if err != nil {
 		return err
@@ -212,28 +213,20 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
 	for _, transfer := range transfersToSubmit {
-		if !tc.hasEnoughBalance(transfer.token, transfer.amount) {
-			return errors.Errorf("not enough balance for token %s", transfer.token)
+		if !tc.hasEnoughBalance(transfer.Token(), transfer.Amount()) {
+			return errors.Errorf("not enough balance for token %s", transfer.Token())
 		}
-		id, witness, signature, err := sign(transfer, tc.validatorContractAddr)
+		data2Sign := append(tc.validatorContractAddr, transfer.DataToSign()...)
+		id, witness, signature, err := sign(data2Sign)
 		if err != nil {
 			return err
 		}
-		transfer.id = id
+		transfer.SetID(id)
 		if signature != nil {
 			response, err := relayer.Submit(
 				context.Background(),
 				&types.Witness{
-					Transfer: &types.Transfer{
-						Cashier:   transfer.cashier.Bytes(),
-						Token:     transfer.coToken.Bytes(),
-						Index:     int64(transfer.index),
-						Sender:    transfer.sender.Bytes(),
-						Recipient: transfer.recipient.Bytes(),
-						Amount:    transfer.amount.String(),
-						Fee:       transfer.fee.String(),
-						TxSender:  transfer.txSender.Bytes(),
-					},
+					Transfer:  transfer.ToTypesTransfer(),
 					Address:   witness.Bytes(),
 					Signature: signature,
 				},
@@ -241,8 +234,9 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 			if err != nil {
 				return err
 			}
+			log.Printf("submitting transfer id: %s\n", hex.EncodeToString(id[:]))
 			if !response.Success {
-				log.Printf("something went wrong when submitting transfer (%s, %s, %d) for %s\n", transfer.cashier, transfer.token, transfer.index, tc.id)
+				log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
 				continue
 			}
 		}
@@ -266,9 +260,13 @@ func (tc *tokenCashierBase) CheckTransfers() error {
 	relayer := services.NewRelayServiceClient(conn)
 
 	for _, transfer := range transfersToSettle {
+		id, err := transfer.ID()
+		if err != nil {
+			return errors.Wrap(err, "failed to get transfer id")
+		}
 		response, err := relayer.Check(
 			context.Background(),
-			&services.CheckRequest{Id: transfer.id.Bytes()},
+			&services.CheckRequest{Id: id},
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to check with relayer")

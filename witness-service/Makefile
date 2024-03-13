@@ -32,6 +32,9 @@ build-witness:
 build-relayer:
 	$(GOBUILD) -o ./bin/relayer cmd/relayer/main.go
 
+build-btc:
+	$(GOBUILD) -o ./bin/btc cmd/bitcoin-cli/main.go
+
 build-explorer:
 	$(GOBUILD) -o ./bin/explorer cmd/explorer/main.go
 

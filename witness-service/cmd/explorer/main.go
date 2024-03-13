@@ -28,6 +28,7 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/iotexproject/ioTube/witness-service/relayer"
+	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/pkg/errors"
 )
 
@@ -245,6 +246,7 @@ func main() {
 			cfg.TransferTableName,
 			"",
 			"",
+			util.NewETHAddressDecoder(),
 		),
 	)
 	if err != nil {
