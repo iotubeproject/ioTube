@@ -98,6 +98,10 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 	token := common.BytesToAddress(transfer.Token)
 	index := uint64(transfer.Index)
 	sender := common.BytesToAddress(transfer.Sender)
+	var txSender common.Address
+	if len(transfer.TxSender) > 0 {
+		txSender = common.BytesToAddress(transfer.TxSender)
+	}
 	recipient := common.BytesToAddress(transfer.Recipient)
 	amount, ok := new(big.Int).SetString(transfer.Amount, 10)
 	if !ok || amount.Sign() == -1 {
@@ -136,6 +140,7 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 		gas:       transfer.Gas,
 		gasPrice:  gasPrice,
 		timestamp: transfer.Timestamp.AsTime(),
+		txSender:  txSender,
 	}, nil
 }
 

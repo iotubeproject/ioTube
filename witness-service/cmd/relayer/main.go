@@ -26,6 +26,7 @@ import (
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
 	"go.uber.org/config"
+	"google.golang.org/grpc"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/relayer"
@@ -45,6 +46,9 @@ type Configuration struct {
 	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
+
+	BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
+	Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
 
 	AlwaysReset       bool      `json:"alwaysReset" yaml:"alwaysReset"`
 	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
@@ -172,9 +176,14 @@ func main() {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}
 	case "iotex":
-		conn, err := iotex.NewDefaultGRPCConn(cfg.ClientURL)
+		var conn *grpc.ClientConn
+		if strings.HasSuffix(cfg.ClientURL, ":443") {
+			conn, err = iotex.NewDefaultGRPCConn(cfg.ClientURL)
+		} else {
+			conn, err = iotex.NewGRPCConnWithoutTLS(cfg.ClientURL)
+		}
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed to create a connection: %v\n", err)
 		}
 		// defer conn.Close()
 		acc, err := account.HexStringToAccount(cfg.PrivateKey)
@@ -188,6 +197,8 @@ func main() {
 		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
 			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
 			validatorContractAddr,
+			cfg.BonusTokens,
+			cfg.Bonus,
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}

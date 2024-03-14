@@ -115,7 +115,7 @@ func NewTokenCashierOnEthereum(
 					if err != nil {
 						return nil, errors.Wrap(err, "failed to extract sender")
 					}
-					transfers = append(transfers, &Transfer{
+					tsf := &Transfer{
 						cashier:     transferLog.Address,
 						token:       tokenAddress,
 						index:       new(big.Int).SetBytes(transferLog.Topics[2][:]).Uint64(),
@@ -125,8 +125,11 @@ func NewTokenCashierOnEthereum(
 						fee:         new(big.Int).SetBytes(transferLog.Data[96:128]),
 						blockHeight: transferLog.BlockNumber,
 						txHash:      transferLog.TxHash,
-						txSender:    from,
-					})
+					}
+					if from != senderAddress {
+						tsf.txSender = from
+					}
+					transfers = append(transfers, tsf)
 				}
 			}
 			return transfers, nil
