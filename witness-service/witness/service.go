@@ -33,13 +33,11 @@ type service struct {
 	processor       dispatcher.Runner
 	batchSize       uint16
 	processInterval time.Duration
-	signHandler     SignHandler
 	disableSubmit   bool
 }
 
 // NewService creates a new witness service
 func NewService(
-	signHandler SignHandler,
 	cashiers []TokenCashier,
 	batchSize uint16,
 	processInterval time.Duration,
@@ -49,7 +47,6 @@ func NewService(
 		cashiers:        cashiers,
 		processInterval: processInterval,
 		batchSize:       batchSize,
-		signHandler:     signHandler,
 		disableSubmit:   disableSubmit,
 	}
 	var err error
@@ -90,11 +87,9 @@ func (s *service) process() error {
 		if s.disableSubmit {
 			continue
 		}
-		if s.signHandler != nil {
-			if err := cashier.SubmitTransfers(s.signHandler); err != nil {
-				log.Println(errors.Wrapf(err, "failed to submit transfers for %s", cashier.ID()))
-				continue
-			}
+		if err := cashier.SubmitTransfers(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to submit transfers for %s", cashier.ID()))
+			continue
 		}
 		if err := cashier.CheckTransfers(); err != nil {
 			log.Println(errors.Wrapf(err, "failed to check transfers for %s", cashier.ID()))

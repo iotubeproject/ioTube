@@ -337,15 +337,11 @@ func hexToAddress(str string, decoder util.AddressDecoder) util.Address {
 func (s *SolRecorder) SOLTransfers(
 	offset uint32,
 	limit uint8,
-	byUpdateTime bool,
-	desc bool,
+	desc Order,
 	queryOpts ...TransferQueryOption,
 ) ([]*SOLRawTransaction, error) {
 	var query string
 	orderBy := "creationTime"
-	if byUpdateTime {
-		orderBy = "updateTime"
-	}
 	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `ataOwner`, `amount`, `payload`, `fee`, `id`, `txSignature`, `txTimestamp`, `status`, `relayer`, `lastValidBlockHeight` FROM %s", s.transferTableName)
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
@@ -389,11 +385,10 @@ func (s *SolRecorder) SOLTransfers(
 func (s *SolRecorder) Transfers(
 	offset uint32,
 	limit uint8,
-	byUpdateTime bool,
-	desc bool,
+	desc Order,
 	queryOpts ...TransferQueryOption,
 ) ([]*Transfer, error) {
-	solTxs, err := s.SOLTransfers(offset, limit, byUpdateTime, desc, queryOpts...)
+	solTxs, err := s.SOLTransfers(offset, limit, desc, queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -563,5 +558,9 @@ func (s *SolRecorder) AddNewTX(height uint64, txHash []byte) error {
 }
 
 func (s *SolRecorder) NewTXs(count uint32) ([]uint64, [][]byte, error) {
+	panic("unimplemented")
+}
+
+func (s *SolRecorder) TransfersBySourceTxHash(hash common.Hash) ([]*Transfer, error) {
 	panic("unimplemented")
 }

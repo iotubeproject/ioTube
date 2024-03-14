@@ -15,7 +15,7 @@ const witnessPrivateKeys = [
     '0x0f62d96d6675f32685bbdb8ac13cda7c23436f63efbb9d07700d8669ff12b7c4',
 ];
 
-contract('TransferValidator', function([owner, minter, sender, relayer, witness1, witness2, witness3, witness4, cashier, receiver]) {
+contract('TransferValidator', function([owner, minter, sender, relayer, cashier, receiver]) {
     beforeEach(async function() {
         this.tokenSafe = await TokenSafe.new();
         this.minterPool = await MinterPool.new();
@@ -27,6 +27,10 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
         this.standardTokenList = await TokenList.new();
         this.witnessList = await WitnessList.new();
         this.validator = await TransferValidator.new(this.witnessList.address);
+        this.witnesses = [];
+        for (let i = 0; i < witnessPrivateKeys.length; i++) {
+            this.witnesses.push(web3.eth.accounts.privateKeyToAccount(witnessPrivateKeys[i]))
+        }
         await this.validator.addPair(this.standardTokenList.address, this.tokenSafe.address);
         await this.validator.addPair(this.mintableTokenList.address, this.minterPool.address);
 
@@ -69,7 +73,7 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
                 assert.equal(await this.validator.settles(key), 0);    
             });
             it('one witness', async function() {
-                await this.witnessList.addWitness(witness1);
+                await this.witnessList.addWitness(this.witnesses[0].address);
                 const signature = await Account.sign(key, witnessPrivateKeys[0]);
                 await this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature, {from: relayer});
                 assert.notEqual(await this.validator.settles(key), 0);
@@ -77,8 +81,8 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
                 assert.equal(await this.shadowToken.balanceOf(this.tokenSafe.address), 99987655);
             });
             it('two witnesses', async function() {
-                await this.witnessList.addWitness(witness1);
-                await this.witnessList.addWitness(witness2);
+                await this.witnessList.addWitness(this.witnesses[0].address);
+                await this.witnessList.addWitness(this.witnesses[1].address);
                 const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
                 const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
                 await this.validator.submit(cashier, this.shadowToken.address, 0, sender, receiver, 12345, signature1 + signature2.substr(2), {from: relayer});
@@ -88,9 +92,9 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
             });
             describe('three witnesses', function() {
                 beforeEach(async function() {
-                    await this.witnessList.addWitness(witness1);
-                    await this.witnessList.addWitness(witness2);
-                    await this.witnessList.addWitness(witness3);
+                    await this.witnessList.addWitness(this.witnesses[0].address);
+                    await this.witnessList.addWitness(this.witnesses[1].address);
+                    await this.witnessList.addWitness(this.witnesses[2].address);
                 });
                 it("three valid signatures", async function() {
                     const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
@@ -115,10 +119,10 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
             });
             describe('four witnesses', function() {
                 beforeEach(async function() {
-                    await this.witnessList.addWitness(witness1);
-                    await this.witnessList.addWitness(witness2);
-                    await this.witnessList.addWitness(witness3);
-                    await this.witnessList.addWitness(witness4);
+                    await this.witnessList.addWitness(this.witnesses[0].address);
+                    await this.witnessList.addWitness(this.witnesses[1].address);
+                    await this.witnessList.addWitness(this.witnesses[2].address);
+                    await this.witnessList.addWitness(this.witnesses[3].address);
                 });
                 it("three submissions", async function() {
                     const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
@@ -158,15 +162,15 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
                 assert.equal(await this.mintableToken.balanceOf(receiver), 0);
             });
             it('one witness', async function() {
-                await this.witnessList.addWitness(witness1);
+                await this.witnessList.addWitness(this.witnesses[0].address);
                 const signature = await Account.sign(key, witnessPrivateKeys[0]);
                 await this.validator.submit(cashier, this.mintableToken.address, 321, sender, receiver, 12345, signature, {from: relayer});
                 assert.notEqual(await this.validator.settles(key), 0);
                 assert.equal(await this.mintableToken.balanceOf(receiver), 12345);
             });
             it('two witnesses', async function() {
-                await this.witnessList.addWitness(witness1);
-                await this.witnessList.addWitness(witness2);
+                await this.witnessList.addWitness(this.witnesses[0].address);
+                await this.witnessList.addWitness(this.witnesses[1].address);
                 const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
                 const signature2 = await Account.sign(key, witnessPrivateKeys[1]);
                 await this.validator.submit(cashier, this.mintableToken.address, 321, sender, receiver, 12345, signature1 + signature2.substr(2), {from: relayer});
@@ -175,9 +179,9 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
             });
             describe('three witnesses', function() {
                 beforeEach(async function() {
-                    await this.witnessList.addWitness(witness1);
-                    await this.witnessList.addWitness(witness2);
-                    await this.witnessList.addWitness(witness3);
+                    await this.witnessList.addWitness(this.witnesses[0].address);
+                    await this.witnessList.addWitness(this.witnesses[1].address);
+                    await this.witnessList.addWitness(this.witnesses[2].address);
                 });
                 it("three valid signatures", async function() {
                     const signature1 = await Account.sign(key, witnessPrivateKeys[0]);
@@ -201,10 +205,10 @@ contract('TransferValidator', function([owner, minter, sender, relayer, witness1
             });
             describe('four witnesses', function() {
                 beforeEach(async function() {
-                    await this.witnessList.addWitness(witness1);
-                    await this.witnessList.addWitness(witness2);
-                    await this.witnessList.addWitness(witness3);
-                    await this.witnessList.addWitness(witness4);
+                    await this.witnessList.addWitness(this.witnesses[0].address);
+                    await this.witnessList.addWitness(this.witnesses[1].address);
+                    await this.witnessList.addWitness(this.witnesses[2].address);
+                    await this.witnessList.addWitness(this.witnesses[3].address);
                 });
                 it("three submissions", async function() {
                     const signature1 = await Account.sign(key, witnessPrivateKeys[0]);

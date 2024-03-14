@@ -29,9 +29,9 @@ function checkDockerPermissions() {
 }
 
 function checkDockerCompose() {
-    docker compose --version > /dev/null 2>&1
+    docker-compose --version > /dev/null 2>&1
     if [ $? -eq 127 ];then
-        echo -e "$RED docker compose command not found $NC"
+        echo -e "$RED docker-compose command not found $NC"
         echo -e "Please install it first"
         exit 1
     fi
@@ -64,42 +64,56 @@ function downloadConfigFile() {
     fi
     
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-iotex.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/relayer-config-iotex.yaml ${IOTEX_RELAYER}/etc/relayer-config-iotex.yaml
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-iotex.yaml ${IOTEX_RELAYER}/etc/relayer-config-iotex.yaml
         if [ $? -ne 0 ];then
             echo "Get config error"
             exit 2
         fi
     fi
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-ethereum.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/relayer-config-ethereum.yaml ${IOTEX_RELAYER}/etc/relayer-config-ethereum.yaml
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-ethereum.yaml ${IOTEX_RELAYER}/etc/relayer-config-ethereum.yaml
         if [ $? -ne 0 ];then
             echo "Get config error"
             exit 2
         fi
     fi
 #    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-heco.yaml ]];then
-#        cp -f $PROJECT_ABS_DIR/relayer-config-heco.yaml ${IOTEX_RELAYER}/etc/relayer-config-heco.yaml
+#        cp -f $PROJECT_ABS_DIR/configs/relayer-config-heco.yaml ${IOTEX_RELAYER}/etc/relayer-config-heco.yaml
 #        if [ $? -ne 0 ];then
 #            echo "Get config error"
 #            exit 2
 #        fi
 #    fi
 #    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-polis.yaml ]];then
-#        cp -f $PROJECT_ABS_DIR/relayer-config-polis.yaml ${IOTEX_RELAYER}/etc/relayer-config-polis.yaml
+#        cp -f $PROJECT_ABS_DIR/configs/relayer-config-polis.yaml ${IOTEX_RELAYER}/etc/relayer-config-polis.yaml
 #        if [ $? -ne 0 ];then
 #            echo "Get config error"
 #            exit 2
 #        fi
 #    fi
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-bsc.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/relayer-config-bsc.yaml ${IOTEX_RELAYER}/etc/relayer-config-bsc.yaml
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-bsc.yaml ${IOTEX_RELAYER}/etc/relayer-config-bsc.yaml
         if [ $? -ne 0 ];then
             echo "Get config error"
             exit 2
         fi
     fi
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/relayer-config-matic.yaml ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-matic.yaml ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-iotex-testnet.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-iotex-testnet.yaml ${IOTEX_RELAYER}/etc/relayer-config-iotex-testnet.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-sepolia.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-sepolia.yaml ${IOTEX_RELAYER}/etc/relayer-config-sepolia.yaml
         if [ $? -ne 0 ];then
             echo "Get config error"
             exit 2
@@ -136,7 +150,7 @@ function grantPrivileges() {
         retryTimes=0
         maxRetryTime=10
         pushd $IOTEX_RELAYER/etc
-        docker compose up -d database
+        docker-compose up -d database
     
         echo -e "$YELLOW Waiting for the mysqld daemon in the relayer-db container to successful... $NC"
         while true;do
@@ -168,7 +182,7 @@ function buildService() {
 function startup() {
     echo -e "$YELLOW Start relayer and it's database. $NC"
     pushd $IOTEX_RELAYER/etc
-    docker compose up -d
+    docker-compose up -d
     if [ $? -eq 0 ];then
         echo -e "${YELLOW} Server port on 7000 & 7001. ${NC}"
     fi
@@ -178,7 +192,7 @@ function startup() {
 function cleanAll() {
     echo -e "$YELLOW Starting clean all containers... $NC"
     pushd $IOTEX_RELAYER/etc
-    docker compose rm -s -f -v
+    docker-compose rm -s -f -v
     popd
     echo -e "${YELLOW} Done. ${NC}"
 

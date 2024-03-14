@@ -85,10 +85,10 @@ contract('TokenCashier', function([owner, minter, sender, receiver, fakeTokenAdd
                         assert.equal(depositResponse.logs[0].args.amount, 500);
                         assert.equal(depositResponse.logs[0].args.fee, 1234);
                         const initBalance = await web3.eth.getBalance(owner);
-                        const withdrawResponse = await this.cashier.withdraw({gasPrice: 1});
+                        const withdrawResponse = await this.cashier.withdraw();
                         const newBalance = await web3.eth.getBalance(owner);
                         assert.equal(
-                            web3.utils.toBN(initBalance).sub(web3.utils.toBN(withdrawResponse.receipt.gasUsed)).toString(),
+                            web3.utils.toBN(initBalance).sub(web3.utils.toBN(withdrawResponse.receipt.gasUsed * withdrawResponse.receipt.effectiveGasPrice)).toString(),
                             web3.utils.toBN(newBalance).sub(web3.utils.toBN(1234)).toString(),
                         );
                     });
@@ -132,8 +132,9 @@ contract('TokenCashier', function([owner, minter, sender, receiver, fakeTokenAdd
             assert.equal(depositResponse.logs[0].args.amount, 500);
             assert.equal(depositResponse.logs[0].args.fee, 1234);
             const balanceBeforeDeposit = await web3.eth.getBalance(sender);
-            depositResponse = await this.cashier.depositTo("0x0000000000000000000000000000000000000000", receiver, 50000, {from: sender, value: 54321, gasPrice: 1});
-            assert.equal(await web3.eth.getBalance(sender), balanceBeforeDeposit - depositResponse.receipt.gasUsed - 54321);
+            // const gasPrice = await web3.eth.getGasPrice();
+            depositResponse = await this.cashier.depositTo("0x0000000000000000000000000000000000000000", receiver, 50000, {from: sender, value: 54321});
+            assert.equal(await web3.eth.getBalance(sender), web3.utils.toBN(balanceBeforeDeposit).sub(web3.utils.toBN(depositResponse.receipt.gasUsed * depositResponse.receipt.effectiveGasPrice + 54321)));
             assert.equal(await this.weth.balanceOf(this.tokenSafe.address), 50000);
             assert.equal(await this.cashier.count(this.weth.address), 1);
             assert.equal(await web3.eth.getBalance(this.cashier.address), 5555);
