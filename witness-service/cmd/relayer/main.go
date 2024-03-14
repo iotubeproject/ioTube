@@ -47,6 +47,9 @@ type Configuration struct {
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
 
+	BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
+	Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
+
 	AlwaysReset       bool      `json:"alwaysReset" yaml:"alwaysReset"`
 	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
 	LarkWebHook       string    `json:"larkWebHook" yaml:"larkWebHook"`
@@ -179,6 +182,9 @@ func main() {
 		} else {
 			conn, err = iotex.NewGRPCConnWithoutTLS(cfg.ClientURL)
 		}
+		if err != nil {
+			log.Fatalf("failed to create a connection: %v\n", err)
+		}
 		// defer conn.Close()
 		acc, err := account.HexStringToAccount(cfg.PrivateKey)
 		if err != nil {
@@ -191,6 +197,8 @@ func main() {
 		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
 			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
 			validatorContractAddr,
+			cfg.BonusTokens,
+			cfg.Bonus,
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}

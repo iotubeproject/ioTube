@@ -11,3 +11,4 @@ database:
   driver: "mysql"
 transferTableName: "iotex_transfers"
 witnessTableName: "iotex_witnesses"
+bonus: "200000000000000000"

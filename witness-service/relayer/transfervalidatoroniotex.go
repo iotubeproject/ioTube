@@ -36,6 +36,7 @@ type transferValidatorOnIoTeX struct {
 	gasLimit      uint64
 	gasPrice      *big.Int
 	bonus         *big.Int
+	bonusTokens   map[string]*big.Int
 	bonusRecorder map[string]time.Time
 
 	relayerAddr           address.Address
@@ -53,6 +54,8 @@ type transferValidatorOnIoTeX struct {
 func NewTransferValidatorOnIoTeX(
 	client iotex.AuthedClient,
 	validatorContractAddr address.Address,
+	bonusTokens map[string]*big.Int,
+	bonus *big.Int,
 ) (TransferValidator, error) {
 	validatorContractIoAddr, err := address.FromBytes(validatorContractAddr.Bytes())
 	if err != nil {
@@ -89,7 +92,8 @@ func NewTransferValidatorOnIoTeX(
 	return &transferValidatorOnIoTeX{
 		gasLimit:      2000000,
 		gasPrice:      big.NewInt(1000000000000),
-		bonus:         big.NewInt(500000000000000000),
+		bonus:         bonus,
+		bonusTokens:   bonusTokens,
 		bonusRecorder: map[string]time.Time{},
 
 		relayerAddr:           client.Account().Address(),
@@ -158,6 +162,11 @@ func (tv *transferValidatorOnIoTeX) refresh() error {
 		activeWitnesses[w.Hex()] = true
 	}
 	tv.witnesses = activeWitnesses
+	gasPrice, err := tv.client.API().SuggestGasPrice(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	tv.gasPrice = new(big.Int).SetUint64(gasPrice.GasPrice)
 
 	return nil
 }
@@ -209,9 +218,9 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 			return StatusOnChainUnknown, err
 		}
 		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
-		if transfer.amount.Cmp(big.NewInt(0)) > 0 {
+		if threshold, ok := tv.bonusTokens[transfer.token.Hex()]; ok && transfer.amount.Cmp(threshold) > 0 {
 			if err := tv.sendBonus(transfer.recipient); err != nil {
-				log.Printf("failed to send bonus to %s\n", transfer.recipient)
+				log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
 			}
 		}
 
@@ -320,6 +329,9 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		SetNonce(nonce).
 		Call(context.Background())
 	if err != nil {
+		if errors.Cause(err).Error() == "rpc error: code = Internal desc = exceeds block gas limit" {
+			err = errors.Wrap(errNoncritical, err.Error())
+		}
 		return common.Hash{}, common.Address{}, 0, nil, err
 	}
 
