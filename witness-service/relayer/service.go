@@ -326,22 +326,22 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 		case errNoncritical:
 			log.Printf("failed to prepare speed up: %+v\n", err)
 		default:
-			return false, err
+			return false, errors.Wrap(err, "failed to speed up")
 		}
 	case StatusOnChainNotConfirmed:
 		// do nothing
 	case StatusOnChainRejected:
 		if err := s.recorder.MarkAsRejected(transfer.id); err != nil {
-			return false, err
+			return false, errors.Wrap(err, "failed to reject")
 		}
 	case StatusOnChainNonceOverwritten:
 		// nonce has been overwritten
 		if err := s.recorder.ResetCausedByNonce(transfer.id); err != nil {
-			return false, err
+			return false, errors.Wrap(err, "failed to reset nonce")
 		}
 	case StatusOnChainSettled:
 		if err := s.recorder.MarkAsSettled(transfer.id, transfer.gas, transfer.timestamp); err != nil {
-			return false, err
+			return false, errors.Wrap(err, "failed to settle")
 		}
 	default:
 		return false, errors.New("unexpected error")
