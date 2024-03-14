@@ -213,6 +213,9 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 	if new(big.Int).Add(r.BlockNumber, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
 		return StatusOnChainNotConfirmed, nil
 	}
+	if transfer.updateTime.After(time.Now().Add(-10 * time.Minute)) {
+		return StatusOnChainNotConfirmed, nil
+	}
 	// no matter what the receipt status is, mark the validation as failure
 	return StatusOnChainRejected, nil
 }
