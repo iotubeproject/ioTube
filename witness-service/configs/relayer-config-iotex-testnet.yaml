@@ -1,0 +1,18 @@
+chain: "iotex-testnet"
+interval: 1m
+clientURL: "https://babel-api.testnet.iotex.io"
+grpcPort: 7101
+grpcProxyPort: 8101
+privateKey: ""
+slackWebHook: ""
+validators:
+  - withPayload: true
+    address: "0xf8efCFF959Af393FdfA8fc0fccedf0E25Fc194e6"
+    cashiers:
+      - "0xBAe51dAad36A1fEA46492F35E04380B3db169A97"
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+  driver: "mysql"
+transferTableName: "iotex_testnet_transfers"
+witnessTableName: "iotex_testnet_witnesses"
+bonus: "200000000000000000"

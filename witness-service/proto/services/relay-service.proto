@@ -26,6 +26,12 @@ service RelayService {
             body: "*"
         };
     };
+    rpc Lookup(LookupRequest) returns (LookupResponse) {
+        option (google.api.http) = {
+            post: "/lookup"
+            body: "*"
+        };
+    };
     rpc StaleHeights(StaleHeightsRequest) returns (StaleHeightsResponse) {
         option (google.api.http) = {
             post: "/stale_heights"
@@ -63,6 +69,14 @@ enum Status {
     SETTLED = 3;
     FAILED = 4;
     CONFIRMING = 5;
+}
+
+message LookupRequest {
+    bytes sourceTxHash = 1;
+}
+
+message LookupResponse {
+	repeated CheckResponse statuses = 1;
 }
 
 message CheckResponse {

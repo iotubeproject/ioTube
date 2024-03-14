@@ -1,0 +1,26 @@
+chain: "sepolia"
+grpcPort: 9182
+grpcProxyPort: 9183
+interval: 15s
+batchSize: 500
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
+  driver: "mysql"
+cashiers:
+  - id: "sepolia-to-iotex-testnet"
+    withPayload: true
+    relayerURL: ":7101"
+    startBlockHeight: 5676226
+    validatorContractAddress: "0xf8efCFF959Af393FdfA8fc0fccedf0E25Fc194e6"
+    cashierContractAddress: "0xBAe51dAad36A1fEA46492F35E04380B3db169A97"
+    transferTableName: "sepolia_transfers"
+    tokenPairs:
+      # IOTX
+      - token2: "0x4f8E54a8d05cb6e55F1713C01CA6f636F0eb30DD"
+        token1: "0xC75A4F0125f98E6998C0b6c3036a32340E0f40A8"
+      # WETH
+      - token2: "0xB63feDD1F256dc81D9F45D21CF1Ed03971a9D9D3"
+        token1: "0x4E11A2FB99fDCF1a4e7480B66d262eDD77a225A4"
+      # USDT
+      - token2: "0xa8CB715963e521B960D8c988155AD21eeD69827B"
+        token1: "0x309489f1f90ce72d0bd9f391848cc9dfc2f22566"

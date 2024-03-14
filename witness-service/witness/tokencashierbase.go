@@ -26,6 +26,7 @@ import (
 
 var (
 	_ReceiptEventTopic, _TransferEventTopic common.Hash
+	_ReceiptEventTopicWithPayload           common.Hash
 	_ZeroHash                               = common.Hash{}
 )
 
@@ -35,6 +36,11 @@ func init() {
 		log.Panicf("failed to decode token cashier abi, %+v", err)
 	}
 	_ReceiptEventTopic = tokenCashierABI.Events["Receipt"].ID
+	tokenCashierWithPayloadABI, err := abi.JSON(strings.NewReader(contract.TokenCashierWithPayloadABI))
+	if err != nil {
+		log.Panicf("failed to decode token cashier abi, %+v", err)
+	}
+	_ReceiptEventTopicWithPayload = tokenCashierWithPayloadABI.Events["Receipt"].ID
 	erc20ABI, err := abi.JSON(strings.NewReader(contract.CrosschainERC20ABI))
 	if err != nil {
 		log.Panicf("failed to decode erc20 abi, %+v", err)
@@ -54,6 +60,7 @@ type (
 		lastPullTimestamp      time.Time
 		calcConfirmHeight      calcConfirmHeightFunc
 		pullTransfers          pullTransfersFunc
+		signHandler            SignHandler
 		hasEnoughBalance       hasEnoughBalanceFunc
 		start                  startStopFunc
 		stop                   startStopFunc
@@ -73,6 +80,7 @@ func newTokenCashierBase(
 	startBlockHeight uint64,
 	calcConfirmHeight calcConfirmHeightFunc,
 	pullTransfers pullTransfersFunc,
+	signHandler SignHandler,
 	hasEnoughBalance hasEnoughBalanceFunc,
 	start startStopFunc,
 	stop startStopFunc,
@@ -87,6 +95,7 @@ func newTokenCashierBase(
 		validatorContractAddr:  validatorContractAddr,
 		calcConfirmHeight:      calcConfirmHeight,
 		pullTransfers:          pullTransfers,
+		signHandler:            signHandler,
 		hasEnoughBalance:       hasEnoughBalance,
 		lastPullTimestamp:      time.Now(),
 		start:                  start,
@@ -212,7 +221,10 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	return nil
 }
 
-func (tc *tokenCashierBase) SubmitTransfers(sign SignHandler) error {
+func (tc *tokenCashierBase) SubmitTransfers() error {
+	if tc.signHandler == nil {
+		return nil
+	}
 	transfersToSubmit, err := tc.recorder.TransfersToSubmit()
 	if err != nil {
 		return err
@@ -227,7 +239,7 @@ func (tc *tokenCashierBase) SubmitTransfers(sign SignHandler) error {
 		if !tc.hasEnoughBalance(transfer.Token(), transfer.Amount()) {
 			return errors.Errorf("not enough balance for token %s", transfer.Token())
 		}
-		id, pubkey, signature, err := sign(transfer, tc.validatorContractAddr)
+		id, pubkey, signature, err := tc.signHandler(transfer, tc.validatorContractAddr)
 		if err != nil {
 			return err
 		}

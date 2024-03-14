@@ -14,7 +14,7 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 )
 
-func startGRPCService(srv *Service, grpcPort int) error {
+func startGRPCService(srv services.RelayServiceServer, grpcPort int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func startGRPCService(srv *Service, grpcPort int) error {
 	return grpcServer.Serve(lis)
 }
 
-func startGRPCProxyService(srv *Service, grpcProxyPort int) error {
+func startGRPCProxyService(srv services.RelayServiceServer, grpcProxyPort int) error {
 	gwmux := runtime.NewServeMux()
 	ctx := context.Background()
 
@@ -41,7 +41,7 @@ func startGRPCProxyService(srv *Service, grpcProxyPort int) error {
 	return gwServer.ListenAndServe()
 }
 
-func StartServer(srv *Service, grpcPort int, grpcProxyPort int) {
+func StartServer(srv services.RelayServiceServer, grpcPort int, grpcProxyPort int) {
 	if grpcPort > 0 {
 		go func() {
 			if e := startGRPCService(srv, grpcPort); e != nil {

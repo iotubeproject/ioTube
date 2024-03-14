@@ -17,6 +17,8 @@ import (
 )
 
 type (
+	// Version
+	Version string
 	// TransferStatus is the status of a transfer
 	TransferStatus string
 
@@ -36,7 +38,7 @@ type (
 		GetRecorder() AbstractRecorder
 		PullTransfersByHeight(blockHeight uint64) error
 		PullTransfers(blockCount uint16) error
-		SubmitTransfers(SignHandler) error
+		SubmitTransfers() error
 		CheckTransfers() error
 		ProcessStales() error
 	}
@@ -86,4 +88,11 @@ const (
 	SubmissionConfirmed = "confirmed"
 	// TransferSettled stands for a settled transfer
 	TransferSettled = "settled"
+
+	// NoPayload is version without payload
+	NoPayload Version = "no-payload"
+	// Payload is version with payload
+	Payload Version = "payload"
+	// ToSolana is version with payload to solana
+	ToSolana Version = "to-solana"
 )

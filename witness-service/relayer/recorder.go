@@ -135,11 +135,13 @@ func (recorder *Recorder) initStore(
 			"`relayer` varchar(42) DEFAULT NULL,"+
 			"`gasPrice` varchar(78) DEFAULT NULL,"+
 			"`notes` varchar(45) DEFAULT NULL,"+
+			"`payload` varchar(24576),"+ // MaxCodeSize
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
 			"UNIQUE KEY `id_UNIQUE` (`id`),"+
 			"KEY `cashier_index` (`cashier`),"+
 			"KEY `token_index` (`token`),"+
 			"KEY `sender_index` (`sender`),"+
+			"KEY `txSender_index` (`txSender`),"+
 			"KEY `sourceTxHash_index` (`sourceTxHash`),"+
 			"KEY `recipient_index` (`recipient`),"+
 			"KEY `status_index` (`status`),"+
@@ -492,6 +494,28 @@ func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 	return count, nil
 }
 
+func (recorder *Recorder) TransfersBySourceTxHash(hash string) ([]*Transfer, error) {
+	recorder.mutex.RLock()
+	defer recorder.mutex.RUnlock()
+	rows, err := recorder.store.DB().Query(
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `sourceTxHash`=?", recorder.transferTableName),
+		hash,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query transfers table")
+	}
+	defer rows.Close()
+	var txs []*Transfer
+	for rows.Next() {
+		tx, err := recorder.assembleTransfer(rows.Scan)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scan transfer")
+		}
+		txs = append(txs, tx)
+	}
+	return txs, nil
+}
+
 func (recorder *Recorder) HeightsOfStaleTransfers(cashier util.Address) ([]uint64, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
@@ -576,21 +600,29 @@ func CashiersQueryOption(cashiers []util.Address) TransferQueryOption {
 	}
 }
 
+type (
+	// Order is the order of the records
+	Order bool
+)
+
+const (
+	// DESC is the descending order
+	DESC Order = true
+	// AESC is the ascending order
+	AESC Order = false
+)
+
 // Transfers returns the list of records of given status
 func (recorder *Recorder) Transfers(
 	offset uint32,
 	limit uint8,
-	byUpdateTime bool,
-	desc bool,
+	desc Order,
 	queryOpts ...TransferQueryOption,
 ) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	var query string
 	orderBy := "creationTime"
-	if byUpdateTime {
-		orderBy = "updateTime"
-	}
 	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
