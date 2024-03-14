@@ -162,7 +162,7 @@ func (tv *transferValidatorOnIoTeX) refresh() error {
 		activeWitnesses[w.Hex()] = true
 	}
 	tv.witnesses = activeWitnesses
-	gasPrice, err := tv.client.API().SuggestGasPrice(context.Background(), nil)
+	gasPrice, err := tv.client.API().SuggestGasPrice(context.Background(), &iotexapi.SuggestGasPriceRequest{})
 	if err != nil {
 		return err
 	}
