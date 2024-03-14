@@ -1,0 +1,18 @@
+chain: "sepolia"
+interval: 5m
+clientURL: "https://rpc-sepolia.rockx.com"
+ethConfirmBlockNumber: 20
+ethGasPriceLimit: 10000000000
+grpcPort: 7100
+grpcProxyPort: 8100
+privateKey: ""
+validators:
+  - withPayload: true
+    address: "0xfbaDFfe2B6c7D700eF74B130f4154dF3412eB0E6"
+    cashiers:
+      - "0xe17f31649C42CE0304008C81Fb7A912cE4e82380"
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+  driver: "mysql"
+transferTableName: "sepolia_transfers"
+witnessTableName: "sepolia_witnesses"

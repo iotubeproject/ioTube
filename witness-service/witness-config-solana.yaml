@@ -43,4 +43,3 @@ cashiers:
     decimalRound:
       - token1: "xgf3DoXeqCRVJ9hzU2vbTjfbs6j5BpCHWSmVGBV7Ryx"
         amount: 9
-destinationChain: "iotex"

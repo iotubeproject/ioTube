@@ -9,6 +9,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"sync"
 	"time"
 )
 
@@ -23,19 +24,43 @@ type (
 	SQLStore struct {
 		db  *sql.DB
 		cfg Config
+		mu  sync.Mutex
+	}
+
+	// SQLStoreFactory is a factory of SQLStore
+	SQLStoreFactory struct {
+		mu     sync.Mutex
+		stores map[string]*SQLStore
 	}
 )
 
-// NewStore instantiates a store
-func NewStore(cfg Config) *SQLStore {
-	if cfg.URI == "" && cfg.Driver == "" {
+// NewSQLStoreFactory creates a new SQLStoreFactory
+func NewSQLStoreFactory() *SQLStoreFactory {
+	return &SQLStoreFactory{
+		stores: make(map[string]*SQLStore),
+	}
+}
+
+// NewStore creates a new SQLStore
+func (f *SQLStoreFactory) NewStore(cfg Config) *SQLStore {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if cfg.Driver == "" && cfg.URI == "" {
 		return nil
 	}
-	return &SQLStore{db: nil, cfg: cfg}
+	key := cfg.Driver + "||" + cfg.URI
+	if store, ok := f.stores[key]; ok {
+		return store
+	}
+	store := &SQLStore{cfg: cfg}
+	f.stores[key] = store
+	return store
 }
 
 // Start opens the SQL (creates new file if not existing yet)
 func (s *SQLStore) Start(_ context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.db != nil {
 		return nil
 	}
@@ -52,6 +77,8 @@ func (s *SQLStore) Start(_ context.Context) error {
 
 // Stop closes the SQL
 func (s *SQLStore) Stop(_ context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
 			return err

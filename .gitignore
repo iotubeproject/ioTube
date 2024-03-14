@@ -15,12 +15,11 @@
 # vendor/
 
 # Truffle build directories
-build/
+*/build/
 
 witness-service/bin/
 
-node_modules/
-
+.vscode
 node_modules
 .env
 coverage

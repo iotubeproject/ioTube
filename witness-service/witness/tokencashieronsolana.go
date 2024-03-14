@@ -30,8 +30,18 @@ var (
 	rl = ratelimit.New(_solanaRPCMaxQPS)
 )
 
-func NewTokenCashierOnSolana(id string, relayerURL string, solanaClient *client.Client, cashier solcommon.PublicKey,
-	validatorAddr common.Address, recorder *SOLRecorder, startBlockHeight uint64, qpsLimit uint32, disablePull bool) (TokenCashier, error) {
+func NewTokenCashierOnSolana(
+	id string,
+	relayerURL string,
+	solanaClient *client.Client,
+	cashier solcommon.PublicKey,
+	validatorAddr common.Address,
+	recorder *SOLRecorder,
+	startBlockHeight uint64,
+	qpsLimit uint32,
+	signHandler SignHandler,
+	disablePull bool,
+) (TokenCashier, error) {
 	if qpsLimit > 0 {
 		rl = ratelimit.New(int(qpsLimit))
 	}
@@ -127,6 +137,7 @@ func NewTokenCashierOnSolana(id string, relayerURL string, solanaClient *client.
 			}
 			return tsfs, nil
 		},
+		signHandler,
 		func(util.Address, *big.Int) bool {
 			return true
 		},

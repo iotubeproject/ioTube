@@ -49,4 +49,4 @@ cashiers:
     decimalRound:
       - token1: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
         amount: -9
-destinationChain: "solana"
+    toSolana: true

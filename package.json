@@ -21,8 +21,11 @@
   },
   "homepage": "https://github.com/iotexproject/IOTX-token-contracts#readme",
   "dependencies": {
-    "@truffle/hdwallet-provider": "^2.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.2",
+    "@truffle/hdwallet-provider": "^1.7.0",
     "eth-lib": "^0.2.8",
+    "ganache": "^7.9.2",
+    "ganache-cli": "^6.12.2",
     "truffle": "^5.0.22",
     "web3-utils": "^1.0.0-beta.55"
   },
@@ -32,7 +35,8 @@
     "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
     "@nomicfoundation/hardhat-toolbox": "^3.0.0",
     "@nomicfoundation/hardhat-verify": "^1.0.0",
-    "@openzeppelin/contracts": "^4.9.1",
+    "@nomiclabs/hardhat-truffle5": "^2.0.7",
+    "@openzeppelin/contracts": "^4.9.6",
     "@typechain/ethers-v6": "^0.4.0",
     "@typechain/hardhat": "^8.0.0",
     "chai": "^4.2.0",
