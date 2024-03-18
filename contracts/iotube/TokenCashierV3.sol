@@ -55,7 +55,7 @@ contract TokenCashierV3 is Pausable {
         depositFee = _fee;
     }
 
-    function depositTo(address _token, address _to, uint256 _amount, bytes calldata _payload) public whenNotPaused payable {
+    function depositTo(address _token, address _to, uint256 _amount, bytes memory _payload) public whenNotPaused payable {
         require(_to != address(0), "invalid destination");
         // require(_payload.length == 0 || contractDestinations[_to], "invalid destination with payload");
         bool isCoin = false;
@@ -92,7 +92,7 @@ contract TokenCashierV3 is Pausable {
         revert("not a whitelisted token");
     }
 
-    function deposit(address _token, uint256 _amount, bytes calldata _payload) public payable {
+    function deposit(address _token, uint256 _amount, bytes memory _payload) public payable {
         depositTo(_token, msg.sender, _amount, _payload);
     }
 

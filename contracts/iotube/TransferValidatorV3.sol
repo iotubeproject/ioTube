@@ -33,15 +33,15 @@ contract TransferValidatorV3 is Pausable {
         witnessList = _witnessList;
     }
 
-    function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount) public view returns(bytes32) {
-        return keccak256(abi.encodePacked(address(this), cashier, tokenAddr, index, from, to, amount));
+    function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory payload) public view returns(bytes32) {
+        return keccak256(abi.encodePacked(address(this), cashier, tokenAddr, index, from, to, amount, payload));
     }
 
-    function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory signatures, bytes calldata payload) public whenNotPaused {
+    function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory signatures, bytes memory payload) public whenNotPaused {
         require(amount != 0, "amount cannot be zero");
         require(to != address(0), "recipient cannot be zero");
         require(signatures.length % 65 == 0, "invalid signature length");
-        bytes32 key = generateKey(cashier, tokenAddr, index, from, to, amount);
+        bytes32 key = generateKey(cashier, tokenAddr, index, from, to, amount, payload);
         require(settles[key] == 0, "transfer has been settled");
         for (uint256 it = 0; it < tokenLists.length; it++) {
             if (tokenLists[it].isAllowed(tokenAddr)) {
