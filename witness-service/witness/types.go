@@ -15,6 +15,8 @@ import (
 )
 
 type (
+	// Version
+	Version string
 	// TransferStatus is the status of a transfer
 	TransferStatus string
 
@@ -36,6 +38,7 @@ type (
 		gas         uint64
 		gasPrice    *big.Int
 		txSender    common.Address
+		payload     []byte
 	}
 
 	// Service manages to exchange iotex coin to ERC20 token on ethereum
@@ -71,4 +74,9 @@ const (
 	SubmissionConfirmed = "confirmed"
 	// TransferSettled stands for a settled transfer
 	TransferSettled = "settled"
+
+	// V1 is version 1.0
+	V1 Version = "v1.0"
+	// V3 is version 3.0
+	V3 Version = "v3.0"
 )

@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/iotexproject/go-pkgs/hash"
 	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/iotexproject/iotex-address/address"
@@ -41,10 +42,11 @@ type transferValidatorOnIoTeX struct {
 
 	relayerAddr           address.Address
 	validatorContractAddr address.Address
+	version               Version
 
 	client                 iotex.AuthedClient
 	validatorContract      iotex.Contract
-	validatorContractABI   abi.ABI
+	unpack                 func(name string, data []byte) ([]interface{}, error)
 	witnessListContract    iotex.Contract
 	witnessListContractABI abi.ABI
 	witnesses              map[string]bool
@@ -53,6 +55,7 @@ type transferValidatorOnIoTeX struct {
 // newTransferValidatorOnIoTeX creates a new TransferValidator on IoTeX
 func newTransferValidatorOnIoTeX(
 	client iotex.AuthedClient,
+	version Version,
 	validatorContractAddr address.Address,
 	bonusTokens map[string]*big.Int,
 	bonus *big.Int,
@@ -61,7 +64,13 @@ func newTransferValidatorOnIoTeX(
 	if err != nil {
 		return nil, err
 	}
-	validatorABI, err := abi.JSON(strings.NewReader(contract.TransferValidatorABI))
+	var validatorABI abi.ABI
+	switch version {
+	case V1:
+		validatorABI, err = abi.JSON(strings.NewReader(contract.TransferValidatorABI))
+	case V3:
+		validatorABI, err = abi.JSON(strings.NewReader(contract.TransferValidatorV3ABI))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -98,10 +107,11 @@ func newTransferValidatorOnIoTeX(
 
 		relayerAddr:           client.Account().Address(),
 		validatorContractAddr: validatorContractIoAddr,
+		version:               version,
 
 		client:                 client,
 		validatorContract:      validatorContract,
-		validatorContractABI:   validatorABI,
+		unpack:                 validatorABI.Unpack,
 		witnessListContract:    client.Contract(witnessContractIoAddr, witnessContractABI),
 		witnessListContractABI: witnessContractABI,
 	}, nil
@@ -200,7 +210,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 	if err != nil {
 		return StatusOnChainUnknown, err
 	}
-	ret, err := tv.validatorContractABI.Unpack("settles", settleHeightData.Raw)
+	ret, err := tv.unpack("settles", settleHeightData.Raw)
 	if err != nil {
 		return StatusOnChainUnknown, err
 	}
@@ -321,19 +331,38 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		nonce = accountMeta.PendingNonce
 	}
 
-	actionHash, err := tv.validatorContract.Execute(
-		"submit",
-		transfer.cashier,
-		transfer.token,
-		new(big.Int).SetUint64(transfer.index),
-		transfer.sender,
-		transfer.recipient,
-		transfer.amount,
-		signatures,
-	).SetGasPrice(tv.gasPrice).
-		SetGasLimit(tv.gasLimit).
-		SetNonce(nonce).
-		Call(context.Background())
+	var actionHash hash.Hash256
+	switch tv.version {
+	case V1:
+		actionHash, err = tv.validatorContract.Execute(
+			"submit",
+			transfer.cashier,
+			transfer.token,
+			new(big.Int).SetUint64(transfer.index),
+			transfer.sender,
+			transfer.recipient,
+			transfer.amount,
+			signatures,
+		).SetGasPrice(tv.gasPrice).
+			SetGasLimit(tv.gasLimit).
+			SetNonce(nonce).
+			Call(context.Background())
+	case V3:
+		actionHash, err = tv.validatorContract.Execute(
+			"submit",
+			transfer.cashier,
+			transfer.token,
+			new(big.Int).SetUint64(transfer.index),
+			transfer.sender,
+			transfer.recipient,
+			transfer.amount,
+			transfer.payload,
+			signatures,
+		).SetGasPrice(tv.gasPrice).
+			SetGasLimit(tv.gasLimit).
+			SetNonce(nonce).
+			Call(context.Background())
+	}
 	if err != nil {
 		if errors.Cause(err).Error() == "rpc error: code = Internal desc = exceeds block gas limit" {
 			err = errors.Wrap(errNoncritical, err.Error())

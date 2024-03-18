@@ -49,6 +49,7 @@ type Configuration struct {
 	Cashiers              []struct {
 		ID                       string      `json:"id" yaml:"id"`
 		RelayerURL               string      `json:"relayerURL" yaml:"relayerURL"`
+		Version                  string      `json:"version" yaml:"version"`
 		CashierContractAddress   string      `json:"cashierContractAddress" yaml:"cashierContractAddress"`
 		TokenSafeContractAddress string      `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
 		ValidatorContractAddress string      `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`

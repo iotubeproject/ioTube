@@ -7,7 +7,6 @@
 package witness
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"log"
@@ -17,12 +16,135 @@ import (
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
+	"github.com/iotexproject/iotex-proto/golang/iotextypes"
 	"github.com/pkg/errors"
 )
+
+type iotexIterator struct {
+	version             Version
+	client              iotex.ReadOnlyClient
+	cashierContractAddr address.Address
+}
+
+func (ii *iotexIterator) filterLogs(topic []byte, startHeight, endHeight uint64) (*iotexapi.GetLogsResponse, error) {
+	return ii.client.API().GetLogs(context.Background(), &iotexapi.GetLogsRequest{
+		Filter: &iotexapi.LogsFilter{
+			Address: []string{ii.cashierContractAddr.String()},
+			Topics: []*iotexapi.Topics{
+				{
+					Topic: [][]byte{topic},
+				},
+			},
+		},
+		Lookup: &iotexapi.GetLogsRequest_ByRange{
+			ByRange: &iotexapi.GetLogsByRange{
+				FromBlock: startHeight,
+				// TODO: this is a bug, which should be fixed in iotex-core
+				ToBlock: endHeight,
+			},
+		},
+	})
+}
+
+func (ii *iotexIterator) extractTransfer(
+	transferLog *iotextypes.Log,
+	topic common.Hash,
+) (*Transfer, error) {
+	senderAddr := common.BytesToAddress(transferLog.Data[:32])
+	amount := new(big.Int).SetBytes(transferLog.Data[64:96])
+
+	receipt, err := ii.client.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{
+		ActionHash: hex.EncodeToString(transferLog.ActHash),
+	})
+	if err != nil {
+		return nil, err
+	}
+	tokenAddr := common.BytesToAddress(transferLog.Topics[1])
+	tokenIoAddr, err := address.FromBytes(tokenAddr.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	cashierAddr, err := address.FromString(transferLog.ContractAddress)
+	if err != nil {
+		return nil, err
+	}
+	cashier := common.BytesToAddress(cashierAddr.Bytes())
+	var realAmount *big.Int
+	for _, l := range receipt.ReceiptInfo.Receipt.Logs {
+		if tokenIoAddr.String() == l.ContractAddress && common.BytesToHash(l.Topics[0]) == topic && (common.BytesToAddress(l.Topics[1]) == senderAddr || cashier == common.BytesToAddress(l.Topics[1])) {
+			if realAmount != nil && common.BytesToHash(l.Topics[2]) != _ZeroHash {
+				return nil, errors.Errorf("two transfers in one transaction %x", transferLog.ActHash)
+			}
+			realAmount = new(big.Int).SetBytes(l.Data)
+		}
+	}
+	if realAmount == nil {
+		return nil, errors.Errorf("failed to get the amount from transfer event for %x", transferLog.ActHash)
+	}
+	switch realAmount.Cmp(amount) {
+	case 1:
+		return nil, errors.Errorf("Invalid amount: %d < %d", amount, realAmount)
+	case -1:
+		log.Printf("\tAmount %d is reduced %d after tax\n", amount, realAmount)
+	case 0:
+		log.Printf("\tAmount %d is the same as real amount %d\n", amount, realAmount)
+	}
+
+	return &Transfer{
+		cashier:     cashier,
+		token:       tokenAddr,
+		index:       new(big.Int).SetBytes(transferLog.Topics[2]).Uint64(),
+		sender:      senderAddr,
+		recipient:   common.BytesToAddress(transferLog.Data[32:64]),
+		amount:      amount,
+		fee:         new(big.Int).SetBytes(transferLog.Data[96:128]),
+		blockHeight: transferLog.BlkHeight,
+		txHash:      common.BytesToHash(transferLog.ActHash),
+		payload:     transferLog.Data[128:],
+	}, nil
+}
+
+func (ii *iotexIterator) Transfers(startHeight uint64, endHeight uint64) ([]*Transfer, error) {
+	transfers := []*Transfer{}
+	switch ii.version {
+	case V1:
+		response, err := ii.filterLogs(_ReceiptEventTopic[:], startHeight, endHeight)
+		if err != nil {
+			return nil, err
+		}
+		for _, transferLog := range response.Logs {
+			if len(transferLog.Data) != 128 {
+				return nil, errors.Errorf("Invalid data length %d, 128 expected", len(transferLog.Data))
+			}
+			tsf, err := ii.extractTransfer(transferLog, _ReceiptEventTopic)
+			if err != nil {
+				return nil, err
+			}
+			transfers = append(transfers, tsf)
+		}
+	case V3:
+		response, err := ii.filterLogs(_ReceiptEventTopicV3[:], startHeight, endHeight)
+		if err != nil {
+			return nil, err
+		}
+		for _, transferLog := range response.Logs {
+			if len(transferLog.Data) >= 128 {
+				return nil, errors.Errorf("Invalid data length %d < 128", len(transferLog.Data))
+			}
+			tsf, err := ii.extractTransfer(transferLog, _ReceiptEventTopicV3)
+			if err != nil {
+				return nil, err
+			}
+			transfers = append(transfers, tsf)
+		}
+	}
+	return transfers, nil
+}
 
 // NewTokenCashier creates a new TokenCashier
 func NewTokenCashier(
 	id string,
+	version Version,
 	relayerURL string,
 	iotexClient iotex.ReadOnlyClient,
 	cashierContractAddr address.Address,
@@ -30,6 +152,11 @@ func NewTokenCashier(
 	recorder *Recorder,
 	startBlockHeight uint64,
 ) (TokenCashier, error) {
+	iter := &iotexIterator{
+		version:             version,
+		client:              iotexClient,
+		cashierContractAddr: cashierContractAddr,
+	}
 	return newTokenCashierBase(
 		id,
 		recorder,
@@ -54,93 +181,7 @@ func NewTokenCashier(
 			}
 			return endHeight, endHeight, nil
 		},
-		func(startHeight uint64, endHeight uint64) ([]*Transfer, error) {
-			response, err := iotexClient.API().GetLogs(context.Background(), &iotexapi.GetLogsRequest{
-				Filter: &iotexapi.LogsFilter{
-					Address: []string{cashierContractAddr.String()},
-					Topics: []*iotexapi.Topics{
-						{
-							Topic: [][]byte{
-								_ReceiptEventTopic.Bytes(),
-							},
-						},
-					},
-				},
-				Lookup: &iotexapi.GetLogsRequest_ByRange{
-					ByRange: &iotexapi.GetLogsByRange{
-						FromBlock: startHeight,
-						// TODO: this is a bug, which should be fixed in iotex-core
-						ToBlock: endHeight,
-					},
-				},
-			})
-			if err != nil {
-				return nil, err
-			}
-			transfers := []*Transfer{}
-			if len(response.Logs) > 0 {
-				log.Printf("\t%d transfers fetched from %d to %d\n", len(response.Logs), startHeight, endHeight)
-				for _, transferLog := range response.Logs {
-					if !bytes.Equal(_ReceiptEventTopic.Bytes(), transferLog.Topics[0]) {
-						return nil, errors.Errorf("Wrong event topic %s, %s expected", transferLog.Topics[0], _ReceiptEventTopic)
-					}
-					if len(transferLog.Data) != 128 {
-						return nil, errors.Errorf("Invalid data length %d, 128 expected", len(transferLog.Data))
-					}
-					senderAddr := common.BytesToAddress(transferLog.Data[:32])
-					amount := new(big.Int).SetBytes(transferLog.Data[64:96])
-					receipt, err := iotexClient.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{
-						ActionHash: hex.EncodeToString(transferLog.ActHash),
-					})
-					if err != nil {
-						return nil, err
-					}
-					tokenAddr := common.BytesToAddress(transferLog.Topics[1])
-					tokenIoAddr, err := address.FromBytes(tokenAddr.Bytes())
-					if err != nil {
-						return nil, err
-					}
-					cashierAddr, err := address.FromString(transferLog.ContractAddress)
-					if err != nil {
-						return nil, err
-					}
-					cashier := common.BytesToAddress(cashierAddr.Bytes())
-					var realAmount *big.Int
-					for _, l := range receipt.ReceiptInfo.Receipt.Logs {
-						if tokenIoAddr.String() == l.ContractAddress && common.BytesToHash(l.Topics[0]) == _TransferEventTopic && (common.BytesToAddress(l.Topics[1]) == senderAddr || cashier == common.BytesToAddress(l.Topics[1])) {
-							if realAmount != nil && common.BytesToHash(l.Topics[2]) != _ZeroHash {
-								return nil, errors.Errorf("two transfers in one transaction %x", transferLog.ActHash)
-							}
-							realAmount = new(big.Int).SetBytes(l.Data)
-						}
-					}
-					if realAmount == nil {
-						return nil, errors.Errorf("failed to get the amount from transfer event for %x", transferLog.ActHash)
-					}
-					switch realAmount.Cmp(amount) {
-					case 1:
-						return nil, errors.Errorf("Invalid amount: %d < %d", amount, realAmount)
-					case -1:
-						log.Printf("\tAmount %d is reduced %d after tax\n", amount, realAmount)
-					case 0:
-						log.Printf("\tAmount %d is the same as real amount %d\n", amount, realAmount)
-					}
-
-					transfers = append(transfers, &Transfer{
-						cashier:     cashier,
-						token:       tokenAddr,
-						index:       new(big.Int).SetBytes(transferLog.Topics[2]).Uint64(),
-						sender:      senderAddr,
-						recipient:   common.BytesToAddress(transferLog.Data[32:64]),
-						amount:      amount,
-						fee:         new(big.Int).SetBytes(transferLog.Data[96:128]),
-						blockHeight: transferLog.BlkHeight,
-						txHash:      common.BytesToHash(transferLog.ActHash),
-					})
-				}
-			}
-			return transfers, nil
-		},
+		iter.Transfers,
 		func(common.Address, *big.Int) bool {
 			return true
 		},

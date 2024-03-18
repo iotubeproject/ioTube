@@ -95,6 +95,7 @@ func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address)
 		transfer.sender.Bytes(),
 		transfer.recipient.Bytes(),
 		math.U256Bytes(transfer.amount),
+		transfer.payload,
 	)
 	if s.privateKey == nil {
 		return id, common.Address{}, nil, nil
@@ -205,6 +206,7 @@ func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*s
 			Timestamp: timestamppb.New(tx.timestamp),
 			Gas:       tx.gas,
 			GasPrice:  gasPrice,
+			Payload:   tx.payload,
 		},
 	}
 

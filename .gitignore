@@ -19,8 +19,7 @@ build/
 
 witness-service/bin/
 
-node_modules/
-
+.vscode
 node_modules
 .env
 coverage
