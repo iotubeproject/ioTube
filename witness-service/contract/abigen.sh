@@ -16,3 +16,5 @@ abigen --abi $DIR/TokenCashier.abi --bin $DIR/TokenCashier.bin --pkg contract --
 abigen --abi $DIR/TokenList.abi --bin $DIR/TokenList.bin --pkg contract --type TokenList --out $DIR/tokenlist.go
 abigen --abi $DIR/ShadowToken.abi --bin $DIR/ShadowToken.bin --pkg contract --type ShadowToken --out $DIR/shadowtoken.go
 abigen --abi $DIR/addresslist.abi --bin $DIR/addresslist.bin --pkg contract --type AddressList --out $DIR/addresslist.go
+abigen --abi $DIR/TransferValidatorV3.abi --pkg contract --type TransferValidatorV3 --out $DIR/transfervaldiatorv3.go
+abigen --abi $DIR/TokenCashierV3.abi --pkg contract --type TokenCashierV3 --out $DIR/tokencashierv3.go

@@ -18,6 +18,7 @@ message Transfer {
     string gasPrice = 9;
     string fee = 10;
     bytes txSender = 11;
+    bytes payload = 12;
 }
 
 message Witness {
