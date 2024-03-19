@@ -38,26 +38,13 @@ contract TokenCashierV3 is Pausable {
     function count(address _token) public view returns (uint256) {
         return counts[_token];
     }
-/*
-    function addContractDestination(address _dest) public onlyOwner {
-        require(!contractDestinations[_dest], "already added");
-        contractDestinations[_dest] = true;
-        emit ContractDestinationAdded(_dest);
-    }
 
-    function removeContractDestination(address _dest) public onlyOwner {
-        require(contractDestinations[_dest], "invalid destination");
-        contractDestinations[_dest] = false;
-        emit ContractDestinationRemoved(_dest);
-    }
-*/
     function setDepositFee(uint256 _fee) public onlyOwner {
         depositFee = _fee;
     }
 
     function depositTo(address _token, address _to, uint256 _amount, bytes memory _payload) public whenNotPaused payable {
         require(_to != address(0), "invalid destination");
-        // require(_payload.length == 0 || contractDestinations[_to], "invalid destination with payload");
         bool isCoin = false;
         uint256 fee = msg.value;
         if (_token == address(0)) {
