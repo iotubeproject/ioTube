@@ -105,6 +105,13 @@ function downloadConfigFile() {
             exit 2
         fi
     fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-bitcoin-testnet.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/relayer-config-bitcoin-testnet.yaml ${IOTEX_RELAYER}/etc/relayer-config-bitcoin-testnet.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
     [[ -f ${IOTEX_RELAYER}/etc/.env ]] || (echo "IOTEX_RELAYER=$IOTEX_RELAYER" > ${IOTEX_RELAYER}/etc/.env;echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${IOTEX_RELAYER}/etc/.env)
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_RELAYER}/etc/crontab
     cp -f $PROJECT_ABS_DIR/backup_relayer ${IOTEX_RELAYER}/etc/backup
@@ -148,6 +155,7 @@ function grantPrivileges() {
         popd
         echo -e "$YELLOW Success! $NC"
         docker exec relayer-db mysql -uroot -p${DB_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%'"  > /dev/null 2>&1
+        docker exec relayer-db mysql -uroot -p${DB_ROOT_PASSWORD} -e "CREATE DATABASE relayer"  > /dev/null 2>&1
         $WHITE_LINE
         touch $IOTEX_RELAYER/data/mysql/.inited
     fi
