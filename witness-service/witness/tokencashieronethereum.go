@@ -201,7 +201,6 @@ func NewTokenCashierOnEthereum(
 	}
 	return newTokenCashierBase(
 		id,
-		version,
 		recorder,
 		relayerURL,
 		validatorContractAddr,

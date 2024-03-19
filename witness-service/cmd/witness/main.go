@@ -31,6 +31,12 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/witness"
 )
 
+// TokenPair defines a token pair
+type TokenPair struct {
+	Token1 string `json:"token1" yaml:"token1"`
+	Token2 string `json:"token2" yaml:"token2"`
+}
+
 // Configuration defines the configuration of the witness service
 type Configuration struct {
 	Chain                 string        `json:"chain" yaml:"chain"`
@@ -47,19 +53,16 @@ type Configuration struct {
 	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
 	Cashiers              []struct {
-		ID                       string `json:"id" yaml:"id"`
-		RelayerURL               string `json:"relayerURL" yaml:"relayerURL"`
-		Version                  string `json:"version" yaml:"version"`
-		CashierContractAddress   string `json:"cashierContractAddress" yaml:"cashierContractAddress"`
-		TokenSafeContractAddress string `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
-		ValidatorContractAddress string `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
-		TransferTableName        string `json:"transferTableName" yaml:"transferTableName"`
-		TokenPairs               []struct {
-			Token1 string `json:"token1" yaml:"token1"`
-			Token2 string `json:"token2" yaml:"token2"`
-		} `json:"tokenPairs" yaml:"tokenPairs"`
-		StartBlockHeight int `json:"startBlockHeight" yaml:"startBlockHeight"`
-		Reverse          struct {
+		ID                       string          `json:"id" yaml:"id"`
+		RelayerURL               string          `json:"relayerURL" yaml:"relayerURL"`
+		Version                  witness.Version `json:"version" yaml:"version"`
+		CashierContractAddress   string          `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+		TokenSafeContractAddress string          `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
+		ValidatorContractAddress string          `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
+		TransferTableName        string          `json:"transferTableName" yaml:"transferTableName"`
+		TokenPairs               []TokenPair     `json:"tokenPairs" yaml:"tokenPairs"`
+		StartBlockHeight         int             `json:"startBlockHeight" yaml:"startBlockHeight"`
+		Reverse                  struct {
 			TransferTableName      string   `json:"transferTableName" yaml:"transferTableName"`
 			CashierContractAddress string   `json:"cashierContractAddress" yaml:"cashierContractAddress"`
 			Tokens                 []string `json:"tokens" yaml:"tokens"`
@@ -94,6 +97,37 @@ func init() {
 		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename> -secret <filename> -blocks <height,height...>")
 		flag.PrintDefaults()
 	}
+}
+
+func parseAddress(addr string) (common.Address, error) {
+	if strings.HasPrefix(addr, "io") {
+		ioAddr, err := address.FromString(addr)
+		if err != nil {
+			log.Fatalf("failed to parse iotex address %s, %v\n", addr, err)
+		}
+		return common.BytesToAddress(ioAddr.Bytes()), nil
+	}
+	return common.HexToAddress(addr), nil
+}
+
+func parseTokenPairs(tokenPairs []TokenPair) map[common.Address]common.Address {
+	pairs := make(map[common.Address]common.Address)
+	for _, pair := range tokenPairs {
+		token1, err := parseAddress(pair.Token1)
+		if err != nil {
+			log.Fatalf("failed to parse token1 address %s, %v\n", pair.Token1, err)
+		}
+		if _, ok := pairs[token1]; ok {
+			log.Fatalf("duplicate token key %s\n", pair.Token1)
+		}
+		token2, err := parseAddress(pair.Token2)
+		if err != nil {
+			log.Fatalf("failed to parse token2 address %s, %v\n", pair.Token1, err)
+		}
+		pairs[token1] = token2
+	}
+
+	return pairs
 }
 
 func main() {
@@ -177,19 +211,9 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to parse cashier contract address %s, %v\n", cc.CashierContractAddress, err)
 			}
-			pairs := make(map[common.Address]common.Address)
-			for _, pair := range cc.TokenPairs {
-				ioAddr, err := address.FromString(pair.Token1)
-				if err != nil {
-					log.Fatalf("failed to parse iotex address %s, %v\n", pair.Token1, err)
-				}
-				if _, ok := pairs[common.BytesToAddress(ioAddr.Bytes())]; ok {
-					log.Fatalf("duplicate token key %s\n", pair.Token1)
-				}
-				pairs[common.BytesToAddress(ioAddr.Bytes())] = common.HexToAddress(pair.Token2)
-			}
 			cashier, err := witness.NewTokenCashier(
 				cc.ID,
+				cc.Version,
 				cc.RelayerURL,
 				iotexClient,
 				cashierContractAddr,
@@ -197,7 +221,7 @@ func main() {
 				witness.NewRecorder(
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
-					pairs,
+					parseTokenPairs(cc.TokenPairs),
 				),
 				uint64(cc.StartBlockHeight),
 			)
@@ -244,6 +268,7 @@ func main() {
 			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
 				cc.ID,
+				cc.Version,
 				cc.RelayerURL,
 				ethClient,
 				common.HexToAddress(cc.CashierContractAddress),
@@ -252,7 +277,7 @@ func main() {
 				witness.NewRecorder(
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
-					pairs,
+					parseTokenPairs(cc.TokenPairs),
 				),
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
