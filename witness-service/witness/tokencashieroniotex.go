@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"math/big"
 	"strings"
@@ -120,6 +121,10 @@ func NewTokenCashier(
 					}
 					senderAddr, recipient, amount, fee, err := getTransferInfo(transferLog.Data)
 					if err != nil {
+						if errors.Cause(err) == errInvalidRecipient {
+							log.Printf("Invalid recipient: %s Log data %x\n", err.Error(), transferLog.Data)
+							continue
+						}
 						return nil, errors.Wrap(err, "failed to get transfer info")
 					}
 					receipt, err := iotexClient.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{
@@ -186,6 +191,10 @@ func NewTokenCashier(
 	), nil
 }
 
+var (
+	errInvalidRecipient = errors.New("invalid recipient")
+)
+
 func getETHTransferInfo(data []byte, addrDecoder util.AddressDecoder) (senderAddrr common.Address,
 	recipient util.Address, amount *big.Int, fee *big.Int, err error) {
 	if len(data) != 128 {
@@ -219,6 +228,8 @@ func getBTCTransferInfo(cashierABI abi.ABI, data []byte, addrDecoder util.Addres
 	senderAddrr = event.Sender
 	recipient, err = addrDecoder.DecodeString(event.Recipient)
 	if err != nil {
+		err = errors.Wrap(errInvalidRecipient,
+			fmt.Sprintf("failed to decode recipient %s, %s", event.Recipient, err.Error()))
 		return
 	}
 	amount = event.Amount
