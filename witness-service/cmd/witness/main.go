@@ -47,23 +47,25 @@ type Configuration struct {
 	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
 	Cashiers              []struct {
-		ID                       string `json:"id" yaml:"id"`
-		RelayerURL               string `json:"relayerURL" yaml:"relayerURL"`
-		CashierContractAddress   string `json:"cashierContractAddress" yaml:"cashierContractAddress"`
-		TokenSafeContractAddress string `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
-		ValidatorContractAddress string `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
-		TransferTableName        string `json:"transferTableName" yaml:"transferTableName"`
-		TokenPairs               []struct {
-			Token1 string `json:"token1" yaml:"token1"`
-			Token2 string `json:"token2" yaml:"token2"`
-		} `json:"tokenPairs" yaml:"tokenPairs"`
-		StartBlockHeight int `json:"startBlockHeight" yaml:"startBlockHeight"`
-		Reverse          struct {
+		ID                       string      `json:"id" yaml:"id"`
+		RelayerURL               string      `json:"relayerURL" yaml:"relayerURL"`
+		CashierContractAddress   string      `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+		TokenSafeContractAddress string      `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
+		ValidatorContractAddress string      `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
+		TransferTableName        string      `json:"transferTableName" yaml:"transferTableName"`
+		TokenPairs               []TokenPair `json:"tokenPairs" yaml:"tokenPairs"`
+		StartBlockHeight         int         `json:"startBlockHeight" yaml:"startBlockHeight"`
+		Reverse                  struct {
 			TransferTableName      string   `json:"transferTableName" yaml:"transferTableName"`
 			CashierContractAddress string   `json:"cashierContractAddress" yaml:"cashierContractAddress"`
 			Tokens                 []string `json:"tokens" yaml:"tokens"`
 		}
 	} `json:"cashiers" yaml:"cashiers"`
+}
+
+type TokenPair struct {
+	Token1 string `json:"token1" yaml:"token1"`
+	Token2 string `json:"token2" yaml:"token2"`
 }
 
 var (
@@ -93,6 +95,25 @@ func init() {
 		fmt.Fprintln(os.Stderr, "Usage:", os.Args[0], "-config <filename> -secret <filename> -blocks <height,height...>")
 		flag.PrintDefaults()
 	}
+}
+
+func parseTokenPairs(tokenPairs []TokenPair) map[common.Address]common.Address {
+	pairs := make(map[common.Address]common.Address)
+	for _, pair := range tokenPairs {
+		token1, err := util.ParseAddress(pair.Token1)
+		if err != nil {
+			log.Fatalf("failed to parse token1 address %s, %v\n", pair.Token1, err)
+		}
+		if _, ok := pairs[token1]; ok {
+			log.Fatalf("duplicate token key %s\n", pair.Token1)
+		}
+		token2, err := util.ParseAddress(pair.Token2)
+		if err != nil {
+			log.Fatalf("failed to parse token2 address %s, %v\n", pair.Token1, err)
+		}
+		pairs[token1] = token2
+	}
+	return pairs
 }
 
 func main() {
@@ -205,7 +226,7 @@ func main() {
 			}
 			cashiers = append(cashiers, cashier)
 		}
-	case "heco", "bsc", "matic", "polis":
+	case "heco", "bsc", "matic", "polis", "iotex-e":
 		// heco and bsc are identical to ethereum
 		fallthrough
 	case "ethereum":
@@ -214,20 +235,9 @@ func main() {
 			log.Fatal(err)
 		}
 		for _, cc := range cfg.Cashiers {
-			addr, err := address.FromString(cc.ValidatorContractAddress)
+			validatorAddr, err := util.ParseAddress(cc.ValidatorContractAddress)
 			if err != nil {
-				log.Fatalf("failed to parse validator contract address %v\n", err)
-			}
-			pairs := make(map[common.Address]common.Address)
-			for _, pair := range cc.TokenPairs {
-				if _, ok := pairs[common.HexToAddress(pair.Token1)]; ok {
-					log.Fatalf("duplicate token key %s\n", pair.Token1)
-				}
-				ioAddr, err := address.FromString(pair.Token2)
-				if err != nil {
-					log.Fatalf("failed to parse iotex address %s, %v\n", pair.Token2, err)
-				}
-				pairs[common.HexToAddress(pair.Token1)] = common.BytesToAddress(ioAddr.Bytes())
+				log.Fatalf("failed to parse validator contract address %s: %v\n", cc.ValidatorContractAddress, err)
 			}
 			var reverseRecorder *witness.Recorder
 			if cc.Reverse.CashierContractAddress != "" && cc.Reverse.TransferTableName != "" {
@@ -241,17 +251,25 @@ func main() {
 					pairs,
 				)
 			}
+			cashierAddr, err := util.ParseAddress(cc.CashierContractAddress)
+			if err != nil {
+				log.Fatalf("invalid cashier address %s: %+v\n", cc.CashierContractAddress, err)
+			}
+			tokenSafeAddr, err := util.ParseAddress(cc.TokenSafeContractAddress)
+			if err != nil {
+				log.Fatalf("invalid token safe address %s: %+v\n", cc.TokenSafeContractAddress, err)
+			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
 				cc.ID,
 				cc.RelayerURL,
 				ethClient,
-				common.HexToAddress(cc.CashierContractAddress),
-				common.HexToAddress(cc.TokenSafeContractAddress),
-				common.BytesToAddress(addr.Bytes()),
+				cashierAddr,
+				tokenSafeAddr,
+				validatorAddr,
 				witness.NewRecorder(
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
-					pairs,
+					parseTokenPairs(cc.TokenPairs),
 				),
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
