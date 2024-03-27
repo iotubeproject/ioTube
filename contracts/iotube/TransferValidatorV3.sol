@@ -14,7 +14,7 @@ interface IMinter {
 }
 
 interface IReceiver {
-    function onReceive(bytes32 id, address sender, address token, uint256 amount, bytes calldata payload) external;
+    function onReceive(address sender, address token, uint256 amount, bytes calldata payload) external;
 }
 
 contract TransferValidatorV3 is Pausable {
@@ -59,7 +59,7 @@ contract TransferValidatorV3 is Pausable {
                 settles[key] = block.number;
                 require(minters[it].mint(tokenAddr, to, amount), "failed to mint token");
                 if (receivers[to]) {
-                    IReceiver(to).onReceive(key, from, tokenAddr, amount, payload);
+                    IReceiver(to).onReceive(from, tokenAddr, amount, payload);
                 }
                 emit Settled(key, witnesses);
                 return;
