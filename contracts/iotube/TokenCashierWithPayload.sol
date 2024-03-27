@@ -1,6 +1,7 @@
-pragma solidity <6.0 >=0.4.24;
+// SPDX-License-Identifier: MIT
+pragma solidity >= 0.8.0;
 
-import "../lifecycle/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface ITokenList {
     function isAllowed(address) external returns (bool);
@@ -12,26 +13,30 @@ interface IWrappedCoin {
     function deposit() external payable;
 }
 
-contract TokenCashierV3 is Pausable {
+contract TokenCashierWithPayload is Ownable {
     event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee, bytes payload);
-    // event ContractDestinationAdded(address indexed destination);
-    // event ContractDestinationRemoved(address indexed destination);
+
+    modifier whenNotPaused() {
+        require(!paused);
+        _;
+    }
+
+    bool public paused;
 
     ITokenList[] public tokenLists;
     address[] public tokenSafes;
     mapping(address => uint256) public counts;
     uint256 public depositFee;
     IWrappedCoin public wrappedCoin;
-    // mapping(address => bool) public contractDestinations;
 
-    constructor(IWrappedCoin _wrappedCoin, ITokenList[] memory _tokenLists, address[] memory _tokenSafes) public {
+    constructor(IWrappedCoin _wrappedCoin, ITokenList[] memory _tokenLists, address[] memory _tokenSafes) {
         require(_tokenLists.length == _tokenSafes.length, "# of token lists is not equal to # of safes");
         wrappedCoin = _wrappedCoin;
         tokenLists = _tokenLists;
         tokenSafes = _tokenSafes;
     }
 
-    function() external {
+    fallback() external {
         revert();
     }
 
@@ -50,7 +55,7 @@ contract TokenCashierV3 is Pausable {
         if (_token == address(0)) {
             require(msg.value >= _amount, "insufficient msg.value");
             fee = msg.value - _amount;
-            wrappedCoin.deposit.value(_amount)();
+            wrappedCoin.deposit{value: _amount}();
             _token = address(wrappedCoin);
             isCoin = true;
         }
@@ -84,7 +89,7 @@ contract TokenCashierV3 is Pausable {
     }
 
     function withdraw() external onlyOwner {
-        msg.sender.transfer(address(this).balance);
+        payable(msg.sender).transfer(address(this).balance);
     }
 
     function withdrawToken(address _token) public onlyOwner {

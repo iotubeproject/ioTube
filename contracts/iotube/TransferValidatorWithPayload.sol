@@ -1,6 +1,7 @@
-pragma solidity <6.0 >=0.4.24;
+// SPDX-License-Identifier: MIT
+pragma solidity >= 0.8.0;
 
-import "../lifecycle/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface IAllowlist {
     function isAllowed(address) external view returns (bool);
@@ -14,13 +15,18 @@ interface IMinter {
 }
 
 interface IReceiver {
-    function onReceive(bytes32 id, address sender, address token, uint256 amount, bytes calldata payload) external;
+    function onReceive(address sender, address token, uint256 amount, bytes calldata payload) external;
 }
 
-contract TransferValidatorV3 is Pausable {
+contract TransferValidatorWithPayload is Ownable {
     event Settled(bytes32 indexed key, address[] witnesses);
     event ReceiverAdded(address receiver);
     event ReceiverRemoved(address receiver);
+    modifier whenNotPaused() {
+        require(!paused);
+        _;
+    }
+    bool public paused;
 
     mapping(bytes32 => uint256) public settles;
     mapping(address => bool) public receivers;
@@ -29,7 +35,7 @@ contract TransferValidatorV3 is Pausable {
     IAllowlist[] public tokenLists;
     IAllowlist public witnessList;
 
-    constructor(IAllowlist _witnessList) public {
+    constructor(IAllowlist _witnessList) {
         witnessList = _witnessList;
     }
 
@@ -59,7 +65,7 @@ contract TransferValidatorV3 is Pausable {
                 settles[key] = block.number;
                 require(minters[it].mint(tokenAddr, to, amount), "failed to mint token");
                 if (receivers[to]) {
-                    IReceiver(to).onReceive(key, from, tokenAddr, amount, payload);
+                    IReceiver(to).onReceive(from, tokenAddr, amount, payload);
                 }
                 emit Settled(key, witnesses);
                 return;

@@ -13,7 +13,7 @@ interface IMinter {
     function owner() external view returns(address);
 }
 
-contract TransferValidator is Pausable {
+contract TransferValidatorV2 is Pausable {
     event Settled(bytes32 indexed key, address[] witnesses);
 
     mapping(bytes32 => uint256) public settles;

@@ -15,7 +15,7 @@
 # vendor/
 
 # Truffle build directories
-build/
+*/build/
 
 witness-service/bin/
 
@@ -30,3 +30,5 @@ typechain-types
 # Hardhat files
 cache
 artifacts
+node_modules
+.vscode
