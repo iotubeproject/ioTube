@@ -63,6 +63,9 @@ cashiers:
       # CRU
       - token1: "io1mrm6dm4mudkau3sk9as0v9prysg5670vcx6rl8"
         token2: "0x9c3af6ffccac8a4ccb31a4b769b84a517c6c13b5"
+      # ATOR
+      - token1: "io1mypw5gnl79d8t6436zfg9psd40llndr2x9ntp6"
+        token2: "0x6ed84215c7c4e94b0dc55c16e574d407586d2116"
   - id: "iotex-to-heco"
     relayerURL: ":7002"
     cashierContractAddress: "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
