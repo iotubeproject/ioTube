@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
@@ -45,6 +46,10 @@ type transferValidatorOnEthereum struct {
 	validatorContract   *contract.TransferValidator
 	witnessListContract *contract.AddressListCaller
 	witnesses           map[string]bool
+
+	bonus         *big.Int
+	bonusTokens   map[common.Address]*big.Int
+	bonusRecorder map[common.Address]time.Time
 }
 
 // NewTransferValidatorOnEthereum creates a new TransferValidator
@@ -58,6 +63,8 @@ func NewTransferValidatorOnEthereum(
 	gasPriceDeviation *big.Int,
 	gasPriceGap *big.Int,
 	validatorContractAddr common.Address,
+	bonusTokens map[string]*big.Int,
+	bonus *big.Int,
 ) (TransferValidator, error) {
 	validatorContract, err := contract.NewTransferValidator(validatorContractAddr, client)
 	if err != nil {
@@ -85,6 +92,10 @@ func NewTransferValidatorOnEthereum(
 
 		client:            client,
 		validatorContract: validatorContract,
+
+		bonusRecorder: map[string]time.Time{},
+		bonusTokens:   bonusTokens,
+		bonus:         bonus,
 	}
 	callOpts, err := tv.callOpts()
 	if err != nil {
@@ -151,6 +162,49 @@ func (tv *transferValidatorOnEthereum) isActiveWitness(witness common.Address) b
 	return ok && val
 }
 
+func (tv *transferValidatorOnEthereum) sendBonus(privateKey *ecdsa.PrivateKey, recipient common.Address) error {
+	ctx := context.Background()
+	balance, err := tv.client.PendingBalanceAt(ctx, recipient)
+	if err != nil {
+		return err
+	}
+	if balance.Cmp(big.NewInt(0)) > 0 {
+		return nil
+	}
+	code, err := tv.client.CodeAt(ctx, recipient, nil)
+	if err != nil {
+		return err
+	}
+	if len(code) != 0 {
+		return nil
+	}
+	nonce, err := tv.client.PendingNonceAt(ctx, recipient)
+	if err != nil {
+		return err
+	}
+	if nonce != 0 {
+		return nil
+	}
+	if _, ok := tv.bonusRecorder[recipient]; ok {
+		return nil
+	}
+	gasPrice, err := tv.client.SuggestGasPrice(ctx)
+	if err != nil {
+		return err
+	}
+	tx := types.NewTransaction(nonce, recipient, tv.bonus, uint64(21000), gasPrice, []byte{})
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tv.chainID), privateKey)
+	if err != nil {
+		return err
+	}
+	if err := tv.client.SendTransaction(context.Background(), signedTx); err != nil {
+		return err
+	}
+	tv.bonusRecorder[recipient] = time.Now()
+
+	return nil
+}
+
 // Check returns true if a transfer has been settled
 func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainType, error) {
 	tv.mu.RLock()
@@ -186,6 +240,12 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 			return StatusOnChainUnknown, err
 		}
 		transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
+		if threshold, ok := tv.bonusTokens[transfer.token]; ok && transfer.amount.Cmp(threshold) > 0 {
+			if err := tv.sendBonus(tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))], transfer.recipient); err != nil {
+				log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
+			}
+		}
+
 		return StatusOnChainSettled, nil
 	}
 	r, err := tv.client.TransactionReceipt(context.Background(), transfer.txHash)
