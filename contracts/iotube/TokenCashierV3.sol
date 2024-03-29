@@ -31,9 +31,9 @@ contract TokenCashierV3 is Pausable {
         tokenSafes = _tokenSafes;
     }
 
-    function() external {
-        revert();
-    }
+    // receive() external {
+    //     revert();
+    // }
 
     function count(address _token) public view returns (uint256) {
         return counts[_token];
