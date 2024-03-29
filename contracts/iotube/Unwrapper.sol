@@ -4,7 +4,7 @@ pragma solidity >= 0.8.0;
 import "../ownership/Ownable.sol";
 
 interface ICrosschainToken {
-    function depositTo(address, uint256) external;
+    function withdrawTo(address, uint256) external;
 }
 
 contract Unwrapper is Ownable {
@@ -17,10 +17,18 @@ contract Unwrapper is Ownable {
     function onReceive(address _sender, ICrosschainToken _token, uint256 _amount, bytes calldata _payload) external {
         require(whitelist[msg.sender], "invalid caller");
         address recipient = _sender;
-        if (_payload.length == 40) {
+        if (_payload.length == 32) {
             (recipient) = abi.decode(_payload, (address));
         }
-        _token.depositTo(recipient, _amount);
+        _token.withdrawTo(recipient, _amount);
+    }
+
+    function addWhitelist(address _addr) external onlyOwner {
+        whitelist[_addr] = true;
+    }
+
+    function removeWhitelist(address _addr) external onlyOwner {
+        whitelist[_addr] = false;
     }
 }
 
