@@ -66,6 +66,12 @@ cashiers:
       # ATOR
       - token1: "io1mypw5gnl79d8t6436zfg9psd40llndr2x9ntp6"
         token2: "0x6ed84215c7c4e94b0dc55c16e574d407586d2116"
+      # MXC
+      - token1: "io1rx6g86z5rtz35sdnk7ywe305sktclmys3cu7kr"
+        token2: "0xC4fFC19CB3dfE37152d07a5444254930e9FF7127"
+      # BZZ
+      - token1: "io1sfdp2uz9dtmphszqehdwwqqdhw4amzfkvfxeff"
+        token2: "0x2bAbAb214Cb2EDCA4D2EA995ee9EaBeC4Bc12687"
   - id: "iotex-to-heco"
     relayerURL: ":7002"
     cashierContractAddress: "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
@@ -192,3 +198,6 @@ cashiers:
       # DATA
       - token1: "io1rt3y6jfg4ph64txhrn6pf54n5jv6mv5mjlp37u"
         token2: "0x72F30B99C6bc3681508950b47A50fe0b18eF4BE6"
+      # MYST
+      - token1: "io1sn3qr4mwrzvvlj4r33k63rjm8lcvt5ckghs9h7"
+        token2: "0x9D06d28aDaC1d9843034c61EE22991469413d790"
