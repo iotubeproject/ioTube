@@ -69,3 +69,9 @@ cashiers:
       # ATOR
       - token2: "io1mypw5gnl79d8t6436zfg9psd40llndr2x9ntp6"
         token1: "0x6ed84215c7c4e94b0dc55c16e574d407586d2116"
+      # MXC
+      - token2: "io1rx6g86z5rtz35sdnk7ywe305sktclmys3cu7kr"
+        token1: "0xC4fFC19CB3dfE37152d07a5444254930e9FF7127"
+      # BZZ
+      - token2: "io1sfdp2uz9dtmphszqehdwwqqdhw4amzfkvfxeff"
+        token1: "0x2bAbAb214Cb2EDCA4D2EA995ee9EaBeC4Bc12687"

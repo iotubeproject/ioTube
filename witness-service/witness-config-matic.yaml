@@ -58,3 +58,6 @@ cashiers:
       # DATA
       - token2: "io1rt3y6jfg4ph64txhrn6pf54n5jv6mv5mjlp37u"
         token1: "0x72F30B99C6bc3681508950b47A50fe0b18eF4BE6"
+      # MYST
+      - token2: "io1sn3qr4mwrzvvlj4r33k63rjm8lcvt5ckghs9h7"
+        token1: "0x9D06d28aDaC1d9843034c61EE22991469413d790"
