@@ -70,8 +70,8 @@ cashiers:
       - token1: "io1rx6g86z5rtz35sdnk7ywe305sktclmys3cu7kr"
         token2: "0xC4fFC19CB3dfE37152d07a5444254930e9FF7127"
       # BZZ
-      - token1: "io1sfdp2uz9dtmphszqehdwwqqdhw4amzfkvfxeff"
-        token2: "0x2bAbAb214Cb2EDCA4D2EA995ee9EaBeC4Bc12687"
+      - token1: "io15qh4h8kw0v5vr9wdcqnm3hp59w9p28322vm3dh"
+        token2: "0xDfF04A48baa71021e0221e9B26DD3C13cdC2FE7e"
   - id: "iotex-to-heco"
     relayerURL: ":7002"
     cashierContractAddress: "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
