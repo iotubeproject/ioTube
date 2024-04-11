@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type (
@@ -235,7 +236,7 @@ func (recorder *Recorder) addWitness(
 	transferTableName, witnessTableName string,
 ) error {
 	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
+		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, payload, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
 		transfer.cashier.Hex(),
 		transfer.token.Hex(),
 		transfer.index,
@@ -243,6 +244,7 @@ func (recorder *Recorder) addWitness(
 		transfer.txSender.Hex(),
 		transfer.recipient.Hex(),
 		transfer.amount.String(),
+		util.EncodeToNullString(transfer.payload),
 		transfer.fee.String(),
 		transfer.id.Hex(),
 	); err != nil {
@@ -318,7 +320,7 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	tx := &Transfer{}
 	var rawAmount string
 	var cashier, token, sender, recipient, id string
-	var relayer, hash, gasPrice, fee, txSender sql.NullString
+	var relayer, hash, payload, gasPrice, fee, txSender sql.NullString
 	var gas, nonce sql.NullInt64
 	var timestamp sql.NullTime
 	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
@@ -348,6 +350,11 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	if timestamp.Valid {
 		tx.timestamp = timestamp.Time
 	}
+	var err error
+	tx.payload, err = util.DecodeNullString(payload)
+	if err != nil {
+		return nil, err
+	}
 	tx.fee = big.NewInt(0)
 	var ok bool
 	if fee.Valid {
@@ -374,7 +381,7 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `id`=?", recorder.transferTableName),
 		id.Hex(),
 	)
 	return recorder.assembleTransfer(row.Scan)
@@ -482,7 +489,7 @@ func (recorder *Recorder) Transfers(
 	if byUpdateTime {
 		orderBy = "updateTime"
 	}
-	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
+	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
 	conditions := []string{}

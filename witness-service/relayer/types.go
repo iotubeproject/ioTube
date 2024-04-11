@@ -32,6 +32,7 @@ type (
 		txSender   common.Address
 		recipient  common.Address
 		amount     *big.Int
+		payload    []byte
 		fee        *big.Int
 		id         common.Hash
 		txHash     common.Hash
@@ -126,6 +127,7 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 		sender.Bytes(),
 		recipient.Bytes(),
 		math.U256Bytes(amount),
+		transfer.Payload,
 	)
 
 	return &Transfer{
@@ -141,6 +143,7 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 		gasPrice:  gasPrice,
 		timestamp: transfer.Timestamp.AsTime(),
 		txSender:  txSender,
+		payload:   transfer.Payload,
 	}, nil
 }
 
@@ -178,12 +181,14 @@ func (transfer *Transfer) ToTypesTransfer() *types.Transfer {
 		Token:     transfer.token.Bytes(),
 		Index:     int64(transfer.index),
 		Sender:    transfer.sender.Bytes(),
+		TxSender:  transfer.txSender.Bytes(),
 		Recipient: transfer.recipient.Bytes(),
 		Amount:    transfer.amount.String(),
 		Fee:       transfer.fee.String(),
 		Gas:       transfer.gas,
 		GasPrice:  gasPrice,
 		Timestamp: timestamppb.New(transfer.timestamp),
+		Payload:   transfer.payload,
 	}
 }
 

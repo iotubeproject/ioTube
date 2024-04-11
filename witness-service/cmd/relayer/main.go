@@ -35,17 +35,18 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	Chain                 string        `json:"chain" yaml:"chain"`
-	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
-	EthConfirmBlockNumber uint16        `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
-	EthDefaultGasPrice    uint64        `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
-	EthGasPriceLimit      uint64        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
-	EthGasPriceHardLimit  uint64        `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
-	EthGasPriceDeviation  int64         `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
-	EthGasPriceGap        uint64        `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
-	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
-	Interval              time.Duration `json:"interval" yaml:"interval"`
-	ValidatorAddress      string        `json:"vialidatorAddress" yaml:"validatorAddress"`
+	Chain                 string          `json:"chain" yaml:"chain"`
+	ClientURL             string          `json:"clientURL" yaml:"clientURL"`
+	EthConfirmBlockNumber uint16          `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+	EthDefaultGasPrice    uint64          `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
+	EthGasPriceLimit      uint64          `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+	EthGasPriceHardLimit  uint64          `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
+	EthGasPriceDeviation  int64           `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
+	EthGasPriceGap        uint64          `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
+	PrivateKey            string          `json:"privateKey" yaml:"privateKey"`
+	Interval              time.Duration   `json:"interval" yaml:"interval"`
+	Version               relayer.Version `json:"version" yaml:"version"`
+	ValidatorAddress      string          `json:"vialidatorAddress" yaml:"validatorAddress"`
 
 	BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
 	Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
@@ -75,6 +76,7 @@ var defaultConfig = Configuration{
 	PrivateKey:            "",
 	SlackWebHook:          "",
 	LarkWebHook:           "",
+	Version:               relayer.V1,
 	TransferTableName:     "relayer.transfers",
 	WitnessTableName:      "relayer.witnesses",
 }
@@ -171,6 +173,7 @@ func main() {
 			new(big.Int).SetUint64(cfg.EthGasPriceHardLimit),
 			new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
 			new(big.Int).SetUint64(cfg.EthGasPriceGap),
+			cfg.Version,
 			common.HexToAddress(cfg.ValidatorAddress),
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
@@ -196,6 +199,7 @@ func main() {
 		}
 		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
 			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
+			cfg.Version,
 			validatorContractAddr,
 			cfg.BonusTokens,
 			cfg.Bonus,

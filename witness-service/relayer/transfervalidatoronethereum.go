@@ -27,6 +27,12 @@ import (
 
 var zeroAddress = common.Address{}
 
+// Version
+type Version string
+
+const V1 Version = "V1"
+const V3 Version = "V3"
+
 // transferValidatorOnEthereum defines the transfer validator
 type transferValidatorOnEthereum struct {
 	mu                 sync.RWMutex
@@ -39,6 +45,7 @@ type transferValidatorOnEthereum struct {
 
 	chainID               *big.Int
 	privateKeys           []*ecdsa.PrivateKey
+	version               Version
 	validatorContractAddr common.Address
 
 	client              *ethclient.Client
@@ -57,6 +64,7 @@ func NewTransferValidatorOnEthereum(
 	gasPriceHardLimit *big.Int,
 	gasPriceDeviation *big.Int,
 	gasPriceGap *big.Int,
+	version Version,
 	validatorContractAddr common.Address,
 ) (TransferValidator, error) {
 	validatorContract, err := contract.NewTransferValidator(validatorContractAddr, client)
@@ -81,6 +89,7 @@ func NewTransferValidatorOnEthereum(
 
 		chainID:               chainID,
 		privateKeys:           privateKeys,
+		version:               version,
 		validatorContractAddr: validatorContractAddr,
 
 		client:            client,
