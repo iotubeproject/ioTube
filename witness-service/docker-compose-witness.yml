@@ -90,6 +90,32 @@ services:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
       RELAYER_URL: ${RELAYER_URL}
 
+  solana-witness:
+    container_name: solana-witness
+    image: witness:latest
+    restart: on-failure
+    volumes:
+      - $IOTEX_WITNESS/etc/witness-config-solana.yaml:/etc/iotube-witness/witness-config-solana.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-solana.secret.yaml:/etc/iotube-witness/witness-config-solana.secret.yaml:ro
+    network_mode: host
+    command: witness -config=/etc/iotube-witness/witness-config-solana.yaml -secret=/etc/iotube-witness/witness-config-solana.secret.yaml
+    environment:
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+      RELAYER_URL: ${RELAYER_URL}
+  
+  iotex-solana-witness:
+    container_name: iotex-solana-witness
+    image: witness:latest
+    restart: on-failure
+    volumes:
+      - $IOTEX_WITNESS/etc/witness-config-iotex-solana.yaml:/etc/iotube-witness/witness-config-iotex.yaml:ro
+      - $IOTEX_WITNESS/etc/witness-config-iotex-solana.secret.yaml:/etc/iotube-witness/witness-config-iotex.secret.yaml:ro
+    network_mode: host
+    command: witness -config=/etc/iotube-witness/witness-config-iotex.yaml -secret=/etc/iotube-witness/witness-config-iotex.secret.yaml
+    environment:
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+      RELAYER_URL: ${RELAYER_URL}
+
   cron:
     image: schnitzler/mysqldump
     restart: always

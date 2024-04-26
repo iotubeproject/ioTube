@@ -9,6 +9,7 @@ package witness
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math"
@@ -16,51 +17,43 @@ import (
 
 	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/ethereum/go-ethereum/common"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq"
-
-	// _ "github.com/mattn/go-sqlite3"
-	"github.com/pkg/errors"
-
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/pkg/errors"
 )
 
 type (
-	// Recorder is a logger based on sql to record exchange events
-	Recorder struct {
+	// SOLRecorder is the recorder for Solana
+	SOLRecorder struct {
 		store                *db.SQLStore
 		cashierMetaTableName string
 		transferTableName    string
-		tokenPairs           map[common.Address]util.Address
-		tokenMintPairs       map[string]util.Address
-		tokenRound           map[common.Address]int
+		tokenPairs           map[solcommon.PublicKey]util.Address
+		tokenRound           map[solcommon.PublicKey]int
 		addrDecoder          util.AddressDecoder
 	}
 )
 
-// NewRecorder returns a recorder for exchange
-func NewRecorder(
+// NewSOLRecorder returns a recorder for exchange
+func NewSOLRecorder(
 	store *db.SQLStore,
 	transferTableName string,
-	tokenPairs map[common.Address]util.Address,
-	tokenMintPairs map[string]util.Address,
-	tokenRound map[common.Address]int,
+	tokenPairs map[solcommon.PublicKey]util.Address,
+	tokenRound map[solcommon.PublicKey]int,
 	addrDecoder util.AddressDecoder,
-) *Recorder {
-	return &Recorder{
+) *SOLRecorder {
+	return &SOLRecorder{
 		store:                store,
-		cashierMetaTableName: "cashier_meta",
+		cashierMetaTableName: "solana_cashier_meta",
 		transferTableName:    transferTableName,
 		tokenPairs:           tokenPairs,
-		tokenMintPairs:       tokenMintPairs,
 		tokenRound:           tokenRound,
 		addrDecoder:          addrDecoder,
 	}
 }
 
 // Start starts the recorder
-func (recorder *Recorder) Start(ctx context.Context) error {
+func (recorder *SOLRecorder) Start(ctx context.Context) error {
 	if err := recorder.store.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start db")
 	}
@@ -75,10 +68,10 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 	}
 	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s ("+
-			"`cashier` varchar(42) NOT NULL,"+
-			"`token` varchar(42) NOT NULL,"+
+			"`cashier` varchar(64) NOT NULL,"+
+			"`token` varchar(64) NOT NULL,"+
 			"`tidx` bigint(20) NOT NULL,"+
-			"`sender` varchar(42) NOT NULL,"+
+			"`sender` varchar(64) NOT NULL,"+
 			"`recipient` varchar(256) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
 			"`payload` varchar(24576),"+
@@ -88,8 +81,8 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
 			"`id` varchar(132),"+
 			"`blockHeight` bigint(20) NOT NULL,"+
-			"`txHash` varchar(66) NOT NULL,"+
-			"`txSender` varchar(42),"+
+			"`txSignature` varchar(128) NOT NULL,"+
+			"`txSender` varchar(64) NOT NULL,"+
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
 			"KEY `id_index` (`id`),"+
 			"KEY `cashier_index` (`cashier`),"+
@@ -97,7 +90,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"KEY `sender_index` (`sender`),"+
 			"KEY `recipient_index` (`recipient`),"+
 			"KEY `status_index` (`status`),"+
-			"KEY `txHash_index` (`txHash`),"+
+			"KEY `txSignature_index` (`txSignature`),"+
 			"KEY `blockHeight_index` (`blockHeight`)"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
 		recorder.transferTableName,
@@ -110,36 +103,36 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 }
 
 // Stop stops the recorder
-func (recorder *Recorder) Stop(ctx context.Context) error {
+func (recorder *SOLRecorder) Stop(ctx context.Context) error {
 	return recorder.store.Stop(ctx)
 }
 
 // AddTransfer creates a new transfer record
-func (recorder *Recorder) AddTransfer(at AbstractTransfer, status TransferStatus) error {
-	tx, ok := at.(*Transfer)
+func (recorder *SOLRecorder) AddTransfer(at AbstractTransfer, status TransferStatus) error {
+	tx, ok := at.(*solTransfer)
 	if !ok {
 		return errors.Errorf("invalid transfer type %T", at)
 	}
-	if err := recorder.validateID(tx.index); err != nil {
+	if err := validateID(tx.index); err != nil {
 		return err
 	}
 	if tx.amount.Sign() != 1 {
 		return errors.New("amount should be larger than 0")
 	}
-	query := fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txHash`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
+	query := fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txSignature`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
-		tx.cashier.Hex(),
-		tx.token.Hex(),
+		hex.EncodeToString(tx.cashier.Bytes()),
+		hex.EncodeToString(tx.token.Bytes()),
 		tx.index,
-		tx.sender.Hex(),
+		hex.EncodeToString(tx.sender.Bytes()),
 		tx.recipient.String(),
 		tx.amount.String(),
 		util.EncodeToNullString(tx.payload),
 		tx.fee.String(),
 		tx.blockHeight,
-		tx.txHash.Hex(),
-		tx.txSender.Hex(),
+		hex.EncodeToString(tx.txSignature),
+		hex.EncodeToString(tx.txPayer.Bytes()),
 		status,
 	)
 	if err != nil {
@@ -150,36 +143,36 @@ func (recorder *Recorder) AddTransfer(at AbstractTransfer, status TransferStatus
 		return err
 	}
 	if affected == 0 {
-		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
+		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.String(), tx.token.String(), tx.index)
 	}
 	return nil
 }
 
-func (recorder *Recorder) UpsertTransfer(at AbstractTransfer) error {
-	tx, ok := at.(*Transfer)
+func (recorder *SOLRecorder) UpsertTransfer(at AbstractTransfer) error {
+	tx, ok := at.(*solTransfer)
 	if !ok {
 		return errors.Errorf("invalid transfer type %T", at)
 	}
-	if err := recorder.validateID(tx.index); err != nil {
+	if err := validateID(tx.index); err != nil {
 		return err
 	}
 	if tx.amount.Sign() != 1 {
 		return errors.New("amount should be larger than 0")
 	}
-	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txHash`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
+	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txSignature`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
-		tx.cashier.Hex(),
-		tx.token.Hex(),
+		hex.EncodeToString(tx.cashier.Bytes()),
+		hex.EncodeToString(tx.token.Bytes()),
 		tx.index,
-		tx.sender.Hex(),
+		hex.EncodeToString(tx.sender.Bytes()),
 		tx.recipient.String(),
 		tx.amount.String(),
 		util.EncodeToNullString(tx.payload),
 		tx.fee.String(),
 		tx.blockHeight,
-		tx.txHash.Hex(),
-		tx.txSender.Hex(),
+		hex.EncodeToString(tx.txSignature),
+		hex.EncodeToString(tx.txPayer.Bytes()),
 		TransferReady,
 		TransferNew,
 		TransferReady,
@@ -192,40 +185,13 @@ func (recorder *Recorder) UpsertTransfer(at AbstractTransfer) error {
 		return err
 	}
 	if affected == 0 {
-		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
+		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.String(), tx.token.String(), tx.index)
 	}
 	return nil
 
 }
 
-func (recorder *Recorder) AmountOfTransferred(cashier, token common.Address) (*big.Int, error) {
-	rows, err := recorder.store.DB().Query(
-		fmt.Sprintf(
-			"SELECT amount FROM %s WHERE cashier = ? AND token = ? AND status='settled'",
-			recorder.transferTableName,
-		),
-		cashier.String(),
-		token.String(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	totalAmount := big.NewInt(0)
-	for rows.Next() {
-		var rawAmount string
-		if err := rows.Scan(&rawAmount); err != nil {
-			return nil, err
-		}
-		amount, ok := new(big.Int).SetString(rawAmount, 10)
-		if !ok || amount.Sign() != 1 {
-			return nil, errors.Errorf("invalid amount %s", rawAmount)
-		}
-		totalAmount = big.NewInt(0).Add(totalAmount, amount)
-	}
-	return totalAmount, nil
-}
-
-func (recorder *Recorder) UpdateSyncHeight(cashier string, height uint64) error {
+func (recorder *SOLRecorder) UpdateSyncHeight(cashier string, height uint64) error {
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("REPLACE INTO %s (`cashier`, `height`) VALUES (?, ?)", recorder.cashierMetaTableName),
 		cashier,
@@ -245,8 +211,8 @@ func (recorder *Recorder) UpdateSyncHeight(cashier string, height uint64) error 
 }
 
 // SettleTransfer marks a record as settled
-func (recorder *Recorder) SettleTransfer(at AbstractTransfer) error {
-	tx, ok := at.(*Transfer)
+func (recorder *SOLRecorder) SettleTransfer(at AbstractTransfer) error {
+	tx, ok := at.(*solTransfer)
 	if !ok {
 		return errors.Errorf("invalid transfer type %T", at)
 	}
@@ -254,8 +220,8 @@ func (recorder *Recorder) SettleTransfer(at AbstractTransfer) error {
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
 		TransferSettled,
-		tx.cashier.Hex(),
-		tx.token.Hex(),
+		hex.EncodeToString(tx.cashier.Bytes()),
+		hex.EncodeToString(tx.token.Bytes()),
 		tx.index,
 		SubmissionConfirmed,
 	)
@@ -267,8 +233,8 @@ func (recorder *Recorder) SettleTransfer(at AbstractTransfer) error {
 }
 
 // ConfirmTransfer marks a record as confirmed
-func (recorder *Recorder) ConfirmTransfer(at AbstractTransfer) error {
-	tx, ok := at.(*Transfer)
+func (recorder *SOLRecorder) ConfirmTransfer(at AbstractTransfer) error {
+	tx, ok := at.(*solTransfer)
 	if !ok {
 		return errors.Errorf("invalid transfer type %T", at)
 	}
@@ -277,8 +243,8 @@ func (recorder *Recorder) ConfirmTransfer(at AbstractTransfer) error {
 		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
 		SubmissionConfirmed,
 		tx.id.Hex(),
-		tx.cashier.Hex(),
-		tx.token.Hex(),
+		hex.EncodeToString(tx.cashier.Bytes()),
+		hex.EncodeToString(tx.token.Bytes()),
 		tx.index,
 		TransferReady,
 	)
@@ -290,19 +256,19 @@ func (recorder *Recorder) ConfirmTransfer(at AbstractTransfer) error {
 }
 
 // TransfersToSettle returns the list of transfers to confirm
-func (recorder *Recorder) TransfersToSettle() ([]AbstractTransfer, error) {
+func (recorder *SOLRecorder) TransfersToSettle() ([]AbstractTransfer, error) {
 	return recorder.transfers(SubmissionConfirmed)
 }
 
 // TransfersToSubmit returns the list of transfers to submit
-func (recorder *Recorder) TransfersToSubmit() ([]AbstractTransfer, error) {
+func (recorder *SOLRecorder) TransfersToSubmit() ([]AbstractTransfer, error) {
 	return recorder.transfers(TransferReady)
 }
 
-func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, error) {
+func (recorder *SOLRecorder) transfers(status TransferStatus) ([]AbstractTransfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
-			"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, status, id, txHash, txSender "+
+			"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, status, id, blockHeight, txSignature, txSender "+
 				"FROM %s "+
 				"WHERE status=? "+
 				"ORDER BY creationTime",
@@ -317,23 +283,24 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 
 	var rec []AbstractTransfer
 	for rows.Next() {
-		tx := &Transfer{}
+		tx := &solTransfer{}
 		var cashier string
 		var token string
 		var sender string
-		var txHash string
 		var recipient string
 		var rawAmount string
 		var fee sql.NullString
 		var id sql.NullString
 		var payload sql.NullString
-		var txSender sql.NullString
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.status, &id, &txHash, &txSender); err != nil {
+		var txSignature string
+		var txSender string
+
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.status, &id, &tx.blockHeight, &txSignature, &txSender); err != nil {
 			return nil, err
 		}
-		tx.cashier = common.HexToAddress(cashier)
-		tx.token = common.HexToAddress(token)
-		tx.sender = common.HexToAddress(sender)
+		tx.cashier = hexToPubkey(cashier)
+		tx.token = hexToPubkey(token)
+		tx.sender = hexToPubkey(sender)
 		tx.recipient, err = recorder.addrDecoder.DecodeString(recipient)
 		if err != nil {
 			return nil, err
@@ -341,8 +308,10 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 		if id.Valid {
 			tx.id = common.HexToHash(id.String)
 		}
-		if txSender.Valid {
-			tx.txSender = common.HexToAddress(txSender.String)
+		tx.txPayer = hexToPubkey(txSender)
+		tx.txSignature, err = hex.DecodeString(txSignature)
+		if err != nil {
+			return nil, err
 		}
 		tx.fee = big.NewInt(0)
 		var ok bool
@@ -360,103 +329,36 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 		if !ok || tx.amount.Sign() != 1 {
 			return nil, errors.Errorf("invalid amount %s", rawAmount)
 		}
-		if toToken, ok := recorder.tokenPairs[tx.token]; ok {
-			tx.coToken = toToken
+		if coToken, ok := recorder.tokenPairs[tx.token]; ok {
+			tx.coToken = coToken
 		} else {
 			// skip if token is not in whitelist
 			continue
-		}
-		// replace recipient with solana ata address
-		if tokenMint, exist := recorder.tokenMintPairs[tx.coToken.String()]; exist {
-			ata, _, err := solcommon.FindAssociatedTokenAddress(tx.recipient.Address().(solcommon.PublicKey),
-				tokenMint.Address().(solcommon.PublicKey))
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to find associated token address for %s", tx.recipient.String())
-			}
-			tx.ataOwner = util.SOLAddressToAddress(tx.recipient.Address().(solcommon.PublicKey))
-			tx.recipient = util.SOLAddressToAddress(ata)
 		}
 		if round, ok := recorder.tokenRound[tx.token]; ok {
 			tx.decimalRound = round
 		} else {
 			tx.decimalRound = 0
 		}
-		tx.txHash = common.HexToHash(txHash)
 		rec = append(rec, tx)
 	}
 	return rec, nil
 }
 
-func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
-	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `status`, `id`, `txHash`, `txSender` FROM %s WHERE `id`=?", recorder.transferTableName),
-		_id.Hex(),
-	)
-
-	tx := &Transfer{}
-	var cashier string
-	var token string
-	var sender string
-	var recipient string
-	var rawAmount string
-	var txHash string
-	var id sql.NullString
-	var payload sql.NullString
-	var txSender sql.NullString
-	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &tx.status, &id, &txHash, &txSender); err != nil {
-		return nil, err
-	}
-
-	tx.cashier = common.HexToAddress(cashier)
-	tx.token = common.HexToAddress(token)
-	tx.sender = common.HexToAddress(sender)
-	var err error
-	tx.recipient, err = recorder.addrDecoder.DecodeString(recipient)
+func hexToPubkey(str string) solcommon.PublicKey {
+	b, err := hex.DecodeString(str)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	if id.Valid {
-		tx.id = common.HexToHash(id.String)
-	}
-	var ok bool
-	tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
-	if !ok || tx.amount.Sign() != 1 {
-		return nil, errors.Errorf("invalid amount %s", rawAmount)
-	}
-	if txSender.Valid {
-		tx.txSender = common.HexToAddress(txSender.String)
-	}
-	tx.payload, err = util.DecodeNullString(payload)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to decode payload %s", payload.String)
-	}
-	if toToken, ok := recorder.tokenPairs[tx.token]; ok {
-		tx.coToken = toToken
-	} else {
-		return nil, errors.New("invalid token")
-	}
-	// replace recipient with solana ata address
-	if tokenMint, exist := recorder.tokenMintPairs[tx.coToken.String()]; exist {
-		ata, _, err := solcommon.FindAssociatedTokenAddress(tx.recipient.Address().(solcommon.PublicKey),
-			tokenMint.Address().(solcommon.PublicKey))
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to find associated token address for %s", tx.recipient.String())
-		}
-		tx.ataOwner = util.SOLAddressToAddress(tx.recipient.Address().(solcommon.PublicKey))
-		tx.recipient = util.SOLAddressToAddress(ata)
-	}
-	if round, ok := recorder.tokenRound[tx.token]; ok {
-		tx.decimalRound = round
-	} else {
-		tx.decimalRound = 0
-	}
-	tx.txHash = common.HexToHash(txHash)
+	return solcommon.PublicKeyFromBytes(b)
+}
 
-	return tx, nil
+func (recorder *SOLRecorder) Transfer(_ common.Hash) (AbstractTransfer, error) {
+	return nil, errors.New("not implemented")
 }
 
 // TipHeight returns the tip height of all the transfers in the recorder
-func (recorder *Recorder) TipHeight(cashier string) (uint64, error) {
+func (recorder *SOLRecorder) TipHeight(cashier string) (uint64, error) {
 	row := recorder.store.DB().QueryRow(
 		fmt.Sprintf("SELECT height FROM %s WHERE cashier=?", recorder.cashierMetaTableName),
 		cashier,
@@ -472,7 +374,7 @@ func (recorder *Recorder) TipHeight(cashier string) (uint64, error) {
 	}
 }
 
-func (recorder *Recorder) maxBlockHeight() (uint64, error) {
+func (recorder *SOLRecorder) maxBlockHeight() (uint64, error) {
 	row := recorder.store.DB().QueryRow(
 		fmt.Sprintf("SELECT MAX(blockHeight) FROM %s", recorder.transferTableName),
 	)
@@ -486,18 +388,7 @@ func (recorder *Recorder) maxBlockHeight() (uint64, error) {
 	return 0, nil
 }
 
-func validateResult(res sql.Result) error {
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected != 1 {
-		return errors.Errorf("The number of rows %d updated is not as expected", affected)
-	}
-	return nil
-}
-
-func (recorder *Recorder) validateID(id uint64) error {
+func validateID(id uint64) error {
 	if id == math.MaxInt64-1 {
 		overflow := errors.New("Hit the largest value designed for id, software upgrade needed")
 		log.Println(overflow)
@@ -506,6 +397,30 @@ func (recorder *Recorder) validateID(id uint64) error {
 	return nil
 }
 
-func (recorder *Recorder) UnsettledTransfers() ([]string, error) {
-	panic("unimplemented")
+// UnsettledTransfers returns the list of unsettled transfers
+func (recorder *SOLRecorder) UnsettledTransfers() ([]string, error) {
+	rows, err := recorder.store.DB().Query(
+		fmt.Sprintf(
+			"SELECT txSignature "+
+				"FROM %s "+
+				"WHERE status!=? "+
+				"ORDER BY creationTime",
+			recorder.transferTableName,
+		),
+		TransferSettled,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rec []string
+	for rows.Next() {
+		var txSignature string
+		if err := rows.Scan(&txSignature); err != nil {
+			return nil, err
+		}
+		rec = append(rec, txSignature)
+	}
+	return rec, nil
 }

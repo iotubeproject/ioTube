@@ -1,0 +1,21 @@
+chain: "solana"
+interval: 1m
+clientURL: ""
+grpcPort: 7007
+grpcProxyPort: 8007
+privateKey: ""
+slackWebHook: "" 
+validatorAddress: ""
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+  driver: "mysql"
+transferTableName: "solana_transfers"
+witnessTableName: "solana_witnesses"
+bonus: "200000000000000000"
+solanaConfig:
+  realmAddr: ""
+  governingTokenMintAddr: ""
+  governanceAddr: ""
+  proposalAddr: ""
+  proposalTransactionAddr: ""
+  threshold: 

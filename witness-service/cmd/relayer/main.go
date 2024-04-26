@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blocto/solana-go-sdk/client"
+	soltypes "github.com/blocto/solana-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -50,16 +52,27 @@ type Configuration struct {
 	BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
 	Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
 
-	AlwaysReset       bool      `json:"alwaysReset" yaml:"alwaysReset"`
-	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
-	LarkWebHook       string    `json:"larkWebHook" yaml:"larkWebHook"`
-	GrpcPort          int       `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort     int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	Database          db.Config `json:"database" yaml:"database"`
-	ExplorerDatabase  db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
-	TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
-	WitnessTableName  string    `json:"witnessTableName" yaml:"witnessTableName"`
-	ExplorerTableName string    `json:"explorerTableName" yaml:"explorerTableName"`
+	AlwaysReset             bool      `json:"alwaysReset" yaml:"alwaysReset"`
+	SlackWebHook            string    `json:"slackWebHook" yaml:"slackWebHook"`
+	LarkWebHook             string    `json:"larkWebHook" yaml:"larkWebHook"`
+	GrpcPort                int       `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort           int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	Database                db.Config `json:"database" yaml:"database"`
+	ExplorerDatabase        db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
+	TransferTableName       string    `json:"transferTableName" yaml:"transferTableName"`
+	NewTransactionTableName string    `json:"newTransactionTableName" yaml:"newTransactionTableName"`
+	WitnessTableName        string    `json:"witnessTableName" yaml:"witnessTableName"`
+	ExplorerTableName       string    `json:"explorerTableName" yaml:"explorerTableName"`
+
+	SolanaConfig struct {
+		RealmAddr               string  `json:"realmAddr" yaml:"realmAddr"`
+		GoverningTokenMintAddr  string  `json:"governingTokenMintAddr" yaml:"governingTokenMintAddr"`
+		GovernanceAddr          string  `json:"governanceAddr" yaml:"governanceAddr"`
+		ProposalAddr            string  `json:"proposalAddr" yaml:"proposalAddr"`
+		ProposalTransactionAddr string  `json:"proposalTransactionAddr" yaml:"proposalTransactionAddr"`
+		Threshold               float64 `json:"threshold" yaml:"threshold"`
+		QPSLimit                uint32  `json:"qpsLimit" yaml:"qpsLimit"`
+	} `json:"solanaConfig" yaml:"solanaConfig"`
 }
 
 var defaultConfig = Configuration{
@@ -138,7 +151,15 @@ func main() {
 	util.SetPrefix("relayer-" + cfg.Chain)
 
 	log.Println("Creating service")
-	var transferValidator relayer.TransferValidator
+	var (
+		transferValidator     relayer.TransferValidator
+		transferValidatorAddr util.Address
+		solProcessor          *relayer.SolProcessor
+		recorder              *relayer.Recorder
+		abstractRecorder      relayer.AbstractRecorder
+		sourceAddrDecoder     util.AddressDecoder
+		destAddrDecoder       util.AddressDecoder
+	)
 	if chain, ok := os.LookupEnv("RELAYER_CHAIN"); ok {
 		cfg.Chain = chain
 	}
@@ -150,6 +171,7 @@ func main() {
 		if cfg.ClientURL == "" {
 			break
 		}
+		log.Panicf("The chain %s have been not supported yet for the new contract with payload\n", cfg.Chain)
 		privateKeys := []*ecdsa.PrivateKey{}
 		for _, pk := range strings.Split(cfg.PrivateKey, ",") {
 			privateKey, err := crypto.HexToECDSA(pk)
@@ -175,6 +197,17 @@ func main() {
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}
+		transferValidatorAddr = util.ETHAddressToAddress(transferValidator.Address())
+		destAddrDecoder = util.NewETHAddressDecoder()
+		recorder = relayer.NewRecorder(
+			db.NewStore(cfg.Database),
+			db.NewStore(cfg.ExplorerDatabase),
+			cfg.TransferTableName,
+			cfg.WitnessTableName,
+			"",
+			cfg.ExplorerTableName,
+		)
+		abstractRecorder = recorder
 	case "iotex":
 		var conn *grpc.ClientConn
 		if strings.HasSuffix(cfg.ClientURL, ":443") {
@@ -202,20 +235,68 @@ func main() {
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}
+		transferValidatorAddr = util.ETHAddressToAddress(transferValidator.Address())
+		destAddrDecoder = util.NewETHAddressDecoder()
+		recorder = relayer.NewRecorder(
+			db.NewStore(cfg.Database),
+			db.NewStore(cfg.ExplorerDatabase),
+			cfg.TransferTableName,
+			cfg.WitnessTableName,
+			cfg.NewTransactionTableName,
+			cfg.ExplorerTableName,
+		)
+		abstractRecorder = recorder
+	case "solana":
+		transferValidator = nil
+		transferValidatorAddr, err = util.NewSOLAddressDecoder().DecodeString(cfg.SolanaConfig.ProposalAddr)
+		if err != nil {
+			log.Fatalf("failed to decode validator address %v", err)
+		}
+
+		sourceAddrDecoder = util.NewETHAddressDecoder()
+		destAddrDecoder = util.NewSOLAddressDecoder()
+		solRecorder := relayer.NewSolRecorder(
+			db.NewStore(cfg.Database),
+			cfg.TransferTableName,
+			cfg.WitnessTableName,
+			sourceAddrDecoder,
+			destAddrDecoder,
+		)
+		recorder = nil
+		abstractRecorder = solRecorder
+
+		privateKey, err := soltypes.AccountFromHex(cfg.PrivateKey)
+		if err != nil {
+			log.Fatalf("failed to decode private key %v", err)
+		}
+		solProcessor = relayer.NewSolProcessor(
+			client.NewClient(cfg.ClientURL),
+			cfg.Interval,
+			&privateKey,
+			relayer.VoteConfig{
+				ProgramID:               cfg.ValidatorAddress,
+				RealmAddr:               cfg.SolanaConfig.RealmAddr,
+				GoverningTokenMintAddr:  cfg.SolanaConfig.GoverningTokenMintAddr,
+				GovernanceAddr:          cfg.SolanaConfig.GovernanceAddr,
+				ProposalAddr:            cfg.SolanaConfig.ProposalAddr,
+				ProposalTransactionAddr: cfg.SolanaConfig.ProposalTransactionAddr,
+				Threshold:               cfg.SolanaConfig.Threshold,
+			},
+			solRecorder,
+			cfg.SolanaConfig.QPSLimit,
+		)
 	default:
 		log.Fatalf("unknown chain name '%s'\n", cfg.Chain)
 	}
 	service, err := relayer.NewService(
 		transferValidator,
-		relayer.NewRecorder(
-			db.NewStore(cfg.Database),
-			db.NewStore(cfg.ExplorerDatabase),
-			cfg.TransferTableName,
-			cfg.WitnessTableName,
-			cfg.ExplorerTableName,
-		),
+		transferValidatorAddr,
+		solProcessor,
+		recorder,
+		abstractRecorder,
 		cfg.Interval,
 		cfg.AlwaysReset,
+		destAddrDecoder,
 	)
 	if err != nil {
 		log.Fatalf("failed to create relay service: %v\n", err)

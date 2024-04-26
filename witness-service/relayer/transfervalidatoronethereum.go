@@ -176,7 +176,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 		if new(big.Int).Add(settleHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
 			return StatusOnChainNotConfirmed, nil
 		}
-		tx, _, err := tv.client.TransactionByHash(context.Background(), transfer.txHash)
+		tx, _, err := tv.client.TransactionByHash(context.Background(), common.BytesToHash(transfer.txHash))
 		if err != nil {
 			return StatusOnChainUnknown, err
 		}
@@ -188,7 +188,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 		transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
 		return StatusOnChainSettled, nil
 	}
-	r, err := tv.client.TransactionReceipt(context.Background(), transfer.txHash)
+	r, err := tv.client.TransactionReceipt(context.Background(), common.BytesToHash(transfer.txHash))
 	switch errors.Cause(err) {
 	case ethereum.NotFound:
 		if transfer.nonce < nonce {
@@ -236,8 +236,8 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 	signatures := []byte{}
 	numOfValidSignatures := 0
 	for _, witness := range witnesses {
-		if !tv.isActiveWitness(witness.addr) {
-			log.Printf("witness %s is inactive\n", witness.addr.Hex())
+		if !tv.isActiveWitness(witness.Address()) {
+			log.Printf("witness %s is inactive\n", witness.Address().Hex())
 			continue
 		}
 		signatures = append(signatures, witness.signature...)
@@ -269,7 +269,8 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		}
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
-	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
+	// TODO: support payload after the contract is updated
+	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier.Bytes(), transfer.token.Address().(common.Address), new(big.Int).SetUint64(transfer.index), transfer.sender.Bytes(), transfer.recipient.Address().(common.Address), transfer.amount, signatures, []byte{})
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil

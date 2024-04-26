@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/pkg/errors"
 )
 
@@ -37,7 +38,7 @@ func NewTokenCashierOnEthereum(
 		id,
 		recorder,
 		relayerURL,
-		validatorContractAddr,
+		validatorContractAddr.Bytes(),
 		startBlockHeight,
 		func(startHeight uint64, count uint16) (uint64, uint64, error) {
 			tipHeader, err := ethereumClient.HeaderByNumber(context.Background(), nil)
@@ -57,7 +58,7 @@ func NewTokenCashierOnEthereum(
 			}
 			return tipHeight - uint64(confirmBlockNumber), endHeight, nil
 		},
-		func(startHeight uint64, endHeight uint64) ([]*Transfer, error) {
+		func(startHeight uint64, endHeight uint64) ([]AbstractTransfer, error) {
 			logs, err := ethereumClient.FilterLogs(context.Background(), ethereum.FilterQuery{
 				FromBlock: new(big.Int).SetUint64(startHeight),
 				ToBlock:   new(big.Int).SetUint64(endHeight),
@@ -71,7 +72,7 @@ func NewTokenCashierOnEthereum(
 			if err != nil {
 				return nil, err
 			}
-			transfers := []*Transfer{}
+			transfers := []AbstractTransfer{}
 			if len(logs) > 0 {
 				log.Printf("\t%d transfers fetched from %d to %d\n", len(logs), startHeight, endHeight)
 				for _, transferLog := range logs {
@@ -87,8 +88,8 @@ func NewTokenCashierOnEthereum(
 					}
 					var realAmount *big.Int
 					for _, l := range receipt.Logs {
-						if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && (l.Topics[1] == senderAddress.Hash() || l.Topics[1] == transferLog.Address.Hash()) {
-							if l.Topics[2] == cashierContractAddr.Hash() || l.Topics[2] != _ZeroHash && l.Topics[2] == tokenSafeContractAddr.Hash() {
+						if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && (l.Topics[1] == common.BytesToHash(senderAddress.Bytes()) || l.Topics[1] == common.BytesToHash(transferLog.Address.Bytes())) {
+							if l.Topics[2] == common.BytesToHash(cashierContractAddr.Bytes()) || l.Topics[2] != _ZeroHash && l.Topics[2] == common.BytesToHash(tokenSafeContractAddr.Bytes()) {
 								if realAmount != nil {
 									return nil, errors.Errorf("two transfers in one transaction %x", transferLog.TxHash)
 								}
@@ -115,12 +116,16 @@ func NewTokenCashierOnEthereum(
 					if err != nil {
 						return nil, errors.Wrap(err, "failed to extract sender")
 					}
+					recipient, err := util.NewETHAddressDecoder().DecodeBytes(transferLog.Data[32:64])
+					if err != nil {
+						return nil, errors.Wrap(err, "failed to decode recipient")
+					}
 					tsf := &Transfer{
 						cashier:     transferLog.Address,
 						token:       tokenAddress,
 						index:       new(big.Int).SetBytes(transferLog.Topics[2][:]).Uint64(),
 						sender:      senderAddress,
-						recipient:   common.BytesToAddress(transferLog.Data[32:64]),
+						recipient:   recipient,
 						amount:      amount,
 						fee:         new(big.Int).SetBytes(transferLog.Data[96:128]),
 						blockHeight: transferLog.BlockNumber,
@@ -134,14 +139,16 @@ func NewTokenCashierOnEthereum(
 			}
 			return transfers, nil
 		},
-		func(token common.Address, amountToTransfer *big.Int) bool {
+		func(_token util.Address, amountToTransfer *big.Int) bool {
 			if reverseRecorder == nil {
 				return true
 			}
-			coToken, ok := recorder.tokenPairs[token]
+			token := _token.Address().(common.Address)
+			_coToken, ok := recorder.tokenPairs[token]
 			if !ok {
 				return false
 			}
+			coToken := _coToken.Address().(common.Address)
 			if _, ok := reverseRecorder.tokenPairs[coToken]; !ok {
 				return true
 			}
@@ -167,5 +174,6 @@ func NewTokenCashierOnEthereum(
 			}
 			return nil
 		},
+		false,
 	), nil
 }

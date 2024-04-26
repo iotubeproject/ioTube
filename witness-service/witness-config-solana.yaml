@@ -1,0 +1,26 @@
+chain: "solana"
+grpcPort: 9120
+grpcProxyPort: 9121
+interval: 1m
+batchSize: 150
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
+  driver: "mysql"
+cashiers:
+  - id: "solana-to-iotex"
+    relayerURL: ":7001"
+    startBlockHeight: 
+    validatorContractAddress: "io17fw6pdvdgpwy72w9f2x2uzgzfrqsx5q7kjm9fs"
+    cashierContractAddress: "A9SGRcytnfx6U1QrnMUwK5sxYyCYY3MpyrPcyeafhSMF"
+    transferTableName: "solana_transfers"
+    qpsLimit: 5
+    disablePull: true
+    tokenPairs:
+      - token1: "So11111111111111111111111111111111111111112"
+        token2: "0xA1F3f211d9B33f2086a800842836D67F139B9A7A"
+      - token1: "3ZmkGg3gj5KP2njgE4nGPfokPauBQQLw6LhWhV67tWKg"
+        token2: "0x99b2b0efb56e62e36960c20cd5ca8ec6abd5557a"
+    decimalRound:
+      - token1: "3ZmkGg3gj5KP2njgE4nGPfokPauBQQLw6LhWhV67tWKg"
+        amount: 9
+destinationChain: "iotex"
