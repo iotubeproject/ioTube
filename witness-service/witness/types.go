@@ -9,34 +9,16 @@ package witness
 import (
 	"context"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/iotexproject/ioTube/witness-service/grpc/types"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type (
 	// TransferStatus is the status of a transfer
 	TransferStatus string
-
-	// Transfer defines a record
-	Transfer struct {
-		cashier     common.Address
-		token       common.Address
-		coToken     common.Address
-		index       uint64
-		sender      common.Address
-		recipient   common.Address
-		amount      *big.Int
-		fee         *big.Int
-		id          common.Hash
-		status      TransferStatus
-		blockHeight uint64
-		txHash      common.Hash
-		timestamp   time.Time
-		gas         uint64
-		gasPrice    *big.Int
-		txSender    common.Address
-	}
 
 	// Service manages to exchange iotex coin to ERC20 token on ethereum
 	Service interface {
@@ -51,13 +33,46 @@ type (
 		Start(context.Context) error
 		Stop(context.Context) error
 		ID() string
-		GetRecorder() *Recorder
+		GetRecorder() AbstractRecorder
 		PullTransfersByHeight(blockHeight uint64) error
 		PullTransfers(blockCount uint16) error
-		SubmitTransfers(func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error
+		SubmitTransfers(SignHandler) error
 		CheckTransfers() error
 		ProcessStales() error
 	}
+
+	AbstractRecorder interface {
+		Start(ctx context.Context) error
+		Stop(ctx context.Context) error
+		AddTransfer(tx AbstractTransfer, status TransferStatus) error
+		UpsertTransfer(tx AbstractTransfer) error
+		TipHeight(id string) (uint64, error)
+		UpdateSyncHeight(id string, height uint64) error
+		Transfer(id common.Hash) (AbstractTransfer, error)
+		UnsettledTransfers() ([]string, error)
+		TransfersToSubmit() ([]AbstractTransfer, error)
+		TransfersToSettle() ([]AbstractTransfer, error)
+		SettleTransfer(tx AbstractTransfer) error
+		ConfirmTransfer(tx AbstractTransfer) error
+	}
+
+	AbstractTransfer interface {
+		Cashier() util.Address
+		Token() util.Address
+		CoToken() util.Address
+		Index() *big.Int
+		Sender() util.Address
+		Recipient() util.Address
+		Payload() []byte
+		Amount() *big.Int
+		ID() []byte
+		SetID(common.Hash)
+		Status() TransferStatus
+		BlockHeight() uint64
+		ToTypesTransfer() *types.Transfer
+	}
+
+	SignHandler func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error)
 )
 
 const (

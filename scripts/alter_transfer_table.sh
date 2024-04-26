@@ -8,3 +8,5 @@ docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.io
 docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.iotex_to_polis_transfers ADD txSender varchar(42);"
 docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.iotex_to_bsc_transfers ADD txSender varchar(42);"
 docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.iotex_to_matic_transfers ADD txSender varchar(42);"
+docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.iotex_transfers ADD payload varchar(24576);"
+docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.iotex_transfers MODIFY recipient varchar(256) NOT NULL;"

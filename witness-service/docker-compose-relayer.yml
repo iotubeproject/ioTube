@@ -88,6 +88,32 @@ services:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-matic.yaml
 
+  iotex-solana-relayer:
+    container_name: iotex-solana-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7008:7008
+      - 8008:8008
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-iotex-solana.yaml:/etc/iotube-relayer/relayer-config-iotex-solana.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-solana.yaml
+
+  solana-relayer:
+    container_name: solana-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7007:7007
+      - 8007:8007
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-solana.yaml:/etc/iotube-relayer/relayer-config-solana.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-solana.yaml
+
   cron:
     image: schnitzler/mysqldump
     restart: always

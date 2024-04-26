@@ -37,6 +37,11 @@ type (
 		cache             *lru.Cache
 		alwaysReset       bool
 		nonceTooLow       map[common.Hash]uint64
+		// TODO: remove transferValidatorAddr once API is separated from service
+		transferValidatorAddr util.Address
+		// TODO: remove abstractRecorder once API is separated from service
+		abstractRecorder AbstractRecorder
+		destAddrDecoder  util.AddressDecoder
 	}
 )
 
@@ -72,7 +77,8 @@ func NewServiceOnEthereum(
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create transfer validator")
 	}
-	return newService(validator, recorder, validator, interval)
+	return newService(validator, util.ETHAddressToAddress(validator.Address()), recorder,
+		recorder, validator, interval, util.NewETHAddressDecoder())
 }
 
 // NewServiceOnIoTeX creates a new relay service on IoTeX
@@ -93,20 +99,34 @@ func NewServiceOnIoTeX(
 	if err != nil {
 		return nil, err
 	}
-	return newService(validator, recorder, validator, interval)
+	return newService(validator, util.ETHAddressToAddress(validator.Address()), recorder,
+		recorder, validator, interval, util.NewETHAddressDecoder())
 }
 
-func newService(tv TransferValidator, recorder *Recorder, bonusSender BonusSender, interval time.Duration) (*Service, error) {
+// NewServiceOnSolana creates a new relay service on Solana
+func NewServiceOnSolana(
+	abstractRecorder AbstractRecorder,
+	validatorContractAddr util.Address,
+) (*Service, error) {
+	return newService(nil, validatorContractAddr, nil,
+		abstractRecorder, nil, 0, util.NewSOLAddressDecoder())
+}
+
+func newService(tv TransferValidator, tvAddr util.Address, recorder *Recorder, abstractRecorder AbstractRecorder,
+	bonusSender BonusSender, interval time.Duration, destAddrDecoder util.AddressDecoder) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
 		return nil, err
 	}
 	s := &Service{
-		transferValidator: tv,
-		bonusSender:       bonusSender,
-		recorder:          recorder,
-		cache:             cache,
-		nonceTooLow:       map[common.Hash]uint64{},
+		transferValidator:     tv,
+		bonusSender:           bonusSender,
+		transferValidatorAddr: tvAddr,
+		recorder:              recorder,
+		abstractRecorder:      abstractRecorder,
+		cache:                 cache,
+		nonceTooLow:           map[common.Hash]uint64{},
+		destAddrDecoder:       destAddrDecoder,
 	}
 	processor, err := dispatcher.NewRunner(interval, s.process)
 	if err != nil {
@@ -122,9 +142,14 @@ func (s *Service) SetAlwaysRetry() {
 	s.alwaysReset = true
 }
 
+// SetProcessor sets the processor
+func (s *Service) SetProcessor(p dispatcher.Runner) {
+	s.processor = p
+}
+
 // Start starts the service
 func (s *Service) Start(ctx context.Context) error {
-	if err := s.recorder.Start(ctx); err != nil {
+	if err := s.abstractRecorder.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start recorder")
 	}
 	return s.processor.Start()
@@ -133,37 +158,35 @@ func (s *Service) Start(ctx context.Context) error {
 // Stop stops the service
 func (s *Service) Stop(ctx context.Context) error {
 	if err := s.processor.Start(); err != nil {
-		return errors.Wrap(err, "failed to start recorder")
+		return errors.Wrap(err, "failed to stop processor")
 	}
-	return s.recorder.Stop(ctx)
+	return s.abstractRecorder.Stop(ctx)
 }
 
 // Submit accepts a submission of witness
 func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
-	if s.transferValidator == nil {
-		return nil, errors.New("cannot accept new submission")
-	}
 	log.Printf("receive a witness from %x\n", w.Address)
-	transfer, err := UnmarshalTransferProto(s.transferValidator.Address(), w.Transfer)
+	transfer, err := UnmarshalTransferProto(w.Transfer, s.destAddrDecoder)
 	if err != nil {
 		return nil, err
 	}
-	witness, err := NewWitness(common.BytesToAddress(w.Address), w.Signature)
+	witness, err := NewWitness(w.Address, w.Signature)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.recorder.AddWitness(transfer, witness); err != nil {
+	transferID, err := s.abstractRecorder.AddWitness(s.transferValidatorAddr, transfer, witness)
+	if err != nil {
 		return nil, err
 	}
 	return &services.WitnessSubmissionResponse{
-		Id:      transfer.id.Bytes(),
+		Id:      transferID.Bytes(),
 		Success: true,
 	}, nil
 }
 
 // Reset resets a transfer status from failed to new
 func (s *Service) Reset(ctx context.Context, request *services.ResetTransferRequest) (*services.ResetTransferResponse, error) {
-	if err := s.recorder.ResetFailedTransfer(common.BytesToHash(request.Id)); err != nil {
+	if err := s.abstractRecorder.ResetFailedTransfer(common.BytesToHash(request.Id)); err != nil {
 		return nil, err
 	}
 	return &services.ResetTransferResponse{Success: true}, nil
@@ -171,7 +194,11 @@ func (s *Service) Reset(ctx context.Context, request *services.ResetTransferRequ
 
 // StaleHeights returns the heights of stale transfers
 func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeightsRequest) (*services.StaleHeightsResponse, error) {
-	heights, err := s.recorder.HeightsOfStaleTransfers(common.BytesToAddress(request.Cashier))
+	cashier, err := DecodeSourceAddrBytes(request.Cashier)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode cashier")
+	}
+	heights, err := s.abstractRecorder.HeightsOfStaleTransfers(cashier)
 	if err != nil {
 		return nil, err
 	}
@@ -206,13 +233,25 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	}
 	queryOpts := []TransferQueryOption{}
 	if len(request.Token) > 0 {
-		queryOpts = append(queryOpts, TokenQueryOption(common.BytesToAddress(request.Token)))
+		addr, err := s.destAddrDecoder.DecodeBytes(request.Token)
+		if err != nil {
+			return nil, err
+		}
+		queryOpts = append(queryOpts, TokenQueryOption(addr))
 	}
 	if len(request.Sender) > 0 {
-		queryOpts = append(queryOpts, SenderQueryOption(common.BytesToAddress(request.Sender)))
+		addr, err := DecodeSourceAddrBytes(request.Sender)
+		if err != nil {
+			return nil, err
+		}
+		queryOpts = append(queryOpts, SenderQueryOption(addr))
 	}
 	if len(request.Recipient) > 0 {
-		queryOpts = append(queryOpts, RecipientQueryOption(common.BytesToAddress(request.Recipient)))
+		addr, err := s.destAddrDecoder.DecodeBytes(request.Recipient)
+		if err != nil {
+			return nil, err
+		}
+		queryOpts = append(queryOpts, RecipientQueryOption(addr))
 	}
 	switch request.Status {
 	case services.Status_SUBMITTED:
@@ -224,7 +263,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	case services.Status_FAILED:
 		queryOpts = append(queryOpts, StatusQueryOption(ValidationFailed, ValidationRejected))
 	}
-	count, err := s.recorder.Count(queryOpts...)
+	count, err := s.abstractRecorder.Count(queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +273,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if skip+first > int32(count) {
 		first = int32(count) - skip
 	}
-	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), false, true, queryOpts...)
+	transfers, err := s.abstractRecorder.Transfers(uint32(skip), uint8(first), false, true, queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +281,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	for _, transfer := range transfers {
 		ids = append(ids, transfer.id)
 	}
-	witnesses, err := s.recorder.Witnesses(ids...)
+	witnesses, err := s.abstractRecorder.Witnesses(ids...)
 	if err != nil {
 		return nil, err
 	}
@@ -253,8 +292,12 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	}
 	for i, transfer := range transfers {
 		gasPrice := "0"
+		txSender := []byte{}
 		if transfer.gasPrice != nil {
 			gasPrice = transfer.gasPrice.String()
+		}
+		if transfer.txSender != nil {
+			txSender = transfer.txSender.Bytes()
 		}
 		response.Transfers[i] = &types.Transfer{
 			Cashier:   transfer.cashier.Bytes(),
@@ -267,7 +310,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 			Gas:       transfer.gas,
 			GasPrice:  gasPrice,
 			Timestamp: timestamppb.New(transfer.timestamp),
-			TxSender:  transfer.txSender.Bytes(),
+			TxSender:  txSender,
 		}
 		response.Statuses[i] = s.assembleCheckResponse(transfer, witnesses)
 		if len(witnesses) == 0 && transfer.status == WaitingForWitnesses {
@@ -286,7 +329,7 @@ func (s *Service) extractWitnesses(witnesses map[common.Hash][]*Witness, id comm
 	if _, ok := witnesses[id]; ok {
 		witnessAddrs = make([][]byte, 0, len(witnesses[id]))
 		for _, witness := range witnesses[id] {
-			witnessAddrs = append(witnessAddrs, witness.addr.Bytes())
+			witnessAddrs = append(witnessAddrs, witness.addr)
 		}
 	}
 	return witnessAddrs
@@ -296,7 +339,7 @@ func (s *Service) convertStatus(status ValidationStatusType) services.Status {
 	switch status {
 	case WaitingForWitnesses, ValidationInProcess:
 		return services.Status_CREATED
-	case ValidationSubmitted:
+	case ValidationSubmitted, ValidationValidationSettled, ValidationExecuted:
 		return services.Status_SUBMITTED
 	case TransferSettled, BonusPending:
 		return services.Status_SETTLED
@@ -311,7 +354,7 @@ func (s *Service) assembleCheckResponse(transfer *Transfer, witnesses map[common
 	return &services.CheckResponse{
 		Key:       transfer.id[:],
 		Witnesses: s.extractWitnesses(witnesses, transfer.id),
-		TxHash:    transfer.txHash.Bytes(),
+		TxHash:    transfer.txHash,
 		Status:    s.convertStatus(transfer.status),
 	}
 }
@@ -319,16 +362,41 @@ func (s *Service) assembleCheckResponse(transfer *Transfer, witnesses map[common
 // Check checks the status of a transfer
 func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*services.CheckResponse, error) {
 	id := common.BytesToHash(request.Id)
-	transfer, err := s.recorder.Transfer(id)
+	transfer, err := s.abstractRecorder.Transfer(id)
 	if err != nil {
 		return nil, err
 	}
-	witnesses, err := s.recorder.Witnesses(id)
+	witnesses, err := s.abstractRecorder.Witnesses(id)
 	if err != nil {
 		return nil, err
 	}
 
 	return s.assembleCheckResponse(transfer, witnesses), nil
+}
+
+// SubmitNewTX submits a new tx to be witnessed
+func (s *Service) SubmitNewTX(ctx context.Context, request *services.SubmitNewTXRequest) (*services.SubmitNewTXResponse, error) {
+	err := s.abstractRecorder.AddNewTX(request.Height, request.TxHash)
+	if err != nil {
+		return nil, err
+	}
+	return &services.SubmitNewTXResponse{Success: true}, nil
+}
+
+// ListNewTX lists txs to be witnessed
+func (s *Service) ListNewTX(ctx context.Context, request *services.ListNewTXRequest) (*services.ListNewTXResponse, error) {
+	heights, txHashes, err := s.abstractRecorder.NewTXs(request.Count)
+	if err != nil {
+		return nil, err
+	}
+	txs := make([]*services.SubmitNewTXRequest, 0, len(heights))
+	for i, height := range heights {
+		txs = append(txs, &services.SubmitNewTXRequest{
+			Height: height,
+			TxHash: txHashes[i],
+		})
+	}
+	return &services.ListNewTXResponse{Txs: txs}, nil
 }
 
 func (s *Service) process() error {
@@ -438,7 +506,7 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 			return false, errors.Wrap(err, "failed to reset nonce")
 		}
 	case StatusOnChainSettled:
-		if err := s.recorder.MarkAsBonusPending(transfer.id, transfer.txHash, transfer.gas, transfer.timestamp); err != nil {
+		if err := s.recorder.MarkAsBonusPending(transfer.id, common.BytesToHash(transfer.txHash), transfer.gas, transfer.timestamp); err != nil {
 			return false, errors.Wrap(err, "failed to update status")
 		}
 	default:
@@ -448,7 +516,8 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 }
 
 func (s *Service) submitTransfers() error {
-	newTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size()), true, false, StatusQueryOption(WaitingForWitnesses), ExcludeTokenQueryOption(common.HexToAddress("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")))
+	excludedAddr, _ := util.NewETHAddressDecoder().DecodeString("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")
+	newTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size()), true, false, StatusQueryOption(WaitingForWitnesses), ExcludeTokenQueryOption(excludedAddr))
 	if err != nil {
 		return err
 	}
