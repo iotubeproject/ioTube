@@ -10,22 +10,18 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"log"
-	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
-	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 )
 
 type service struct {
@@ -86,16 +82,8 @@ func (s *service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address) (common.Hash, common.Address, []byte, error) {
-	id := crypto.Keccak256Hash(
-		validatorContractAddr.Bytes(),
-		transfer.cashier.Bytes(),
-		transfer.coToken.Bytes(),
-		math.U256Bytes(new(big.Int).SetUint64(transfer.index)),
-		transfer.sender.Bytes(),
-		transfer.recipient.Bytes(),
-		math.U256Bytes(transfer.amount),
-	)
+func (s *service) sign(data []byte) (common.Hash, common.Address, []byte, error) {
+	id := crypto.Keccak256Hash(data)
 	if s.privateKey == nil {
 		return id, common.Address{}, nil, nil
 	}
@@ -168,7 +156,7 @@ func (s *service) FetchByHeights(ctx context.Context, request *services.FetchReq
 func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*services.QueryResponse, error) {
 	id := common.BytesToHash(request.Id)
 
-	var tx *Transfer
+	var tx AbstractTransfer
 	var e error
 	for _, c := range s.cashiers {
 		tx, e = c.GetRecorder().Transfer(id)
@@ -182,24 +170,7 @@ func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*s
 			Transfer: nil,
 		}, nil
 	}
-	gasPrice := "0"
-	if tx.gasPrice != nil {
-		gasPrice = tx.gasPrice.String()
-	}
-
-	response := &services.QueryResponse{
-		Transfer: &types.Transfer{
-			Cashier:   tx.cashier.Bytes(),
-			Token:     tx.token.Bytes(),
-			Index:     int64(tx.index),
-			Sender:    tx.sender.Bytes(),
-			Recipient: tx.recipient.Bytes(),
-			Amount:    tx.amount.String(),
-			Timestamp: timestamppb.New(tx.timestamp),
-			Gas:       tx.gas,
-			GasPrice:  gasPrice,
-		},
-	}
-
-	return response, nil
+	return &services.QueryResponse{
+		Transfer: tx.ToTypesTransfer(),
+	}, nil
 }
