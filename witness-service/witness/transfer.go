@@ -1,12 +1,10 @@
 package witness
 
 import (
-	"bytes"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -61,17 +59,6 @@ func (t *Transfer) SetID(id common.Hash) {
 
 func (t *Transfer) BlockHeight() uint64 {
 	return t.blockHeight
-}
-
-func (t *Transfer) DataToSign() []byte {
-	return bytes.Join([][]byte{
-		t.cashier.Bytes(),
-		t.coToken.Bytes(),
-		math.U256Bytes(new(big.Int).SetUint64(t.index)),
-		t.sender.Bytes(),
-		t.recipient.Bytes(),
-		math.U256Bytes(t.amount),
-	}, []byte{})
 }
 
 func (t *Transfer) ToTypesTransfer() *types.Transfer {

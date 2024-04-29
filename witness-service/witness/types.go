@@ -35,7 +35,7 @@ type (
 		GetRecorder() AbstractRecorder
 		PullTransfersByHeight(blockHeight uint64) error
 		PullTransfers(blockCount uint16) error
-		SubmitTransfers(func([]byte) (common.Hash, common.Address, []byte, error)) error
+		SubmitTransfers(func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error)) error
 		CheckTransfers() error
 	}
 
@@ -63,7 +63,6 @@ type (
 		SetID(common.Hash)
 		Status() TransferStatus
 		BlockHeight() uint64
-		DataToSign() []byte
 		ToTypesTransfer() *types.Transfer
 	}
 )

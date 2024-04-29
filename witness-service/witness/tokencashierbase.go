@@ -202,7 +202,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	return nil
 }
 
-func (tc *tokenCashierBase) SubmitTransfers(sign func([]byte) (common.Hash, common.Address, []byte, error)) error {
+func (tc *tokenCashierBase) SubmitTransfers(sign func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error)) error {
 	transfersToSubmit, err := tc.recorder.TransfersToSubmit()
 	if err != nil {
 		return err
@@ -217,8 +217,7 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func([]byte) (common.Hash, comm
 		if !tc.hasEnoughBalance(transfer.Token(), transfer.Amount()) {
 			return errors.Errorf("not enough balance for token %s", transfer.Token())
 		}
-		data2Sign := append(tc.validatorContractAddr, transfer.DataToSign()...)
-		id, witness, signature, err := sign(data2Sign)
+		id, pubkey, signature, err := sign(transfer, tc.validatorContractAddr)
 		if err != nil {
 			return err
 		}
@@ -228,7 +227,7 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func([]byte) (common.Hash, comm
 				context.Background(),
 				&types.Witness{
 					Transfer:  transfer.ToTypesTransfer(),
-					Address:   witness.Bytes(),
+					Address:   pubkey,
 					Signature: signature,
 				},
 			)

@@ -7,17 +7,17 @@
 package witness
 
 import (
+	"bytes"
 	"context"
-	"crypto/ecdsa"
+	"crypto/ed25519"
+	"encoding/binary"
 	"log"
-	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -26,26 +26,26 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 )
 
-type service struct {
+type solService struct {
 	services.UnimplementedWitnessServiceServer
 	cashiers        []TokenCashier
 	processor       dispatcher.Runner
 	batchSize       uint16
 	processInterval time.Duration
-	privateKey      *ecdsa.PrivateKey
-	witnessAddress  common.Address
+	privateKey      *ed25519.PrivateKey
+	pubkey          ed25519.PublicKey
 	disableSubmit   bool
 }
 
-// NewService creates a new witness service
-func NewService(
-	privateKey *ecdsa.PrivateKey,
+// NewSolService creates a new witness service for transfers to solana
+func NewSolService(
+	privateKey *ed25519.PrivateKey,
 	cashiers []TokenCashier,
 	batchSize uint16,
 	processInterval time.Duration,
 	disableSubmit bool,
-) (*service, error) {
-	s := &service{
+) (*solService, error) {
+	s := &solService{
 		cashiers:        cashiers,
 		processInterval: processInterval,
 		batchSize:       batchSize,
@@ -53,7 +53,7 @@ func NewService(
 		disableSubmit:   disableSubmit,
 	}
 	if privateKey != nil {
-		s.witnessAddress = crypto.PubkeyToAddress(privateKey.PublicKey)
+		s.pubkey = privateKey.Public().(ed25519.PublicKey)
 	}
 	var err error
 	if s.processor, err = dispatcher.NewRunner(processInterval, s.process); err != nil {
@@ -63,7 +63,7 @@ func NewService(
 	return s, nil
 }
 
-func (s *service) Start(ctx context.Context) error {
+func (s *solService) Start(ctx context.Context) error {
 	for _, cashier := range s.cashiers {
 		if err := cashier.Start(ctx); err != nil {
 			return errors.Wrap(err, "failed to start recorder")
@@ -72,7 +72,7 @@ func (s *service) Start(ctx context.Context) error {
 	return s.processor.Start()
 }
 
-func (s *service) Stop(ctx context.Context) error {
+func (s *solService) Stop(ctx context.Context) error {
 	if err := s.processor.Close(); err != nil {
 		return err
 	}
@@ -84,29 +84,38 @@ func (s *service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *service) sign(tsf AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
-	transfer, ok := tsf.(*Transfer)
+// TODO: refactor with signHandler
+func (s *solService) sign(transfer AbstractTransfer, validatorAddr []byte) (common.Hash, []byte, []byte, error) {
+	tsf, ok := transfer.(*Transfer)
 	if !ok {
 		panic("invalid transfer type")
 	}
-	id := crypto.Keccak256Hash(
-		validatorContractAddr,
-		transfer.cashier.Bytes(),
-		transfer.coToken.Bytes(),
-		math.U256Bytes(new(big.Int).SetUint64(transfer.index)),
-		transfer.sender.Bytes(),
-		transfer.recipient.Bytes(),
-		math.U256Bytes(transfer.amount),
-	)
+
+	idxBuf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(idxBuf, tsf.index)
+	amtBuf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(amtBuf, tsf.amount.Uint64())
+
+	data := bytes.Join([][]byte{
+		validatorAddr,
+		tsf.cashier.Bytes(),
+		tsf.coToken.Bytes(),
+		idxBuf,
+		tsf.sender.Bytes(),
+		tsf.recipient.Bytes(),
+		amtBuf,
+	}, []byte{})
+
+	id := crypto.Keccak256Hash(data)
 	if s.privateKey == nil {
 		return id, nil, nil, nil
 	}
-	signature, err := crypto.Sign(id.Bytes(), s.privateKey)
+	signature := ed25519.Sign(*s.privateKey, data)
 
-	return id, s.witnessAddress.Bytes(), signature, err
+	return id, s.pubkey, signature, nil
 }
 
-func (s *service) process() error {
+func (s *solService) process() error {
 	for _, cashier := range s.cashiers {
 		if err := cashier.PullTransfers(s.batchSize); err != nil {
 			return errors.Wrap(err, "failed to pull transfers")
@@ -126,7 +135,7 @@ func (s *service) process() error {
 	return nil
 }
 
-func (s *service) ProcessOneBlock(height uint64) error {
+func (s *solService) ProcessOneBlock(height uint64) error {
 	for _, cashier := range s.cashiers {
 		if err := cashier.PullTransfersByHeight(height); err != nil {
 			return err
@@ -135,7 +144,7 @@ func (s *service) ProcessOneBlock(height uint64) error {
 	return nil
 }
 
-func (s *service) FetchByHeights(ctx context.Context, request *services.FetchRequest) (*emptypb.Empty, error) {
+func (s *solService) FetchByHeights(ctx context.Context, request *services.FetchRequest) (*emptypb.Empty, error) {
 	re := regexp.MustCompile(`^([0-9]*)-([0-9]*)$`)
 	var start, end uint64
 	var err error
@@ -167,7 +176,7 @@ func (s *service) FetchByHeights(ctx context.Context, request *services.FetchReq
 	return nil, nil
 }
 
-func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*services.QueryResponse, error) {
+func (s *solService) Query(ctx context.Context, request *services.QueryRequest) (*services.QueryResponse, error) {
 	id := common.BytesToHash(request.Id)
 
 	var tx AbstractTransfer
