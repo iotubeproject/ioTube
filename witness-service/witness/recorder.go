@@ -32,7 +32,7 @@ type (
 		store                *db.SQLStore
 		cashierMetaTableName string
 		transferTableName    string
-		tokenPairs           map[common.Address]common.Address
+		tokenPairs           map[common.Address]util.Address
 		addrDecoder          util.AddressDecoder
 	}
 )
@@ -41,7 +41,7 @@ type (
 func NewRecorder(
 	store *db.SQLStore,
 	transferTableName string,
-	tokenPairs map[common.Address]common.Address,
+	tokenPairs map[common.Address]util.Address,
 	addrDecoder util.AddressDecoder,
 ) *Recorder {
 	return &Recorder{

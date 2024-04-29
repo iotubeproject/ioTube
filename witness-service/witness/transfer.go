@@ -18,7 +18,7 @@ import (
 type Transfer struct {
 	cashier     common.Address
 	token       common.Address
-	coToken     common.Address
+	coToken     util.Address
 	index       uint64
 	sender      common.Address
 	recipient   util.Address

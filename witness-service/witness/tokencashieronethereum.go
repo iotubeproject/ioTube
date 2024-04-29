@@ -144,10 +144,11 @@ func NewTokenCashierOnEthereum(
 				return true
 			}
 			token := _token.Address().(common.Address)
-			coToken, ok := recorder.tokenPairs[token]
+			_coToken, ok := recorder.tokenPairs[token]
 			if !ok {
 				return false
 			}
+			coToken := _coToken.Address().(common.Address)
 			if _, ok := reverseRecorder.tokenPairs[coToken]; !ok {
 				return true
 			}
