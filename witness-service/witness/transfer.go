@@ -34,12 +34,12 @@ type Transfer struct {
 	txSender    common.Address
 }
 
-func (t *Transfer) Cashier() common.Address {
-	return t.cashier
+func (t *Transfer) Cashier() util.Address {
+	return util.ETHAddressToAddress(t.cashier)
 }
 
-func (t *Transfer) Token() common.Address {
-	return t.token
+func (t *Transfer) Token() util.Address {
+	return util.ETHAddressToAddress(t.token)
 }
 
 func (t *Transfer) Index() *big.Int {

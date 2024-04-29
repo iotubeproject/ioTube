@@ -19,6 +19,7 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
+	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
@@ -59,7 +60,7 @@ type (
 	}
 	calcConfirmHeightFunc func(startHeight uint64, count uint16) (uint64, uint64, error)
 	pullTransfersFunc     func(startHeight uint64, endHeight uint64) ([]AbstractTransfer, error)
-	hasEnoughBalanceFunc  func(token common.Address, amount *big.Int) bool
+	hasEnoughBalanceFunc  func(token util.Address, amount *big.Int) bool
 	startStopFunc         func(context.Context) error
 )
 

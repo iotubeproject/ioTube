@@ -12,8 +12,12 @@ import (
 	"encoding/hex"
 	"log"
 	"math/big"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
@@ -26,10 +30,39 @@ func NewTokenCashier(
 	relayerURL string,
 	iotexClient iotex.ReadOnlyClient,
 	cashierContractAddr address.Address,
-	validatorContractAddr common.Address,
+	validatorContractAddr []byte,
 	recorder *Recorder,
 	startBlockHeight uint64,
+	addrDecoder util.AddressDecoder,
 ) (TokenCashier, error) {
+
+	var (
+		getTransferInfo func([]byte) (common.Address, util.Address, *big.Int, *big.Int, error)
+		logTopic        []byte
+	)
+	switch addrDecoder.(type) {
+	case *util.SOLAddressDecoder:
+		tokenSOLCashierABI, err := abi.JSON(strings.NewReader(TokenCashierBitcoinABI))
+		if err != nil {
+			log.Panicf("failed to decode token cashier abi, %+v", err)
+		}
+		getTransferInfo = func(data []byte) (common.Address,
+			util.Address, *big.Int, *big.Int, error) {
+			return getSOLTransferInfo(tokenSOLCashierABI, data, util.NewSOLAddressDecoder())
+		}
+		logTopic = tokenSOLCashierABI.Events["Receipt"].ID.Bytes()
+	case *util.ETHAddressDecoder:
+		getTransferInfo = func(data []byte) (common.Address,
+			util.Address, *big.Int, *big.Int, error) {
+			return getETHTransferInfo(data, util.NewETHAddressDecoder())
+		}
+		logTopic = _ReceiptEventTopic.Bytes()
+	default:
+		return nil, errors.Errorf("unsupported address decoder %T", addrDecoder)
+	}
+	log.Printf("the address of recipient is monitored: %s\n", cashierContractAddr.String())
+	log.Printf("the event topic %s is monitored\n", hex.EncodeToString(logTopic))
+
 	return newTokenCashierBase(
 		id,
 		recorder,
@@ -54,14 +87,14 @@ func NewTokenCashier(
 			}
 			return endHeight, endHeight, nil
 		},
-		func(startHeight uint64, endHeight uint64) ([]*Transfer, error) {
+		func(startHeight uint64, endHeight uint64) ([]AbstractTransfer, error) {
 			response, err := iotexClient.API().GetLogs(context.Background(), &iotexapi.GetLogsRequest{
 				Filter: &iotexapi.LogsFilter{
 					Address: []string{cashierContractAddr.String()},
 					Topics: []*iotexapi.Topics{
 						{
 							Topic: [][]byte{
-								_ReceiptEventTopic.Bytes(),
+								logTopic,
 							},
 						},
 					},
@@ -77,18 +110,17 @@ func NewTokenCashier(
 			if err != nil {
 				return nil, err
 			}
-			transfers := []*Transfer{}
+			transfers := []AbstractTransfer{}
 			if len(response.Logs) > 0 {
 				log.Printf("\t%d transfers fetched from %d to %d\n", len(response.Logs), startHeight, endHeight)
 				for _, transferLog := range response.Logs {
-					if !bytes.Equal(_ReceiptEventTopic.Bytes(), transferLog.Topics[0]) {
+					if !bytes.Equal(logTopic, transferLog.Topics[0]) {
 						return nil, errors.Errorf("Wrong event topic %s, %s expected", transferLog.Topics[0], _ReceiptEventTopic)
 					}
-					if len(transferLog.Data) != 128 {
-						return nil, errors.Errorf("Invalid data length %d, 128 expected", len(transferLog.Data))
+					senderAddr, recipient, amount, fee, err := getTransferInfo(transferLog.Data)
+					if err != nil {
+						return nil, errors.Wrap(err, "failed to get transfer info")
 					}
-					senderAddr := common.BytesToAddress(transferLog.Data[:32])
-					amount := new(big.Int).SetBytes(transferLog.Data[64:96])
 					receipt, err := iotexClient.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{
 						ActionHash: hex.EncodeToString(transferLog.ActHash),
 					})
@@ -131,9 +163,9 @@ func NewTokenCashier(
 						token:       tokenAddr,
 						index:       new(big.Int).SetBytes(transferLog.Topics[2]).Uint64(),
 						sender:      senderAddr,
-						recipient:   common.BytesToAddress(transferLog.Data[32:64]),
+						recipient:   recipient,
 						amount:      amount,
-						fee:         new(big.Int).SetBytes(transferLog.Data[96:128]),
+						fee:         fee,
 						blockHeight: transferLog.BlkHeight,
 						txHash:      common.BytesToHash(transferLog.ActHash),
 					})
@@ -141,7 +173,7 @@ func NewTokenCashier(
 			}
 			return transfers, nil
 		},
-		func(common.Address, *big.Int) bool {
+		func(util.Address, *big.Int) bool {
 			return true
 		},
 		func(context.Context) error {
@@ -152,3 +184,53 @@ func NewTokenCashier(
 		},
 	), nil
 }
+
+func getETHTransferInfo(data []byte, addrDecoder util.AddressDecoder) (senderAddrr common.Address,
+	recipient util.Address, amount *big.Int, fee *big.Int, err error) {
+	if len(data) != 128 {
+		err = errors.Errorf("Invalid data length %d, 128 expected", len(data))
+		return
+	}
+	senderAddrr = common.BytesToAddress(data[:32])
+	recipient, err = addrDecoder.DecodeBytes(data[32:64])
+	if err != nil {
+		return
+	}
+	amount = new(big.Int).SetBytes(data[64:96])
+	fee = new(big.Int).SetBytes(data[96:128])
+
+	return
+}
+
+func getSOLTransferInfo(cashierABI abi.ABI, data []byte, addrDecoder util.AddressDecoder) (senderAddrr common.Address,
+	recipient util.Address, amount *big.Int, fee *big.Int, err error) {
+	var event struct {
+		Sender    common.Address
+		Recipient string
+		Amount    *big.Int
+		Fee       *big.Int
+	}
+
+	if err = cashierABI.UnpackIntoInterface(&event, "Receipt", data); err != nil {
+		return
+	}
+
+	senderAddrr = event.Sender
+	recipient, err = addrDecoder.DecodeString(event.Recipient)
+	if err != nil {
+		return
+	}
+	amount = event.Amount
+	fee = event.Fee
+
+	return
+}
+
+// TokenCashierBitcoinMetaData contains all meta data concerning the TokenCashierBitcoin contract.
+var TokenCashierBitcoinMetaData = &bind.MetaData{
+	ABI: "[{\"inputs\":[],\"name\":\"InvalidInitialization\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotInitializing\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"version\",\"type\":\"uint64\"}],\"name\":\"Initialized\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"recipient\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"Receipt\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"bitcoin\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"count\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"depositFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bitcoin\",\"type\":\"address\"}],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_sender\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_to\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"report\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_fee\",\"type\":\"uint256\"}],\"name\":\"setDepositFee\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"withdrawToken\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+}
+
+// TokenCashierBitcoinABI is the input ABI used to generate the binding from.
+// Deprecated: Use TokenCashierBitcoinMetaData.ABI instead.
+var TokenCashierBitcoinABI = TokenCashierBitcoinMetaData.ABI

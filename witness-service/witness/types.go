@@ -54,8 +54,8 @@ type (
 	}
 
 	AbstractTransfer interface {
-		Cashier() common.Address
-		Token() common.Address
+		Cashier() util.Address
+		Token() util.Address
 		Index() *big.Int
 		Recipient() util.Address
 		Amount() *big.Int

@@ -139,10 +139,11 @@ func NewTokenCashierOnEthereum(
 			}
 			return transfers, nil
 		},
-		func(token common.Address, amountToTransfer *big.Int) bool {
+		func(_token util.Address, amountToTransfer *big.Int) bool {
 			if reverseRecorder == nil {
 				return true
 			}
+			token := _token.Address().(common.Address)
 			coToken, ok := recorder.tokenPairs[token]
 			if !ok {
 				return false
