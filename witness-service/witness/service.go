@@ -10,7 +10,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"log"
-	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -84,19 +83,15 @@ func (s *service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *service) sign(tsf AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
-	transfer, ok := tsf.(*Transfer)
-	if !ok {
-		panic("invalid transfer type")
-	}
+func (s *service) sign(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
 	id := crypto.Keccak256Hash(
 		validatorContractAddr,
-		transfer.cashier.Bytes(),
-		transfer.coToken.Bytes(),
-		math.U256Bytes(new(big.Int).SetUint64(transfer.index)),
-		transfer.sender.Bytes(),
-		transfer.recipient.Bytes(),
-		math.U256Bytes(transfer.amount),
+		transfer.Cashier().Bytes(),
+		transfer.CoToken().Bytes(),
+		math.U256Bytes(transfer.Index()),
+		transfer.Sender().Bytes(),
+		transfer.Recipient().Bytes(),
+		math.U256Bytes(transfer.Amount()),
 	)
 	if s.privateKey == nil {
 		return id, nil, nil, nil

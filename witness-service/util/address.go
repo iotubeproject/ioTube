@@ -49,6 +49,12 @@ func (s *solAddress) Address() interface{} {
 	return s.address
 }
 
+func SOLAddressToAddress(addr solcommon.PublicKey) Address {
+	return &solAddress{
+		address: addr,
+	}
+}
+
 type AddressDecoder interface {
 	DecodeBytes([]byte) (Address, error)
 	DecodeString(string) (Address, error)

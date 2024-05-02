@@ -86,23 +86,18 @@ func (s *solService) Stop(ctx context.Context) error {
 
 // TODO: refactor with signHandler
 func (s *solService) sign(transfer AbstractTransfer, validatorAddr []byte) (common.Hash, []byte, []byte, error) {
-	tsf, ok := transfer.(*Transfer)
-	if !ok {
-		panic("invalid transfer type")
-	}
-
 	idxBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(idxBuf, tsf.index)
+	binary.LittleEndian.PutUint64(idxBuf, transfer.Index().Uint64())
 	amtBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(amtBuf, tsf.amount.Uint64())
+	binary.LittleEndian.PutUint64(amtBuf, transfer.Amount().Uint64())
 
 	data := bytes.Join([][]byte{
 		validatorAddr,
-		tsf.cashier.Bytes(),
-		tsf.coToken.Bytes(),
+		transfer.Cashier().Bytes(),
+		transfer.CoToken().Bytes(),
 		idxBuf,
-		tsf.sender.Bytes(),
-		tsf.recipient.Bytes(),
+		transfer.Sender().Bytes(),
+		transfer.Recipient().Bytes(),
 		amtBuf,
 	}, []byte{})
 

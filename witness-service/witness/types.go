@@ -56,7 +56,9 @@ type (
 	AbstractTransfer interface {
 		Cashier() util.Address
 		Token() util.Address
+		CoToken() util.Address
 		Index() *big.Int
+		Sender() util.Address
 		Recipient() util.Address
 		Amount() *big.Int
 		ID() ([]byte, error)
