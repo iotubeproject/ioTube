@@ -170,5 +170,15 @@ func (s *solTransfer) Status() TransferStatus {
 }
 
 func (s *solTransfer) ToTypesTransfer() *types.Transfer {
-	panic("not implemented")
+	return &types.Transfer{
+		Cashier:   s.cashier.Bytes(),
+		Token:     s.coToken.Bytes(),
+		Index:     int64(s.index),
+		Sender:    s.sender.Bytes(),
+		Recipient: s.recipient.Bytes(),
+		Amount:    s.amount.String(),
+		Timestamp: timestamppb.Now(),
+		Fee:       s.fee.String(),
+		TxSender:  s.txPayer.Bytes(),
+	}
 }

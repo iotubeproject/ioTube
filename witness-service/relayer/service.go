@@ -31,11 +31,13 @@ type (
 		cache             *lru.Cache
 		alwaysReset       bool
 		nonceTooLow       map[common.Hash]uint64
+		addrDecoder       util.AddressDecoder
 	}
 )
 
 // NewService creates a new relay service
-func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration, alwaysReset bool) (*Service, error) {
+func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration,
+	alwaysReset bool, addrDecoder util.AddressDecoder) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
 		return nil, err
@@ -46,6 +48,7 @@ func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration
 		cache:             cache,
 		alwaysReset:       alwaysReset,
 		nonceTooLow:       map[common.Hash]uint64{},
+		addrDecoder:       addrDecoder,
 	}
 	processor, err := dispatcher.NewRunner(interval, s.process)
 	if err != nil {
@@ -78,7 +81,7 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 		return nil, errors.New("cannot accept new submission")
 	}
 	log.Printf("receive a witness from %x\n", w.Address)
-	transfer, err := UnmarshalTransferProto(s.transferValidator.Address(), w.Transfer)
+	transfer, err := UnmarshalTransferProto(s.transferValidator.Address(), w.Transfer, s.addrDecoder)
 	if err != nil {
 		return nil, err
 	}

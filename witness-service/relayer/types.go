@@ -13,9 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/iotexproject/ioTube/witness-service/grpc/types"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type (
@@ -25,11 +27,11 @@ type (
 	StatusOnChainType int
 	// Transfer defines a transfer structure
 	Transfer struct {
-		cashier    common.Address
+		cashier    util.Address
 		token      common.Address
 		index      uint64
-		sender     common.Address
-		txSender   common.Address
+		sender     util.Address
+		txSender   util.Address
 		recipient  common.Address
 		amount     *big.Int
 		fee        *big.Int
@@ -93,14 +95,23 @@ var errGasPriceTooHigh = errors.New("gas price is too high")
 var errNoncritical = errors.New("error before submission")
 
 // UnmarshalTransferProto unmarshals a transfer proto
-func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transfer) (*Transfer, error) {
-	cashier := common.BytesToAddress(transfer.Cashier)
+func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transfer, addrDecoder util.AddressDecoder) (*Transfer, error) {
+	cashier, err := addrDecoder.DecodeBytes(transfer.Cashier)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode cashier")
+	}
 	token := common.BytesToAddress(transfer.Token)
 	index := uint64(transfer.Index)
-	sender := common.BytesToAddress(transfer.Sender)
-	var txSender common.Address
+	sender, err := addrDecoder.DecodeBytes(transfer.Sender)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode sender")
+	}
+	var txSender util.Address
 	if len(transfer.TxSender) > 0 {
-		txSender = common.BytesToAddress(transfer.TxSender)
+		txSender, err = addrDecoder.DecodeBytes(transfer.TxSender)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode tx sender")
+		}
 	}
 	recipient := common.BytesToAddress(transfer.Recipient)
 	amount, ok := new(big.Int).SetString(transfer.Amount, 10)

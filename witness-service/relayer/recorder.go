@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type (
@@ -47,6 +48,7 @@ type (
 		// updateStatusAndTransactionQuery is a query to set status and transaction
 		updateStatusAndTransactionQuery            string
 		updateStatusAndTransactionQueryForExplorer string
+		addrDecoder                                util.AddressDecoder
 	}
 )
 
@@ -57,6 +59,7 @@ func NewRecorder(
 	transferTableName string,
 	witnessTableName string,
 	explorerTableName string,
+	addrDecoder util.AddressDecoder,
 ) *Recorder {
 	return &Recorder{
 		store:                           store,
@@ -68,6 +71,7 @@ func NewRecorder(
 		updateStatusQueryForExplorer:    fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=?", explorerTableName),
 		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=? AND `status`=?", transferTableName),
 		updateStatusAndTransactionQueryForExplorer: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=?", explorerTableName),
+		addrDecoder: addrDecoder,
 	}
 }
 
@@ -107,11 +111,11 @@ func (recorder *Recorder) initStore(
 
 	if _, err := store.DB().Exec(fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s ("+
-			"`cashier` varchar(42) NOT NULL,"+
+			"`cashier` varchar(64) NOT NULL,"+
 			"`token` varchar(42) NOT NULL,"+
 			"`tidx` bigint(20) NOT NULL,"+
-			"`sender` varchar(42) NOT NULL,"+
-			"`txSender` varchar(42),"+
+			"`sender` varchar(64) NOT NULL,"+
+			"`txSender` varchar(64),"+
 			"`recipient` varchar(42) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
 			"`fee` varchar(78),"+
@@ -236,11 +240,11 @@ func (recorder *Recorder) addWitness(
 ) error {
 	if _, err := tx.Exec(
 		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
-		transfer.cashier.Hex(),
+		hex.EncodeToString(transfer.cashier.Bytes()),
 		transfer.token.Hex(),
 		transfer.index,
-		transfer.sender.Hex(),
-		transfer.txSender.Hex(),
+		hex.EncodeToString(transfer.sender.Bytes()),
+		hex.EncodeToString(transfer.txSender.Bytes()),
 		transfer.recipient.Hex(),
 		transfer.amount.String(),
 		transfer.fee.String(),
@@ -248,10 +252,10 @@ func (recorder *Recorder) addWitness(
 	); err != nil {
 		return errors.Wrap(err, "failed to insert into transfer table")
 	}
-	if transfer.txSender != zeroAddress {
+	if transfer.txSender != nil {
 		if _, err := tx.Exec(
 			fmt.Sprintf("UPDATE `%s` SET `txSender`=? WHERE `id`=?", transferTableName),
-			transfer.txSender.Hex(),
+			hex.EncodeToString(transfer.txSender.Bytes()),
 			transfer.id.Hex(),
 		); err != nil {
 			return errors.Wrap(err, "failed to update tx sender")
@@ -324,11 +328,11 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
-	tx.cashier = common.HexToAddress(cashier)
+	tx.cashier = recorder.hexToAddress(cashier)
 	tx.token = common.HexToAddress(token)
-	tx.sender = common.HexToAddress(sender)
+	tx.sender = recorder.hexToAddress(sender)
 	if txSender.Valid {
-		tx.txSender = common.HexToAddress(txSender.String)
+		tx.txSender = recorder.hexToAddress(txSender.String)
 	}
 	tx.recipient = common.HexToAddress(recipient)
 	tx.id = common.HexToHash(id)
@@ -367,6 +371,18 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 		}
 	}
 	return tx, nil
+}
+
+func (recorder *Recorder) hexToAddress(str string) util.Address {
+	bytes, err := hex.DecodeString(str)
+	if err != nil {
+		log.Panicf("failed to decode hex string %s", str)
+	}
+	ret, err := recorder.addrDecoder.DecodeBytes(bytes)
+	if err != nil {
+		log.Panicf("failed to decode address %s", str)
+	}
+	return ret
 }
 
 // Transfer returns the validation tx related information of a given transfer
