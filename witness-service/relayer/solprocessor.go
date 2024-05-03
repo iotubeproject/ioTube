@@ -2,11 +2,14 @@ package relayer
 
 import (
 	"context"
+	"encoding/base64"
 	"log"
 	"math"
 	"time"
 
 	"github.com/blocto/solana-go-sdk/client"
+	"github.com/blocto/solana-go-sdk/common"
+	"github.com/blocto/solana-go-sdk/program/token"
 	"github.com/blocto/solana-go-sdk/rpc"
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/util"
@@ -22,6 +25,8 @@ type SolProcessor struct {
 	runner      dispatcher.Runner
 	client      *client.Client
 	threshold   float64
+
+	voterTokenAddr string
 }
 
 func NewSolProcessor() *SolProcessor {
@@ -126,7 +131,7 @@ func (s *SolProcessor) SubmitTransfers() error {
 		return nil
 	}
 
-	activeWitnessMap, totalWeight, err := s.updateActiveWitnesses()
+	activeWitnessMap, totalWeight, err := s.getActiveWitnesses()
 	if err != nil {
 		return err
 	}
@@ -199,7 +204,47 @@ func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction,
 	return nil
 }
 
-// TODO: check https://solanacookbook.com/guides/get-program-accounts.html#deep-dive
-func (s *SolProcessor) updateActiveWitnesses() (map[string]uint64, uint64, error) {
-	return nil, 0, nil
+func (s *SolProcessor) getActiveWitnesses() (map[string]uint64, uint64, error) {
+	// https://solanacookbook.com/guides/get-program-accounts.html#deep-dive
+	resp, err := s.client.RpcClient.GetProgramAccountsWithConfig(
+		context.Background(),
+		common.TokenProgramID.String(),
+		rpc.GetProgramAccountsConfig{
+			Encoding:   rpc.AccountEncodingBase64,
+			Commitment: rpc.CommitmentFinalized,
+			Filters: []rpc.GetProgramAccountsConfigFilter{
+				{
+					DataSize: token.TokenAccountSize,
+					MemCmp: &rpc.GetProgramAccountsConfigFilterMemCmp{
+						Offset: 0,
+						Bytes:  s.voterTokenAddr,
+					},
+				}},
+		},
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	ownerMap := make(map[string]uint64)
+	for _, re := range resp.Result {
+		data, err := base64.StdEncoding.DecodeString((re.Account.Data.([]any))[0].(string))
+		if err != nil {
+			return nil, 0, err
+		}
+		tokenAccount, err := token.TokenAccountFromData(data)
+		if err != nil {
+			return nil, 0, err
+		}
+		ownerMap[tokenAccount.Owner.String()] = tokenAccount.Amount
+	}
+
+	supply, err := s.client.GetTokenSupplyWithConfig(context.Background(), s.voterTokenAddr, client.GetTokenSupplyConfig{
+		Commitment: rpc.CommitmentFinalized,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return ownerMap, supply.Amount, nil
 }
