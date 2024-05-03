@@ -7,6 +7,7 @@
 package relayer
 
 import (
+	"context"
 	"math/big"
 	"time"
 
@@ -63,6 +64,32 @@ type (
 		Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 		// SpeedUp resubmits validation with higher gas price
 		SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
+	}
+
+	AbstractRecorder interface {
+		// Start starts the recorder
+		Start(ctx context.Context) error
+		// Stop stops the recorder
+		Stop(ctx context.Context) error
+		// AddWitness adds a witness and a transfer
+		AddWitness(transfer *Transfer, witness *Witness) error
+		// ResetFailedTransfer resets a failed transfer
+		ResetFailedTransfer(id common.Hash) error
+		// Transfers returns a list of transfers
+		Transfers(offset uint32, limit uint8, byUpdateTime bool, desc bool,
+			queryOpts ...TransferQueryOption) ([]*Transfer, error)
+		// Transfer returns a transfer by id
+		Transfer(id common.Hash) (*Transfer, error)
+		// Witnesses returns a list of witnesses by transfer id
+		Witnesses(ids ...common.Hash) (map[common.Hash][]*Witness, error)
+		// Count returns the number of transfers
+		Count(opts ...TransferQueryOption) (int, error)
+	}
+
+	SOLRawTransaction struct {
+		signature            string
+		lastValidBlockHeight uint64
+		id                   common.Hash
 	}
 )
 

@@ -28,6 +28,7 @@ type (
 		transferValidator TransferValidator
 		processor         dispatcher.Runner
 		recorder          *Recorder
+		abstractRecorder  AbstractRecorder
 		cache             *lru.Cache
 		alwaysReset       bool
 		nonceTooLow       map[common.Hash]uint64
@@ -36,7 +37,9 @@ type (
 )
 
 // NewService creates a new relay service
-func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration,
+func NewService(tv TransferValidator, recorder *Recorder,
+	abstractRecorder AbstractRecorder,
+	interval time.Duration,
 	alwaysReset bool, addrDecoder util.AddressDecoder) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
@@ -45,6 +48,7 @@ func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration
 	s := &Service{
 		transferValidator: tv,
 		recorder:          recorder,
+		abstractRecorder:  abstractRecorder,
 		cache:             cache,
 		alwaysReset:       alwaysReset,
 		nonceTooLow:       map[common.Hash]uint64{},
@@ -61,7 +65,7 @@ func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration
 
 // Start starts the service
 func (s *Service) Start(ctx context.Context) error {
-	if err := s.recorder.Start(ctx); err != nil {
+	if err := s.abstractRecorder.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start recorder")
 	}
 	return s.processor.Start()
@@ -72,7 +76,7 @@ func (s *Service) Stop(ctx context.Context) error {
 	if err := s.processor.Start(); err != nil {
 		return errors.Wrap(err, "failed to start recorder")
 	}
-	return s.recorder.Stop(ctx)
+	return s.abstractRecorder.Stop(ctx)
 }
 
 // Submit accepts a submission of witness
@@ -89,7 +93,7 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	if err != nil {
 		return nil, err
 	}
-	if err := s.recorder.AddWitness(transfer, witness); err != nil {
+	if err := s.abstractRecorder.AddWitness(transfer, witness); err != nil {
 		return nil, err
 	}
 	return &services.WitnessSubmissionResponse{
@@ -100,7 +104,7 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 
 // Reset resets a transfer status from failed to new
 func (s *Service) Reset(ctx context.Context, request *services.ResetTransferRequest) (*services.ResetTransferResponse, error) {
-	if err := s.recorder.ResetFailedTransfer(common.BytesToHash(request.Id)); err != nil {
+	if err := s.abstractRecorder.ResetFailedTransfer(common.BytesToHash(request.Id)); err != nil {
 		return nil, err
 	}
 	return &services.ResetTransferResponse{Success: true}, nil
@@ -149,7 +153,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	case services.Status_FAILED:
 		queryOpts = append(queryOpts, StatusQueryOption(ValidationFailed, ValidationRejected))
 	}
-	count, err := s.recorder.Count(queryOpts...)
+	count, err := s.abstractRecorder.Count(queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +163,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if skip+first > int32(count) {
 		first = int32(count) - skip
 	}
-	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), false, true, queryOpts...)
+	transfers, err := s.abstractRecorder.Transfers(uint32(skip), uint8(first), false, true, queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +171,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	for _, transfer := range transfers {
 		ids = append(ids, transfer.id)
 	}
-	witnesses, err := s.recorder.Witnesses(ids...)
+	witnesses, err := s.abstractRecorder.Witnesses(ids...)
 	if err != nil {
 		return nil, err
 	}
@@ -244,11 +248,11 @@ func (s *Service) assembleCheckResponse(transfer *Transfer, witnesses map[common
 // Check checks the status of a transfer
 func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*services.CheckResponse, error) {
 	id := common.BytesToHash(request.Id)
-	transfer, err := s.recorder.Transfer(id)
+	transfer, err := s.abstractRecorder.Transfer(id)
 	if err != nil {
 		return nil, err
 	}
-	witnesses, err := s.recorder.Witnesses(id)
+	witnesses, err := s.abstractRecorder.Witnesses(id)
 	if err != nil {
 		return nil, err
 	}
