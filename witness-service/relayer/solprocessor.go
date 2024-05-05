@@ -11,6 +11,7 @@ import (
 	"github.com/blocto/solana-go-sdk/common"
 	"github.com/blocto/solana-go-sdk/program/token"
 	"github.com/blocto/solana-go-sdk/rpc"
+	soltypes "github.com/blocto/solana-go-sdk/types"
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/pkg/errors"
@@ -177,9 +178,10 @@ func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction,
 		return s.solRecorder.ResetTransferInProcess(transfer.id)
 	}
 
-	// TODO: prepare instructions
+	// TODO: prepare instructions for the transaction
+	tx := soltypes.Transaction{}
 
-	// TODO: sendtransaction
+	sig, err := s.client.SendTransaction(context.Background(), tx)
 
 	// txHash, relayer, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses[transfer.id])
 	// switch errors.Cause(err) {
