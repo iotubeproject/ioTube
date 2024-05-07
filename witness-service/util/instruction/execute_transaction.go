@@ -3,6 +3,7 @@ package instruction
 import (
 	"fmt"
 
+	"github.com/blocto/solana-go-sdk/common"
 	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/blocto/solana-go-sdk/pkg/bincode"
 	soltypes "github.com/blocto/solana-go-sdk/types"
@@ -41,5 +42,20 @@ func ExecuteTransaction(programID solcommon.PublicKey, param *ExecuteTransaction
 		ProgramID: programID,
 		Accounts:  accounts,
 		Data:      data,
+	}
+}
+
+const (
+	mintPK            = ""
+	recipient         = ""
+	governanceAddress = ""
+)
+
+func GetFooTransactionAccounts() []soltypes.AccountMeta {
+	return []soltypes.AccountMeta{
+		{PubKey: common.TokenProgramID, IsSigner: false, IsWritable: false},
+		{PubKey: common.PublicKeyFromString(mintPK), IsSigner: false, IsWritable: true},
+		{PubKey: common.PublicKeyFromString(recipient), IsSigner: false, IsWritable: true},
+		{PubKey: common.PublicKeyFromString(governanceAddress), IsSigner: false, IsWritable: false},
 	}
 }

@@ -39,6 +39,10 @@ func (s *SolRecorder) MarkAsSettled(sig string) error {
 	return nil
 }
 
+func (s *SolRecorder) MarkAsValidated(id common.Hash, sig string, validBlockHeight uint64) error {
+	return nil
+}
+
 func (s *SolRecorder) MarkAsProcessing(id common.Hash) error {
 	return nil
 }

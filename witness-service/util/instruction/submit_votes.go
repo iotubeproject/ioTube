@@ -11,15 +11,15 @@ import (
 type GovernanceInstructionType int
 
 type SubmitVotesParam struct {
-	Realm               solcommon.PublicKey
-	GoverningTokenMint  solcommon.PublicKey
-	Governance          solcommon.PublicKey
-	Proposal            solcommon.PublicKey
-	ProposalTransaction solcommon.PublicKey
-	VoteRecord          solcommon.PublicKey
-	RecordTranaction    solcommon.PublicKey
-	Payer               solcommon.PublicKey
-	TokenOwnerRecord    solcommon.PublicKey
+	Realm                  solcommon.PublicKey
+	GoverningTokenMint     solcommon.PublicKey
+	Governance             solcommon.PublicKey
+	Proposal               solcommon.PublicKey
+	ProposalTransaction    solcommon.PublicKey
+	VoteRecord             solcommon.PublicKey
+	RecordTranaction       solcommon.PublicKey
+	Payer                  solcommon.PublicKey
+	VotersTokenOwnerRecord []solcommon.PublicKey
 }
 
 func SubmitVotes(programID solcommon.PublicKey, param *SubmitVotesParam) soltypes.Instruction {
@@ -45,7 +45,14 @@ func SubmitVotes(programID solcommon.PublicKey, param *SubmitVotesParam) soltype
 		{PubKey: param.RecordTranaction, IsSigner: false, IsWritable: true},
 		{PubKey: param.Payer, IsSigner: true, IsWritable: true},
 		{PubKey: solcommon.SystemProgramID, IsSigner: false, IsWritable: false},
-		{PubKey: param.TokenOwnerRecord, IsSigner: false, IsWritable: false},
+	}
+
+	for _, tokenOwnerRecord := range param.VotersTokenOwnerRecord {
+		accounts = append(accounts, soltypes.AccountMeta{
+			PubKey:     tokenOwnerRecord,
+			IsSigner:   false,
+			IsWritable: false,
+		})
 	}
 
 	return soltypes.Instruction{

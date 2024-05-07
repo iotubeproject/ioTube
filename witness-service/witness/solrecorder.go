@@ -318,8 +318,8 @@ func (recorder *SOLRecorder) transfers(status TransferStatus) ([]AbstractTransfe
 		if !ok || tx.amount.Sign() != 1 {
 			return nil, errors.Errorf("invalid amount %s", rawAmount)
 		}
-		if toToken, ok := recorder.tokenPairs[tx.token]; ok {
-			tx.coToken = toToken
+		if coToken, ok := recorder.tokenPairs[tx.token]; ok {
+			tx.coToken = coToken
 		} else {
 			// skip if token is not in whitelist
 			continue
