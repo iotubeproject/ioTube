@@ -193,7 +193,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 		if err != nil {
 			return errors.Wrap(err, "failed to unmarshal public key")
 		}
-		if crypto.PubkeyToAddress(*pk) != witness.addr {
+		if crypto.PubkeyToAddress(*pk) != witness.Address() {
 			return errors.New("invalid signature")
 		}
 	}
@@ -241,7 +241,7 @@ func (recorder *Recorder) addWitness(
 	if _, err := tx.Exec(
 		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
 		hex.EncodeToString(transfer.cashier.Bytes()),
-		transfer.token.Hex(),
+		transfer.token.String(),
 		transfer.index,
 		hex.EncodeToString(transfer.sender.Bytes()),
 		hex.EncodeToString(transfer.txSender.Bytes()),
@@ -265,7 +265,7 @@ func (recorder *Recorder) addWitness(
 		if _, err := tx.Exec(
 			fmt.Sprintf("INSERT IGNORE INTO %s (`transferId`, `witness`, `signature`) VALUES (?, ?, ?)", witnessTableName),
 			transfer.id.Hex(),
-			witness.addr.Hex(),
+			witness.Address().Hex(),
 			hex.EncodeToString(witness.signature),
 		); err != nil {
 			return errors.Wrap(err, "failed to insert into witness table")
@@ -311,7 +311,7 @@ func (recorder *Recorder) Witnesses(ids ...common.Hash) (map[common.Hash][]*Witn
 			witnesses[id] = []*Witness{}
 		}
 		witnesses[id] = append(witnesses[id], &Witness{
-			addr:      common.HexToAddress(addr),
+			addr:      common.HexToAddress(addr).Bytes(),
 			signature: sigBytes,
 		})
 	}
@@ -329,7 +329,11 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = recorder.hexToAddress(cashier)
-	tx.token = common.HexToAddress(token)
+	var err error
+	tx.token, err = util.NewETHAddressDecoder().DecodeString(token)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode token")
+	}
 	tx.sender = recorder.hexToAddress(sender)
 	if txSender.Valid {
 		tx.txSender = recorder.hexToAddress(txSender.String)

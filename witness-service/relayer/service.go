@@ -89,7 +89,7 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	if err != nil {
 		return nil, err
 	}
-	witness, err := NewWitness(common.BytesToAddress(w.Address), w.Signature)
+	witness, err := NewWitness(w.Address, w.Signature)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +215,7 @@ func (s *Service) extractWitnesses(witnesses map[common.Hash][]*Witness, id comm
 	if _, ok := witnesses[id]; ok {
 		witnessAddrs = make([][]byte, 0, len(witnesses[id]))
 		for _, witness := range witnesses[id] {
-			witnessAddrs = append(witnessAddrs, witness.addr.Bytes())
+			witnessAddrs = append(witnessAddrs, witness.addr)
 		}
 	}
 	return witnessAddrs

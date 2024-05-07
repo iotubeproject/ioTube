@@ -218,7 +218,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 			return StatusOnChainUnknown, err
 		}
 		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
-		if threshold, ok := tv.bonusTokens[transfer.token.Hex()]; ok && transfer.amount.Cmp(threshold) > 0 {
+		if threshold, ok := tv.bonusTokens[transfer.token.String()]; ok && transfer.amount.Cmp(threshold) > 0 {
 			if err := tv.sendBonus(transfer.recipient); err != nil {
 				log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
 			}
@@ -282,8 +282,8 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 	signatures := []byte{}
 	numOfValidSignatures := 0
 	for _, witness := range witnesses {
-		if !tv.isActiveWitness(witness.addr) {
-			addr, err := address.FromBytes(witness.addr.Bytes())
+		if !tv.isActiveWitness(witness.Address()) {
+			addr, err := address.FromBytes(witness.Address().Bytes())
 			if err != nil {
 				return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 			}

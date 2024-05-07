@@ -29,7 +29,7 @@ type (
 	// Transfer defines a transfer structure
 	Transfer struct {
 		cashier    util.Address
-		token      common.Address
+		token      util.Address
 		index      uint64
 		sender     util.Address
 		txSender   util.Address
@@ -48,7 +48,7 @@ type (
 	}
 	// Witness defines a witness structure
 	Witness struct {
-		addr      common.Address
+		addr      []byte
 		signature []byte
 	}
 
@@ -90,6 +90,13 @@ type (
 		signature            string
 		lastValidBlockHeight uint64
 		id                   common.Hash
+
+		cashier   util.Address
+		token     util.Address
+		index     uint64
+		sender    util.Address
+		recipient util.Address
+		amount    *big.Int
 	}
 )
 
@@ -127,7 +134,10 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode cashier")
 	}
-	token := common.BytesToAddress(transfer.Token)
+	token, err := addrDecoder.DecodeBytes(transfer.Token)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode token")
+	}
 	index := uint64(transfer.Index)
 	sender, err := addrDecoder.DecodeBytes(transfer.Sender)
 	if err != nil {
@@ -183,12 +193,12 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 }
 
 // NewWitness creates a new witness struct
-func NewWitness(witnessAddr common.Address, signature []byte) (*Witness, error) {
+func NewWitness(witnessBytes []byte, signature []byte) (*Witness, error) {
 	clone := make([]byte, len(signature))
 	copy(clone, signature)
 
 	return &Witness{
-		addr:      witnessAddr,
+		addr:      witnessBytes,
 		signature: signature,
 	}, nil
 }
@@ -226,5 +236,5 @@ func (transfer *Transfer) ToTypesTransfer() *types.Transfer {
 }
 
 func (w *Witness) Address() common.Address {
-	return w.addr
+	return common.BytesToAddress(w.addr)
 }
