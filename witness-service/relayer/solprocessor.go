@@ -12,23 +12,40 @@ import (
 	"github.com/blocto/solana-go-sdk/program/token"
 	"github.com/blocto/solana-go-sdk/rpc"
 	soltypes "github.com/blocto/solana-go-sdk/types"
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/near/borsh-go"
+	"github.com/pkg/errors"
+
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/util"
-	"github.com/pkg/errors"
+	"github.com/iotexproject/ioTube/witness-service/util/instruction"
 )
 
 const (
-	_limitSize = 64
+	_limitSize        = 64
+	_validBlockHeight = 150
 )
 
-type SolProcessor struct {
-	solRecorder *SolRecorder
-	runner      dispatcher.Runner
-	client      *client.Client
-	threshold   float64
+type (
+	SolProcessor struct {
+		solRecorder *SolRecorder
+		runner      dispatcher.Runner
+		client      *client.Client
+		privateKey  *soltypes.Account
 
-	voterTokenAddr string
-}
+		voteCfg voteConfig
+	}
+
+	voteConfig struct {
+		ProgramID               string
+		Threshold               float64
+		RealmAddr               string
+		MintTokenAddr           string
+		GovernanceAddr          string
+		ProposalAddr            string
+		ProposalTransactionAddr string
+	}
+)
 
 func NewSolProcessor() *SolProcessor {
 	return &SolProcessor{}
@@ -146,68 +163,8 @@ func (s *SolProcessor) SubmitTransfers() error {
 	return nil
 }
 
-func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction,
-	activeWitnessMap map[string]uint64, totalWeight uint64) error {
-	witnessesMap, err := s.solRecorder.Witnesses(transfer.id)
-	if err != nil {
-		return errors.Wrapf(err, "failed to fetch witness for %s", transfer.id.String())
-	}
-	witnesses := witnessesMap[transfer.id]
-	if err := s.solRecorder.MarkAsProcessing(transfer.id); err != nil {
-		return errors.Wrapf(err, "failed to mark %s as processing", transfer.id.String())
-	}
-
-	validWitness := make([]*Witness, 0)
-	for _, witness := range witnesses {
-		// TODO: correct this
-		witnessStr := witness.Address().String()
-		if _, existed := activeWitnessMap[witnessStr]; !existed {
-			continue
-		}
-		validWitness = append(validWitness, witness)
-	}
-
-	votersWeight := uint64(0)
-	for _, witness := range validWitness {
-		witnessStr := witness.Address().String()
-		votersWeight += activeWitnessMap[witnessStr]
-	}
-
-	if votersWeight < uint64(math.Round(s.threshold*float64(totalWeight))) {
-		log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
-		return s.solRecorder.ResetTransferInProcess(transfer.id)
-	}
-
-	// TODO: prepare instructions for the transaction
-	tx := soltypes.Transaction{}
-
-	sig, err := s.client.SendTransaction(context.Background(), tx)
-
-	// txHash, relayer, nonce, gasPrice, err := s.transferValidator.Submit(transfer, witnesses[transfer.id])
-	// switch errors.Cause(err) {
-	// case nil:
-	// 	return s.recorder.MarkAsValidated(transfer.id, txHash, relayer, nonce, gasPrice)
-	// case errNoncritical:
-	// 	log.Printf("failed to prepare submission: %v\n", err)
-	// 	return s.recorder.ResetTransferInProcess(transfer.id)
-	// default:
-	// 	log.Printf("failed to submit %x, %+v", transfer.id, err)
-	// 	var recorderErr error
-	// 	if s.alwaysReset {
-	// 		recorderErr = s.recorder.ResetTransferInProcess(transfer.id)
-	// 	} else {
-	// 		recorderErr = s.recorder.MarkAsFailed(transfer.id)
-	// 	}
-	// 	if recorderErr != nil {
-	// 		log.Printf("failed to mark transfer %x, %v\n", transfer.id, recorderErr)
-	// 	}
-	// 	return err
-	// }
-	return nil
-}
-
+// https://solanacookbook.com/guides/get-program-accounts.html#deep-dive
 func (s *SolProcessor) getActiveWitnesses() (map[string]uint64, uint64, error) {
-	// https://solanacookbook.com/guides/get-program-accounts.html#deep-dive
 	resp, err := s.client.RpcClient.GetProgramAccountsWithConfig(
 		context.Background(),
 		common.TokenProgramID.String(),
@@ -219,7 +176,7 @@ func (s *SolProcessor) getActiveWitnesses() (map[string]uint64, uint64, error) {
 					DataSize: token.TokenAccountSize,
 					MemCmp: &rpc.GetProgramAccountsConfigFilterMemCmp{
 						Offset: 0,
-						Bytes:  s.voterTokenAddr,
+						Bytes:  s.voteCfg.MintTokenAddr,
 					},
 				}},
 		},
@@ -241,7 +198,7 @@ func (s *SolProcessor) getActiveWitnesses() (map[string]uint64, uint64, error) {
 		ownerMap[tokenAccount.Owner.String()] = tokenAccount.Amount
 	}
 
-	supply, err := s.client.GetTokenSupplyWithConfig(context.Background(), s.voterTokenAddr, client.GetTokenSupplyConfig{
+	supply, err := s.client.GetTokenSupplyWithConfig(context.Background(), s.voteCfg.MintTokenAddr, client.GetTokenSupplyConfig{
 		Commitment: rpc.CommitmentFinalized,
 	})
 	if err != nil {
@@ -249,4 +206,165 @@ func (s *SolProcessor) getActiveWitnesses() (map[string]uint64, uint64, error) {
 	}
 
 	return ownerMap, supply.Amount, nil
+}
+
+func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction,
+	activeWitnessMap map[string]uint64, totalWeight uint64) error {
+	witnessesMap, err := s.solRecorder.Witnesses(transfer.id)
+	if err != nil {
+		return errors.Wrapf(err, "failed to fetch witness for %s", transfer.id.String())
+	}
+	witnesses := witnessesMap[transfer.id]
+	if err := s.solRecorder.MarkAsProcessing(transfer.id); err != nil {
+		return errors.Wrapf(err, "failed to mark %s as processing", transfer.id.String())
+	}
+
+	validWitness := make([]*Witness, 0)
+	for _, witness := range witnesses {
+		witnessStr := common.PublicKeyFromBytes(witness.addr).String()
+		if _, existed := activeWitnessMap[witnessStr]; !existed {
+			continue
+		}
+		validWitness = append(validWitness, witness)
+	}
+
+	votersWeight := uint64(0)
+	for _, witness := range validWitness {
+		witnessStr := common.PublicKeyFromBytes(witness.addr).String()
+		votersWeight += activeWitnessMap[witnessStr]
+	}
+
+	if votersWeight < uint64(math.Round(s.voteCfg.Threshold*float64(totalWeight))) {
+		log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
+		return s.solRecorder.ResetTransferInProcess(transfer.id)
+	}
+
+	tx, submmitedHeight, err := s.buildTransaction(transfer, validWitness)
+	if err != nil {
+		log.Printf("failed to build transaction for %s, %v\n", transfer.id, err)
+		return s.solRecorder.ResetTransferInProcess(transfer.id)
+	}
+
+	sig, err := s.client.SendTransaction(context.Background(), tx)
+	if err != nil {
+		if recorderErr := s.solRecorder.ResetTransferInProcess(transfer.id); recorderErr != nil {
+			log.Printf("failed to mark transfer %x, %v\n", transfer.id, recorderErr)
+		}
+		return err
+	}
+	return s.solRecorder.MarkAsValidated(transfer.id, sig, submmitedHeight+_validBlockHeight)
+}
+
+func (s *SolProcessor) buildTransaction(transfer *SOLRawTransaction, witnesses []*Witness) (soltypes.Transaction, uint64, error) {
+	resp, err := s.client.GetLatestBlockhashWithConfig(context.Background(), client.GetLatestBlockhashConfig{
+		Commitment: rpc.CommitmentConfirmed})
+	if err != nil {
+		return soltypes.Transaction{}, 0, err
+	}
+
+	instr, err := s.buildInstructions(transfer, witnesses)
+	if err != nil {
+		return soltypes.Transaction{}, 0, err
+	}
+
+	tx, err := soltypes.NewTransaction(soltypes.NewTransactionParam{
+		Message: soltypes.NewMessage(soltypes.NewMessageParam{
+			FeePayer:        s.privateKey.PublicKey,
+			RecentBlockhash: resp.Blockhash,
+			Instructions:    instr,
+		}),
+		Signers: []soltypes.Account{*s.privateKey},
+	})
+	return tx, resp.LatestValidBlockHeight, err
+}
+
+func (s *SolProcessor) buildInstructions(transfer *SOLRawTransaction, witnesses []*Witness) ([]soltypes.Instruction, error) {
+	msg, err := borsh.Serialize(struct {
+		ProgramID common.PublicKey
+		Cashier   ethcommon.Address
+		CoToken   common.PublicKey
+		Index     uint64
+		Sender    string
+		Recipient common.PublicKey
+		Amount    uint64
+	}{
+		ProgramID: common.PublicKeyFromString(s.voteCfg.ProgramID),
+		Cashier:   ethcommon.BytesToAddress(transfer.cashier.Bytes()),
+		CoToken:   common.PublicKeyFromBytes(transfer.token.Bytes()),
+		Index:     transfer.index,
+		Sender:    transfer.sender.String(),
+		Recipient: common.PublicKeyFromBytes(transfer.recipient.Bytes()),
+		Amount:    transfer.amount.Uint64(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	msgs := make([][]byte, len(witnesses))
+	sigs := make([][]byte, len(witnesses))
+	pubkeys := make([][]byte, len(witnesses))
+	for i := range witnesses {
+		msgs[i] = make([]byte, len(msg))
+		copy(msgs[i], msg)
+		sigs[i] = witnesses[i].signature
+		pubkeys[i] = witnesses[i].addr
+	}
+	ed25519Instr, err := instruction.NewEd25519Instruction(msgs, sigs, pubkeys, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	voteRecordAddr := instruction.GetVoteRecordAddr(
+		common.PublicKeyFromString(s.voteCfg.ProgramID),
+		common.PublicKeyFromString(s.voteCfg.ProposalAddr),
+		transfer.id,
+	)
+	recordTranactionAddr := instruction.GetRecordTranactionAddr(
+		common.PublicKeyFromString(s.voteCfg.ProgramID),
+		common.PublicKeyFromString(s.voteCfg.ProposalAddr),
+		voteRecordAddr,
+	)
+
+	votersTokenOwnerRecord := make([]common.PublicKey, len(witnesses))
+	for i, witness := range witnesses {
+		votersTokenOwnerRecord[i] = instruction.GetTokenOwnerRecordAddr(
+			common.PublicKeyFromString(s.voteCfg.ProgramID),
+			common.PublicKeyFromString(s.voteCfg.RealmAddr),
+			common.PublicKeyFromString(s.voteCfg.MintTokenAddr),
+			common.PublicKeyFromBytes(witness.addr),
+		)
+	}
+
+	submitVotesInstr := instruction.SubmitVotes(
+		common.PublicKeyFromString(s.voteCfg.ProgramID),
+		&instruction.SubmitVotesParam{
+			Realm:                  common.PublicKeyFromString(s.voteCfg.RealmAddr),
+			GoverningTokenMint:     common.PublicKeyFromString(s.voteCfg.MintTokenAddr),
+			Governance:             common.PublicKeyFromString(s.voteCfg.GovernanceAddr),
+			Proposal:               common.PublicKeyFromString(s.voteCfg.ProposalAddr),
+			ProposalTransaction:    common.PublicKeyFromString(s.voteCfg.ProposalTransactionAddr),
+			VoteRecord:             voteRecordAddr,
+			RecordTranaction:       recordTranactionAddr,
+			Payer:                  s.privateKey.PublicKey,
+			VotersTokenOwnerRecord: votersTokenOwnerRecord,
+		},
+	)
+
+	executeTransactionInstr := instruction.ExecuteTransaction(
+		common.PublicKeyFromString(s.voteCfg.ProgramID),
+		&instruction.ExecuteTransactionParam{
+			Governance:       common.PublicKeyFromString(s.voteCfg.GovernanceAddr),
+			Proposal:         common.PublicKeyFromString(s.voteCfg.ProposalAddr),
+			VoteRecord:       voteRecordAddr,
+			RecordTranaction: recordTranactionAddr,
+			// TODO: get TransactionAccounts from transfer
+			TransactionAccounts: instruction.GetFooTransactionAccounts(),
+		},
+	)
+
+	return []soltypes.Instruction{
+		ed25519Instr,
+		submitVotesInstr,
+		executeTransactionInstr,
+	}, nil
 }
