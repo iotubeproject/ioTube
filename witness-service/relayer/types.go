@@ -11,9 +11,8 @@ import (
 	"math/big"
 	"time"
 
+	soltypes "github.com/blocto/solana-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -33,7 +32,7 @@ type (
 		index      uint64
 		sender     util.Address
 		txSender   util.Address
-		recipient  common.Address
+		recipient  util.Address
 		amount     *big.Int
 		fee        *big.Int
 		id         common.Hash
@@ -72,7 +71,7 @@ type (
 		// Stop stops the recorder
 		Stop(ctx context.Context) error
 		// AddWitness adds a witness and a transfer
-		AddWitness(transfer *Transfer, witness *Witness) error
+		AddWitness(validator util.Address, transfer *Transfer, witness *Witness) (common.Hash, error)
 		// ResetFailedTransfer resets a failed transfer
 		ResetFailedTransfer(id common.Hash) error
 		// Transfers returns a list of transfers
@@ -87,16 +86,19 @@ type (
 	}
 
 	SOLRawTransaction struct {
-		signature            string
-		lastValidBlockHeight uint64
 		id                   common.Hash
-
-		cashier   util.Address
-		token     util.Address
-		index     uint64
-		sender    util.Address
-		recipient util.Address
-		amount    *big.Int
+		cashier              util.Address
+		token                util.Address
+		index                uint64
+		sender               util.Address
+		txSender             util.Address
+		recipient            util.Address
+		amount               *big.Int
+		fee                  *big.Int
+		relayer              common.Address
+		signature            soltypes.Signature
+		lastValidBlockHeight uint64
+		status               ValidationStatusType
 	}
 )
 
@@ -129,28 +131,33 @@ var errGasPriceTooHigh = errors.New("gas price is too high")
 var errNoncritical = errors.New("error before submission")
 
 // UnmarshalTransferProto unmarshals a transfer proto
-func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transfer, addrDecoder util.AddressDecoder) (*Transfer, error) {
-	cashier, err := addrDecoder.DecodeBytes(transfer.Cashier)
+func UnmarshalTransferProto(transfer *types.Transfer,
+	sourceAddrDecoder util.AddressDecoder, destAddrDecoder util.AddressDecoder,
+) (*Transfer, error) {
+	cashier, err := sourceAddrDecoder.DecodeBytes(transfer.Cashier)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode cashier")
 	}
-	token, err := addrDecoder.DecodeBytes(transfer.Token)
+	token, err := destAddrDecoder.DecodeBytes(transfer.Token)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode token")
 	}
 	index := uint64(transfer.Index)
-	sender, err := addrDecoder.DecodeBytes(transfer.Sender)
+	sender, err := sourceAddrDecoder.DecodeBytes(transfer.Sender)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode sender")
 	}
 	var txSender util.Address
 	if len(transfer.TxSender) > 0 {
-		txSender, err = addrDecoder.DecodeBytes(transfer.TxSender)
+		txSender, err = sourceAddrDecoder.DecodeBytes(transfer.TxSender)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decode tx sender")
 		}
 	}
-	recipient := common.BytesToAddress(transfer.Recipient)
+	recipient, err := destAddrDecoder.DecodeBytes(transfer.Recipient)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode recipient")
+	}
 	amount, ok := new(big.Int).SetString(transfer.Amount, 10)
 	if !ok || amount.Sign() == -1 {
 		return nil, errors.Errorf("invalid amount %s", transfer.Amount)
@@ -166,16 +173,6 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 			return nil, errors.Errorf("invalid gas price %s", transfer.GasPrice)
 		}
 	}
-	id := crypto.Keccak256Hash(
-		validatorAddr.Bytes(),
-		cashier.Bytes(),
-		token.Bytes(),
-		math.U256Bytes(new(big.Int).SetUint64(index)),
-		sender.Bytes(),
-		recipient.Bytes(),
-		math.U256Bytes(amount),
-	)
-
 	return &Transfer{
 		cashier:   cashier,
 		token:     token,
@@ -184,7 +181,6 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 		recipient: recipient,
 		amount:    amount,
 		fee:       fee,
-		id:        id,
 		gas:       transfer.Gas,
 		gasPrice:  gasPrice,
 		timestamp: transfer.Timestamp.AsTime(),

@@ -20,6 +20,7 @@ import (
 
 	// mute lint error
 	"github.com/ethereum/go-ethereum/common"
+	ethmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -180,45 +181,54 @@ func (recorder *Recorder) Stop(ctx context.Context) error {
 }
 
 // AddWitness records a new witness
-func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error {
+func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer, witness *Witness) (common.Hash, error) {
+	transfer.id = crypto.Keccak256Hash(
+		validator.Bytes(),
+		transfer.cashier.Bytes(),
+		transfer.token.Bytes(),
+		ethmath.U256Bytes(new(big.Int).SetUint64(transfer.index)),
+		transfer.sender.Bytes(),
+		transfer.recipient.Bytes(),
+		ethmath.U256Bytes(transfer.amount),
+	)
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	recorder.validateID(uint64(transfer.index))
 	if len(witness.signature) != 0 {
 		rpk, err := crypto.Ecrecover(transfer.id.Bytes(), witness.signature)
 		if err != nil {
-			return err
+			return common.Hash{}, err
 		}
 		pk, err := crypto.UnmarshalPubkey(rpk)
 		if err != nil {
-			return errors.Wrap(err, "failed to unmarshal public key")
+			return common.Hash{}, errors.Wrap(err, "failed to unmarshal public key")
 		}
 		if crypto.PubkeyToAddress(*pk) != witness.Address() {
-			return errors.New("invalid signature")
+			return common.Hash{}, errors.New("invalid signature")
 		}
 	}
 	recorder.metric("new", transfer.amount)
 	tx, err := recorder.store.DB().Begin()
 	if err != nil {
-		return err
+		return common.Hash{}, err
 	}
 	defer tx.Rollback()
 	if err := recorder.addWitness(tx, transfer, witness, recorder.transferTableName, recorder.witnessTableName); err != nil {
-		return errors.Wrap(err, "failed to add witness")
+		return common.Hash{}, errors.Wrap(err, "failed to add witness")
 	}
 	var explorerTx *sql.Tx
 	if recorder.explorerStore != nil {
 		explorerTx, err = recorder.explorerStore.DB().Begin()
 		if err != nil {
-			return err
+			return common.Hash{}, err
 		}
 		defer explorerTx.Rollback()
 		if err := recorder.addWitness(explorerTx, transfer, witness, recorder.explorerTableName, ""); err != nil {
-			return err
+			return common.Hash{}, err
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return errors.Wrap(err, "failed to commit transaction")
+		return common.Hash{}, errors.Wrap(err, "failed to commit transaction")
 	}
 	if explorerTx != nil {
 		for {
@@ -229,7 +239,7 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 		}
 	}
 
-	return nil
+	return transfer.id, nil
 }
 
 func (recorder *Recorder) addWitness(
@@ -245,7 +255,7 @@ func (recorder *Recorder) addWitness(
 		transfer.index,
 		hex.EncodeToString(transfer.sender.Bytes()),
 		hex.EncodeToString(transfer.txSender.Bytes()),
-		transfer.recipient.Hex(),
+		transfer.recipient.String(),
 		transfer.amount.String(),
 		transfer.fee.String(),
 		transfer.id.Hex(),
@@ -338,7 +348,10 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	if txSender.Valid {
 		tx.txSender = recorder.hexToAddress(txSender.String)
 	}
-	tx.recipient = common.HexToAddress(recipient)
+	tx.recipient, err = util.NewETHAddressDecoder().DecodeString(recipient)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode recipient")
+	}
 	tx.id = common.HexToHash(id)
 	if relayer.Valid {
 		tx.relayer = common.HexToAddress(relayer.String)

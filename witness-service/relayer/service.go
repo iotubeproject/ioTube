@@ -26,18 +26,21 @@ type (
 	Service struct {
 		services.UnimplementedRelayServiceServer
 		transferValidator TransferValidator
-		processor         dispatcher.Runner
-		recorder          *Recorder
-		abstractRecorder  AbstractRecorder
-		cache             *lru.Cache
-		alwaysReset       bool
-		nonceTooLow       map[common.Hash]uint64
-		addrDecoder       util.AddressDecoder
+		// TODO: remove transferValidatorAddr once API is separated from service
+		transferValidatorAddr util.Address
+		processor             dispatcher.Runner
+		recorder              *Recorder
+		// TODO: remove abstractRecorder once API is separated from service
+		abstractRecorder AbstractRecorder
+		cache            *lru.Cache
+		alwaysReset      bool
+		nonceTooLow      map[common.Hash]uint64
+		addrDecoder      util.AddressDecoder
 	}
 )
 
 // NewService creates a new relay service
-func NewService(tv TransferValidator, recorder *Recorder,
+func NewService(tv TransferValidator, tvAddr util.Address, recorder *Recorder,
 	abstractRecorder AbstractRecorder,
 	interval time.Duration,
 	alwaysReset bool, addrDecoder util.AddressDecoder) (*Service, error) {
@@ -46,13 +49,14 @@ func NewService(tv TransferValidator, recorder *Recorder,
 		return nil, err
 	}
 	s := &Service{
-		transferValidator: tv,
-		recorder:          recorder,
-		abstractRecorder:  abstractRecorder,
-		cache:             cache,
-		alwaysReset:       alwaysReset,
-		nonceTooLow:       map[common.Hash]uint64{},
-		addrDecoder:       addrDecoder,
+		transferValidator:     tv,
+		transferValidatorAddr: tvAddr,
+		recorder:              recorder,
+		abstractRecorder:      abstractRecorder,
+		cache:                 cache,
+		alwaysReset:           alwaysReset,
+		nonceTooLow:           map[common.Hash]uint64{},
+		addrDecoder:           addrDecoder,
 	}
 	processor, err := dispatcher.NewRunner(interval, s.process)
 	if err != nil {
@@ -85,7 +89,11 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 		return nil, errors.New("cannot accept new submission")
 	}
 	log.Printf("receive a witness from %x\n", w.Address)
-	transfer, err := UnmarshalTransferProto(s.transferValidator.Address(), w.Transfer, s.addrDecoder)
+	transfer, err := UnmarshalTransferProto(
+		w.Transfer,
+		// TODO: fix this
+		s.addrDecoder,
+		s.addrDecoder)
 	if err != nil {
 		return nil, err
 	}
@@ -93,11 +101,12 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	if err != nil {
 		return nil, err
 	}
-	if err := s.abstractRecorder.AddWitness(transfer, witness); err != nil {
+	transferID, err := s.abstractRecorder.AddWitness(s.transferValidatorAddr, transfer, witness)
+	if err != nil {
 		return nil, err
 	}
 	return &services.WitnessSubmissionResponse{
-		Id:      transfer.id.Bytes(),
+		Id:      transferID.Bytes(),
 		Success: true,
 	}, nil
 }

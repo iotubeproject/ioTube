@@ -13,6 +13,7 @@ import (
 	"github.com/blocto/solana-go-sdk/rpc"
 	soltypes "github.com/blocto/solana-go-sdk/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/mr-tron/base58"
 	"github.com/near/borsh-go"
 	"github.com/pkg/errors"
 
@@ -86,7 +87,7 @@ func (s *SolProcessor) ConfirmTransfers() error {
 	for _, tsf := range submittedTsfs {
 		status, err := s.client.GetSignatureStatusWithConfig(
 			context.Background(),
-			tsf.signature, client.GetSignatureStatusesConfig{
+			base58.Encode(tsf.signature[:]), client.GetSignatureStatusesConfig{
 				SearchTransactionHistory: true,
 			},
 		)
@@ -110,7 +111,7 @@ func (s *SolProcessor) ConfirmTransfers() error {
 		if !isTxConfirmed(status) {
 			continue
 		}
-		if err := s.solRecorder.MarkAsSettled(tsf.signature); err != nil {
+		if err := s.solRecorder.MarkAsSettled(tsf.id); err != nil {
 			log.Printf("failed to settle transaction %s, %+v\n", tsf.signature, err)
 			continue
 		}
@@ -129,7 +130,7 @@ func (s *SolProcessor) isTXExpired(tx *SOLRawTransaction) (bool, error) {
 }
 
 func (s *SolProcessor) resetTransaction(tx *SOLRawTransaction) error {
-	if err := s.solRecorder.ResetFailedTransfer(tx.signature); err != nil {
+	if err := s.solRecorder.ResetFailedTransfer(tx.id); err != nil {
 		return err
 	}
 	return nil
@@ -214,7 +215,10 @@ func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction,
 	if err != nil {
 		return errors.Wrapf(err, "failed to fetch witness for %s", transfer.id.String())
 	}
-	witnesses := witnessesMap[transfer.id]
+	witnesses, ok := witnessesMap[transfer.id]
+	if !ok {
+		return errors.Wrapf(err, "no witness are found for %s", transfer.id.String())
+	}
 	if err := s.solRecorder.MarkAsProcessing(transfer.id); err != nil {
 		return errors.Wrapf(err, "failed to mark %s as processing", transfer.id.String())
 	}
@@ -252,7 +256,12 @@ func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction,
 		}
 		return err
 	}
-	return s.solRecorder.MarkAsValidated(transfer.id, sig, submmitedHeight+_validBlockHeight)
+	sigBytes, err := base58.Decode(sig)
+	if err != nil {
+		return err
+	}
+	relayerAddr := ethcommon.BytesToAddress(s.privateKey.PublicKey.Bytes())
+	return s.solRecorder.MarkAsValidated(transfer.id, sigBytes, relayerAddr, submmitedHeight+_validBlockHeight)
 }
 
 func (s *SolProcessor) buildTransaction(transfer *SOLRawTransaction, witnesses []*Witness) (soltypes.Transaction, uint64, error) {

@@ -270,7 +270,7 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
 	// TODO: support cashier and sender with string type
-	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token.Address().(common.Address), new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
+	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token.Address().(common.Address), new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient.Address().(common.Address), transfer.amount, signatures)
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil
