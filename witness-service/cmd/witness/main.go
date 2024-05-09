@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"flag"
 	"fmt"
 	"log"
@@ -18,12 +19,15 @@ import (
 	"strings"
 	"time"
 
+	solclient "github.com/blocto/solana-go-sdk/client"
+	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
+	"github.com/mr-tron/base58"
 	"go.uber.org/config"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
@@ -64,6 +68,7 @@ type Configuration struct {
 			Tokens                 []string `json:"tokens" yaml:"tokens"`
 		}
 	} `json:"cashiers" yaml:"cashiers"`
+	DestinationChain string `json:"destinationChain" yaml:"destinationChain"`
 }
 
 var (
@@ -162,7 +167,10 @@ func main() {
 		}
 	}
 
-	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
+	var (
+		cashiers    = make([]witness.TokenCashier, 0, len(cfg.Cashiers))
+		signHandler witness.SignHandler
+	)
 	switch cfg.Chain {
 	case "iotex":
 		conn, err := iotex.NewDefaultGRPCConn(cfg.ClientURL)
@@ -171,12 +179,31 @@ func main() {
 		}
 		iotexClient := iotex.NewReadOnlyClient(iotexapi.NewAPIServiceClient(conn))
 		// defer conn.Close()
+
+		var destAddrDecoder util.AddressDecoder
+		if cfg.DestinationChain == "solana" {
+			destAddrDecoder = util.NewSOLAddressDecoder()
+
+			privateKeyBytes, err := base58.Decode(cfg.PrivateKey)
+			if err != nil {
+				log.Fatalf("failed to decode private key %v\n", err)
+			}
+			if len(privateKeyBytes) != ed25519.PrivateKeySize {
+				log.Fatalf("invalid private key length %d\n", len(privateKeyBytes))
+			}
+			edPrivateKey := ed25519.PrivateKey(privateKeyBytes)
+			signHandler = witness.NewEd25519SignHandler(&edPrivateKey)
+		} else {
+			destAddrDecoder = util.NewETHAddressDecoder()
+			signHandler = witness.NewSecp256k1SignHandler(privateKey)
+		}
+
 		for _, cc := range cfg.Cashiers {
 			cashierContractAddr, err := address.FromString(cc.CashierContractAddress)
 			if err != nil {
 				log.Fatalf("failed to parse cashier contract address %s, %v\n", cc.CashierContractAddress, err)
 			}
-			pairs := make(map[common.Address]common.Address)
+			pairs := make(map[common.Address]util.Address)
 			for _, pair := range cc.TokenPairs {
 				ioAddr, err := address.FromString(pair.Token1)
 				if err != nil {
@@ -185,20 +212,30 @@ func main() {
 				if _, ok := pairs[common.BytesToAddress(ioAddr.Bytes())]; ok {
 					log.Fatalf("duplicate token key %s\n", pair.Token1)
 				}
-				pairs[common.BytesToAddress(ioAddr.Bytes())] = common.HexToAddress(pair.Token2)
+				addr, err := destAddrDecoder.DecodeString(pair.Token2)
+				if err != nil {
+					log.Fatalf("failed to decode destination address %s, %v\n", pair.Token2, err)
+				}
+				pairs[common.BytesToAddress(ioAddr.Bytes())] = addr
+			}
+			validatorContractAddr, err := destAddrDecoder.DecodeString(cc.ValidatorContractAddress)
+			if err != nil {
+				log.Fatalf("failed to decode validator contract address %s, %v\n", cc.ValidatorContractAddress, err)
 			}
 			cashier, err := witness.NewTokenCashier(
 				cc.ID,
 				cc.RelayerURL,
 				iotexClient,
 				cashierContractAddr,
-				common.HexToAddress(cc.ValidatorContractAddress),
+				validatorContractAddr.Bytes(),
 				witness.NewRecorder(
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
+					destAddrDecoder,
 				),
 				uint64(cc.StartBlockHeight),
+				destAddrDecoder,
 			)
 			if err != nil {
 				log.Fatalf("failed to create cashier %v\n", err)
@@ -218,7 +255,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to parse validator contract address %v\n", err)
 			}
-			pairs := make(map[common.Address]common.Address)
+			pairs := make(map[common.Address]util.Address)
 			for _, pair := range cc.TokenPairs {
 				if _, ok := pairs[common.HexToAddress(pair.Token1)]; ok {
 					log.Fatalf("duplicate token key %s\n", pair.Token1)
@@ -227,18 +264,19 @@ func main() {
 				if err != nil {
 					log.Fatalf("failed to parse iotex address %s, %v\n", pair.Token2, err)
 				}
-				pairs[common.HexToAddress(pair.Token1)] = common.BytesToAddress(ioAddr.Bytes())
+				pairs[common.HexToAddress(pair.Token1)] = util.ETHAddressToAddress(common.BytesToAddress(ioAddr.Bytes()))
 			}
 			var reverseRecorder *witness.Recorder
 			if cc.Reverse.CashierContractAddress != "" && cc.Reverse.TransferTableName != "" {
-				pairs := make(map[common.Address]common.Address)
+				pairs := make(map[common.Address]util.Address)
 				for _, token := range cc.Reverse.Tokens {
-					pairs[common.HexToAddress(token)] = common.HexToAddress(token)
+					pairs[common.HexToAddress(token)] = util.ETHAddressToAddress(common.HexToAddress(token))
 				}
 				reverseRecorder = witness.NewRecorder(
 					db.NewStore(cfg.Database),
 					cc.Reverse.TransferTableName,
 					pairs,
+					util.NewETHAddressDecoder(),
 				)
 			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
@@ -252,6 +290,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
+					util.NewETHAddressDecoder(),
 				),
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
@@ -263,12 +302,52 @@ func main() {
 			}
 			cashiers = append(cashiers, cashier)
 		}
+		signHandler = witness.NewSecp256k1SignHandler(privateKey)
+	case "solana":
+		solClient := solclient.NewClient(cfg.ClientURL)
+		for _, cc := range cfg.Cashiers {
+			addr, err := address.FromString(cc.ValidatorContractAddress)
+			if err != nil {
+				log.Fatalf("failed to parse validator contract address %v\n", err)
+			}
+			pairs := make(map[solcommon.PublicKey]util.Address)
+			for _, pair := range cc.TokenPairs {
+				token := solcommon.PublicKeyFromString(pair.Token1)
+				if _, ok := pairs[token]; ok {
+					log.Fatalf("duplicate token key %s\n", pair.Token1)
+				}
+				token2, err := util.NewETHAddressDecoder().DecodeString(pair.Token2)
+				if err != nil {
+					log.Fatalf("failed to parse iotex address %s, %v\n", pair.Token2, err)
+				}
+				pairs[token] = token2
+			}
+			cashier, err := witness.NewTokenCashierOnSolana(
+				cc.ID,
+				cc.RelayerURL,
+				solClient,
+				solcommon.PublicKeyFromString(cc.CashierContractAddress),
+				common.BytesToAddress(addr.Bytes()),
+				witness.NewSOLRecorder(
+					db.NewStore(cfg.Database),
+					cc.TransferTableName,
+					pairs,
+					util.NewETHAddressDecoder(),
+				),
+				uint64(cc.StartBlockHeight),
+			)
+			if err != nil {
+				log.Fatalf("failed to create cashier %v\n", err)
+			}
+			cashiers = append(cashiers, cashier)
+		}
+		signHandler = witness.NewSecp256k1SignHandler(privateKey)
 	default:
 		log.Fatalf("unknown chain name %s", cfg.Chain)
 	}
 
 	service, err := witness.NewService(
-		privateKey,
+		signHandler,
 		cashiers,
 		uint16(cfg.BatchSize),
 		cfg.Interval,

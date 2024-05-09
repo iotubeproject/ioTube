@@ -202,7 +202,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	return nil
 }
 
-func (tc *tokenCashierBase) SubmitTransfers(sign func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error)) error {
+func (tc *tokenCashierBase) SubmitTransfers(sign SignHandler) error {
 	transfersToSubmit, err := tc.recorder.TransfersToSubmit()
 	if err != nil {
 		return err

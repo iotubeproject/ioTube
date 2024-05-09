@@ -29,27 +29,39 @@ const (
 
 type (
 	SolProcessor struct {
-		solRecorder *SolRecorder
-		runner      dispatcher.Runner
 		client      *client.Client
+		solRecorder *SolRecorder
 		privateKey  *soltypes.Account
-
-		voteCfg voteConfig
+		runner      dispatcher.Runner
+		voteCfg     VoteConfig
 	}
 
-	voteConfig struct {
+	VoteConfig struct {
 		ProgramID               string
-		Threshold               float64
 		RealmAddr               string
 		MintTokenAddr           string
 		GovernanceAddr          string
 		ProposalAddr            string
 		ProposalTransactionAddr string
+		Threshold               float64
 	}
 )
 
-func NewSolProcessor() *SolProcessor {
-	return &SolProcessor{}
+func NewSolProcessor(client *client.Client, interval time.Duration,
+	privateKey *soltypes.Account, voteCfg VoteConfig, solRecorder *SolRecorder,
+) *SolProcessor {
+	s := &SolProcessor{
+		client:      client,
+		solRecorder: solRecorder,
+		privateKey:  privateKey,
+		voteCfg:     voteCfg,
+	}
+	var err error
+	s.runner, err = dispatcher.NewRunner(interval, s.process)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return s
 }
 
 func (s *SolProcessor) Start() error {
@@ -59,7 +71,7 @@ func (s *SolProcessor) Start() error {
 	return s.runner.Start()
 }
 
-func (s *SolProcessor) Stop() error {
+func (s *SolProcessor) Close() error {
 	if err := s.runner.Close(); err != nil {
 		return err
 	}

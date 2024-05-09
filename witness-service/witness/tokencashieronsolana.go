@@ -23,7 +23,6 @@ func NewTokenCashierOnSolana(
 	relayerURL string,
 	solanaClient *client.Client,
 	cashier solcommon.PublicKey,
-	tokenAddr common.Address,
 	validatorAddr common.Address,
 	recorder *SOLRecorder,
 	startBlockHeight uint64,

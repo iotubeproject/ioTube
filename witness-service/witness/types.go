@@ -35,7 +35,7 @@ type (
 		GetRecorder() AbstractRecorder
 		PullTransfersByHeight(blockHeight uint64) error
 		PullTransfers(blockCount uint16) error
-		SubmitTransfers(func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error)) error
+		SubmitTransfers(SignHandler) error
 		CheckTransfers() error
 	}
 
@@ -67,6 +67,8 @@ type (
 		BlockHeight() uint64
 		ToTypesTransfer() *types.Transfer
 	}
+
+	SignHandler func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error)
 )
 
 const (

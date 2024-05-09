@@ -31,19 +31,22 @@ type (
 		processor             dispatcher.Runner
 		recorder              *Recorder
 		// TODO: remove abstractRecorder once API is separated from service
-		abstractRecorder AbstractRecorder
-		cache            *lru.Cache
-		alwaysReset      bool
-		nonceTooLow      map[common.Hash]uint64
-		addrDecoder      util.AddressDecoder
+		abstractRecorder  AbstractRecorder
+		cache             *lru.Cache
+		alwaysReset       bool
+		nonceTooLow       map[common.Hash]uint64
+		sourceAddrDecoder util.AddressDecoder
+		destAddrDecoder   util.AddressDecoder
 	}
 )
 
 // NewService creates a new relay service
-func NewService(tv TransferValidator, tvAddr util.Address, recorder *Recorder,
-	abstractRecorder AbstractRecorder,
-	interval time.Duration,
-	alwaysReset bool, addrDecoder util.AddressDecoder) (*Service, error) {
+func NewService(tv TransferValidator, tvAddr util.Address,
+	solProcessor *SolProcessor,
+	recorder *Recorder, abstractRecorder AbstractRecorder,
+	interval time.Duration, alwaysReset bool,
+	sourceAddrDecoder util.AddressDecoder, destAddrDecoder util.AddressDecoder,
+) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
 		return nil, err
@@ -56,13 +59,19 @@ func NewService(tv TransferValidator, tvAddr util.Address, recorder *Recorder,
 		cache:                 cache,
 		alwaysReset:           alwaysReset,
 		nonceTooLow:           map[common.Hash]uint64{},
-		addrDecoder:           addrDecoder,
+		sourceAddrDecoder:     sourceAddrDecoder,
+		destAddrDecoder:       destAddrDecoder,
 	}
-	processor, err := dispatcher.NewRunner(interval, s.process)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create runner")
+
+	if solProcessor != nil {
+		s.processor = solProcessor
+	} else {
+		processor, err := dispatcher.NewRunner(interval, s.process)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create runner")
+		}
+		s.processor = processor
 	}
-	s.processor = processor
 
 	return s, nil
 }
@@ -89,11 +98,7 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 		return nil, errors.New("cannot accept new submission")
 	}
 	log.Printf("receive a witness from %x\n", w.Address)
-	transfer, err := UnmarshalTransferProto(
-		w.Transfer,
-		// TODO: fix this
-		s.addrDecoder,
-		s.addrDecoder)
+	transfer, err := UnmarshalTransferProto(w.Transfer, s.sourceAddrDecoder, s.destAddrDecoder)
 	if err != nil {
 		return nil, err
 	}

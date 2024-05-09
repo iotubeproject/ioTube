@@ -376,6 +376,32 @@ func (s *SolRecorder) Transfers(
 	return txs, nil
 }
 
+// Count returns the number of records of given restrictions
+func (s *SolRecorder) Count(opts ...TransferQueryOption) (int, error) {
+	var row *sql.Row
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", s.transferTableName)
+	params := []interface{}{}
+	opts = append(opts, ExcludeAmountZeroOption())
+	conditions := []string{}
+	for _, opt := range opts {
+		condition, ps := opt()
+		if condition == "" {
+			continue
+		}
+		conditions = append(conditions, condition)
+		params = append(params, ps...)
+	}
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	row = s.store.DB().QueryRow(query, params...)
+	var count int
+	if err := row.Scan(&count); err != nil {
+		return 0, errors.Wrap(err, "failed to scan row")
+	}
+	return count, nil
+}
+
 func (s *SolRecorder) MarkAsProcessing(id common.Hash) error {
 	log.Printf("processing %s\n", id.Hex())
 	result, err := s.store.DB().Exec(s.updateStatusQuery, ValidationInProcess, id.Hex(), WaitingForWitnesses)
