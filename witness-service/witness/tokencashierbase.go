@@ -225,14 +225,15 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 				context.Background(),
 				&types.Witness{
 					Transfer: &types.Transfer{
-						Cashier:   transfer.cashier.Bytes(),
-						Token:     transfer.coToken.Bytes(),
-						Index:     int64(transfer.index),
-						Sender:    transfer.sender.Bytes(),
-						Recipient: transfer.recipient.Bytes(),
-						Amount:    transfer.amount.String(),
-						Fee:       transfer.fee.String(),
-						TxSender:  transfer.txSender.Bytes(),
+						Cashier:     transfer.cashier.Bytes(),
+						Token:       transfer.coToken.Bytes(),
+						Index:       int64(transfer.index),
+						Sender:      transfer.sender.Bytes(),
+						Recipient:   transfer.recipient.Bytes(),
+						Amount:      transfer.amount.String(),
+						Fee:         transfer.fee.String(),
+						TxSender:    transfer.txSender.Bytes(),
+						BlockHeight: transfer.blockHeight,
 					},
 					Address:   witness.Bytes(),
 					Signature: signature,
@@ -248,6 +249,27 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 		}
 		if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (tc *tokenCashierBase) ProcessStales() error {
+	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	if err != nil {
+		return errors.Wrap(err, "failed to create connection")
+	}
+	defer conn.Close()
+	relayer := services.NewRelayServiceClient(conn)
+	response, err := relayer.StaleHeights(context.Background(), &services.StaleHeightsRequest{
+		Cashier: common.HexToAddress(tc.id).Bytes(),
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch stale heights")
+	}
+	for _, height := range response.Heights {
+		if err := tc.PullTransfersByHeight(height); err != nil {
+			return errors.Wrap(err, "failed to pull transfers by height")
 		}
 	}
 	return nil

@@ -115,6 +115,7 @@ func (recorder *Recorder) initStore(
 			"`recipient` varchar(42) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
 			"`fee` varchar(78),"+
+			"`blockHeight` bigint(20),"+
 			"`id` varchar(66) NOT NULL,"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
@@ -247,6 +248,15 @@ func (recorder *Recorder) addWitness(
 		transfer.id.Hex(),
 	); err != nil {
 		return errors.Wrap(err, "failed to insert into transfer table")
+	}
+	if transfer.blockHeight != 0 {
+		if _, err := tx.Exec(
+			fmt.Sprintf("UPDATE `%s` SET `blockHeight`=? WHERE `id`=?", transferTableName),
+			transfer.blockHeight,
+			transfer.id.Hex(),
+		); err != nil {
+			return errors.Wrap(err, "failed to update block height")
+		}
 	}
 	if transfer.txSender != zeroAddress {
 		if _, err := tx.Exec(
@@ -406,6 +416,28 @@ func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 		return 0, errors.Wrap(err, "failed to scan row")
 	}
 	return count, nil
+}
+
+func (recorder *Recorder) HeightsOfStaleTransfers(cashier common.Address) ([]uint64, error) {
+	recorder.mutex.RLock()
+	defer recorder.mutex.RUnlock()
+	rows, err := recorder.store.DB().Query(
+		fmt.Sprintf("SELECT DISTINCT(`blockHeight`) FROM %s WHERE `status`=? AND `creationTime` < DATE_SUB(NOW(), INTERVAL 60 MINUTE)", recorder.transferTableName),
+		WaitingForWitnesses,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query transfers table")
+	}
+	defer rows.Close()
+	var heights []uint64
+	for rows.Next() {
+		var height uint64
+		if err := rows.Scan(&height); err != nil {
+			return nil, errors.Wrap(err, "failed to scan transfer")
+		}
+		heights = append(heights, height)
+	}
+	return heights, nil
 }
 
 type TransferQueryOption func() (string, []interface{})

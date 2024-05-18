@@ -120,6 +120,9 @@ func (s *service) process() error {
 		if err := cashier.CheckTransfers(); err != nil {
 			return errors.Wrap(err, "failed to check transfers")
 		}
+		if err := cashier.ProcessStales(); err != nil {
+			return errors.Wrap(err, "failed to process stales")
+		}
 	}
 	return nil
 }

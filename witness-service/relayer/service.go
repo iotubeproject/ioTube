@@ -103,6 +103,18 @@ func (s *Service) Reset(ctx context.Context, request *services.ResetTransferRequ
 	return &services.ResetTransferResponse{Success: true}, nil
 }
 
+// StaleHeights returns the heights of stale transfers
+func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeightsRequest) (*services.StaleHeightsResponse, error) {
+	heights, err := s.recorder.HeightsOfStaleTransfers(common.BytesToAddress(request.Cashier))
+	if err != nil {
+		return nil, err
+	}
+
+	return &services.StaleHeightsResponse{
+		Heights: heights,
+	}, nil
+}
+
 // List lists the recent transfers
 func (s *Service) List(ctx context.Context, request *services.ListRequest) (*services.ListResponse, error) {
 	first := request.First

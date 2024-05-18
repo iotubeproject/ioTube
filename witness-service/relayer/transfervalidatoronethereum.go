@@ -222,33 +222,35 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 		return StatusOnChainUnknown, err
 	}
 	settleHeight, err := tv.validatorContract.Settles(&bind.CallOpts{}, transfer.id)
-	if err != nil {
-		return StatusOnChainUnknown, err
-	}
-	if settleHeight.Cmp(big.NewInt(0)) > 0 {
-		// contract status: settled
-		if new(big.Int).Add(settleHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
-			return StatusOnChainNotConfirmed, nil
+	if err == nil {
+		if settleHeight.Cmp(big.NewInt(0)) > 0 {
+			if new(big.Int).Add(settleHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
+				return StatusOnChainNotConfirmed, nil
+			}
+			tx, _, err := tv.client.TransactionByHash(context.Background(), transfer.txHash)
+			if err == nil {
+				transfer.gas = tx.Gas()
+				settleBlockHeader, err := tv.client.HeaderByNumber(context.Background(), settleHeight)
+				if err != nil {
+					return StatusOnChainUnknown, err
+				}
+				transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
+			}
+			return StatusOnChainSettled, nil
+
 		}
-		tx, _, err := tv.client.TransactionByHash(context.Background(), transfer.txHash)
-		if err != nil {
-			return StatusOnChainUnknown, err
-		}
-		transfer.gas = tx.Gas()
-		settleBlockHeader, err := tv.client.HeaderByNumber(context.Background(), settleHeight)
-		if err != nil {
-			return StatusOnChainUnknown, err
-		}
-		transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
-		if threshold, ok := tv.bonusTokens[transfer.token]; ok && transfer.amount.Cmp(threshold) > 0 {
-			if err := tv.sendBonus(tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))], transfer.recipient); err != nil {
-				log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
+		var r *types.Receipt
+		r, err = tv.client.TransactionReceipt(context.Background(), transfer.txHash)
+		if err == nil {
+			if r == nil {
+				return StatusOnChainNotConfirmed, nil
+			}
+			if new(big.Int).Add(r.BlockNumber, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
+				return StatusOnChainNotConfirmed, nil
 			}
 		}
-
-		return StatusOnChainSettled, nil
 	}
-	r, err := tv.client.TransactionReceipt(context.Background(), transfer.txHash)
+	log.Println(err)
 	switch errors.Cause(err) {
 	case ethereum.NotFound:
 		if transfer.nonce < nonce {
@@ -266,12 +268,6 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 		break
 	default:
 		return StatusOnChainUnknown, err
-	}
-	if r == nil {
-		return StatusOnChainNotConfirmed, nil
-	}
-	if new(big.Int).Add(r.BlockNumber, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
-		return StatusOnChainNotConfirmed, nil
 	}
 	if transfer.updateTime.After(time.Now().Add(-10 * time.Minute)) {
 		return StatusOnChainNotConfirmed, nil

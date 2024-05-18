@@ -55,6 +55,7 @@ type (
 		PullTransfers(blockCount uint16) error
 		SubmitTransfers(func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error
 		CheckTransfers() error
+		ProcessStales() error
 	}
 )
 
