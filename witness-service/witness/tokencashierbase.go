@@ -104,6 +104,10 @@ func (tc *tokenCashierBase) Stop(ctx context.Context) error {
 	return tc.recorder.Stop(ctx)
 }
 
+func (tc *tokenCashierBase) ID() string {
+	return tc.id
+}
+
 func (tc *tokenCashierBase) GetRecorder() *Recorder {
 	return tc.recorder
 }

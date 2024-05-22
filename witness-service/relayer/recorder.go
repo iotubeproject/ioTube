@@ -422,8 +422,9 @@ func (recorder *Recorder) HeightsOfStaleTransfers(cashier common.Address) ([]uin
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	rows, err := recorder.store.DB().Query(
-		fmt.Sprintf("SELECT DISTINCT(`blockHeight`) FROM %s WHERE `status`=? AND `creationTime` < DATE_SUB(NOW(), INTERVAL 60 MINUTE)", recorder.transferTableName),
+		fmt.Sprintf("SELECT DISTINCT(`blockHeight`) FROM %s WHERE `status`=? AND `cashier`=? `creationTime` < DATE_SUB(NOW(), INTERVAL 60 MINUTE)", recorder.transferTableName),
 		WaitingForWitnesses,
+		cashier.Hex(),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query transfers table")
@@ -435,7 +436,9 @@ func (recorder *Recorder) HeightsOfStaleTransfers(cashier common.Address) ([]uin
 		if err := rows.Scan(&height); err != nil {
 			return nil, errors.Wrap(err, "failed to scan transfer")
 		}
-		heights = append(heights, height)
+		if height != 0 {
+			heights = append(heights, height)
+		}
 	}
 	return heights, nil
 }
