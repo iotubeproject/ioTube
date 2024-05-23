@@ -175,6 +175,8 @@ func main() {
 			new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
 			new(big.Int).SetUint64(cfg.EthGasPriceGap),
 			validatorAddr,
+			cfg.BonusTokens,
+			cfg.Bonus,
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}

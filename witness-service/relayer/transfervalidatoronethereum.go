@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 var zeroAddress = common.Address{}
@@ -93,10 +94,20 @@ func NewTransferValidatorOnEthereum(
 		client:            client,
 		validatorContract: validatorContract,
 
-		bonusRecorder: map[string]time.Time{},
-		bonusTokens:   bonusTokens,
+		bonusRecorder: map[common.Address]time.Time{},
+		bonusTokens:   map[common.Address]*big.Int{},
 		bonus:         bonus,
 	}
+	if bonus != nil && bonus.Cmp(big.NewInt(0)) > 0 {
+		for token, threshold := range bonusTokens {
+			addr, err := util.ParseAddress(token)
+			if err != nil {
+				return nil, err
+			}
+			tv.bonusTokens[addr] = threshold
+		}
+	}
+
 	callOpts, err := tv.callOpts()
 	if err != nil {
 		return nil, err
@@ -235,9 +246,14 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 					return StatusOnChainUnknown, err
 				}
 				transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
+				if threshold, ok := tv.bonusTokens[transfer.token]; ok && transfer.amount.Cmp(threshold) > 0 {
+					privateKey := tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
+					if err := tv.sendBonus(privateKey, transfer.recipient); err != nil {
+						log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
+					}
+				}
 			}
 			return StatusOnChainSettled, nil
-
 		}
 		var r *types.Receipt
 		r, err = tv.client.TransactionReceipt(context.Background(), transfer.txHash)
