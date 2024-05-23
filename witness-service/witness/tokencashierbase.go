@@ -15,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
@@ -204,7 +205,24 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	return nil
 }
 
-func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error {
+func (tc *tokenCashierBase) SignTransfers(sign SignFunc) error {
+	transfersToSign, err := tc.recorder.TransfersToSign()
+	if err != nil {
+		return err
+	}
+	for _, transfer := range transfersToSign {
+		id, signature, err := sign(transfer, tc.validatorContractAddr)
+		if err != nil {
+			return err
+		}
+		if err := tc.recorder.AddSignature(transfer, id[:], signature); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (tc *tokenCashierBase) SubmitTransfers() error {
 	transfersToSubmit, err := tc.recorder.TransfersToSubmit()
 	if err != nil {
 		return err
@@ -219,37 +237,35 @@ func (tc *tokenCashierBase) SubmitTransfers(sign func(*Transfer, common.Address)
 		if !tc.hasEnoughBalance(transfer.token, transfer.amount) {
 			return errors.Errorf("not enough balance for token %s", transfer.token)
 		}
-		id, witness, signature, err := sign(transfer, tc.validatorContractAddr)
+		witnessPublicKey, err := crypto.SigToPub(transfer.id.Bytes(), transfer.signature)
+		if err != nil {
+			return errors.Wrapf(err, "failed to recover signature for transfer %s", transfer.id)
+		}
+		witness := crypto.PubkeyToAddress(*witnessPublicKey)
+		response, err := relayer.Submit(
+			context.Background(),
+			&types.Witness{
+				Transfer: &types.Transfer{
+					Cashier:     transfer.cashier.Bytes(),
+					Token:       transfer.coToken.Bytes(),
+					Index:       int64(transfer.index),
+					Sender:      transfer.sender.Bytes(),
+					Recipient:   transfer.recipient.Bytes(),
+					Amount:      transfer.amount.String(),
+					Fee:         transfer.fee.String(),
+					TxSender:    transfer.txSender.Bytes(),
+					BlockHeight: transfer.blockHeight,
+				},
+				Address:   witness.Bytes(),
+				Signature: transfer.signature,
+			},
+		)
 		if err != nil {
 			return err
 		}
-		transfer.id = id
-		if signature != nil {
-			response, err := relayer.Submit(
-				context.Background(),
-				&types.Witness{
-					Transfer: &types.Transfer{
-						Cashier:     transfer.cashier.Bytes(),
-						Token:       transfer.coToken.Bytes(),
-						Index:       int64(transfer.index),
-						Sender:      transfer.sender.Bytes(),
-						Recipient:   transfer.recipient.Bytes(),
-						Amount:      transfer.amount.String(),
-						Fee:         transfer.fee.String(),
-						TxSender:    transfer.txSender.Bytes(),
-						BlockHeight: transfer.blockHeight,
-					},
-					Address:   witness.Bytes(),
-					Signature: signature,
-				},
-			)
-			if err != nil {
-				return err
-			}
-			if !response.Success {
-				log.Printf("something went wrong when submitting transfer (%s, %s, %d) for %s\n", transfer.cashier, transfer.token, transfer.index, tc.id)
-				continue
-			}
+		if !response.Success {
+			log.Printf("something went wrong when submitting transfer (%s, %s, %d) for %s\n", transfer.cashier, transfer.token, transfer.index, tc.id)
+			continue
 		}
 		if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
 			return err

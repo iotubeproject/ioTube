@@ -35,7 +35,6 @@ type service struct {
 	batchSize       uint16
 	processInterval time.Duration
 	privateKey      *ecdsa.PrivateKey
-	witnessAddress  common.Address
 	disableSubmit   bool
 }
 
@@ -53,9 +52,6 @@ func NewService(
 		batchSize:       batchSize,
 		privateKey:      privateKey,
 		disableSubmit:   disableSubmit,
-	}
-	if privateKey != nil {
-		s.witnessAddress = crypto.PubkeyToAddress(privateKey.PublicKey)
 	}
 	var err error
 	if s.processor, err = dispatcher.NewRunner(processInterval, s.process); err != nil {
@@ -86,7 +82,7 @@ func (s *service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address) (common.Hash, common.Address, []byte, error) {
+func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address) (common.Hash, []byte, error) {
 	id := crypto.Keccak256Hash(
 		validatorContractAddr.Bytes(),
 		transfer.cashier.Bytes(),
@@ -96,12 +92,9 @@ func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address)
 		transfer.recipient.Bytes(),
 		math.U256Bytes(transfer.amount),
 	)
-	if s.privateKey == nil {
-		return id, common.Address{}, nil, nil
-	}
 	signature, err := crypto.Sign(id.Bytes(), s.privateKey)
 
-	return id, s.witnessAddress, signature, err
+	return id, signature, err
 }
 
 func (s *service) process() error {
@@ -114,10 +107,14 @@ func (s *service) process() error {
 			continue
 		}
 		if s.privateKey != nil {
-			if err := cashier.SubmitTransfers(s.sign); err != nil {
-				log.Println(errors.Wrapf(err, "failed to submit transfers for %s", cashier.ID()))
+			if err := cashier.SignTransfers(s.sign); err != nil {
+				log.Println(errors.Wrapf(err, "failed to sign transfers for %s", cashier.ID()))
 				continue
 			}
+		}
+		if err := cashier.SubmitTransfers(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to submit transfers for %s", cashier.ID()))
+			continue
 		}
 		if err := cashier.CheckTransfers(); err != nil {
 			log.Println(errors.Wrapf(err, "failed to check transfers for %s", cashier.ID()))

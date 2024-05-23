@@ -29,6 +29,7 @@ type (
 		amount      *big.Int
 		fee         *big.Int
 		id          common.Hash
+		signature   []byte
 		status      TransferStatus
 		blockHeight uint64
 		txHash      common.Hash
@@ -46,6 +47,8 @@ type (
 		Stop(context.Context) error
 	}
 
+	SignFunc func(*Transfer, common.Address) (common.Hash, []byte, error)
+
 	// TokenCashier defines the interface to pull transfers from chain in a block range
 	TokenCashier interface {
 		Start(context.Context) error
@@ -54,7 +57,8 @@ type (
 		GetRecorder() *Recorder
 		PullTransfersByHeight(blockHeight uint64) error
 		PullTransfers(blockCount uint16) error
-		SubmitTransfers(func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error
+		SignTransfers(SignFunc) error
+		SubmitTransfers() error
 		CheckTransfers() error
 		ProcessStales() error
 	}
@@ -65,6 +69,8 @@ const (
 	TransferNew TransferStatus = "new"
 	// TransferReady stands for a new transfer ready to sign
 	TransferReady = "ready"
+	// TransferSigned stands for a signed transfer
+	TransferSigned = "signed"
 	// WitnessSubmitted stands for a witnessed transfer
 	WitnessSubmitted = "submitted"
 	// SubmissionConfirmed stands for a confirmed witness

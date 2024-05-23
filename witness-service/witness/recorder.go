@@ -9,6 +9,7 @@ package witness
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math"
@@ -95,6 +96,12 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 		return errors.Wrapf(err, "failed to create table %s", recorder.transferTableName)
 	}
 
+	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
+		"ALTER TABLE %s ADD COLUMN IF NOT EXISTS `signature` varchar(132) DEFAULT NULL",
+		recorder.transferTableName,
+	)); err != nil {
+		return errors.Wrapf(err, "failed to add column signature to table %s", recorder.transferTableName)
+	}
 	return nil
 }
 
@@ -137,6 +144,25 @@ func (recorder *Recorder) AddTransfer(tx *Transfer, status TransferStatus) error
 		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
 	}
 	return nil
+}
+
+func (recorder *Recorder) AddSignature(tx *Transfer, id, sig []byte) error {
+	if err := recorder.validateID(tx.index); err != nil {
+		return err
+	}
+	result, err := recorder.store.DB().Exec(
+		fmt.Sprintf("UPDATE %s SET `signature`=?, `id`=?, `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=?", recorder.transferTableName),
+		hex.EncodeToString(sig),
+		hex.EncodeToString(id),
+		TransferSigned,
+		tx.cashier.Hex(),
+		tx.token.Hex(),
+		tx.index,
+	)
+	if err != nil {
+		return err
+	}
+	return recorder.validateResult(result)
 }
 
 func (recorder *Recorder) UpsertTransfer(tx *Transfer) error {
@@ -245,13 +271,12 @@ func (recorder *Recorder) SettleTransfer(tx *Transfer) error {
 func (recorder *Recorder) ConfirmTransfer(tx *Transfer) error {
 	log.Printf("mark transfer %s as confirmed", tx.id.Hex())
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
+		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
 		SubmissionConfirmed,
-		tx.id.Hex(),
 		tx.cashier.Hex(),
 		tx.token.Hex(),
 		tx.index,
-		TransferReady,
+		TransferSigned,
 	)
 	if err != nil {
 		return err
@@ -265,9 +290,13 @@ func (recorder *Recorder) TransfersToSettle() ([]*Transfer, error) {
 	return recorder.transfers(SubmissionConfirmed)
 }
 
+func (recorder *Recorder) TransfersToSign() ([]*Transfer, error) {
+	return recorder.transfers(TransferReady)
+}
+
 // TransfersToSubmit returns the list of transfers to submit
 func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
-	return recorder.transfers(TransferReady)
+	return recorder.transfers(TransferSigned)
 }
 
 func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
