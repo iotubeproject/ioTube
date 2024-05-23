@@ -14,6 +14,7 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	// mute lint error
@@ -96,13 +97,15 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 		return errors.Wrapf(err, "failed to create table %s", recorder.transferTableName)
 	}
 
-	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
-		"ALTER TABLE %s ADD COLUMN IF NOT EXISTS `signature` varchar(132) DEFAULT NULL",
+	_, err := recorder.store.DB().Exec(fmt.Sprintf(
+		"ALTER TABLE %s ADD COLUMN `signature` varchar(132) DEFAULT NULL",
 		recorder.transferTableName,
-	)); err != nil {
-		return errors.Wrapf(err, "failed to add column signature to table %s", recorder.transferTableName)
+	))
+	if err == nil || strings.Contains(err.Error(), "Duplicate column name") {
+		return nil
 	}
-	return nil
+
+	return errors.Wrapf(err, "failed to add column signature to table %s", recorder.transferTableName)
 }
 
 // Stop stops the recorder
@@ -302,7 +305,7 @@ func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
 func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
-			"SELECT cashier, token, tidx, sender, recipient, amount, fee, blockHeight, status, id, txSender "+
+			"SELECT cashier, token, tidx, sender, recipient, amount, fee, blockHeight, status, id, signature, txSender "+
 				"FROM %s "+
 				"WHERE status=? "+
 				"ORDER BY creationTime",
@@ -325,8 +328,9 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		var rawAmount string
 		var fee sql.NullString
 		var id sql.NullString
+		var signature sql.NullString
 		var txSender sql.NullString
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &tx.blockHeight, &tx.status, &id, &txSender); err != nil {
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &tx.blockHeight, &tx.status, &id, &signature, &txSender); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -335,6 +339,12 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		tx.recipient = common.HexToAddress(recipient)
 		if id.Valid {
 			tx.id = common.HexToHash(id.String)
+		}
+		if signature.Valid {
+			tx.signature, err = hex.DecodeString(signature.String)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if txSender.Valid {
 			tx.txSender = common.HexToAddress(txSender.String)
