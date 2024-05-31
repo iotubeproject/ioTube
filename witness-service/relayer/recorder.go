@@ -422,7 +422,7 @@ func (recorder *Recorder) HeightsOfStaleTransfers(cashier common.Address) ([]uin
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	rows, err := recorder.store.DB().Query(
-		fmt.Sprintf("SELECT DISTINCT(`blockHeight`) FROM %s WHERE `status`=? AND `cashier`=? `creationTime` < DATE_SUB(NOW(), INTERVAL 60 MINUTE)", recorder.transferTableName),
+		fmt.Sprintf("SELECT DISTINCT(`blockHeight`) FROM %s WHERE `status`=? AND `cashier`=? AND `creationTime` < DATE_SUB(NOW(), INTERVAL 60 MINUTE)", recorder.transferTableName),
 		WaitingForWitnesses,
 		cashier.Hex(),
 	)

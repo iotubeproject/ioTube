@@ -180,30 +180,34 @@ func (tv *transferValidatorOnEthereum) sendBonus(privateKey *ecdsa.PrivateKey, r
 		return err
 	}
 	if balance.Cmp(big.NewInt(0)) > 0 {
-		return nil
+		return errors.New("not a zero balance account")
 	}
 	code, err := tv.client.CodeAt(ctx, recipient, nil)
 	if err != nil {
 		return err
 	}
 	if len(code) != 0 {
-		return nil
+		return errors.New("not a common account")
 	}
 	nonce, err := tv.client.PendingNonceAt(ctx, recipient)
 	if err != nil {
 		return err
 	}
 	if nonce != 0 {
-		return nil
+		return errors.New("not a new account")
 	}
 	if _, ok := tv.bonusRecorder[recipient]; ok {
-		return nil
+		return errors.New("bonus already sent")
 	}
 	gasPrice, err := tv.client.SuggestGasPrice(ctx)
 	if err != nil {
 		return err
 	}
-	tx := types.NewTransaction(nonce, recipient, tv.bonus, uint64(21000), gasPrice, []byte{})
+	pendingNonce, err := tv.client.PendingNonceAt(ctx, crypto.PubkeyToAddress(privateKey.PublicKey))
+	if err != nil {
+		return err
+	}
+	tx := types.NewTransaction(pendingNonce, recipient, tv.bonus, uint64(21000), gasPrice, []byte{})
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tv.chainID), privateKey)
 	if err != nil {
 		return err
@@ -239,18 +243,20 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 				return StatusOnChainNotConfirmed, nil
 			}
 			tx, _, err := tv.client.TransactionByHash(context.Background(), transfer.txHash)
-			if err == nil {
-				transfer.gas = tx.Gas()
-				settleBlockHeader, err := tv.client.HeaderByNumber(context.Background(), settleHeight)
-				if err != nil {
-					return StatusOnChainUnknown, err
-				}
-				transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
-				if threshold, ok := tv.bonusTokens[transfer.token]; ok && transfer.amount.Cmp(threshold) > 0 {
-					privateKey := tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
-					if err := tv.sendBonus(privateKey, transfer.recipient); err != nil {
-						log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
-					}
+			if err != nil {
+				return StatusOnChainNotConfirmed, nil
+			}
+			transfer.gas = tx.Gas()
+			settleBlockHeader, err := tv.client.HeaderByNumber(context.Background(), settleHeight)
+			if err != nil {
+				return StatusOnChainUnknown, err
+			}
+			transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
+			if threshold, ok := tv.bonusTokens[transfer.token]; ok && transfer.amount.Cmp(threshold) >= 0 {
+				log.Printf("\t\tthreshold %d < amount %d\n", threshold, transfer.amount)
+				privateKey := tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
+				if err := tv.sendBonus(privateKey, transfer.recipient); err != nil {
+					log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
 				}
 			}
 			return StatusOnChainSettled, nil
