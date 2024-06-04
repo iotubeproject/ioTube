@@ -72,6 +72,7 @@ func NewEd25519Instruction(msgs [][]byte, sigs [][]byte, pubkeys [][]byte, thisI
 
 	return soltypes.Instruction{
 		ProgramID: Ed25519ProgramID,
+		Accounts:  []soltypes.AccountMeta{},
 		Data:      instrData,
 	}, nil
 }

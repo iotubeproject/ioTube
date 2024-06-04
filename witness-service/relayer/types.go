@@ -109,6 +109,10 @@ const (
 	ValidationInProcess = "processing"
 	// ValidationSubmitted stands for a transfer with validation submitted
 	ValidationSubmitted = "validated"
+	// ValidationValidationSettled stands for witness validation which has been settled
+	ValidationValidationSettled = "valsettled"
+	// ValidationExecuted stands for a transfer with execution submitted
+	ValidationExecuted = "executed"
 	// TransferSettled stands for a transfer which has been settled
 	TransferSettled = "settled"
 	// ValidationFailed stands for the validation of a transfer failed

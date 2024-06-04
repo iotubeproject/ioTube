@@ -8,7 +8,6 @@ package witness
 
 import (
 	"context"
-	"encoding/hex"
 	"log"
 	"math/big"
 	"strings"
@@ -234,7 +233,6 @@ func (tc *tokenCashierBase) SubmitTransfers(sign SignHandler) error {
 			if err != nil {
 				return err
 			}
-			log.Printf("submitting transfer id: %s\n", hex.EncodeToString(id[:]))
 			if !response.Success {
 				log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
 				continue

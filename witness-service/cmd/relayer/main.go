@@ -65,9 +65,8 @@ type Configuration struct {
 	ExplorerTableName string    `json:"explorerTableName" yaml:"explorerTableName"`
 
 	SolanaConfig struct {
-		ProgramID               string  `json:"programID" yaml:"programID"`
 		RealmAddr               string  `json:"realmAddr" yaml:"realmAddr"`
-		MintTokenAddr           string  `json:"mintTokenAddr" yaml:"mintTokenAddr"`
+		GoverningTokenMintAddr  string  `json:"governingTokenMintAddr" yaml:"governingTokenMintAddr"`
 		GovernanceAddr          string  `json:"governanceAddr" yaml:"governanceAddr"`
 		ProposalAddr            string  `json:"proposalAddr" yaml:"proposalAddr"`
 		ProposalTransactionAddr string  `json:"proposalTransactionAddr" yaml:"proposalTransactionAddr"`
@@ -205,7 +204,7 @@ func main() {
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
 			cfg.ExplorerTableName,
-			destAddrDecoder,
+			sourceAddrDecoder,
 		)
 		abstractRecorder = recorder
 	case "iotex":
@@ -228,7 +227,7 @@ func main() {
 			log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
 		}
 		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
-			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
+			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 2, acc),
 			validatorContractAddr,
 			cfg.BonusTokens,
 			cfg.Bonus,
@@ -248,16 +247,15 @@ func main() {
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
 			cfg.ExplorerTableName,
-			destAddrDecoder,
+			sourceAddrDecoder,
 		)
 		abstractRecorder = recorder
 	case "solana":
-		privateKey, err := soltypes.AccountFromBase58(cfg.PrivateKey)
-		if err != nil {
-			log.Fatalf("failed to decode private key %v", err)
-		}
 		transferValidator = nil
-		transferValidatorAddr = util.SOLAddressToAddress(privateKey.PublicKey)
+		transferValidatorAddr, err = util.NewSOLAddressDecoder().DecodeString(cfg.ValidatorAddress)
+		if err != nil {
+			log.Fatalf("failed to decode validator address %v", err)
+		}
 
 		sourceAddrDecoder = util.NewETHAddressDecoder()
 		destAddrDecoder = util.NewSOLAddressDecoder()
@@ -271,14 +269,18 @@ func main() {
 		recorder = nil
 		abstractRecorder = solRecorder
 
+		privateKey, err := soltypes.AccountFromHex(cfg.PrivateKey)
+		if err != nil {
+			log.Fatalf("failed to decode private key %v", err)
+		}
 		solProcessor = relayer.NewSolProcessor(
 			client.NewClient(cfg.ClientURL),
 			cfg.Interval,
 			&privateKey,
 			relayer.VoteConfig{
-				ProgramID:               cfg.SolanaConfig.ProgramID,
+				ProgramID:               cfg.ValidatorAddress,
 				RealmAddr:               cfg.SolanaConfig.RealmAddr,
-				MintTokenAddr:           cfg.SolanaConfig.MintTokenAddr,
+				GoverningTokenMintAddr:  cfg.SolanaConfig.GoverningTokenMintAddr,
 				GovernanceAddr:          cfg.SolanaConfig.GovernanceAddr,
 				ProposalAddr:            cfg.SolanaConfig.ProposalAddr,
 				ProposalTransactionAddr: cfg.SolanaConfig.ProposalTransactionAddr,

@@ -220,7 +220,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
 		if threshold, ok := tv.bonusTokens[transfer.token.String()]; ok && transfer.amount.Cmp(threshold) > 0 {
 			if err := tv.sendBonus(transfer.recipient.Address().(common.Address)); err != nil {
-				log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
+				log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient.String(), err)
 			}
 		}
 
@@ -294,6 +294,7 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		numOfValidSignatures++
 	}
 	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
+		log.Printf("insufficient witnesses, %d/%d\n", numOfValidSignatures, len(tv.witnesses))
 		return common.Hash{}, common.Address{}, 0, nil, errInsufficientWitnesses
 	}
 	accountMeta, err := tv.relayerAccountMeta()
@@ -317,11 +318,11 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 
 	actionHash, err := tv.validatorContract.Execute(
 		"submit",
-		transfer.cashier,
-		transfer.token,
+		transfer.cashier.Bytes(),
+		transfer.token.Address().(common.Address),
 		new(big.Int).SetUint64(transfer.index),
-		transfer.sender,
-		transfer.recipient,
+		transfer.sender.Bytes(),
+		transfer.recipient.Address().(common.Address),
 		transfer.amount,
 		signatures,
 	).SetGasPrice(tv.gasPrice).

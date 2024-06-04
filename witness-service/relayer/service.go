@@ -79,7 +79,7 @@ func NewService(tv TransferValidator, tvAddr util.Address,
 // Start starts the service
 func (s *Service) Start(ctx context.Context) error {
 	if err := s.abstractRecorder.Start(ctx); err != nil {
-		return errors.Wrap(err, "failed to start recorder")
+		return errors.Wrap(err, "failed to start processor")
 	}
 	return s.processor.Start()
 }
@@ -87,16 +87,13 @@ func (s *Service) Start(ctx context.Context) error {
 // Stop stops the service
 func (s *Service) Stop(ctx context.Context) error {
 	if err := s.processor.Start(); err != nil {
-		return errors.Wrap(err, "failed to start recorder")
+		return errors.Wrap(err, "failed to stop processor")
 	}
 	return s.abstractRecorder.Stop(ctx)
 }
 
 // Submit accepts a submission of witness
 func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
-	if s.transferValidator == nil {
-		return nil, errors.New("cannot accept new submission")
-	}
 	log.Printf("receive a witness from %x\n", w.Address)
 	transfer, err := UnmarshalTransferProto(w.Transfer, s.sourceAddrDecoder, s.destAddrDecoder)
 	if err != nil {

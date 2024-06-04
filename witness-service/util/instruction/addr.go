@@ -50,3 +50,18 @@ func GetTokenOwnerRecordAddr(programID, realm, governingTokenMint, governingToke
 	}
 	return pubkey
 }
+
+func GetGoverningTokenHoldingAddress(programID, realm, governingTokenMint solcommon.PublicKey) solcommon.PublicKey {
+	pubkey, _, err := solcommon.FindProgramAddress(
+		[][]byte{
+			[]byte("governance"),
+			realm[:],
+			governingTokenMint[:],
+		},
+		programID,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return pubkey
+}

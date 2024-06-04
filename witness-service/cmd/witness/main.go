@@ -8,8 +8,8 @@ package main
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"crypto/ed25519"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -27,7 +27,6 @@ import (
 	"github.com/iotexproject/iotex-address/address"
 	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 	"github.com/iotexproject/iotex-proto/golang/iotexapi"
-	"github.com/mr-tron/base58"
 	"go.uber.org/config"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
@@ -145,17 +144,44 @@ func main() {
 	if cfg.LarkWebHook != "" {
 		util.SetLarkURL(cfg.LarkWebHook)
 	}
-	var privateKey *ecdsa.PrivateKey
-	if cfg.PrivateKey != "" {
-		privateKey, err = crypto.HexToECDSA(cfg.PrivateKey)
-		if err != nil {
-			log.Fatalf("failed to decode private key %v\n", err)
+
+	var (
+		signHandler     witness.SignHandler
+		destAddrDecoder util.AddressDecoder
+	)
+	switch cfg.DestinationChain {
+	default:
+		destAddrDecoder = util.NewETHAddressDecoder()
+
+		if cfg.PrivateKey != "" {
+			privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
+			if err != nil {
+				log.Fatalf("failed to decode private key %v\n", err)
+			}
+			util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
+			log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
+			signHandler = witness.NewSecp256k1SignHandler(privateKey)
+		} else {
+			log.Println("No Private Key")
 		}
-		util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
-		log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
-	} else {
-		log.Println("No Private Key")
+	case "solana":
+		destAddrDecoder = util.NewSOLAddressDecoder()
+
+		if cfg.PrivateKey != "" {
+			privateKeyBytes, err := hex.DecodeString(cfg.PrivateKey)
+			if err != nil {
+				log.Fatalf("failed to decode private key %v\n", err)
+			}
+			if len(privateKeyBytes) != ed25519.PrivateKeySize {
+				log.Fatalf("invalid private key length %d\n", len(privateKeyBytes))
+			}
+			edPrivateKey := ed25519.PrivateKey(privateKeyBytes)
+			signHandler = witness.NewEd25519SignHandler(&edPrivateKey)
+		} else {
+			log.Println("No Private Key")
+		}
 	}
+
 	if cfg.RelayerURL != "" {
 		for i, cc := range cfg.Cashiers {
 			switch {
@@ -167,10 +193,7 @@ func main() {
 		}
 	}
 
-	var (
-		cashiers    = make([]witness.TokenCashier, 0, len(cfg.Cashiers))
-		signHandler witness.SignHandler
-	)
+	var cashiers = make([]witness.TokenCashier, 0, len(cfg.Cashiers))
 	switch cfg.Chain {
 	case "iotex":
 		conn, err := iotex.NewDefaultGRPCConn(cfg.ClientURL)
@@ -179,25 +202,6 @@ func main() {
 		}
 		iotexClient := iotex.NewReadOnlyClient(iotexapi.NewAPIServiceClient(conn))
 		// defer conn.Close()
-
-		var destAddrDecoder util.AddressDecoder
-		if cfg.DestinationChain == "solana" {
-			destAddrDecoder = util.NewSOLAddressDecoder()
-
-			privateKeyBytes, err := base58.Decode(cfg.PrivateKey)
-			if err != nil {
-				log.Fatalf("failed to decode private key %v\n", err)
-			}
-			if len(privateKeyBytes) != ed25519.PrivateKeySize {
-				log.Fatalf("invalid private key length %d\n", len(privateKeyBytes))
-			}
-			edPrivateKey := ed25519.PrivateKey(privateKeyBytes)
-			signHandler = witness.NewEd25519SignHandler(&edPrivateKey)
-		} else {
-			destAddrDecoder = util.NewETHAddressDecoder()
-			signHandler = witness.NewSecp256k1SignHandler(privateKey)
-		}
-
 		for _, cc := range cfg.Cashiers {
 			cashierContractAddr, err := address.FromString(cc.CashierContractAddress)
 			if err != nil {
@@ -276,7 +280,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.Reverse.TransferTableName,
 					pairs,
-					util.NewETHAddressDecoder(),
+					destAddrDecoder,
 				)
 			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
@@ -290,7 +294,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
-					util.NewETHAddressDecoder(),
+					destAddrDecoder,
 				),
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
@@ -302,7 +306,6 @@ func main() {
 			}
 			cashiers = append(cashiers, cashier)
 		}
-		signHandler = witness.NewSecp256k1SignHandler(privateKey)
 	case "solana":
 		solClient := solclient.NewClient(cfg.ClientURL)
 		for _, cc := range cfg.Cashiers {
@@ -316,7 +319,7 @@ func main() {
 				if _, ok := pairs[token]; ok {
 					log.Fatalf("duplicate token key %s\n", pair.Token1)
 				}
-				token2, err := util.NewETHAddressDecoder().DecodeString(pair.Token2)
+				token2, err := destAddrDecoder.DecodeString(pair.Token2)
 				if err != nil {
 					log.Fatalf("failed to parse iotex address %s, %v\n", pair.Token2, err)
 				}
@@ -332,7 +335,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
-					util.NewETHAddressDecoder(),
+					destAddrDecoder,
 				),
 				uint64(cc.StartBlockHeight),
 			)
@@ -341,7 +344,6 @@ func main() {
 			}
 			cashiers = append(cashiers, cashier)
 		}
-		signHandler = witness.NewSecp256k1SignHandler(privateKey)
 	default:
 		log.Fatalf("unknown chain name %s", cfg.Chain)
 	}

@@ -2,6 +2,7 @@ package witness
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
@@ -13,9 +14,20 @@ import (
 	"github.com/blocto/solana-go-sdk/rpc"
 	"github.com/blocto/solana-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/mr-tron/base58"
+	"github.com/near/borsh-go"
 	"github.com/pkg/errors"
+	"go.uber.org/ratelimit"
 
 	"github.com/iotexproject/ioTube/witness-service/util"
+)
+
+const (
+	_solanaRPCMaxQPS = 4
+)
+
+var (
+	rl = ratelimit.New(_solanaRPCMaxQPS)
 )
 
 func NewTokenCashierOnSolana(
@@ -35,13 +47,10 @@ func NewTokenCashierOnSolana(
 		validatorAddr.Bytes(),
 		startBlockHeight,
 		func(startHeight uint64, count uint16) (uint64, uint64, error) {
-			resp, err := solanaClient.RpcClient.GetBlockHeightWithConfig(context.Background(), rpc.GetBlockHeightConfig{
-				Commitment: rpc.CommitmentFinalized,
-			})
+			tipHeight, err := solanaClient.GetSlot(context.Background())
 			if err != nil {
 				return 0, 0, errors.Wrap(err, "failed to query tip block header")
 			}
-			tipHeight := resp.Result
 			if startHeight > tipHeight {
 				return 0, 0, errors.Errorf("chain tip height %d is less than startHeight %d", tipHeight, startHeight)
 			}
@@ -60,6 +69,7 @@ func NewTokenCashierOnSolana(
 
 			potentialTxs := make([]string, 0)
 			for h := startHeight; h <= endHeight; h++ {
+				rl.Take()
 				resp, err := solanaClient.RpcClient.GetBlockWithConfig(context.Background(),
 					h,
 					rpc.GetBlockConfig{
@@ -95,6 +105,7 @@ func NewTokenCashierOnSolana(
 
 			tsfs := make([]AbstractTransfer, 0)
 			for _, txHash := range potentialTxs {
+				rl.Take()
 				tx, err := solanaClient.GetTransactionWithConfig(context.Background(), txHash, client.GetTransactionConfig{
 					Commitment: rpc.CommitmentFinalized,
 				})
@@ -104,15 +115,17 @@ func NewTokenCashierOnSolana(
 				tsf, err := transferInfoFromAccounts(tx.Transaction.Message, cashier)
 				if err != nil {
 					// Skip if no transfer info found
+					log.Println("failed to get transfer info: ", err)
 					continue
 				}
 				transferInfo, err := filterTubeTransfer(tsf, cashier, tx.Meta.LogMessages)
 				if err != nil {
 					// Skip if no transfer info matched
+					log.Println("failed to filter transfer info: ", err)
 					continue
 				}
 				log.Printf("a solana transfer (hash %s, amount %d, fee %d) to %s\n",
-					tx.Transaction.Signatures[0],
+					base58.Encode(tx.Transaction.Signatures[0]),
 					transferInfo.amount, transferInfo.fee, transferInfo.recipient.String())
 				tsfs = append(tsfs, &solTransfer{
 					cashier:     cashier,
@@ -152,8 +165,8 @@ type transferInfo struct {
 }
 
 const (
-	tubeProgramNumInstructions = 1
-	tubeProgramNumAccounts     = 6
+	tubeProgramNumInstructions = 2
+	tubeProgramNumAccounts     = 7
 	tubeProgramSenderIdx       = 2
 	tubeProgramTokenIdx        = 4
 )
@@ -167,16 +180,16 @@ func transferInfoFromAccounts(msg types.Message, cashier solcommon.PublicKey) (*
 	if len(msg.Instructions) != tubeProgramNumInstructions {
 		return nil, errors.New("invalid instruction count")
 	}
-	if len(msg.Instructions[0].Accounts) != tubeProgramNumAccounts {
+	if len(msg.Instructions[1].Accounts) != tubeProgramNumAccounts {
 		return nil, errors.New("invalid account count")
 	}
-	if msg.Accounts[msg.Instructions[0].ProgramIDIndex] != cashier {
+	if msg.Accounts[msg.Instructions[1].ProgramIDIndex] != cashier {
 		return nil, errors.New("invalid cashier account")
 	}
 
 	return &transferInfo{
-		token:   msg.Accounts[msg.Instructions[0].Accounts[tubeProgramTokenIdx]],
-		sender:  msg.Accounts[msg.Instructions[0].Accounts[tubeProgramSenderIdx]],
+		token:   msg.Accounts[msg.Instructions[1].Accounts[tubeProgramTokenIdx]],
+		sender:  msg.Accounts[msg.Instructions[1].Accounts[tubeProgramSenderIdx]],
 		txPayer: msg.Accounts[0],
 	}, nil
 }
@@ -191,39 +204,75 @@ func filterTubeTransfer(prefilledTsf *transferInfo, cashier solcommon.PublicKey,
 	if err != nil {
 		return nil, err
 	}
-	re2, err := regexp.Compile(`Program log: (.*)`)
+	re2, err := regexp.Compile(`Program log: Bridge: (.*)`)
 	if err != nil {
 		return nil, err
 	}
 
+	var (
+		_unfound = -1
+		re1Idx   = _unfound
+	)
 	matchStr := ""
 	for i, log := range logs {
-		if !re1.MatchString(log) || i+1 >= len(logs) {
+		if re1.MatchString(log) {
+			re1Idx = i
 			continue
 		}
-
-		matches := re2.FindStringSubmatch(logs[i+1])
-		if len(matches) != 2 {
-			continue
+		if re2.MatchString(log) {
+			if re1Idx == _unfound {
+				break
+			}
+			matches := re2.FindStringSubmatch(log)
+			if len(matches) != 2 {
+				continue
+			}
+			matchStr = matches[1]
+			break
 		}
-		matchStr = matches[1]
-		break
 	}
 
 	if len(matchStr) == 0 {
 		return nil, errors.New("no match found")
 	}
 
-	// TODO: implement the logic to parse the log message
-
-	prefilledTsf.index = 0
-	recipient, err := util.NewETHAddressDecoder().DecodeString("0xBE0a404563130Bc490442dbBCB593E67CcE336b1")
-	if err != nil {
-		panic(err)
+	if err := fillTransferFromEvent(prefilledTsf, matchStr); err != nil {
+		return nil, err
 	}
-	prefilledTsf.recipient = recipient
-	prefilledTsf.amount = big.NewInt(100)
-	prefilledTsf.fee = big.NewInt(10)
 
 	return prefilledTsf, nil
+}
+
+func fillTransferFromEvent(tsf *transferInfo, event string) error {
+	data, err := hex.DecodeString(event)
+	if err != nil {
+		return err
+	}
+	bridgeEvent := struct {
+		Token       solcommon.PublicKey
+		Index       uint64
+		Sender      solcommon.PublicKey
+		Recipient   string
+		Amount      uint64
+		Fee         uint64
+		Destination uint32
+	}{}
+	if err := borsh.Deserialize(&bridgeEvent, data); err != nil {
+		return err
+	}
+	if tsf.token != bridgeEvent.Token {
+		return errors.New("token mismatch")
+	}
+	if tsf.sender != bridgeEvent.Sender {
+		return errors.New("sender mismatch")
+	}
+	tsf.index = bridgeEvent.Index
+	recipient, err := util.NewETHAddressDecoder().DecodeString(bridgeEvent.Recipient)
+	if err != nil {
+		return err
+	}
+	tsf.recipient = recipient
+	tsf.amount = big.NewInt(int64(bridgeEvent.Amount))
+	tsf.fee = big.NewInt(int64(bridgeEvent.Fee))
+	return nil
 }

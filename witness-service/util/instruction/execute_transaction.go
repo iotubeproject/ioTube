@@ -1,12 +1,14 @@
 package instruction
 
 import (
-	"fmt"
+	"context"
 
-	"github.com/blocto/solana-go-sdk/common"
+	"github.com/blocto/solana-go-sdk/client"
 	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/blocto/solana-go-sdk/pkg/bincode"
+	"github.com/blocto/solana-go-sdk/rpc"
 	soltypes "github.com/blocto/solana-go-sdk/types"
+	"github.com/near/borsh-go"
 )
 
 type ExecuteTransactionParam struct {
@@ -19,15 +21,13 @@ type ExecuteTransactionParam struct {
 
 func ExecuteTransaction(programID solcommon.PublicKey, param *ExecuteTransactionParam) soltypes.Instruction {
 	data, err := bincode.SerializeData(struct {
-		Instruction GovernanceInstructionType
+		Instruction borsh.Enum
 	}{
-		Instruction: GovernanceInstructionType(16),
+		Instruction: 16,
 	})
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Printf("ExecuteTransaction data: %v\n", data)
 
 	accounts := []soltypes.AccountMeta{
 		{PubKey: param.Governance, IsSigner: false, IsWritable: false},
@@ -45,17 +45,87 @@ func ExecuteTransaction(programID solcommon.PublicKey, param *ExecuteTransaction
 	}
 }
 
-const (
-	mintPK            = ""
-	recipient         = ""
-	governanceAddress = ""
-)
-
-func GetFooTransactionAccounts() []soltypes.AccountMeta {
-	return []soltypes.AccountMeta{
-		{PubKey: common.TokenProgramID, IsSigner: false, IsWritable: false},
-		{PubKey: common.PublicKeyFromString(mintPK), IsSigner: false, IsWritable: true},
-		{PubKey: common.PublicKeyFromString(recipient), IsSigner: false, IsWritable: true},
-		{PubKey: common.PublicKeyFromString(governanceAddress), IsSigner: false, IsWritable: false},
+func CTokenTransactionAccounts(
+	cli *client.Client,
+	cToken solcommon.PublicKey,
+	userAccount solcommon.PublicKey,
+	governanceAddress solcommon.PublicKey,
+) ([]soltypes.AccountMeta, error) {
+	cTokenAccount, err := cli.GetAccountInfoWithConfig(context.Background(),
+		cToken.String(),
+		client.GetAccountInfoConfig{
+			Commitment: rpc.CommitmentFinalized,
+		})
+	if err != nil {
+		return nil, err
 	}
+
+	cTokenProgramId := cTokenAccount.Owner
+	authority, _, err := solcommon.FindProgramAddress(
+		[][]byte{
+			cToken[:],
+		},
+		cTokenProgramId,
+	)
+	if err != nil {
+		panic(err)
+	}
+	cTokenInfo := struct {
+		Initialized    uint8
+		BumpSeed       uint8
+		TokenProgramId solcommon.PublicKey
+		Config         solcommon.PublicKey
+		Token          solcommon.PublicKey
+		TokenMint      solcommon.PublicKey
+		Destination    uint32
+		Fee            uint64
+	}{}
+	if err := borsh.Deserialize(&cTokenInfo, cTokenAccount.Data); err != nil {
+		panic(err)
+	}
+
+	return []soltypes.AccountMeta{
+		{PubKey: cTokenProgramId, IsSigner: false, IsWritable: false},
+		{PubKey: cToken, IsSigner: false, IsWritable: false},
+		{PubKey: authority, IsSigner: false, IsWritable: false},
+		{PubKey: cTokenInfo.Token, IsSigner: false, IsWritable: true},
+		{PubKey: userAccount, IsSigner: false, IsWritable: true},
+		{PubKey: governanceAddress, IsSigner: false, IsWritable: false},
+		{PubKey: cTokenInfo.TokenMint, IsSigner: false, IsWritable: true},
+		{PubKey: solcommon.TokenProgramID, IsSigner: false, IsWritable: false},
+		{PubKey: cTokenInfo.Config, IsSigner: false, IsWritable: false},
+	}, nil
+}
+
+func GoverningTokenDepositAmount(
+	cli *client.Client,
+	tokenOwnerRecord solcommon.PublicKey,
+) (uint64, error) {
+	tokenOwnerRecordAccount, err := cli.GetAccountInfoWithConfig(context.Background(),
+		tokenOwnerRecord.String(),
+		client.GetAccountInfoConfig{
+			Commitment: rpc.CommitmentFinalized,
+		})
+	if err != nil {
+		return 0, err
+	}
+
+	tokenOwnerRecordInfo := struct {
+		AccountType                 borsh.Enum
+		Realm                       solcommon.PublicKey
+		GoverningTokenMint          solcommon.PublicKey
+		GoverningTokenOwner         solcommon.PublicKey
+		GoverningTokenDepositAmount uint64
+		UnrelinquishedVotesCount    uint64
+		OutstandingProposalCount    uint8
+		Version                     uint8
+		Reserved                    [6]byte
+		GovernanceDelegate          *solcommon.PublicKey
+		ReservedV2                  [128]byte
+	}{}
+	if err := borsh.Deserialize(&tokenOwnerRecordInfo, tokenOwnerRecordAccount.Data); err != nil {
+		panic(err)
+	}
+
+	return tokenOwnerRecordInfo.GoverningTokenDepositAmount, nil
 }

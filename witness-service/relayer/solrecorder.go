@@ -1,11 +1,9 @@
 package relayer
 
 import (
-	"bytes"
 	"context"
 	"crypto/ed25519"
 	"database/sql"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -22,6 +20,7 @@ import (
 
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/util/instruction"
 )
 
 // SolRecorder is a logger based on sql to record exchange events
@@ -119,24 +118,26 @@ func (s *SolRecorder) Stop(ctx context.Context) error {
 func (s *SolRecorder) AddWitness(validator util.Address, transfer *Transfer, witness *Witness) (common.Hash, error) {
 	validateID(uint64(transfer.index))
 
-	idxBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(idxBuf, transfer.index)
-	amtBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(amtBuf, transfer.amount.Uint64())
-	data := bytes.Join([][]byte{
+	data, err := instruction.SerializePayload(
 		validator.Bytes(),
 		transfer.cashier.Bytes(),
 		transfer.token.Bytes(),
-		idxBuf,
-		transfer.sender.Bytes(),
+		transfer.index,
+		transfer.sender.String(),
 		transfer.recipient.Bytes(),
-		amtBuf,
-	}, []byte{})
-	if ok := ed25519.Verify(witness.addr, data, witness.signature); !ok {
+		transfer.amount.Uint64(),
+	)
+	if err != nil {
+		return common.Hash{}, errors.Wrap(err, "failed to serialize payload")
+	}
+
+	id := crypto.Keccak256Hash(data)
+
+	if ok := ed25519.Verify(witness.addr, id[:], witness.signature); !ok {
 		return common.Hash{}, errors.New("invalid signature")
 	}
 
-	transfer.id = crypto.Keccak256Hash(data)
+	transfer.id = id
 
 	tx, err := s.store.DB().Begin()
 	if err != nil {
@@ -412,6 +413,16 @@ func (s *SolRecorder) MarkAsProcessing(id common.Hash) error {
 	return validateResult(result)
 }
 
+func (s *SolRecorder) MarkAsExecuting(id common.Hash) error {
+	log.Printf("executing %s\n", id.Hex())
+	result, err := s.store.DB().Exec(s.updateStatusQuery, ValidationInProcess, id.Hex(), ValidationValidationSettled)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as processing")
+	}
+
+	return validateResult(result)
+}
+
 func (s *SolRecorder) MarkAsValidated(id common.Hash, sig soltypes.Signature, relayer common.Address, validBlockHeight uint64) error {
 	log.Printf("mark transfer %s as validated (%s, %s, %d)\n", id.Hex(), base58.Encode(sig), relayer.Hex(), validBlockHeight)
 	result, err := s.store.DB().Exec(
@@ -430,9 +441,36 @@ func (s *SolRecorder) MarkAsValidated(id common.Hash, sig soltypes.Signature, re
 	return validateResult(result)
 }
 
+func (s *SolRecorder) MarkAsValidationSettled(id common.Hash) error {
+	log.Printf("mark transfer %s as validation settled\n", id.Hex())
+	result, err := s.store.DB().Exec(s.updateStatusQuery, ValidationValidationSettled, id.Hex(), ValidationSubmitted)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as settled")
+	}
+
+	return validateResult(result)
+}
+
+func (s *SolRecorder) MarkAsExecuted(id common.Hash, sig soltypes.Signature, relayer common.Address, validBlockHeight uint64) error {
+	log.Printf("mark transfer %s as executed (%s, %s, %d)\n", id.Hex(), base58.Encode(sig), relayer.Hex(), validBlockHeight)
+	result, err := s.store.DB().Exec(
+		fmt.Sprintf("UPDATE `%s` SET `status`=?, `txSignature`=?, `lastValidBlockHeight`=? WHERE `id`=? AND `status`=?", s.transferTableName),
+		ValidationExecuted,
+		hex.EncodeToString(sig[:]),
+		validBlockHeight,
+		id.Hex(),
+		ValidationInProcess,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as validated")
+	}
+
+	return validateResult(result)
+}
+
 func (s *SolRecorder) MarkAsSettled(id common.Hash) error {
 	log.Printf("mark transfer %s as settled\n", id.Hex())
-	result, err := s.store.DB().Exec(s.updateStatusQuery, TransferSettled, id.Hex(), ValidationSubmitted)
+	result, err := s.store.DB().Exec(s.updateStatusQuery, TransferSettled, id.Hex(), ValidationExecuted)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as settled")
 	}
@@ -446,6 +484,16 @@ func (s *SolRecorder) ResetFailedTransfer(id common.Hash) error {
 
 func (s *SolRecorder) ResetTransferInProcess(id common.Hash) error {
 	return s.reset(id, ValidationInProcess)
+}
+
+func (s *SolRecorder) ResetExecutionInProcess(id common.Hash) error {
+	log.Printf("reset transfer %s\n", id.Hex())
+	result, err := s.store.DB().Exec(s.updateStatusQuery, ValidationValidationSettled, id.Hex(), ValidationInProcess)
+	if err != nil {
+		return errors.Wrap(err, "failed to reset")
+	}
+
+	return validateResult(result)
 }
 
 func (s *SolRecorder) reset(id common.Hash, status ValidationStatusType) error {

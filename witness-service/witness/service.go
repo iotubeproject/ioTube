@@ -7,11 +7,9 @@
 package witness
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/ed25519"
-	"encoding/binary"
 	"log"
 	"regexp"
 	"strconv"
@@ -26,6 +24,7 @@ import (
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
+	"github.com/iotexproject/ioTube/witness-service/util/instruction"
 )
 
 type service struct {
@@ -187,26 +186,23 @@ func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
 
 func NewEd25519SignHandler(privateKey *ed25519.PrivateKey) SignHandler {
 	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
-		idxBuf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(idxBuf, transfer.Index().Uint64())
-		amtBuf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(amtBuf, transfer.Amount().Uint64())
-
-		data := bytes.Join([][]byte{
+		data, err := instruction.SerializePayload(
 			validatorContractAddr,
 			transfer.Cashier().Bytes(),
 			transfer.CoToken().Bytes(),
-			idxBuf,
-			transfer.Sender().Bytes(),
+			transfer.Index().Uint64(),
+			transfer.Sender().String(),
 			transfer.Recipient().Bytes(),
-			amtBuf,
-		}, []byte{})
-
+			transfer.Amount().Uint64(),
+		)
+		if err != nil {
+			return common.Hash{}, nil, nil, err
+		}
 		id := crypto.Keccak256Hash(data)
 		if privateKey == nil {
 			return id, nil, nil, nil
 		}
-		signature := ed25519.Sign(*privateKey, data)
+		signature := ed25519.Sign(*privateKey, id[:])
 
 		return id, privateKey.Public().(ed25519.PublicKey), signature, nil
 	}
