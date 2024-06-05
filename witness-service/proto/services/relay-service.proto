@@ -26,6 +26,12 @@ service RelayService {
             body: "*"
         };
     };
+    rpc StaleHeights(StaleHeightsRequest) returns (StaleHeightsResponse) {
+        option (google.api.http) = {
+            post: "/stale_heights"
+            body: "*"
+        };
+    };
     rpc List(ListRequest) returns (ListResponse) {
         option (google.api.http) = {
             post: "/list"
@@ -52,6 +58,14 @@ message CheckResponse {
     repeated bytes witnesses = 2;
     bytes txHash = 3;
     Status status = 4;
+}
+
+message StaleHeightsRequest {
+    bytes cashier = 1;
+}
+
+message StaleHeightsResponse {
+    repeated uint64 heights = 1;
 }
 
 message ListRequest {

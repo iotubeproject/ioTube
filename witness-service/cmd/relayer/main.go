@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/iotex-address/address"
@@ -143,7 +142,7 @@ func main() {
 		cfg.Chain = chain
 	}
 	switch cfg.Chain {
-	case "heco", "bsc", "matic", "polis":
+	case "heco", "bsc", "matic", "polis", "iotex-e":
 		// heco and bsc are idential to ethereum
 		fallthrough
 	case "ethereum":
@@ -162,6 +161,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to create eth client %v\n", err)
 		}
+		validatorAddr, err := util.ParseAddress(cfg.ValidatorAddress)
+		if err != nil {
+			log.Fatalf("failed to parse validator address %s: %+v", cfg.ValidatorAddress, err)
+		}
 		if transferValidator, err = relayer.NewTransferValidatorOnEthereum(
 			ethClient,
 			privateKeys,
@@ -171,7 +174,9 @@ func main() {
 			new(big.Int).SetUint64(cfg.EthGasPriceHardLimit),
 			new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
 			new(big.Int).SetUint64(cfg.EthGasPriceGap),
-			common.HexToAddress(cfg.ValidatorAddress),
+			validatorAddr,
+			cfg.BonusTokens,
+			cfg.Bonus,
 		); err != nil {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}

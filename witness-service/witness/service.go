@@ -107,18 +107,25 @@ func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address)
 func (s *service) process() error {
 	for _, cashier := range s.cashiers {
 		if err := cashier.PullTransfers(s.batchSize); err != nil {
-			return errors.Wrap(err, "failed to pull transfers")
+			log.Println(errors.Wrapf(err, "failed to pull transfers for %s", cashier.ID()))
+			continue
 		}
 		if s.disableSubmit {
 			continue
 		}
 		if s.privateKey != nil {
 			if err := cashier.SubmitTransfers(s.sign); err != nil {
-				return errors.Wrap(err, "failed to submit transfers")
+				log.Println(errors.Wrapf(err, "failed to submit transfers for %s", cashier.ID()))
+				continue
 			}
 		}
 		if err := cashier.CheckTransfers(); err != nil {
-			return errors.Wrap(err, "failed to check transfers")
+			log.Println(errors.Wrapf(err, "failed to check transfers for %s", cashier.ID()))
+			continue
+		}
+		if err := cashier.ProcessStales(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to process stales for %s", cashier.ID()))
+			continue
 		}
 	}
 	return nil

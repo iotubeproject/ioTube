@@ -50,11 +50,13 @@ type (
 	TokenCashier interface {
 		Start(context.Context) error
 		Stop(context.Context) error
+		ID() string
 		GetRecorder() *Recorder
 		PullTransfersByHeight(blockHeight uint64) error
 		PullTransfers(blockCount uint16) error
 		SubmitTransfers(func(*Transfer, common.Address) (common.Hash, common.Address, []byte, error)) error
 		CheckTransfers() error
+		ProcessStales() error
 	}
 )
 
