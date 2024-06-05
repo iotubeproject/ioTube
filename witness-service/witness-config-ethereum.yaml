@@ -75,3 +75,9 @@ cashiers:
       # BZZ
       - token2: "io125ncge9vg39m4u67dl8vpa0gxwqmkdq86plm7e"
         token1: "0xDfF04A48baa71021e0221e9B26DD3C13cdC2FE7e"
+      # STOS
+      - token2: "io1dskaukl7ghuj6a3rflt7zkphdsxwyd3hhg43yx"
+        token1: "0xf96c9ea3b23d7ba69c90d506ecb54a7e77958d50"
+      # NOIA
+      - token2: "io1ns80pjvwra4qv70yymm5xly56j5a8gkednnl8f"
+        token1: "0xedf708dcf579d4c6ea7889ae255ba66ad2cf9757"
