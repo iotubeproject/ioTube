@@ -201,7 +201,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 	if settleHeight.Cmp(big.NewInt(0)) > 0 {
 		response, err := tv.client.API().GetReceiptByAction(
 			context.Background(),
-			&iotexapi.GetReceiptByActionRequest{ActionHash: transfer.txHash.String()[2:]},
+			&iotexapi.GetReceiptByActionRequest{ActionHash: common.BytesToHash(transfer.txHash).String()[2:]},
 		)
 		if err != nil {
 			return StatusOnChainUnknown, err
@@ -227,7 +227,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		return StatusOnChainSettled, nil
 	}
 	response, err := tv.client.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{
-		ActionHash: hex.EncodeToString(transfer.txHash.Bytes()),
+		ActionHash: hex.EncodeToString(transfer.txHash),
 	})
 	switch status.Code(err) {
 	case codes.NotFound:

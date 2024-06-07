@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	_solanaRPCMaxQPS = 4
+	_solanaRPCMaxQPS = 29
 )
 
 var (

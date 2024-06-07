@@ -251,11 +251,11 @@ func (recorder *Recorder) addWitness(
 	if _, err := tx.Exec(
 		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
 		hex.EncodeToString(transfer.cashier.Bytes()),
-		transfer.token.String(),
+		hex.EncodeToString(transfer.token.Bytes()),
 		transfer.index,
 		hex.EncodeToString(transfer.sender.Bytes()),
 		hex.EncodeToString(transfer.txSender.Bytes()),
-		transfer.recipient.String(),
+		hex.EncodeToString(transfer.recipient.Bytes()),
 		transfer.amount.String(),
 		transfer.fee.String(),
 		transfer.id.Hex(),
@@ -338,27 +338,21 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
-	tx.cashier = recorder.hexToAddress(cashier)
-	var err error
-	tx.token, err = util.NewETHAddressDecoder().DecodeString(token)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode token")
-	}
-	tx.sender = recorder.hexToAddress(sender)
+	tx.cashier = recorder.hexToAddress(cashier, recorder.addrDecoder)
+	tx.token = recorder.hexToAddress(token, util.NewETHAddressDecoder())
+	tx.sender = recorder.hexToAddress(sender, recorder.addrDecoder)
 	if txSender.Valid {
-		tx.txSender = recorder.hexToAddress(txSender.String)
+		tx.txSender = recorder.hexToAddress(txSender.String, recorder.addrDecoder)
 	}
-	tx.recipient, err = util.NewETHAddressDecoder().DecodeString(recipient)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode recipient")
-	}
+	tx.recipient = recorder.hexToAddress(recipient, util.NewETHAddressDecoder())
 	tx.id = common.HexToHash(id)
 	if relayer.Valid {
 		tx.relayer = common.HexToAddress(relayer.String)
 	}
 
 	if hash.Valid {
-		tx.txHash = common.HexToHash(hash.String)
+		h := common.HexToHash(hash.String)
+		tx.txHash = h[:]
 	}
 	if nonce.Valid {
 		tx.nonce = uint64(nonce.Int64)
@@ -390,12 +384,12 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	return tx, nil
 }
 
-func (recorder *Recorder) hexToAddress(str string) util.Address {
+func (recorder *Recorder) hexToAddress(str string, decoder util.AddressDecoder) util.Address {
 	bytes, err := hex.DecodeString(str)
 	if err != nil {
 		log.Panicf("failed to decode hex string %s", str)
 	}
-	ret, err := recorder.addrDecoder.DecodeBytes(bytes)
+	ret, err := decoder.DecodeBytes(bytes)
 	if err != nil {
 		log.Panicf("failed to decode address %s", str)
 	}
@@ -449,9 +443,9 @@ func ExcludeAmountZeroOption() TransferQueryOption {
 	}
 }
 
-func ExcludeTokenQueryOption(token common.Address) TransferQueryOption {
+func ExcludeTokenQueryOption(token util.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
-		return "token <> ?", []interface{}{token.String()}
+		return "token <> ?", []interface{}{hex.EncodeToString(token.Bytes())}
 	}
 }
 
@@ -470,31 +464,31 @@ func StatusQueryOption(statuses ...ValidationStatusType) TransferQueryOption {
 	}
 }
 
-func TokenQueryOption(token common.Address) TransferQueryOption {
+func TokenQueryOption(token util.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
-		return "token = ?", []interface{}{token.String()}
+		return "token = ?", []interface{}{hex.EncodeToString(token.Bytes())}
 	}
 }
 
-func SenderQueryOption(sender common.Address) TransferQueryOption {
+func SenderQueryOption(sender util.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
-		return "sender = ?", []interface{}{sender.String()}
+		return "sender = ?", []interface{}{hex.EncodeToString(sender.Bytes())}
 	}
 }
 
-func RecipientQueryOption(recipient common.Address) TransferQueryOption {
+func RecipientQueryOption(recipient util.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
-		return "recipient = ?", []interface{}{recipient.String()}
+		return "recipient = ?", []interface{}{hex.EncodeToString(recipient.Bytes())}
 	}
 }
 
-func CashiersQueryOption(cashiers []common.Address) TransferQueryOption {
+func CashiersQueryOption(cashiers []util.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
 		questions := make([]string, len(cashiers))
 		params := make([]interface{}, len(cashiers))
 		for i, cashier := range cashiers {
 			questions[i] = "?"
-			params[i] = cashier.Hex()
+			params[i] = hex.EncodeToString(cashier.Bytes())
 		}
 		return "cashier in (" + strings.Join(questions, ",") + ")", params
 	}

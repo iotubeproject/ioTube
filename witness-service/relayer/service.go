@@ -146,13 +146,25 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	}
 	queryOpts := []TransferQueryOption{}
 	if len(request.Token) > 0 {
-		queryOpts = append(queryOpts, TokenQueryOption(common.BytesToAddress(request.Token)))
+		addr, err := s.destAddrDecoder.DecodeBytes(request.Token)
+		if err != nil {
+			return nil, err
+		}
+		queryOpts = append(queryOpts, TokenQueryOption(addr))
 	}
 	if len(request.Sender) > 0 {
-		queryOpts = append(queryOpts, SenderQueryOption(common.BytesToAddress(request.Sender)))
+		addr, err := s.sourceAddrDecoder.DecodeBytes(request.Sender)
+		if err != nil {
+			return nil, err
+		}
+		queryOpts = append(queryOpts, SenderQueryOption(addr))
 	}
 	if len(request.Recipient) > 0 {
-		queryOpts = append(queryOpts, RecipientQueryOption(common.BytesToAddress(request.Recipient)))
+		addr, err := s.destAddrDecoder.DecodeBytes(request.Recipient)
+		if err != nil {
+			return nil, err
+		}
+		queryOpts = append(queryOpts, RecipientQueryOption(addr))
 	}
 	switch request.Status {
 	case services.Status_SUBMITTED:
@@ -236,7 +248,7 @@ func (s *Service) convertStatus(status ValidationStatusType) services.Status {
 	switch status {
 	case WaitingForWitnesses, ValidationInProcess:
 		return services.Status_CREATED
-	case ValidationSubmitted:
+	case ValidationSubmitted, ValidationValidationSettled, ValidationExecuted:
 		return services.Status_SUBMITTED
 	case TransferSettled:
 		return services.Status_SETTLED
@@ -251,7 +263,7 @@ func (s *Service) assembleCheckResponse(transfer *Transfer, witnesses map[common
 	return &services.CheckResponse{
 		Key:       transfer.id[:],
 		Witnesses: s.extractWitnesses(witnesses, transfer.id),
-		TxHash:    transfer.txHash.Bytes(),
+		TxHash:    transfer.txHash,
 		Status:    s.convertStatus(transfer.status),
 	}
 }
@@ -368,7 +380,8 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 }
 
 func (s *Service) submitTransfers() error {
-	newTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size()), true, false, StatusQueryOption(WaitingForWitnesses), ExcludeTokenQueryOption(common.HexToAddress("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")))
+	excludedAddr, _ := util.NewETHAddressDecoder().DecodeString("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")
+	newTransfers, err := s.recorder.Transfers(0, uint8(s.transferValidator.Size()), true, false, StatusQueryOption(WaitingForWitnesses), ExcludeTokenQueryOption(excludedAddr))
 	if err != nil {
 		return err
 	}

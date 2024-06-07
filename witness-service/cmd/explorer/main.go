@@ -21,7 +21,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/iotexproject/ioTube/witness-service/db"
@@ -54,10 +53,12 @@ type (
 	}
 	Service struct {
 		services.UnimplementedExplorerServiceServer
-		cache    *lru.Cache
-		recorder *relayer.Recorder
-		hits     uint64
-		queries  uint64
+		cache             *lru.Cache
+		recorder          *relayer.Recorder
+		hits              uint64
+		queries           uint64
+		sourceAddrDecoder util.AddressDecoder
+		destAddrDecoder   util.AddressDecoder
 	}
 
 	// Configuration defines the configuration of the witness service
@@ -66,10 +67,15 @@ type (
 		GrpcProxyPort     int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 		Database          db.Config `json:"database" yaml:"database"`
 		TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
+		SourceChain       string    `json:"sourceChain" yaml:"sourceChain"`
+		DestinationChain  string    `json:"destinationChain" yaml:"destinationChain"`
 	}
 )
 
-func NewService(recorder *relayer.Recorder) (*Service, error) {
+func NewService(recorder *relayer.Recorder,
+	sourceAddrDecoder util.AddressDecoder,
+	destAddrDecoder util.AddressDecoder,
+) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
 		return nil, err
@@ -121,18 +127,34 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 	}
 	queryOpts := []relayer.TransferQueryOption{}
 	if len(request.Token) > 0 {
-		queryOpts = append(queryOpts, relayer.TokenQueryOption(common.BytesToAddress(request.Token)))
+		addr, err := s.destAddrDecoder.DecodeBytes(request.Token)
+		if err != nil {
+			return nil, err
+		}
+		queryOpts = append(queryOpts, relayer.TokenQueryOption(addr))
 	}
 	if len(request.Sender) > 0 {
-		queryOpts = append(queryOpts, relayer.SenderQueryOption(common.BytesToAddress(request.Sender)))
+		addr, err := s.sourceAddrDecoder.DecodeBytes(request.Sender)
+		if err != nil {
+			return nil, err
+		}
+		queryOpts = append(queryOpts, relayer.SenderQueryOption(addr))
 	}
 	if len(request.Recipient) > 0 {
-		queryOpts = append(queryOpts, relayer.RecipientQueryOption(common.BytesToAddress(request.Recipient)))
+		addr, err := s.destAddrDecoder.DecodeBytes(request.Recipient)
+		if err != nil {
+			return nil, err
+		}
+		queryOpts = append(queryOpts, relayer.RecipientQueryOption(addr))
 	}
 	if len(request.Cashiers) > 0 {
-		cashiers := make([]common.Address, len(request.Cashiers))
+		cashiers := make([]util.Address, len(request.Cashiers))
 		for i, cashier := range request.Cashiers {
-			cashiers[i] = common.BytesToAddress(cashier)
+			addr, err := s.sourceAddrDecoder.DecodeBytes(cashier)
+			if err != nil {
+				return nil, err
+			}
+			cashiers[i] = addr
 		}
 		queryOpts = append(queryOpts, relayer.CashiersQueryOption(cashiers))
 	}
@@ -195,7 +217,7 @@ func (s *Service) assembleCheckResponse(transfer *relayer.Transfer) *services.Ch
 	id := transfer.ID()
 	return &services.CheckResponse{
 		Key:    id.Bytes(),
-		TxHash: transfer.TxHash().Bytes(),
+		TxHash: transfer.TxHash(),
 		Status: s.convertStatus(transfer.Status()),
 	}
 }
@@ -239,6 +261,10 @@ func main() {
 	}
 	log.Println("Creating service")
 
+	var (
+		sourceAddrDecoder = util.NewAddressDecoder(cfg.SourceChain)
+		destAddrDecoder   = util.NewAddressDecoder(cfg.DestinationChain)
+	)
 	service, err := NewService(
 		relayer.NewRecorder(
 			db.NewStore(cfg.Database),
@@ -246,8 +272,10 @@ func main() {
 			cfg.TransferTableName,
 			"",
 			"",
-			util.NewETHAddressDecoder(),
+			sourceAddrDecoder,
 		),
+		sourceAddrDecoder,
+		destAddrDecoder,
 	)
 	if err != nil {
 		log.Fatalf("failed to create relay service: %v\n", err)

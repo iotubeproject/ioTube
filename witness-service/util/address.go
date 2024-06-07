@@ -95,3 +95,12 @@ func (s *SOLAddressDecoder) DecodeString(str string) (Address, error) {
 		address: solcommon.PublicKeyFromString(str),
 	}, nil
 }
+
+func NewAddressDecoder(chain string) AddressDecoder {
+	switch chain {
+	default:
+		return NewETHAddressDecoder()
+	case "sol", "solana":
+		return NewSOLAddressDecoder()
+	}
+}

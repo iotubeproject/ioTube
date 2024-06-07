@@ -176,7 +176,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 		if new(big.Int).Add(settleHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
 			return StatusOnChainNotConfirmed, nil
 		}
-		tx, _, err := tv.client.TransactionByHash(context.Background(), transfer.txHash)
+		tx, _, err := tv.client.TransactionByHash(context.Background(), common.BytesToHash(transfer.txHash))
 		if err != nil {
 			return StatusOnChainUnknown, err
 		}
@@ -188,7 +188,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 		transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
 		return StatusOnChainSettled, nil
 	}
-	r, err := tv.client.TransactionReceipt(context.Background(), transfer.txHash)
+	r, err := tv.client.TransactionReceipt(context.Background(), common.BytesToHash(transfer.txHash))
 	switch errors.Cause(err) {
 	case ethereum.NotFound:
 		if transfer.nonce < nonce {

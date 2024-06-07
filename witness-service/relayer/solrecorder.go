@@ -243,7 +243,7 @@ func solTXToTransfer(solTX *SOLRawTransaction) *Transfer {
 		amount:     solTX.amount,
 		fee:        solTX.fee,
 		id:         solTX.id,
-		txHash:     common.Hash{},
+		txHash:     solTX.signature,
 		timestamp:  time.Now(),
 		gas:        0,
 		gasPrice:   big.NewInt(0),

@@ -25,7 +25,7 @@ import (
 const (
 	_limitSize        = 64
 	_validBlockHeight = 150
-	_solanaRPCMaxQPS  = 4
+	_solanaRPCMaxQPS  = 10
 )
 
 var (
@@ -140,6 +140,7 @@ func (s *SolProcessor) ConfirmTransfers() error {
 }
 
 func (s *SolProcessor) confirmTransfer(sig string) (bool, bool, error) {
+	rl.Take()
 	status, err := s.client.GetSignatureStatusWithConfig(
 		context.Background(),
 		sig,
@@ -148,6 +149,7 @@ func (s *SolProcessor) confirmTransfer(sig string) (bool, bool, error) {
 		},
 	)
 	if err != nil {
+		log.Printf("err when confirming transaction %s, %+v\n", sig, err)
 		return false, false, err
 	}
 	if status == nil {
@@ -155,7 +157,7 @@ func (s *SolProcessor) confirmTransfer(sig string) (bool, bool, error) {
 	}
 
 	if status.Err != nil {
-		log.Printf("failed to confirm transaction %s, %+v\n", sig, status.Err)
+		log.Printf("failed to confirm transaction status %s, %+v\n", sig, status.Err)
 		return false, true, errors.New("failed to confirm transaction")
 	}
 
@@ -468,7 +470,6 @@ func (s *SolProcessor) confirmLookupTable(sig string) error {
 		case <-timeout:
 			return errors.Errorf("timeout to confirm transaction %s", sig)
 		default:
-			rl.Take()
 			confirmed, failed, err := s.confirmTransfer(sig)
 			if err != nil || failed {
 				return errors.Errorf("failed to confirm transaction %s", sig)

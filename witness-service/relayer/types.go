@@ -36,7 +36,7 @@ type (
 		amount     *big.Int
 		fee        *big.Int
 		id         common.Hash
-		txHash     common.Hash
+		txHash     []byte
 		timestamp  time.Time
 		gas        uint64
 		gasPrice   *big.Int
@@ -207,7 +207,7 @@ func (transfer *Transfer) ID() common.Hash {
 	return transfer.id
 }
 
-func (transfer *Transfer) TxHash() common.Hash {
+func (transfer *Transfer) TxHash() []byte {
 	return transfer.txHash
 }
 
