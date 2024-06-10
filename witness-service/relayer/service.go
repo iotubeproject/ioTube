@@ -31,12 +31,11 @@ type (
 		processor             dispatcher.Runner
 		recorder              *Recorder
 		// TODO: remove abstractRecorder once API is separated from service
-		abstractRecorder  AbstractRecorder
-		cache             *lru.Cache
-		alwaysReset       bool
-		nonceTooLow       map[common.Hash]uint64
-		sourceAddrDecoder util.AddressDecoder
-		destAddrDecoder   util.AddressDecoder
+		abstractRecorder AbstractRecorder
+		cache            *lru.Cache
+		alwaysReset      bool
+		nonceTooLow      map[common.Hash]uint64
+		destAddrDecoder  util.AddressDecoder
 	}
 )
 
@@ -45,7 +44,7 @@ func NewService(tv TransferValidator, tvAddr util.Address,
 	solProcessor *SolProcessor,
 	recorder *Recorder, abstractRecorder AbstractRecorder,
 	interval time.Duration, alwaysReset bool,
-	sourceAddrDecoder util.AddressDecoder, destAddrDecoder util.AddressDecoder,
+	destAddrDecoder util.AddressDecoder,
 ) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
@@ -59,7 +58,6 @@ func NewService(tv TransferValidator, tvAddr util.Address,
 		cache:                 cache,
 		alwaysReset:           alwaysReset,
 		nonceTooLow:           map[common.Hash]uint64{},
-		sourceAddrDecoder:     sourceAddrDecoder,
 		destAddrDecoder:       destAddrDecoder,
 	}
 
@@ -79,7 +77,7 @@ func NewService(tv TransferValidator, tvAddr util.Address,
 // Start starts the service
 func (s *Service) Start(ctx context.Context) error {
 	if err := s.abstractRecorder.Start(ctx); err != nil {
-		return errors.Wrap(err, "failed to start processor")
+		return errors.Wrap(err, "failed to start recorder")
 	}
 	return s.processor.Start()
 }
@@ -95,7 +93,7 @@ func (s *Service) Stop(ctx context.Context) error {
 // Submit accepts a submission of witness
 func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
 	log.Printf("receive a witness from %x\n", w.Address)
-	transfer, err := UnmarshalTransferProto(w.Transfer, s.sourceAddrDecoder, s.destAddrDecoder)
+	transfer, err := UnmarshalTransferProto(w.Transfer, s.destAddrDecoder)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +151,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 		queryOpts = append(queryOpts, TokenQueryOption(addr))
 	}
 	if len(request.Sender) > 0 {
-		addr, err := s.sourceAddrDecoder.DecodeBytes(request.Sender)
+		addr, err := DecodeSourceAddrBytes(request.Sender)
 		if err != nil {
 			return nil, err
 		}

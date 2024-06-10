@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/mr-tron/base58"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
@@ -49,7 +50,6 @@ type (
 		// updateStatusAndTransactionQuery is a query to set status and transaction
 		updateStatusAndTransactionQuery            string
 		updateStatusAndTransactionQueryForExplorer string
-		addrDecoder                                util.AddressDecoder
 	}
 )
 
@@ -60,7 +60,6 @@ func NewRecorder(
 	transferTableName string,
 	witnessTableName string,
 	explorerTableName string,
-	addrDecoder util.AddressDecoder,
 ) *Recorder {
 	return &Recorder{
 		store:                           store,
@@ -72,7 +71,6 @@ func NewRecorder(
 		updateStatusQueryForExplorer:    fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=?", explorerTableName),
 		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=? AND `status`=?", transferTableName),
 		updateStatusAndTransactionQueryForExplorer: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=?", explorerTableName),
-		addrDecoder: addrDecoder,
 	}
 }
 
@@ -250,12 +248,12 @@ func (recorder *Recorder) addWitness(
 ) error {
 	if _, err := tx.Exec(
 		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
-		hex.EncodeToString(transfer.cashier.Bytes()),
-		hex.EncodeToString(transfer.token.Bytes()),
+		transfer.cashier.String(),
+		transfer.token.String(),
 		transfer.index,
-		hex.EncodeToString(transfer.sender.Bytes()),
-		hex.EncodeToString(transfer.txSender.Bytes()),
-		hex.EncodeToString(transfer.recipient.Bytes()),
+		transfer.sender.String(),
+		transfer.txSender.String(),
+		transfer.recipient.String(),
 		transfer.amount.String(),
 		transfer.fee.String(),
 		transfer.id.Hex(),
@@ -265,7 +263,7 @@ func (recorder *Recorder) addWitness(
 	if transfer.txSender != nil {
 		if _, err := tx.Exec(
 			fmt.Sprintf("UPDATE `%s` SET `txSender`=? WHERE `id`=?", transferTableName),
-			hex.EncodeToString(transfer.txSender.Bytes()),
+			transfer.txSender.String(),
 			transfer.id.Hex(),
 		); err != nil {
 			return errors.Wrap(err, "failed to update tx sender")
@@ -338,13 +336,13 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
-	tx.cashier = recorder.hexToAddress(cashier, recorder.addrDecoder)
-	tx.token = recorder.hexToAddress(token, util.NewETHAddressDecoder())
-	tx.sender = recorder.hexToAddress(sender, recorder.addrDecoder)
+	tx.cashier = recorder.stringToAddress(cashier)
+	tx.token = recorder.stringToAddress(token)
+	tx.sender = recorder.stringToAddress(sender)
 	if txSender.Valid {
-		tx.txSender = recorder.hexToAddress(txSender.String, recorder.addrDecoder)
+		tx.txSender = recorder.stringToAddress(txSender.String)
 	}
-	tx.recipient = recorder.hexToAddress(recipient, util.NewETHAddressDecoder())
+	tx.recipient = recorder.stringToAddress(recipient)
 	tx.id = common.HexToHash(id)
 	if relayer.Valid {
 		tx.relayer = common.HexToAddress(relayer.String)
@@ -384,16 +382,28 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	return tx, nil
 }
 
-func (recorder *Recorder) hexToAddress(str string, decoder util.AddressDecoder) util.Address {
-	bytes, err := hex.DecodeString(str)
-	if err != nil {
-		log.Panicf("failed to decode hex string %s", str)
-	}
-	ret, err := decoder.DecodeBytes(bytes)
-	if err != nil {
+func (recorder *Recorder) stringToAddress(str string) util.Address {
+	// Try to decode the string with Base58
+	_, err := base58.Decode(str)
+	switch {
+	// Eth Address is hex-encoded whose length is 42
+	case len(str) == 42 && strings.HasPrefix(str, "0x") && err != nil:
+		ret, err := util.NewETHAddressDecoder().DecodeString(str)
+		if err != nil {
+			log.Panicf("failed to decode address %s", str)
+		}
+		return ret
+	// Sol Address is base58-encoded
+	case err == nil:
+		ret, err := util.NewSOLAddressDecoder().DecodeString(str)
+		if err != nil {
+			log.Panicf("failed to decode address %s", str)
+		}
+		return ret
+	default:
 		log.Panicf("failed to decode address %s", str)
+		return nil
 	}
-	return ret
 }
 
 // Transfer returns the validation tx related information of a given transfer
@@ -445,7 +455,7 @@ func ExcludeAmountZeroOption() TransferQueryOption {
 
 func ExcludeTokenQueryOption(token util.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
-		return "token <> ?", []interface{}{hex.EncodeToString(token.Bytes())}
+		return "token <> ?", []interface{}{token.String()}
 	}
 }
 
@@ -466,19 +476,19 @@ func StatusQueryOption(statuses ...ValidationStatusType) TransferQueryOption {
 
 func TokenQueryOption(token util.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
-		return "token = ?", []interface{}{hex.EncodeToString(token.Bytes())}
+		return "token = ?", []interface{}{token.String()}
 	}
 }
 
 func SenderQueryOption(sender util.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
-		return "sender = ?", []interface{}{hex.EncodeToString(sender.Bytes())}
+		return "sender = ?", []interface{}{sender.String()}
 	}
 }
 
 func RecipientQueryOption(recipient util.Address) TransferQueryOption {
 	return func() (string, []interface{}) {
-		return "recipient = ?", []interface{}{hex.EncodeToString(recipient.Bytes())}
+		return "recipient = ?", []interface{}{recipient.String()}
 	}
 }
 
@@ -488,7 +498,7 @@ func CashiersQueryOption(cashiers []util.Address) TransferQueryOption {
 		params := make([]interface{}, len(cashiers))
 		for i, cashier := range cashiers {
 			questions[i] = "?"
-			params[i] = hex.EncodeToString(cashier.Bytes())
+			params[i] = cashier.String()
 		}
 		return "cashier in (" + strings.Join(questions, ",") + ")", params
 	}

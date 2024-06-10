@@ -53,12 +53,11 @@ type (
 	}
 	Service struct {
 		services.UnimplementedExplorerServiceServer
-		cache             *lru.Cache
-		recorder          *relayer.Recorder
-		hits              uint64
-		queries           uint64
-		sourceAddrDecoder util.AddressDecoder
-		destAddrDecoder   util.AddressDecoder
+		cache           *lru.Cache
+		recorder        *relayer.Recorder
+		hits            uint64
+		queries         uint64
+		destAddrDecoder util.AddressDecoder
 	}
 
 	// Configuration defines the configuration of the witness service
@@ -67,13 +66,11 @@ type (
 		GrpcProxyPort     int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 		Database          db.Config `json:"database" yaml:"database"`
 		TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
-		SourceChain       string    `json:"sourceChain" yaml:"sourceChain"`
 		DestinationChain  string    `json:"destinationChain" yaml:"destinationChain"`
 	}
 )
 
 func NewService(recorder *relayer.Recorder,
-	sourceAddrDecoder util.AddressDecoder,
 	destAddrDecoder util.AddressDecoder,
 ) (*Service, error) {
 	cache, err := lru.New(100)
@@ -134,7 +131,7 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 		queryOpts = append(queryOpts, relayer.TokenQueryOption(addr))
 	}
 	if len(request.Sender) > 0 {
-		addr, err := s.sourceAddrDecoder.DecodeBytes(request.Sender)
+		addr, err := relayer.DecodeSourceAddrBytes(request.Sender)
 		if err != nil {
 			return nil, err
 		}
@@ -150,7 +147,7 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 	if len(request.Cashiers) > 0 {
 		cashiers := make([]util.Address, len(request.Cashiers))
 		for i, cashier := range request.Cashiers {
-			addr, err := s.sourceAddrDecoder.DecodeBytes(cashier)
+			addr, err := relayer.DecodeSourceAddrBytes(cashier)
 			if err != nil {
 				return nil, err
 			}
@@ -262,8 +259,7 @@ func main() {
 	log.Println("Creating service")
 
 	var (
-		sourceAddrDecoder = util.NewAddressDecoder(cfg.SourceChain)
-		destAddrDecoder   = util.NewAddressDecoder(cfg.DestinationChain)
+		destAddrDecoder = util.NewAddressDecoder(cfg.DestinationChain)
 	)
 	service, err := NewService(
 		relayer.NewRecorder(
@@ -272,9 +268,7 @@ func main() {
 			cfg.TransferTableName,
 			"",
 			"",
-			sourceAddrDecoder,
 		),
-		sourceAddrDecoder,
 		destAddrDecoder,
 	)
 	if err != nil {

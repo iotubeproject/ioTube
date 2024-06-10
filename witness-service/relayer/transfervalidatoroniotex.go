@@ -294,7 +294,6 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		numOfValidSignatures++
 	}
 	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
-		log.Printf("insufficient witnesses, %d/%d\n", numOfValidSignatures, len(tv.witnesses))
 		return common.Hash{}, common.Address{}, 0, nil, errInsufficientWitnesses
 	}
 	accountMeta, err := tv.relayerAccountMeta()

@@ -38,7 +38,6 @@ import (
 // Configuration defines the configuration of the witness service
 type Configuration struct {
 	Chain                 string        `json:"chain" yaml:"chain"`
-	SourceChain           string        `json:"sourceChain" yaml:"sourceChain"`
 	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
 	EthConfirmBlockNumber uint16        `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
 	EthDefaultGasPrice    uint64        `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
@@ -196,7 +195,6 @@ func main() {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}
 		transferValidatorAddr = util.ETHAddressToAddress(transferValidator.Address())
-		sourceAddrDecoder = util.NewETHAddressDecoder()
 		destAddrDecoder = util.NewETHAddressDecoder()
 		recorder = relayer.NewRecorder(
 			db.NewStore(cfg.Database),
@@ -204,7 +202,6 @@ func main() {
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
 			cfg.ExplorerTableName,
-			sourceAddrDecoder,
 		)
 		abstractRecorder = recorder
 	case "iotex":
@@ -235,11 +232,6 @@ func main() {
 			log.Fatalf("failed to create transfer validator: %v\n", err)
 		}
 		transferValidatorAddr = util.ETHAddressToAddress(transferValidator.Address())
-		if cfg.SourceChain == "solana" {
-			sourceAddrDecoder = util.NewSOLAddressDecoder()
-		} else {
-			sourceAddrDecoder = util.NewETHAddressDecoder()
-		}
 		destAddrDecoder = util.NewETHAddressDecoder()
 		recorder = relayer.NewRecorder(
 			db.NewStore(cfg.Database),
@@ -247,7 +239,6 @@ func main() {
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
 			cfg.ExplorerTableName,
-			sourceAddrDecoder,
 		)
 		abstractRecorder = recorder
 	case "solana":
@@ -299,7 +290,6 @@ func main() {
 		abstractRecorder,
 		cfg.Interval,
 		cfg.AlwaysReset,
-		sourceAddrDecoder,
 		destAddrDecoder,
 	)
 	if err != nil {

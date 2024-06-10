@@ -135,10 +135,9 @@ var errGasPriceTooHigh = errors.New("gas price is too high")
 var errNoncritical = errors.New("error before submission")
 
 // UnmarshalTransferProto unmarshals a transfer proto
-func UnmarshalTransferProto(transfer *types.Transfer,
-	sourceAddrDecoder util.AddressDecoder, destAddrDecoder util.AddressDecoder,
+func UnmarshalTransferProto(transfer *types.Transfer, destAddrDecoder util.AddressDecoder,
 ) (*Transfer, error) {
-	cashier, err := sourceAddrDecoder.DecodeBytes(transfer.Cashier)
+	cashier, err := DecodeSourceAddrBytes(transfer.Cashier)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode cashier")
 	}
@@ -147,13 +146,13 @@ func UnmarshalTransferProto(transfer *types.Transfer,
 		return nil, errors.Wrap(err, "failed to decode token")
 	}
 	index := uint64(transfer.Index)
-	sender, err := sourceAddrDecoder.DecodeBytes(transfer.Sender)
+	sender, err := DecodeSourceAddrBytes(transfer.Sender)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode sender")
 	}
 	var txSender util.Address
 	if len(transfer.TxSender) > 0 {
-		txSender, err = sourceAddrDecoder.DecodeBytes(transfer.TxSender)
+		txSender, err = DecodeSourceAddrBytes(transfer.TxSender)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decode tx sender")
 		}
@@ -190,6 +189,20 @@ func UnmarshalTransferProto(transfer *types.Transfer,
 		timestamp: transfer.Timestamp.AsTime(),
 		txSender:  txSender,
 	}, nil
+}
+
+// DecodeSourceAddrBytes decode bytes into util.Address based on the length of bytes
+func DecodeSourceAddrBytes(bytes []byte) (util.Address, error) {
+	switch len(bytes) {
+	// ETH address
+	case 20:
+		return util.NewETHAddressDecoder().DecodeBytes(bytes)
+	// Solana address
+	case 32:
+		return util.NewSOLAddressDecoder().DecodeBytes(bytes)
+	default:
+		return nil, errors.Errorf("invalid address length %d", len(bytes))
+	}
 }
 
 // NewWitness creates a new witness struct
