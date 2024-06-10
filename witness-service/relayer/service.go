@@ -2,11 +2,14 @@ package relayer
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"log"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -15,6 +18,8 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/iotex-address/address"
+	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 )
 
 type (
@@ -26,6 +31,7 @@ type (
 	Service struct {
 		services.UnimplementedRelayServiceServer
 		transferValidator TransferValidator
+		bonusSender       BonusSender
 		processor         dispatcher.Runner
 		recorder          *Recorder
 		cache             *lru.Cache
@@ -34,17 +40,72 @@ type (
 	}
 )
 
-// NewService creates a new relay service
-func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration, alwaysReset bool) (*Service, error) {
+// NewServiceOnEthereum creates a new relay service on Ethereum
+func NewServiceOnEthereum(
+	recorder *Recorder,
+	interval time.Duration,
+	client *ethclient.Client,
+	privateKeys []*ecdsa.PrivateKey,
+	confirmBlockNumber uint16,
+	defaultGasPrice *big.Int,
+	gasPriceLimit *big.Int,
+	gasPriceHardLimit *big.Int,
+	gasPriceDeviation *big.Int,
+	gasPriceGap *big.Int,
+	validatorContractAddr common.Address,
+	bonusTokens map[string]*big.Int,
+	bonus *big.Int,
+) (*Service, error) {
+	validator, err := newTransferValidatorOnEthereum(
+		client,
+		privateKeys,
+		confirmBlockNumber,
+		defaultGasPrice,
+		gasPriceLimit,
+		gasPriceHardLimit,
+		gasPriceDeviation,
+		gasPriceGap,
+		validatorContractAddr,
+		bonusTokens,
+		bonus,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create transfer validator")
+	}
+	return newService(validator, recorder, validator, interval)
+}
+
+// NewServiceOnIoTeX creates a new relay service on IoTeX
+func NewServiceOnIoTeX(
+	recorder *Recorder,
+	interval time.Duration,
+	client iotex.AuthedClient,
+	validatorContractAddr address.Address,
+	bonusTokens map[string]*big.Int,
+	bonus *big.Int,
+) (*Service, error) {
+	validator, err := newTransferValidatorOnIoTeX(
+		client,
+		validatorContractAddr,
+		bonusTokens,
+		bonus,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return newService(validator, recorder, validator, interval)
+}
+
+func newService(tv TransferValidator, recorder *Recorder, bonusSender BonusSender, interval time.Duration) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
 		return nil, err
 	}
 	s := &Service{
 		transferValidator: tv,
+		bonusSender:       bonusSender,
 		recorder:          recorder,
 		cache:             cache,
-		alwaysReset:       alwaysReset,
 		nonceTooLow:       map[common.Hash]uint64{},
 	}
 	processor, err := dispatcher.NewRunner(interval, s.process)
@@ -54,6 +115,11 @@ func NewService(tv TransferValidator, recorder *Recorder, interval time.Duration
 	s.processor = processor
 
 	return s, nil
+}
+
+// SetAlwaysRetry sets the service to always retry
+func (s *Service) SetAlwaysRetry() {
+	s.alwaysReset = true
 }
 
 // Start starts the service
@@ -152,7 +218,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	case services.Status_SUBMITTED:
 		queryOpts = append(queryOpts, StatusQueryOption(ValidationSubmitted))
 	case services.Status_SETTLED:
-		queryOpts = append(queryOpts, StatusQueryOption(TransferSettled))
+		queryOpts = append(queryOpts, StatusQueryOption(TransferSettled, BonusPending))
 	case services.Status_CREATED, services.Status_CONFIRMING:
 		queryOpts = append(queryOpts, StatusQueryOption(WaitingForWitnesses))
 	case services.Status_FAILED:
@@ -232,7 +298,7 @@ func (s *Service) convertStatus(status ValidationStatusType) services.Status {
 		return services.Status_CREATED
 	case ValidationSubmitted:
 		return services.Status_SUBMITTED
-	case TransferSettled:
+	case TransferSettled, BonusPending:
 		return services.Status_SETTLED
 	case ValidationFailed, ValidationRejected:
 		return services.Status_FAILED
@@ -269,10 +335,30 @@ func (s *Service) process() error {
 	if s.transferValidator == nil {
 		return nil
 	}
+	if err := s.sendBonus(); err != nil {
+		util.LogErr(err)
+	}
 	if err := s.confirmTransfers(); err != nil {
 		util.LogErr(err)
 	}
 	return s.submitTransfers()
+}
+
+func (s *Service) sendBonus() error {
+	transfers, err := s.recorder.Transfers(0, uint8(s.bonusSender.Size()), false, false, StatusQueryOption(BonusPending))
+	if err != nil {
+		return errors.Wrap(err, "failed to read transfers to reward")
+	}
+	for _, transfer := range transfers {
+		if err := s.bonusSender.SendBonus(transfer); err != nil {
+			util.Alert("failed to send reward" + err.Error())
+		} else {
+			if err := s.recorder.MarkAsSettled(transfer.id); err != nil {
+				util.Alert("failed to mark transfer as settled" + err.Error())
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Service) confirmTransfers() error {
@@ -352,8 +438,8 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 			return false, errors.Wrap(err, "failed to reset nonce")
 		}
 	case StatusOnChainSettled:
-		if err := s.recorder.MarkAsSettled(transfer.id, transfer.gas, transfer.timestamp); err != nil {
-			return false, errors.Wrap(err, "failed to settle")
+		if err := s.recorder.MarkAsBonusPending(transfer.id, transfer.gas, transfer.timestamp); err != nil {
+			return false, errors.Wrap(err, "failed to update status")
 		}
 	default:
 		return false, errors.New("unexpected error")

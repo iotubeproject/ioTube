@@ -658,20 +658,38 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, re
 }
 
 // MarkAsSettled marks a record as settled
-func (recorder *Recorder) MarkAsSettled(id common.Hash, gas uint64, ts time.Time) error {
+func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
 	log.Printf("mark transfer %s as settled\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=? AND `status`=?", recorder.transferTableName),
+		recorder.updateStatusQuery,
 		TransferSettled,
+		id.Hex(),
+		BonusPending,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as settled")
+	}
+
+	return recorder.validateResult(result)
+}
+
+// MarkAsBonusPending marks a record as bonus pending
+func (recorder *Recorder) MarkAsBonusPending(id common.Hash, gas uint64, ts time.Time) error {
+	log.Printf("mark transfer %s as bonus pending\n", id.Hex())
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
+	result, err := recorder.store.DB().Exec(
+		fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=? AND `status`=?", recorder.transferTableName),
+		BonusPending,
 		gas,
 		ts,
 		id.Hex(),
 		ValidationSubmitted,
 	)
 	if err != nil {
-		return errors.Wrap(err, "failed to mark as settled")
+		return errors.Wrap(err, "failed to mark as bonus pending")
 	}
 	if recorder.explorerStore != nil {
 		for {
