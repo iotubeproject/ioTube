@@ -239,6 +239,7 @@ func solTXToTransfer(solTX *SOLRawTransaction) *Transfer {
 		token:      solTX.token,
 		index:      solTX.index,
 		sender:     solTX.sender,
+		txSender:   solTX.txSender,
 		recipient:  solTX.recipient,
 		amount:     solTX.amount,
 		fee:        solTX.fee,

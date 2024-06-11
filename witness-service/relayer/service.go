@@ -203,8 +203,12 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	}
 	for i, transfer := range transfers {
 		gasPrice := "0"
+		txSender := []byte{}
 		if transfer.gasPrice != nil {
 			gasPrice = transfer.gasPrice.String()
+		}
+		if transfer.txSender != nil {
+			txSender = transfer.txSender.Bytes()
 		}
 		response.Transfers[i] = &types.Transfer{
 			Cashier:   transfer.cashier.Bytes(),
@@ -217,7 +221,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 			Gas:       transfer.gas,
 			GasPrice:  gasPrice,
 			Timestamp: timestamppb.New(transfer.timestamp),
-			TxSender:  transfer.txSender.Bytes(),
+			TxSender:  txSender,
 		}
 		response.Statuses[i] = s.assembleCheckResponse(transfer, witnesses)
 		if len(witnesses) == 0 && transfer.status == WaitingForWitnesses {
