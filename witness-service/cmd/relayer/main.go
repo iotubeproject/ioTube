@@ -66,7 +66,7 @@ var defaultConfig = Configuration{
 	Interval:              time.Hour,
 	ClientURL:             "",
 	EthConfirmBlockNumber: 20,
-	EthGasPriceLimit:      120000000000,
+	EthGasPriceLimit:      1200000000000,
 	EthGasPriceDeviation:  0,
 	EthGasPriceGap:        0,
 	GrpcPort:              8080,
@@ -137,7 +137,7 @@ func main() {
 	util.SetPrefix("relayer-" + cfg.Chain)
 
 	log.Println("Creating service")
-	var transferValidator relayer.TransferValidator
+	var service *relayer.Service
 	if chain, ok := os.LookupEnv("RELAYER_CHAIN"); ok {
 		cfg.Chain = chain
 	}
@@ -165,7 +165,15 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to parse validator address %s: %+v", cfg.ValidatorAddress, err)
 		}
-		if transferValidator, err = relayer.NewTransferValidatorOnEthereum(
+		service, err = relayer.NewServiceOnEthereum(
+			relayer.NewRecorder(
+				db.NewStore(cfg.Database),
+				db.NewStore(cfg.ExplorerDatabase),
+				cfg.TransferTableName,
+				cfg.WitnessTableName,
+				cfg.ExplorerTableName,
+			),
+			cfg.Interval,
 			ethClient,
 			privateKeys,
 			cfg.EthConfirmBlockNumber,
@@ -177,8 +185,9 @@ func main() {
 			validatorAddr,
 			cfg.BonusTokens,
 			cfg.Bonus,
-		); err != nil {
-			log.Fatalf("failed to create transfer validator: %v\n", err)
+		)
+		if err != nil {
+			log.Fatalf("failed to create relay service: %v\n", err)
 		}
 	case "iotex":
 		var conn *grpc.ClientConn
@@ -199,31 +208,29 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
 		}
-		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
+
+		service, err = relayer.NewServiceOnIoTeX(
+			relayer.NewRecorder(
+				db.NewStore(cfg.Database),
+				db.NewStore(cfg.ExplorerDatabase),
+				cfg.TransferTableName,
+				cfg.WitnessTableName,
+				cfg.ExplorerTableName,
+			),
+			cfg.Interval,
 			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
 			validatorContractAddr,
 			cfg.BonusTokens,
 			cfg.Bonus,
-		); err != nil {
-			log.Fatalf("failed to create transfer validator: %v\n", err)
+		)
+		if err != nil {
+			log.Fatalf("failed to create relay service: %v\n", err)
 		}
 	default:
 		log.Fatalf("unknown chain name '%s'\n", cfg.Chain)
 	}
-	service, err := relayer.NewService(
-		transferValidator,
-		relayer.NewRecorder(
-			db.NewStore(cfg.Database),
-			db.NewStore(cfg.ExplorerDatabase),
-			cfg.TransferTableName,
-			cfg.WitnessTableName,
-			cfg.ExplorerTableName,
-		),
-		cfg.Interval,
-		cfg.AlwaysReset,
-	)
-	if err != nil {
-		log.Fatalf("failed to create relay service: %v\n", err)
+	if cfg.AlwaysReset {
+		service.SetAlwaysRetry()
 	}
 	if err := service.Start(context.Background()); err != nil {
 		log.Fatalf("failed to start relay service: %v\n", err)

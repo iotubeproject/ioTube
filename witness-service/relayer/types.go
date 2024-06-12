@@ -50,6 +50,14 @@ type (
 		signature []byte
 	}
 
+	// BonusSender defines the interface of a bonus sender
+	BonusSender interface {
+		// SendBonus sends bonus to a transfer
+		SendBonus(transfer *Transfer) error
+		// Size returns the number of senders
+		Size() int
+	}
+
 	// TransferValidator defines the interface of a transfer validator
 	TransferValidator interface {
 		// Size returns the number of relayers
@@ -72,6 +80,8 @@ const (
 	ValidationInProcess = "processing"
 	// ValidationSubmitted stands for a transfer with validation submitted
 	ValidationSubmitted = "validated"
+	// BonusPending stands for a transfer with pending bonus
+	BonusPending = "bonus"
 	// TransferSettled stands for a transfer which has been settled
 	TransferSettled = "settled"
 	// ValidationFailed stands for the validation of a transfer failed

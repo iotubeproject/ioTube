@@ -50,13 +50,13 @@ type transferValidatorOnIoTeX struct {
 	witnesses              map[string]bool
 }
 
-// NewTransferValidatorOnIoTeX creates a new TransferValidator on IoTeX
-func NewTransferValidatorOnIoTeX(
+// newTransferValidatorOnIoTeX creates a new TransferValidator on IoTeX
+func newTransferValidatorOnIoTeX(
 	client iotex.AuthedClient,
 	validatorContractAddr address.Address,
 	bonusTokens map[string]*big.Int,
 	bonus *big.Int,
-) (TransferValidator, error) {
+) (*transferValidatorOnIoTeX, error) {
 	validatorContractIoAddr, err := address.FromBytes(validatorContractAddr.Bytes())
 	if err != nil {
 		return nil, err
@@ -181,6 +181,17 @@ func (tv *transferValidatorOnIoTeX) Size() int {
 	return 1
 }
 
+func (tv *transferValidatorOnIoTeX) SendBonus(transfer *Transfer) error {
+	tv.mu.Lock()
+	defer tv.mu.Unlock()
+
+	threshold, ok := tv.bonusTokens[transfer.token.Hex()]
+	if !ok || transfer.amount.Cmp(threshold) < 0 {
+		return nil
+	}
+	return tv.sendBonus(transfer.recipient)
+}
+
 // Check returns true if a transfer has been settled
 func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType, error) {
 	tv.mu.RLock()
@@ -218,11 +229,6 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 			return StatusOnChainUnknown, err
 		}
 		transfer.timestamp = metaResponse.BlkMetas[0].Timestamp.AsTime()
-		if threshold, ok := tv.bonusTokens[transfer.token.Hex()]; ok && transfer.amount.Cmp(threshold) > 0 {
-			if err := tv.sendBonus(transfer.recipient); err != nil {
-				log.Printf("failed to send bonus to %s, %+v\n", transfer.recipient, err)
-			}
-		}
 
 		return StatusOnChainSettled, nil
 	}

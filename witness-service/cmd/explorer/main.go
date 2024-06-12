@@ -139,7 +139,7 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 	case services.Status_SUBMITTED:
 		queryOpts = append(queryOpts, relayer.StatusQueryOption(relayer.ValidationSubmitted))
 	case services.Status_SETTLED:
-		queryOpts = append(queryOpts, relayer.StatusQueryOption(relayer.TransferSettled))
+		queryOpts = append(queryOpts, relayer.StatusQueryOption(relayer.TransferSettled, relayer.BonusPending))
 	case services.Status_CONFIRMING, services.Status_CREATED:
 		queryOpts = append(queryOpts, relayer.StatusQueryOption(relayer.WaitingForWitnesses))
 	case services.Status_FAILED:
@@ -181,7 +181,7 @@ func (s *Service) convertStatus(status relayer.ValidationStatusType) services.St
 		return services.Status_CREATED
 	case relayer.ValidationSubmitted:
 		return services.Status_SUBMITTED
-	case relayer.TransferSettled:
+	case relayer.TransferSettled, relayer.BonusPending:
 		return services.Status_SETTLED
 	case relayer.ValidationFailed, relayer.ValidationRejected:
 		return services.Status_FAILED
