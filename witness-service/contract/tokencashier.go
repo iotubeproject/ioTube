@@ -31,7 +31,7 @@ var (
 
 // TokenCashierMetaData contains all meta data concerning the TokenCashier contract.
 var TokenCashierMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"contractIWrappedCoin\",\"name\":\"_wrappedCoin\",\"type\":\"address\"},{\"internalType\":\"contractITokenList[]\",\"name\":\"_tokenLists\",\"type\":\"address[]\"},{\"internalType\":\"address[]\",\"name\":\"_tokenSafes\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"recipient\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"Receipt\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"fallback\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"count\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"counts\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"depositFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_to\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"depositTo\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_fee\",\"type\":\"uint256\"}],\"name\":\"setDepositFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenLists\",\"outputs\":[{\"internalType\":\"contractITokenList\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenSafes\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"withdraw\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"withdrawToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"wrappedCoin\",\"outputs\":[{\"internalType\":\"contractIWrappedCoin\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"contractIWrappedCoin\",\"name\":\"_wrappedCoin\",\"type\":\"address\"},{\"internalType\":\"contractITokenList[]\",\"name\":\"_tokenLists\",\"type\":\"address[]\"},{\"internalType\":\"address[]\",\"name\":\"_tokenSafes\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"recipient\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"}],\"name\":\"Receipt\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"fallback\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"count\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"counts\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"depositFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_to\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"_payload\",\"type\":\"bytes\"}],\"name\":\"depositTo\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_fee\",\"type\":\"uint256\"}],\"name\":\"setDepositFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenLists\",\"outputs\":[{\"internalType\":\"contractITokenList\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenSafes\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"withdraw\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"withdrawToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"wrappedCoin\",\"outputs\":[{\"internalType\":\"contractIWrappedCoin\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // TokenCashierABI is the input ABI used to generate the binding from.
@@ -428,25 +428,25 @@ func (_TokenCashier *TokenCashierCallerSession) WrappedCoin() (common.Address, e
 	return _TokenCashier.Contract.WrappedCoin(&_TokenCashier.CallOpts)
 }
 
-// DepositTo is a paid mutator transaction binding the contract method 0x9de88d72.
+// DepositTo is a paid mutator transaction binding the contract method 0xd13b5612.
 //
-// Solidity: function depositTo(address _token, string _to, uint256 _amount) payable returns()
-func (_TokenCashier *TokenCashierTransactor) DepositTo(opts *bind.TransactOpts, _token common.Address, _to string, _amount *big.Int) (*types.Transaction, error) {
-	return _TokenCashier.contract.Transact(opts, "depositTo", _token, _to, _amount)
+// Solidity: function depositTo(address _token, string _to, uint256 _amount, bytes _payload) payable returns()
+func (_TokenCashier *TokenCashierTransactor) DepositTo(opts *bind.TransactOpts, _token common.Address, _to string, _amount *big.Int, _payload []byte) (*types.Transaction, error) {
+	return _TokenCashier.contract.Transact(opts, "depositTo", _token, _to, _amount, _payload)
 }
 
-// DepositTo is a paid mutator transaction binding the contract method 0x9de88d72.
+// DepositTo is a paid mutator transaction binding the contract method 0xd13b5612.
 //
-// Solidity: function depositTo(address _token, string _to, uint256 _amount) payable returns()
-func (_TokenCashier *TokenCashierSession) DepositTo(_token common.Address, _to string, _amount *big.Int) (*types.Transaction, error) {
-	return _TokenCashier.Contract.DepositTo(&_TokenCashier.TransactOpts, _token, _to, _amount)
+// Solidity: function depositTo(address _token, string _to, uint256 _amount, bytes _payload) payable returns()
+func (_TokenCashier *TokenCashierSession) DepositTo(_token common.Address, _to string, _amount *big.Int, _payload []byte) (*types.Transaction, error) {
+	return _TokenCashier.Contract.DepositTo(&_TokenCashier.TransactOpts, _token, _to, _amount, _payload)
 }
 
-// DepositTo is a paid mutator transaction binding the contract method 0x9de88d72.
+// DepositTo is a paid mutator transaction binding the contract method 0xd13b5612.
 //
-// Solidity: function depositTo(address _token, string _to, uint256 _amount) payable returns()
-func (_TokenCashier *TokenCashierTransactorSession) DepositTo(_token common.Address, _to string, _amount *big.Int) (*types.Transaction, error) {
-	return _TokenCashier.Contract.DepositTo(&_TokenCashier.TransactOpts, _token, _to, _amount)
+// Solidity: function depositTo(address _token, string _to, uint256 _amount, bytes _payload) payable returns()
+func (_TokenCashier *TokenCashierTransactorSession) DepositTo(_token common.Address, _to string, _amount *big.Int, _payload []byte) (*types.Transaction, error) {
+	return _TokenCashier.Contract.DepositTo(&_TokenCashier.TransactOpts, _token, _to, _amount, _payload)
 }
 
 // Pause is a paid mutator transaction binding the contract method 0x8456cb59.
@@ -957,12 +957,13 @@ type TokenCashierReceipt struct {
 	Recipient string
 	Amount    *big.Int
 	Fee       *big.Int
+	Payload   []byte
 	Raw       types.Log // Blockchain specific contextual infos
 }
 
-// FilterReceipt is a free log retrieval operation binding the contract event 0xc59b3b73be4e0b3a1cd9e30aa4a4c13883a774a91c35fc607669f741dc9296e6.
+// FilterReceipt is a free log retrieval operation binding the contract event 0x5c19714fce15effc6b70576855990fdd03e4f73ed5ac526a275b8648c07c89ce.
 //
-// Solidity: event Receipt(address indexed token, uint256 indexed id, address sender, string recipient, uint256 amount, uint256 fee)
+// Solidity: event Receipt(address indexed token, uint256 indexed id, address sender, string recipient, uint256 amount, uint256 fee, bytes payload)
 func (_TokenCashier *TokenCashierFilterer) FilterReceipt(opts *bind.FilterOpts, token []common.Address, id []*big.Int) (*TokenCashierReceiptIterator, error) {
 
 	var tokenRule []interface{}
@@ -981,9 +982,9 @@ func (_TokenCashier *TokenCashierFilterer) FilterReceipt(opts *bind.FilterOpts, 
 	return &TokenCashierReceiptIterator{contract: _TokenCashier.contract, event: "Receipt", logs: logs, sub: sub}, nil
 }
 
-// WatchReceipt is a free log subscription operation binding the contract event 0xc59b3b73be4e0b3a1cd9e30aa4a4c13883a774a91c35fc607669f741dc9296e6.
+// WatchReceipt is a free log subscription operation binding the contract event 0x5c19714fce15effc6b70576855990fdd03e4f73ed5ac526a275b8648c07c89ce.
 //
-// Solidity: event Receipt(address indexed token, uint256 indexed id, address sender, string recipient, uint256 amount, uint256 fee)
+// Solidity: event Receipt(address indexed token, uint256 indexed id, address sender, string recipient, uint256 amount, uint256 fee, bytes payload)
 func (_TokenCashier *TokenCashierFilterer) WatchReceipt(opts *bind.WatchOpts, sink chan<- *TokenCashierReceipt, token []common.Address, id []*big.Int) (event.Subscription, error) {
 
 	var tokenRule []interface{}
@@ -1027,9 +1028,9 @@ func (_TokenCashier *TokenCashierFilterer) WatchReceipt(opts *bind.WatchOpts, si
 	}), nil
 }
 
-// ParseReceipt is a log parse operation binding the contract event 0xc59b3b73be4e0b3a1cd9e30aa4a4c13883a774a91c35fc607669f741dc9296e6.
+// ParseReceipt is a log parse operation binding the contract event 0x5c19714fce15effc6b70576855990fdd03e4f73ed5ac526a275b8648c07c89ce.
 //
-// Solidity: event Receipt(address indexed token, uint256 indexed id, address sender, string recipient, uint256 amount, uint256 fee)
+// Solidity: event Receipt(address indexed token, uint256 indexed id, address sender, string recipient, uint256 amount, uint256 fee, bytes payload)
 func (_TokenCashier *TokenCashierFilterer) ParseReceipt(log types.Log) (*TokenCashierReceipt, error) {
 	event := new(TokenCashierReceipt)
 	if err := _TokenCashier.contract.UnpackLog(event, "Receipt", log); err != nil {

@@ -65,6 +65,7 @@ func (s *SolRecorder) Start(ctx context.Context) error {
 			"`txSender` varchar(64) NOT NULL,"+
 			"`recipient` varchar(64) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
+			"`payload` varchar(24576),"+
 			"`fee` varchar(78),"+
 			"`id` varchar(66) NOT NULL,"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
@@ -126,6 +127,7 @@ func (s *SolRecorder) AddWitness(validator util.Address, transfer *Transfer, wit
 		transfer.sender.String(),
 		transfer.recipient.Bytes(),
 		transfer.amount.Uint64(),
+		transfer.payload,
 	)
 	if err != nil {
 		return common.Hash{}, errors.Wrap(err, "failed to serialize payload")
@@ -146,7 +148,7 @@ func (s *SolRecorder) AddWitness(validator util.Address, transfer *Transfer, wit
 	defer tx.Rollback()
 
 	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", s.transferTableName),
+		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, payload, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", s.transferTableName),
 		hex.EncodeToString(transfer.cashier.Bytes()),
 		hex.EncodeToString(transfer.token.Bytes()),
 		transfer.index,
@@ -154,6 +156,7 @@ func (s *SolRecorder) AddWitness(validator util.Address, transfer *Transfer, wit
 		hex.EncodeToString(transfer.txSender.Bytes()),
 		hex.EncodeToString(transfer.recipient.Bytes()),
 		transfer.amount.String(),
+		util.EncodeToNullString(transfer.payload),
 		transfer.fee.String(),
 		transfer.id.Hex(),
 	); err != nil {
@@ -223,7 +226,7 @@ func (s *SolRecorder) Witnesses(ids ...common.Hash) (map[common.Hash][]*Witness,
 // Transfer returns the validation tx related information of a given transfer
 func (s *SolRecorder) Transfer(id common.Hash) (*Transfer, error) {
 	row := s.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txSignature`, `status`, `relayer`, `lastValidBlockHeight` FROM %s WHERE `id`=?", s.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txSignature`, `status`, `relayer`, `lastValidBlockHeight` FROM %s WHERE `id`=?", s.transferTableName),
 		id.Hex(),
 	)
 	solTX, err := s.assembleTransfer(row.Scan)
@@ -242,6 +245,7 @@ func solTXToTransfer(solTX *SOLRawTransaction) *Transfer {
 		txSender:   solTX.txSender,
 		recipient:  solTX.recipient,
 		amount:     solTX.amount,
+		payload:    solTX.payload,
 		fee:        solTX.fee,
 		id:         solTX.id,
 		txHash:     solTX.signature,
@@ -259,9 +263,9 @@ func (s *SolRecorder) assembleTransfer(scan func(dest ...interface{}) error) (*S
 	tx := &SOLRawTransaction{}
 	var rawAmount string
 	var cashier, token, sender, txSender, recipient, id string
-	var relayer, signature, fee sql.NullString
+	var relayer, payload, signature, fee sql.NullString
 	var lastValidBlockHeight sql.NullInt64
-	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &fee, &id, &signature, &tx.status, &relayer, &lastValidBlockHeight); err != nil {
+	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &payload, &fee, &id, &signature, &tx.status, &relayer, &lastValidBlockHeight); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = hexToAddress(cashier, s.sourceAddrDecoder)
@@ -287,6 +291,11 @@ func (s *SolRecorder) assembleTransfer(scan func(dest ...interface{}) error) (*S
 		if !ok || tx.fee.Sign() == -1 {
 			return nil, errors.Errorf("invalid fee %s", fee.String)
 		}
+	}
+	var err error
+	tx.payload, err = util.DecodeNullString(payload)
+	if err != nil {
+		return nil, err
 	}
 	tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
 	if !ok || tx.amount.Sign() != 1 {
@@ -320,7 +329,7 @@ func (s *SolRecorder) SOLTransfers(
 	if byUpdateTime {
 		orderBy = "updateTime"
 	}
-	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txSignature`, `status`, `relayer`, `lastValidBlockHeight` FROM %s", s.transferTableName)
+	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txSignature`, `status`, `relayer`, `lastValidBlockHeight` FROM %s", s.transferTableName)
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
 	conditions := []string{}

@@ -53,7 +53,7 @@ type (
 )
 
 func NewSolProcessor(client *client.Client, interval time.Duration,
-	privateKey *soltypes.Account, voteCfg VoteConfig, solRecorder *SolRecorder,
+	privateKey *soltypes.Account, voteCfg VoteConfig, solRecorder *SolRecorder, qpslimit uint32,
 ) *SolProcessor {
 	s := &SolProcessor{
 		client:      client,
@@ -65,6 +65,9 @@ func NewSolProcessor(client *client.Client, interval time.Duration,
 	s.runner, err = dispatcher.NewRunner(interval, s.process)
 	if err != nil {
 		log.Fatalln(err)
+	}
+	if qpslimit > 0 {
+		rl = ratelimit.New(int(qpslimit))
 	}
 	return s
 }
@@ -333,6 +336,7 @@ func (s *SolProcessor) buildInstructions(transfer *SOLRawTransaction, witnesses 
 		transfer.sender.String(),
 		transfer.recipient.Bytes(),
 		transfer.amount.Uint64(),
+		transfer.payload,
 	)
 	if err != nil {
 		return nil, err

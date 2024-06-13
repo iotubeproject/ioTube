@@ -35,9 +35,8 @@ func NewTokenCashier(
 	startBlockHeight uint64,
 	addrDecoder util.AddressDecoder,
 ) (TokenCashier, error) {
-
 	var (
-		getTransferInfo func([]byte) (common.Address, util.Address, *big.Int, *big.Int, error)
+		getTransferInfo func([]byte) (common.Address, util.Address, *big.Int, *big.Int, []byte, error)
 		logTopic        []byte
 	)
 	switch addrDecoder.(type) {
@@ -47,13 +46,13 @@ func NewTokenCashier(
 			log.Panicf("failed to decode token cashier abi, %+v", err)
 		}
 		getTransferInfo = func(data []byte) (common.Address,
-			util.Address, *big.Int, *big.Int, error) {
+			util.Address, *big.Int, *big.Int, []byte, error) {
 			return getSOLTransferInfo(tokenSOLCashierABI, data, util.NewSOLAddressDecoder())
 		}
 		logTopic = tokenSOLCashierABI.Events["Receipt"].ID.Bytes()
 	case *util.ETHAddressDecoder:
 		getTransferInfo = func(data []byte) (common.Address,
-			util.Address, *big.Int, *big.Int, error) {
+			util.Address, *big.Int, *big.Int, []byte, error) {
 			return getETHTransferInfo(data, util.NewETHAddressDecoder())
 		}
 		logTopic = _ReceiptEventTopic.Bytes()
@@ -117,7 +116,7 @@ func NewTokenCashier(
 					if !bytes.Equal(logTopic, transferLog.Topics[0]) {
 						return nil, errors.Errorf("Wrong event topic %s, %s expected", transferLog.Topics[0], _ReceiptEventTopic)
 					}
-					senderAddr, recipient, amount, fee, err := getTransferInfo(transferLog.Data)
+					senderAddr, recipient, amount, fee, payload, err := getTransferInfo(transferLog.Data)
 					if err != nil {
 						return nil, errors.Wrap(err, "failed to get transfer info")
 					}
@@ -168,6 +167,7 @@ func NewTokenCashier(
 						fee:         fee,
 						blockHeight: transferLog.BlkHeight,
 						txHash:      common.BytesToHash(transferLog.ActHash),
+						payload:     payload,
 					})
 				}
 			}
@@ -186,7 +186,7 @@ func NewTokenCashier(
 }
 
 func getETHTransferInfo(data []byte, addrDecoder util.AddressDecoder) (senderAddrr common.Address,
-	recipient util.Address, amount *big.Int, fee *big.Int, err error) {
+	recipient util.Address, amount *big.Int, fee *big.Int, payload []byte, err error) {
 	if len(data) != 128 {
 		err = errors.Errorf("Invalid data length %d, 128 expected", len(data))
 		return
@@ -198,17 +198,20 @@ func getETHTransferInfo(data []byte, addrDecoder util.AddressDecoder) (senderAdd
 	}
 	amount = new(big.Int).SetBytes(data[64:96])
 	fee = new(big.Int).SetBytes(data[96:128])
+	// TODO: payload is not supported yet until the contract is updated
+	payload = []byte{}
 
 	return
 }
 
 func getSOLTransferInfo(cashierABI abi.ABI, data []byte, addrDecoder util.AddressDecoder) (senderAddrr common.Address,
-	recipient util.Address, amount *big.Int, fee *big.Int, err error) {
+	recipient util.Address, amount *big.Int, fee *big.Int, payload []byte, err error) {
 	var event struct {
 		Sender    common.Address
 		Recipient string
 		Amount    *big.Int
 		Fee       *big.Int
+		Payload   []byte
 	}
 
 	if err = cashierABI.UnpackIntoInterface(&event, "Receipt", data); err != nil {
@@ -222,6 +225,7 @@ func getSOLTransferInfo(cashierABI abi.ABI, data []byte, addrDecoder util.Addres
 	}
 	amount = new(big.Int).Set(event.Amount)
 	fee = new(big.Int).Set(event.Fee)
+	payload = event.Payload
 
 	return
 }

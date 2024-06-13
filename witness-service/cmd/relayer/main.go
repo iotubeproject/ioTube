@@ -70,6 +70,7 @@ type Configuration struct {
 		ProposalAddr            string  `json:"proposalAddr" yaml:"proposalAddr"`
 		ProposalTransactionAddr string  `json:"proposalTransactionAddr" yaml:"proposalTransactionAddr"`
 		Threshold               float64 `json:"threshold" yaml:"threshold"`
+		QPSLimit                uint32  `json:"qpsLimit" yaml:"qpsLimit"`
 	} `json:"solanaConfig" yaml:"solanaConfig"`
 }
 
@@ -169,6 +170,7 @@ func main() {
 		if cfg.ClientURL == "" {
 			break
 		}
+		log.Panicf("The chain %s have been not supported yet for the new contract with payload\n", cfg.Chain)
 		privateKeys := []*ecdsa.PrivateKey{}
 		for _, pk := range strings.Split(cfg.PrivateKey, ",") {
 			privateKey, err := crypto.HexToECDSA(pk)
@@ -278,6 +280,7 @@ func main() {
 				Threshold:               cfg.SolanaConfig.Threshold,
 			},
 			solRecorder,
+			cfg.SolanaConfig.QPSLimit,
 		)
 	default:
 		log.Fatalf("unknown chain name '%s'\n", cfg.Chain)

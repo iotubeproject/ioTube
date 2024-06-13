@@ -71,6 +71,7 @@ func (recorder *SOLRecorder) Start(ctx context.Context) error {
 			"`sender` varchar(64) NOT NULL,"+
 			"`recipient` varchar(256) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
+			"`payload` varchar(24576),"+
 			"`fee` varchar(78),"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
@@ -115,7 +116,7 @@ func (recorder *SOLRecorder) AddTransfer(at AbstractTransfer, status TransferSta
 	if tx.amount.Sign() != 1 {
 		return errors.New("amount should be larger than 0")
 	}
-	query := fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txSignature`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
+	query := fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txSignature`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
 		hex.EncodeToString(tx.cashier.Bytes()),
@@ -124,6 +125,7 @@ func (recorder *SOLRecorder) AddTransfer(at AbstractTransfer, status TransferSta
 		hex.EncodeToString(tx.sender.Bytes()),
 		tx.recipient.String(),
 		tx.amount.String(),
+		util.EncodeToNullString(tx.payload),
 		tx.fee.String(),
 		tx.blockHeight,
 		hex.EncodeToString(tx.txSignature),
@@ -154,7 +156,7 @@ func (recorder *SOLRecorder) UpsertTransfer(at AbstractTransfer) error {
 	if tx.amount.Sign() != 1 {
 		return errors.New("amount should be larger than 0")
 	}
-	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `fee`, `blockHeight`, `txSignature`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
+	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txSignature`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
 		hex.EncodeToString(tx.cashier.Bytes()),
@@ -163,6 +165,7 @@ func (recorder *SOLRecorder) UpsertTransfer(at AbstractTransfer) error {
 		hex.EncodeToString(tx.sender.Bytes()),
 		tx.recipient.String(),
 		tx.amount.String(),
+		util.EncodeToNullString(tx.payload),
 		tx.fee.String(),
 		tx.blockHeight,
 		hex.EncodeToString(tx.txSignature),
@@ -262,7 +265,7 @@ func (recorder *SOLRecorder) TransfersToSubmit() ([]AbstractTransfer, error) {
 func (recorder *SOLRecorder) transfers(status TransferStatus) ([]AbstractTransfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
-			"SELECT cashier, token, tidx, sender, recipient, amount, fee, status, id, blockHeight, txSignature, txSender "+
+			"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, status, id, blockHeight, txSignature, txSender "+
 				"FROM %s "+
 				"WHERE status=? "+
 				"ORDER BY creationTime",
@@ -285,10 +288,11 @@ func (recorder *SOLRecorder) transfers(status TransferStatus) ([]AbstractTransfe
 		var rawAmount string
 		var fee sql.NullString
 		var id sql.NullString
+		var payload sql.NullString
 		var txSignature string
 		var txSender string
 
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &tx.status, &id, &tx.blockHeight, &txSignature, &txSender); err != nil {
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.status, &id, &tx.blockHeight, &txSignature, &txSender); err != nil {
 			return nil, err
 		}
 		tx.cashier = hexToPubkey(cashier)
@@ -313,6 +317,10 @@ func (recorder *SOLRecorder) transfers(status TransferStatus) ([]AbstractTransfe
 			if !ok || tx.fee.Sign() == -1 {
 				return nil, errors.Errorf("invalid fee %s", fee.String)
 			}
+		}
+		tx.payload, err = util.DecodeNullString(payload)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to decode payload %s", payload.String)
 		}
 		tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
 		if !ok || tx.amount.Sign() != 1 {

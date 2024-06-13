@@ -34,6 +34,7 @@ type (
 		txSender   util.Address
 		recipient  util.Address
 		amount     *big.Int
+		payload    []byte
 		fee        *big.Int
 		id         common.Hash
 		txHash     []byte
@@ -94,6 +95,7 @@ type (
 		txSender             util.Address
 		recipient            util.Address
 		amount               *big.Int
+		payload              []byte
 		fee                  *big.Int
 		relayer              common.Address
 		signature            soltypes.Signature
@@ -183,6 +185,7 @@ func UnmarshalTransferProto(transfer *types.Transfer, destAddrDecoder util.Addre
 		sender:    sender,
 		recipient: recipient,
 		amount:    amount,
+		payload:   transfer.Payload,
 		fee:       fee,
 		gas:       transfer.Gas,
 		gasPrice:  gasPrice,
@@ -241,6 +244,7 @@ func (transfer *Transfer) ToTypesTransfer() *types.Transfer {
 		Sender:    transfer.sender.Bytes(),
 		Recipient: transfer.recipient.Bytes(),
 		Amount:    transfer.amount.String(),
+		Payload:   transfer.payload,
 		Fee:       transfer.fee.String(),
 		Gas:       transfer.gas,
 		GasPrice:  gasPrice,

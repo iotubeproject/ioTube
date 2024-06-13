@@ -160,6 +160,11 @@
           "internalType": "uint256",
           "name": "amount",
           "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "payload",
+          "type": "bytes"
         }
       ],
       "name": "generateKey",
@@ -328,54 +333,14 @@
           "internalType": "bytes",
           "name": "signatures",
           "type": "bytes"
-        }
-      ],
-      "name": "submit",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
-          "internalType": "bytes[]",
-          "name": "cashiers",
-          "type": "bytes[]"
-        },
-        {
-          "internalType": "address[]",
-          "name": "tokenAddrs",
-          "type": "address[]"
-        },
-        {
-          "internalType": "uint256[]",
-          "name": "indexes",
-          "type": "uint256[]"
-        },
-        {
-          "internalType": "bytes[]",
-          "name": "senders",
-          "type": "bytes[]"
-        },
-        {
-          "internalType": "address[]",
-          "name": "recipients",
-          "type": "address[]"
-        },
-        {
-          "internalType": "uint256[]",
-          "name": "amounts",
-          "type": "uint256[]"
         },
         {
           "internalType": "bytes",
-          "name": "signatures",
+          "name": "payload",
           "type": "bytes"
         }
       ],
-      "name": "submitMulti",
+      "name": "submit",
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",

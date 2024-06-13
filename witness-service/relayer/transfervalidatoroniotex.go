@@ -324,6 +324,7 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 		transfer.recipient.Address().(common.Address),
 		transfer.amount,
 		signatures,
+		transfer.payload,
 	).SetGasPrice(tv.gasPrice).
 		SetGasLimit(tv.gasLimit).
 		SetNonce(nonce).

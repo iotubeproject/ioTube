@@ -32,6 +32,7 @@ type Transfer struct {
 	gas         uint64
 	gasPrice    *big.Int
 	txSender    common.Address
+	payload     []byte
 }
 
 func (t *Transfer) Cashier() util.Address {
@@ -84,6 +85,7 @@ func (t *Transfer) ToTypesTransfer() *types.Transfer {
 		TxSender:  t.txSender.Bytes(),
 		Gas:       t.gas,
 		GasPrice:  gasPrice,
+		Payload:   t.payload,
 	}
 }
 
@@ -93,6 +95,10 @@ func (t *Transfer) Sender() util.Address {
 
 func (t *Transfer) Recipient() util.Address {
 	return t.recipient
+}
+
+func (t *Transfer) Payload() []byte {
+	return t.payload
 }
 
 func (t *Transfer) Amount() *big.Int {
@@ -118,6 +124,7 @@ type solTransfer struct {
 	blockHeight uint64
 	txSignature soltypes.Signature
 	txPayer     solcommon.PublicKey
+	payload     []byte
 }
 
 func (s *solTransfer) Cashier() util.Address {
@@ -153,6 +160,10 @@ func (s *solTransfer) BlockHeight() uint64 {
 	return s.blockHeight
 }
 
+func (s *solTransfer) Payload() []byte {
+	return s.payload
+}
+
 func (s *solTransfer) Amount() *big.Int {
 	return s.amount
 }
@@ -180,5 +191,6 @@ func (s *solTransfer) ToTypesTransfer() *types.Transfer {
 		Timestamp: timestamppb.Now(),
 		Fee:       s.fee.String(),
 		TxSender:  s.txPayer.Bytes(),
+		Payload:   s.payload,
 	}
 }

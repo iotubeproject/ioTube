@@ -71,6 +71,7 @@ func SerializePayload(
 	sender string,
 	recipient []byte,
 	amount uint64,
+	payload []byte,
 ) ([]byte, error) {
 	return borsh.Serialize(struct {
 		ProgramID solcommon.PublicKey
@@ -80,6 +81,7 @@ func SerializePayload(
 		Sender    string
 		Recipient solcommon.PublicKey
 		Amount    uint64
+		Payload   []byte
 	}{
 		ProgramID: solcommon.PublicKeyFromBytes(programID),
 		Cashier:   ethcommon.BytesToAddress(cashier),
@@ -88,5 +90,6 @@ func SerializePayload(
 		Sender:    sender,
 		Recipient: solcommon.PublicKeyFromBytes(recipient),
 		Amount:    amount,
+		Payload:   payload,
 	})
 }

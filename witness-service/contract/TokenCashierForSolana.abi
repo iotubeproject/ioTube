@@ -84,6 +84,12 @@
           "internalType": "uint256",
           "name": "fee",
           "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "payload",
+          "type": "bytes"
         }
       ],
       "name": "Receipt",
@@ -174,6 +180,11 @@
           "internalType": "uint256",
           "name": "_amount",
           "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "_payload",
+          "type": "bytes"
         }
       ],
       "name": "depositTo",

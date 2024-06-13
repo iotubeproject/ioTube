@@ -117,6 +117,7 @@ func (recorder *Recorder) initStore(
 			"`txSender` varchar(64),"+
 			"`recipient` varchar(42) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
+			"`payload` varchar(24576),"+
 			"`fee` varchar(78),"+
 			"`id` varchar(66) NOT NULL,"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
@@ -188,6 +189,7 @@ func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer,
 		transfer.sender.Bytes(),
 		transfer.recipient.Bytes(),
 		ethmath.U256Bytes(transfer.amount),
+		transfer.payload,
 	)
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
@@ -247,7 +249,7 @@ func (recorder *Recorder) addWitness(
 	transferTableName, witnessTableName string,
 ) error {
 	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
+		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, payload, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
 		transfer.cashier.String(),
 		transfer.token.String(),
 		transfer.index,
@@ -255,6 +257,7 @@ func (recorder *Recorder) addWitness(
 		transfer.txSender.String(),
 		transfer.recipient.String(),
 		transfer.amount.String(),
+		util.EncodeToNullString(transfer.payload),
 		transfer.fee.String(),
 		transfer.id.Hex(),
 	); err != nil {
@@ -330,10 +333,10 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	tx := &Transfer{}
 	var rawAmount string
 	var cashier, token, sender, recipient, id string
-	var relayer, hash, gasPrice, fee, txSender sql.NullString
+	var relayer, hash, payload, gasPrice, fee, txSender sql.NullString
 	var gas, nonce sql.NullInt64
 	var timestamp sql.NullTime
-	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
+	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &payload, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = recorder.stringToAddress(cashier)
@@ -360,6 +363,11 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	}
 	if timestamp.Valid {
 		tx.timestamp = timestamp.Time
+	}
+	var err error
+	tx.payload, err = util.DecodeNullString(payload)
+	if err != nil {
+		return nil, err
 	}
 	tx.fee = big.NewInt(0)
 	var ok bool
@@ -411,7 +419,7 @@ func (recorder *Recorder) Transfer(id common.Hash) (*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `id`=?", recorder.transferTableName),
 		id.Hex(),
 	)
 	return recorder.assembleTransfer(row.Scan)
@@ -519,7 +527,7 @@ func (recorder *Recorder) Transfers(
 	if byUpdateTime {
 		orderBy = "updateTime"
 	}
-	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
+	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
 	conditions := []string{}

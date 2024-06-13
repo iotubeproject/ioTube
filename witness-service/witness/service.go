@@ -174,6 +174,7 @@ func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
 			transfer.Sender().Bytes(),
 			transfer.Recipient().Bytes(),
 			math.U256Bytes(transfer.Amount()),
+			transfer.Payload(),
 		)
 		if privateKey == nil {
 			return id, nil, nil, nil
@@ -194,6 +195,7 @@ func NewEd25519SignHandler(privateKey *ed25519.PrivateKey) SignHandler {
 			transfer.Sender().String(),
 			transfer.Recipient().Bytes(),
 			transfer.Amount().Uint64(),
+			transfer.Payload(),
 		)
 		if err != nil {
 			return common.Hash{}, nil, nil, err

@@ -13,7 +13,15 @@ interface IWrappedCoin {
 }
 
 contract TokenCashier is Pausable {
-    event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee);
+    event Receipt(
+        address indexed token,
+        uint256 indexed id,
+        address sender,
+        string recipient,
+        uint256 amount,
+        uint256 fee,
+        bytes payload
+    );
 
     ITokenList[] public tokenLists;
     address[] public tokenSafes;
@@ -40,8 +48,12 @@ contract TokenCashier is Pausable {
         depositFee = _fee;
     }
 
-    function depositTo(address _token, address _to, uint256 _amount) public whenNotPaused payable {
-        require(_to != address(0), "invalid destination");
+    function depositTo(address _token, string memory _to, uint256 _amount, bytes memory _payload)
+        public
+        payable
+        whenNotPaused
+    {
+        // require(_to != "", "invalid destination");
         bool isCoin = false;
         uint256 fee = msg.value;
         if (_token == address(0)) {
@@ -57,7 +69,10 @@ contract TokenCashier is Pausable {
                 require(_amount >= tokenLists[i].minAmount(_token), "amount too low");
                 require(_amount <= tokenLists[i].maxAmount(_token), "amount too high");
                 if (tokenSafes[i] == address(0)) {
-                    require(!isCoin && safeTransferFrom(_token, msg.sender, address(this), _amount), "fail to transfer token to cashier");
+                    require(
+                        !isCoin && safeTransferFrom(_token, msg.sender, address(this), _amount),
+                        "fail to transfer token to cashier"
+                    );
                     // selector = bytes4(keccak256(bytes('burn(uint256)')))
                     (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0x42966c68, _amount));
                     require(success && (data.length == 0 || abi.decode(data, (bool))), "fail to burn token");
@@ -69,15 +84,11 @@ contract TokenCashier is Pausable {
                     }
                 }
                 counts[_token] += 1;
-                emit Receipt(_token, counts[_token], msg.sender, _to, _amount, fee);
+                emit Receipt(_token, counts[_token], msg.sender, _to, _amount, fee, _payload);
                 return;
             }
         }
         revert("not a whitelisted token");
-    }
-
-    function deposit(address _token, uint256 _amount) public payable {
-        depositTo(_token, msg.sender, _amount);
     }
 
     function withdraw() external onlyOwner {

@@ -60,6 +60,7 @@ type (
 		Index() *big.Int
 		Sender() util.Address
 		Recipient() util.Address
+		Payload() []byte
 		Amount() *big.Int
 		ID() ([]byte, error)
 		SetID(common.Hash)

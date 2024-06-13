@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	_solanaRPCMaxQPS = 29
+	_solanaRPCMaxQPS = 25
 )
 
 var (
@@ -38,8 +38,11 @@ func NewTokenCashierOnSolana(
 	validatorAddr common.Address,
 	recorder *SOLRecorder,
 	startBlockHeight uint64,
+	qpsLimit uint32,
 ) (TokenCashier, error) {
-
+	if qpsLimit > 0 {
+		rl = ratelimit.New(int(qpsLimit))
+	}
 	return newTokenCashierBase(
 		id,
 		recorder,
@@ -138,6 +141,7 @@ func NewTokenCashierOnSolana(
 					blockHeight: tx.Slot,
 					txSignature: tx.Transaction.Signatures[0],
 					txPayer:     transferInfo.txPayer,
+					payload:     transferInfo.payload,
 				})
 			}
 			return tsfs, nil
@@ -162,6 +166,7 @@ type transferInfo struct {
 	recipient util.Address
 	amount    *big.Int
 	fee       *big.Int
+	payload   []byte
 }
 
 const (
@@ -256,6 +261,7 @@ func fillTransferFromEvent(tsf *transferInfo, event string) error {
 		Amount      uint64
 		Fee         uint64
 		Destination uint32
+		Payload     []byte
 	}{}
 	if err := borsh.Deserialize(&bridgeEvent, data); err != nil {
 		return err
@@ -274,5 +280,6 @@ func fillTransferFromEvent(tsf *transferInfo, event string) error {
 	tsf.recipient = recipient
 	tsf.amount = big.NewInt(int64(bridgeEvent.Amount))
 	tsf.fee = big.NewInt(int64(bridgeEvent.Fee))
+	tsf.payload = bridgeEvent.Payload
 	return nil
 }

@@ -1,0 +1,19 @@
+chain: "solana"
+grpcPort: 9120
+grpcProxyPort: 9121
+interval: 20s
+batchSize: 100
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
+  driver: "mysql"
+cashiers:
+  - id: "solana-to-iotex"
+    relayerURL: ":7001"
+    startBlockHeight: 
+    validatorContractAddress: ""
+    cashierContractAddress: ""
+    transferTableName: "solana_transfers"
+    tokenPairs:
+      - token1: ""
+        token2: ""
+destinationChain: "iotex"

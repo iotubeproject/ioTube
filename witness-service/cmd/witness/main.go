@@ -66,6 +66,7 @@ type Configuration struct {
 			CashierContractAddress string   `json:"cashierContractAddress" yaml:"cashierContractAddress"`
 			Tokens                 []string `json:"tokens" yaml:"tokens"`
 		}
+		QPSLimit uint32 `json:"qpsLimit" yaml:"qpsLimit"`
 	} `json:"cashiers" yaml:"cashiers"`
 	DestinationChain string `json:"destinationChain" yaml:"destinationChain"`
 }
@@ -338,6 +339,7 @@ func main() {
 					destAddrDecoder,
 				),
 				uint64(cc.StartBlockHeight),
+				cc.QPSLimit,
 			)
 			if err != nil {
 				log.Fatalf("failed to create cashier %v\n", err)
