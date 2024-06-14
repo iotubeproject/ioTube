@@ -676,13 +676,14 @@ func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
 }
 
 // MarkAsBonusPending marks a record as bonus pending
-func (recorder *Recorder) MarkAsBonusPending(id common.Hash, gas uint64, ts time.Time) error {
+func (recorder *Recorder) MarkAsBonusPending(id common.Hash, txHash common.Hash, gas uint64, ts time.Time) error {
 	log.Printf("mark transfer %s as bonus pending\n", id.Hex())
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("UPDATE `%s` SET `status`=?, `gas`=?, `txTimestamp`=? WHERE `id`=? AND `status`=?", recorder.transferTableName),
+		fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `gas`=?, `txTimestamp`=? WHERE `id`=? AND `status`=?", recorder.transferTableName),
 		BonusPending,
+		txHash.Hex(),
 		gas,
 		ts,
 		id.Hex(),

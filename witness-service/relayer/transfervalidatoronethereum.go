@@ -260,8 +260,23 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 				return StatusOnChainNotConfirmed, nil
 			}
 			tx, _, err := tv.client.TransactionByHash(context.Background(), transfer.txHash)
+			if errors.Cause(err) == ethereum.NotFound {
+				var iter *contract.TransferValidatorSettledIterator
+				iter, err = tv.validatorContract.FilterSettled(
+					&bind.FilterOpts{Start: settleHeight.Uint64()},
+					[][32]byte{transfer.id},
+				)
+				if err != nil {
+					return StatusOnChainNotConfirmed, err
+				}
+				if !iter.Next() {
+					return StatusOnChainNotConfirmed, ethereum.NotFound
+				}
+				transfer.txHash = iter.Event.Raw.TxHash
+				tx, _, err = tv.client.TransactionByHash(context.Background(), transfer.txHash)
+			}
 			if err != nil {
-				return StatusOnChainNotConfirmed, nil
+				return StatusOnChainNotConfirmed, err
 			}
 			transfer.gas = tx.Gas()
 			settleBlockHeader, err := tv.client.HeaderByNumber(context.Background(), settleHeight)
