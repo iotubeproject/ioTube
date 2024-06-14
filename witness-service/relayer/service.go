@@ -438,7 +438,7 @@ func (s *Service) confirmTransfer(transfer *Transfer) (bool, error) {
 			return false, errors.Wrap(err, "failed to reset nonce")
 		}
 	case StatusOnChainSettled:
-		if err := s.recorder.MarkAsBonusPending(transfer.id, transfer.gas, transfer.timestamp); err != nil {
+		if err := s.recorder.MarkAsBonusPending(transfer.id, transfer.txHash, transfer.gas, transfer.timestamp); err != nil {
 			return false, errors.Wrap(err, "failed to update status")
 		}
 	default:
