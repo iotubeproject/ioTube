@@ -24,7 +24,7 @@ import (
 
 var (
 	_ReceiptEventTopic, _TransferEventTopic common.Hash
-	_ReceiptEventTopicV3                    common.Hash
+	_ReceiptEventTopicWithPayload           common.Hash
 	_ZeroHash                               = common.Hash{}
 )
 
@@ -34,11 +34,11 @@ func init() {
 		log.Panicf("failed to decode token cashier abi, %+v", err)
 	}
 	_ReceiptEventTopic = tokenCashierABI.Events["Receipt"].ID
-	tokenCashierV3ABI, err := abi.JSON(strings.NewReader(contract.TokenCashierV3ABI))
+	tokenCashierWithPayloadABI, err := abi.JSON(strings.NewReader(contract.TokenCashierWithPayloadABI))
 	if err != nil {
 		log.Panicf("failed to decode token cashier abi, %+v", err)
 	}
-	_ReceiptEventTopicV3 = tokenCashierV3ABI.Events["Receipt"].ID
+	_ReceiptEventTopicWithPayload = tokenCashierWithPayloadABI.Events["Receipt"].ID
 	erc20ABI, err := abi.JSON(strings.NewReader(contract.CrosschainERC20ABI))
 	if err != nil {
 		log.Panicf("failed to decode erc20 abi, %+v", err)

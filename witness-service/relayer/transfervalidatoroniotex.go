@@ -66,10 +66,10 @@ func newTransferValidatorOnIoTeX(
 	}
 	var validatorABI abi.ABI
 	switch version {
-	case V1:
+	case NoPayload:
 		validatorABI, err = abi.JSON(strings.NewReader(contract.TransferValidatorABI))
-	case V3:
-		validatorABI, err = abi.JSON(strings.NewReader(contract.TransferValidatorV3ABI))
+	case Payload:
+		validatorABI, err = abi.JSON(strings.NewReader(contract.TransferValidatorWithPayloadABI))
 	}
 	if err != nil {
 		return nil, err
@@ -333,7 +333,7 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 
 	var actionHash hash.Hash256
 	switch tv.version {
-	case V1:
+	case NoPayload:
 		actionHash, err = tv.validatorContract.Execute(
 			"submit",
 			transfer.cashier,
@@ -347,7 +347,7 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 			SetGasLimit(tv.gasLimit).
 			SetNonce(nonce).
 			Call(context.Background())
-	case V3:
+	case Payload:
 		actionHash, err = tv.validatorContract.Execute(
 			"submit",
 			transfer.cashier,

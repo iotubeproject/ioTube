@@ -4,9 +4,7 @@ pragma solidity >= 0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface ITokenList {
-    function isAllowed(address) external returns (bool);
-    function maxAmount(address) external returns (uint256);
-    function minAmount(address) external returns (uint256);
+    function isAllowed(address) external view returns (bool);
 }
 
 interface IWrappedCoin {
@@ -15,7 +13,8 @@ interface IWrappedCoin {
 
 contract TokenCashierWithPayload is Ownable {
     event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee, bytes payload);
-
+    event Pause();
+    event Unpause();
     modifier whenNotPaused() {
         require(!paused);
         _;
@@ -40,12 +39,33 @@ contract TokenCashierWithPayload is Ownable {
         revert();
     }
 
+    function pause() public onlyOwner {
+        require(!paused, "already paused");
+        paused = true;
+        emit Pause();
+    }
+
+    function unpause() public onlyOwner {
+        require(paused, "already unpaused");
+        paused = false;
+        emit Unpause();
+    }
+
     function count(address _token) public view returns (uint256) {
         return counts[_token];
     }
 
     function setDepositFee(uint256 _fee) public onlyOwner {
         depositFee = _fee;
+    }
+
+    function getSafeAddress(address _token) public view returns (address) {
+        for (uint256 i = 0; i < tokenLists.length; i++) {
+            if (tokenLists[i].isAllowed(_token)) {
+                return tokenSafes[i];
+            }
+        }
+        return address(0);
     }
 
     function depositTo(address _token, address _to, uint256 _amount, bytes memory _payload) public whenNotPaused payable {
@@ -60,28 +80,21 @@ contract TokenCashierWithPayload is Ownable {
             isCoin = true;
         }
         require(fee >= depositFee, "insufficient fee");
-        for (uint256 i = 0; i < tokenLists.length; i++) {
-            if (tokenLists[i].isAllowed(_token)) {
-                require(_amount >= tokenLists[i].minAmount(_token), "amount too low");
-                require(_amount <= tokenLists[i].maxAmount(_token), "amount too high");
-                if (tokenSafes[i] == address(0)) {
-                    require(!isCoin && safeTransferFrom(_token, msg.sender, address(this), _amount), "fail to transfer token to cashier");
-                    // selector = bytes4(keccak256(bytes('burn(uint256)')))
-                    (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0x42966c68, _amount));
-                    require(success && (data.length == 0 || abi.decode(data, (bool))), "fail to burn token");
-                } else {
-                    if (isCoin) {
-                        require(safeTransfer(_token, tokenSafes[i], _amount), "failed to put into safe");
-                    } else {
-                        require(safeTransferFrom(_token, msg.sender, tokenSafes[i], _amount), "failed to put into safe");
-                    }
-                }
-                counts[_token] += 1;
-                emit Receipt(_token, counts[_token], msg.sender, _to, _amount, fee, _payload);
-                return;
+        address safe = getSafeAddress(_token);
+        if (safe == address(0)) {
+            require(!isCoin && safeTransferFrom(_token, msg.sender, address(this), _amount), "fail to transfer token to cashier");
+            // selector = bytes4(keccak256(bytes('burn(uint256)')))
+            (bool success, bytes memory data) = _token.call(abi.encodeWithSelector(0x42966c68, _amount));
+            require(success && (data.length == 0 || abi.decode(data, (bool))), "fail to burn token");
+        } else {
+            if (isCoin) {
+                require(safeTransfer(_token, safe, _amount), "failed to put into safe");
+            } else {
+                require(safeTransferFrom(_token, msg.sender, safe, _amount), "failed to put into safe");
             }
         }
-        revert("not a whitelisted token");
+        counts[_token] += 1;
+        emit Receipt(_token, counts[_token], msg.sender, _to, _amount, fee, _payload);
     }
 
     function deposit(address _token, uint256 _amount, bytes memory _payload) public payable {

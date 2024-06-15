@@ -75,8 +75,8 @@ const (
 	// TransferSettled stands for a settled transfer
 	TransferSettled = "settled"
 
-	// V1 is version 1.0
-	V1 Version = "v1.0"
-	// V3 is version 3.0
-	V3 Version = "v3.0"
+	// NoPayload is version without payload
+	NoPayload Version = "no-payload"
+	// Payload is version with payload
+	Payload Version = "payload"
 )

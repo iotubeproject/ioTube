@@ -17,7 +17,6 @@
 				"type": "address[]"
 			}
 		],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "constructor"
 	},
@@ -102,12 +101,10 @@
 		"type": "event"
 	},
 	{
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "fallback"
 	},
 	{
-		"constant": true,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -123,12 +120,10 @@
 				"type": "uint256"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -144,12 +139,10 @@
 				"type": "uint256"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -169,12 +162,10 @@
 		],
 		"name": "deposit",
 		"outputs": [],
-		"payable": true,
 		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [],
 		"name": "depositFee",
 		"outputs": [
@@ -184,12 +175,10 @@
 				"type": "uint256"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -214,12 +203,29 @@
 		],
 		"name": "depositTo",
 		"outputs": [],
-		"payable": true,
 		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
-		"constant": true,
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_token",
+				"type": "address"
+			}
+		],
+		"name": "getSafeAddress",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "owner",
 		"outputs": [
@@ -229,21 +235,17 @@
 				"type": "address"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [],
 		"name": "pause",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [],
 		"name": "paused",
 		"outputs": [
@@ -253,12 +255,17 @@
 				"type": "bool"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": false,
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -268,12 +275,10 @@
 		],
 		"name": "setDepositFee",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -289,12 +294,10 @@
 				"type": "address"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -310,12 +313,10 @@
 				"type": "address"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -325,30 +326,24 @@
 		],
 		"name": "transferOwnership",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [],
 		"name": "unpause",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [],
 		"name": "withdraw",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -358,12 +353,10 @@
 		],
 		"name": "withdrawToken",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [],
 		"name": "wrappedCoin",
 		"outputs": [
@@ -373,7 +366,6 @@
 				"type": "address"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	}

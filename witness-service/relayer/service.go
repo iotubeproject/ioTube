@@ -23,6 +23,9 @@ import (
 )
 
 type (
+	// Version
+	Version string
+
 	responseWithTimestamp struct {
 		response *services.ListResponse
 		ts       time.Time
@@ -40,6 +43,12 @@ type (
 	}
 )
 
+// NoPayload is the version without payload
+const NoPayload Version = "no-payload"
+
+// Payload is the version with payload
+const Payload Version = "payload"
+
 // NewServiceOnEthereum creates a new relay service on Ethereum
 func NewServiceOnEthereum(
 	recorder *Recorder,
@@ -52,6 +61,7 @@ func NewServiceOnEthereum(
 	gasPriceHardLimit *big.Int,
 	gasPriceDeviation *big.Int,
 	gasPriceGap *big.Int,
+	version Version,
 	validatorContractAddr common.Address,
 	bonusTokens map[string]*big.Int,
 	bonus *big.Int,
@@ -65,6 +75,7 @@ func NewServiceOnEthereum(
 		gasPriceHardLimit,
 		gasPriceDeviation,
 		gasPriceGap,
+		version,
 		validatorContractAddr,
 		bonusTokens,
 		bonus,
@@ -80,12 +91,14 @@ func NewServiceOnIoTeX(
 	recorder *Recorder,
 	interval time.Duration,
 	client iotex.AuthedClient,
+	version Version,
 	validatorContractAddr address.Address,
 	bonusTokens map[string]*big.Int,
 	bonus *big.Int,
 ) (*Service, error) {
 	validator, err := newTransferValidatorOnIoTeX(
 		client,
+		version,
 		validatorContractAddr,
 		bonusTokens,
 		bonus,

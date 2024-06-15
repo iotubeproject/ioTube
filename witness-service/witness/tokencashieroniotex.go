@@ -107,7 +107,7 @@ func (ii *iotexIterator) extractTransfer(
 func (ii *iotexIterator) Transfers(startHeight uint64, endHeight uint64) ([]*Transfer, error) {
 	transfers := []*Transfer{}
 	switch ii.version {
-	case V1:
+	case NoPayload:
 		response, err := ii.filterLogs(_ReceiptEventTopic[:], startHeight, endHeight)
 		if err != nil {
 			return nil, err
@@ -122,8 +122,8 @@ func (ii *iotexIterator) Transfers(startHeight uint64, endHeight uint64) ([]*Tra
 			}
 			transfers = append(transfers, tsf)
 		}
-	case V3:
-		response, err := ii.filterLogs(_ReceiptEventTopicV3[:], startHeight, endHeight)
+	case Payload:
+		response, err := ii.filterLogs(_ReceiptEventTopicWithPayload[:], startHeight, endHeight)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +131,7 @@ func (ii *iotexIterator) Transfers(startHeight uint64, endHeight uint64) ([]*Tra
 			if len(transferLog.Data) >= 128 {
 				return nil, errors.Errorf("Invalid data length %d < 128", len(transferLog.Data))
 			}
-			tsf, err := ii.extractTransfer(transferLog, _ReceiptEventTopicV3)
+			tsf, err := ii.extractTransfer(transferLog, _ReceiptEventTopicWithPayload)
 			if err != nil {
 				return nil, err
 			}

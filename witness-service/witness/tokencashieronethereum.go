@@ -35,7 +35,7 @@ func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr com
 	}
 	var err error
 	switch version {
-	case V1:
+	case NoPayload, Payload:
 	default:
 		return nil, errors.Errorf("invalid version %s", version)
 	}
@@ -108,7 +108,7 @@ func (iter *iterator) extract(
 func (iter *iterator) Transfers(start, end uint64) ([]*Transfer, error) {
 	transfers := []*Transfer{}
 	switch iter.version {
-	case V1:
+	case NoPayload:
 		filter, err := contract.NewTokenCashierFilterer(iter.cashierContractAddr, iter.client)
 		if err != nil {
 			return nil, err
@@ -140,8 +140,8 @@ func (iter *iterator) Transfers(start, end uint64) ([]*Transfer, error) {
 			}
 			transfers = append(transfers, tsf)
 		}
-	case V3:
-		filter, err := contract.NewTokenCashierV3Filterer(iter.cashierContractAddr, iter.client)
+	case Payload:
+		filter, err := contract.NewTokenCashierWithPayloadFilterer(iter.cashierContractAddr, iter.client)
 		if err != nil {
 			return nil, err
 		}

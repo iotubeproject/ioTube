@@ -75,7 +75,7 @@ var defaultConfig = Configuration{
 	PrivateKey:            "",
 	SlackWebHook:          "",
 	LarkWebHook:           "",
-	Version:               relayer.V1,
+	Version:               relayer.NoPayload,
 	TransferTableName:     "relayer.transfers",
 	WitnessTableName:      "relayer.witnesses",
 }

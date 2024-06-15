@@ -29,12 +29,6 @@ import (
 
 var zeroAddress = common.Address{}
 
-// Version
-type Version string
-
-const V1 Version = "V1"
-const V3 Version = "V3"
-
 // transferValidatorOnEthereum defines the transfer validator
 type transferValidatorOnEthereum struct {
 	mu                 sync.RWMutex
@@ -381,6 +375,7 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		}
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
+	// TODO: submit different format based on the version
 	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
 	switch errors.Cause(err) {
 	case nil:

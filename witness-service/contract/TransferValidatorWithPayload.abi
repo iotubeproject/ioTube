@@ -7,7 +7,6 @@
 				"type": "address"
 			}
 		],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "constructor"
 	},
@@ -88,7 +87,6 @@
 		"type": "event"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "contract IAllowlist",
@@ -103,12 +101,10 @@
 		],
 		"name": "addPair",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -118,12 +114,10 @@
 		],
 		"name": "addReceiver",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -154,6 +148,11 @@
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "payload",
+				"type": "bytes"
 			}
 		],
 		"name": "generateKey",
@@ -164,12 +163,29 @@
 				"type": "bytes32"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": true,
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "tokenAddr",
+				"type": "address"
+			}
+		],
+		"name": "getMinter",
+		"outputs": [
+			{
+				"internalType": "contract IMinter",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -185,12 +201,10 @@
 				"type": "address"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [],
 		"name": "numOfPairs",
 		"outputs": [
@@ -200,12 +214,10 @@
 				"type": "uint256"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [],
 		"name": "owner",
 		"outputs": [
@@ -215,21 +227,17 @@
 				"type": "address"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [],
 		"name": "pause",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [],
 		"name": "paused",
 		"outputs": [
@@ -239,12 +247,10 @@
 				"type": "bool"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -260,12 +266,10 @@
 				"type": "bool"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -275,12 +279,17 @@
 		],
 		"name": "removeReceiver",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": true,
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "bytes32",
@@ -296,12 +305,10 @@
 				"type": "uint256"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -346,12 +353,10 @@
 		],
 		"name": "submit",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -367,12 +372,10 @@
 				"type": "address"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -382,21 +385,17 @@
 		],
 		"name": "transferOwnership",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [],
 		"name": "unpause",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": false,
 		"inputs": [
 			{
 				"internalType": "address",
@@ -406,12 +405,10 @@
 		],
 		"name": "upgrade",
 		"outputs": [],
-		"payable": false,
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"constant": true,
 		"inputs": [],
 		"name": "witnessList",
 		"outputs": [
@@ -421,7 +418,6 @@
 				"type": "address"
 			}
 		],
-		"payable": false,
 		"stateMutability": "view",
 		"type": "function"
 	}
