@@ -4,11 +4,13 @@ import (
 	"context"
 	"log"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/blocto/solana-go-sdk/client"
 	"github.com/blocto/solana-go-sdk/common"
 	"github.com/blocto/solana-go-sdk/program/address_lookup_table"
+	"github.com/blocto/solana-go-sdk/program/compute_budget"
 	"github.com/blocto/solana-go-sdk/rpc"
 	soltypes "github.com/blocto/solana-go-sdk/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -310,21 +312,7 @@ func (s *SolProcessor) buildTransaction(transfer *SOLRawTransaction, witnesses [
 		return soltypes.Transaction{}, 0, err
 	}
 
-	resp, err := s.client.GetLatestBlockhash(context.Background())
-	if err != nil {
-		return soltypes.Transaction{}, 0, err
-	}
-
-	tx, err := soltypes.NewTransaction(soltypes.NewTransactionParam{
-		Message: soltypes.NewMessage(soltypes.NewMessageParam{
-			FeePayer:                   s.privateKey.PublicKey,
-			RecentBlockhash:            resp.Blockhash,
-			Instructions:               instr,
-			AddressLookupTableAccounts: []soltypes.AddressLookupTableAccount{lookupTable},
-		}),
-		Signers: []soltypes.Account{*s.privateKey},
-	})
-	return tx, resp.LatestValidBlockHeight, err
+	return s.buildOptimalTransaction(instr, []soltypes.AddressLookupTableAccount{lookupTable})
 }
 
 func (s *SolProcessor) buildInstructions(transfer *SOLRawTransaction, witnesses []*Witness) ([]soltypes.Instruction, error) {
@@ -404,11 +392,6 @@ func (s *SolProcessor) buildInstructions(transfer *SOLRawTransaction, witnesses 
 }
 
 func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (soltypes.AddressLookupTableAccount, error) {
-	recentBlockhashResponse, err := s.client.GetLatestBlockhash(context.Background())
-	if err != nil {
-		return soltypes.AddressLookupTableAccount{}, err
-	}
-
 	slot, err := s.client.GetSlot(context.Background())
 	if err != nil {
 		return soltypes.AddressLookupTableAccount{}, err
@@ -426,28 +409,22 @@ func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (so
 		addrs = append(addrs, acct.PubKey)
 	}
 
-	tx, err := soltypes.NewTransaction(soltypes.NewTransactionParam{
-		Signers: []soltypes.Account{*s.privateKey},
-		Message: soltypes.NewMessage(soltypes.NewMessageParam{
-			FeePayer:        s.privateKey.PublicKey,
-			RecentBlockhash: recentBlockhashResponse.Blockhash,
-			Instructions: []soltypes.Instruction{
-				address_lookup_table.CreateLookupTable(address_lookup_table.CreateLookupTableParams{
-					LookupTable: lookupTablePubkey,
-					Authority:   s.privateKey.PublicKey,
-					Payer:       s.privateKey.PublicKey,
-					RecentSlot:  slot,
-					BumpSeed:    bumpSeed,
-				}),
-				address_lookup_table.ExtendLookupTable(address_lookup_table.ExtendLookupTableParams{
-					LookupTable: lookupTablePubkey,
-					Authority:   s.privateKey.PublicKey,
-					Payer:       &s.privateKey.PublicKey,
-					Addresses:   addrs,
-				}),
-			},
+	instrs := []soltypes.Instruction{
+		address_lookup_table.CreateLookupTable(address_lookup_table.CreateLookupTableParams{
+			LookupTable: lookupTablePubkey,
+			Authority:   s.privateKey.PublicKey,
+			Payer:       s.privateKey.PublicKey,
+			RecentSlot:  slot,
+			BumpSeed:    bumpSeed,
 		}),
-	})
+		address_lookup_table.ExtendLookupTable(address_lookup_table.ExtendLookupTableParams{
+			LookupTable: lookupTablePubkey,
+			Authority:   s.privateKey.PublicKey,
+			Payer:       &s.privateKey.PublicKey,
+			Addresses:   addrs,
+		}),
+	}
+	tx, _, err := s.buildOptimalTransaction(instrs, nil)
 	if err != nil {
 		return soltypes.AddressLookupTableAccount{}, err
 	}
@@ -468,7 +445,7 @@ func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (so
 }
 
 func (s *SolProcessor) confirmLookupTable(sig string) error {
-	timeout := time.After(30 * time.Second)
+	timeout := time.After(60 * time.Second)
 	for {
 		select {
 		case <-timeout:
@@ -517,25 +494,11 @@ func (s *SolProcessor) executeTransfer(transfer *SOLRawTransaction) error {
 }
 
 func (s *SolProcessor) buildTransactionForExecution(transfer *SOLRawTransaction) (soltypes.Transaction, uint64, error) {
-	resp, err := s.client.GetLatestBlockhash(context.Background())
-	if err != nil {
-		return soltypes.Transaction{}, 0, err
-	}
-
 	instr, err := s.buildExecutionInstruction(transfer)
 	if err != nil {
 		return soltypes.Transaction{}, 0, err
 	}
-
-	tx, err := soltypes.NewTransaction(soltypes.NewTransactionParam{
-		Message: soltypes.NewMessage(soltypes.NewMessageParam{
-			FeePayer:        s.privateKey.PublicKey,
-			RecentBlockhash: resp.Blockhash,
-			Instructions:    instr,
-		}),
-		Signers: []soltypes.Account{*s.privateKey},
-	})
-	return tx, resp.LatestValidBlockHeight, err
+	return s.buildOptimalTransaction(instr, nil)
 }
 
 func (s *SolProcessor) buildExecutionInstruction(transfer *SOLRawTransaction) ([]soltypes.Instruction, error) {
@@ -574,4 +537,115 @@ func (s *SolProcessor) buildExecutionInstruction(transfer *SOLRawTransaction) ([
 	return []soltypes.Instruction{
 		executeTransactionInstr,
 	}, nil
+}
+
+func (s *SolProcessor) buildOptimalTransaction(
+	instructions []soltypes.Instruction,
+	lookupTable []soltypes.AddressLookupTableAccount) (soltypes.Transaction, uint64, error) {
+	computeBudget, err := s.computeBudget(instructions, lookupTable)
+	if err != nil {
+		return soltypes.Transaction{}, 0, errors.Wrap(err, "failed to compute budget")
+	}
+	redundantBudget := uint32(1.1 * float32(computeBudget))
+	log.Printf("compute budget: %d, redundant budget: %d\n", computeBudget, redundantBudget)
+
+	priorityFee, err := s.getPriorityFee(instructions)
+	if err != nil {
+		return soltypes.Transaction{}, 0, errors.Wrap(err, "failed to get priority fee")
+	}
+	log.Printf("priority fee: %d\n", priorityFee)
+
+	recentBlockhashResponse, err := s.client.GetLatestBlockhash(context.Background())
+	if err != nil {
+		return soltypes.Transaction{}, 0, err
+	}
+
+	tx, err := soltypes.NewTransaction(soltypes.NewTransactionParam{
+		Signers: []soltypes.Account{*s.privateKey},
+		Message: soltypes.NewMessage(soltypes.NewMessageParam{
+			FeePayer:        s.privateKey.PublicKey,
+			RecentBlockhash: recentBlockhashResponse.Blockhash,
+			Instructions: append([]soltypes.Instruction{
+				compute_budget.SetComputeUnitPrice(compute_budget.SetComputeUnitPriceParam{
+					MicroLamports: priorityFee,
+				}),
+				compute_budget.SetComputeUnitLimit(compute_budget.SetComputeUnitLimitParam{
+					Units: redundantBudget,
+				})},
+				instructions...,
+			),
+			AddressLookupTableAccounts: lookupTable,
+		}),
+	})
+	if err != nil {
+		return soltypes.Transaction{}, 0, err
+	}
+	return tx, recentBlockhashResponse.LatestValidBlockHeight, nil
+}
+
+func (s *SolProcessor) computeBudget(instructions []soltypes.Instruction,
+	lookupTable []soltypes.AddressLookupTableAccount) (uint64, error) {
+	simulatedTX, err := soltypes.NewTransaction(soltypes.NewTransactionParam{
+		Message: soltypes.NewMessage(soltypes.NewMessageParam{
+			FeePayer:                   s.privateKey.PublicKey,
+			Instructions:               instructions,
+			AddressLookupTableAccounts: lookupTable,
+		}),
+		Signers: []soltypes.Account{*s.privateKey},
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	rl.Take()
+	simulationResp, err := s.client.SimulateTransactionWithConfig(
+		context.Background(),
+		simulatedTX,
+		client.SimulateTransactionConfig{
+			ReplaceRecentBlockhash: true,
+		})
+	if err != nil {
+		return 0, err
+	}
+	if simulationResp.Err != nil {
+		log.Printf("failed to simulate transaction, %+v\n", simulationResp.Err)
+		return 0, errors.New("failed to simulate transaction")
+	}
+	if simulationResp.UnitConsumed == nil {
+		return 0, errors.New("failed to get unit consumed")
+	}
+	return *simulationResp.UnitConsumed, nil
+}
+
+func (s *SolProcessor) getPriorityFee(instructions []soltypes.Instruction) (uint64, error) {
+	addresses := make([]common.PublicKey, 0)
+	for _, instr := range instructions {
+		for _, acct := range instr.Accounts {
+			addresses = append(addresses, acct.PubKey)
+		}
+	}
+
+	rl.Take()
+	fees, err := s.client.GetRecentPrioritizationFees(context.Background(), addresses)
+	if err != nil {
+		return 0, err
+	}
+
+	sort.Slice(fees, func(i, j int) bool {
+		return fees[i].PrioritizationFee < fees[j].PrioritizationFee
+	})
+
+	var (
+		n   = len(fees)
+		fee uint64
+	)
+	if n%2 == 0 {
+		fee = uint64((fees[n/2-1].PrioritizationFee + fees[n/2].PrioritizationFee) / 2)
+	} else {
+		fee = fees[n/2].PrioritizationFee
+	}
+	if fee < 1 {
+		return 1, nil
+	}
+	return fee, nil
 }
