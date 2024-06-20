@@ -587,8 +587,16 @@ func (s *SolProcessor) computeBudget(instructions []soltypes.Instruction,
 	lookupTable []soltypes.AddressLookupTableAccount) (uint64, error) {
 	simulatedTX, err := soltypes.NewTransaction(soltypes.NewTransactionParam{
 		Message: soltypes.NewMessage(soltypes.NewMessageParam{
-			FeePayer:                   s.privateKey.PublicKey,
-			Instructions:               instructions,
+			FeePayer: s.privateKey.PublicKey,
+			Instructions: append([]soltypes.Instruction{
+				compute_budget.SetComputeUnitPrice(compute_budget.SetComputeUnitPriceParam{
+					MicroLamports: 1,
+				}),
+				compute_budget.SetComputeUnitLimit(compute_budget.SetComputeUnitLimitParam{
+					Units: 1_400_000,
+				})},
+				instructions...,
+			),
 			AddressLookupTableAccounts: lookupTable,
 		}),
 		Signers: []soltypes.Account{*s.privateKey},
