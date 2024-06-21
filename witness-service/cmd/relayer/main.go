@@ -45,7 +45,8 @@ type Configuration struct {
 	PrivateKey            string          `json:"privateKey" yaml:"privateKey"`
 	Interval              time.Duration   `json:"interval" yaml:"interval"`
 	Version               relayer.Version `json:"version" yaml:"version"`
-	ValidatorAddress      string          `json:"vialidatorAddress" yaml:"validatorAddress"`
+	ValidatorAddress      string          `json:"validatorAddress" yaml:"validatorAddress"`
+	ValidatorWithPayload  string          `json:"validatorWithPayload" yaml:"validatorWithPayload"`
 
 	BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
 	Bonus       *big.Int            `json:"bonus" yaml:"bonus"`

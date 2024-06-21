@@ -29,29 +29,118 @@ import (
 
 var zeroAddress = common.Address{}
 
-// transferValidatorOnEthereum defines the transfer validator
-type transferValidatorOnEthereum struct {
-	mu                 sync.RWMutex
-	confirmBlockNumber uint16
-	defaultGasPrice    *big.Int
-	gasPriceLimit      *big.Int
-	gasPriceHardLimit  *big.Int
-	gasPriceDeviation  *big.Int
-	gasPriceGap        *big.Int
+type (
+	// transferValidatorOnEthereum defines the transfer validator
+	transferValidatorOnEthereum struct {
+		mu                 sync.RWMutex
+		confirmBlockNumber uint16
+		defaultGasPrice    *big.Int
+		gasPriceLimit      *big.Int
+		gasPriceHardLimit  *big.Int
+		gasPriceDeviation  *big.Int
+		gasPriceGap        *big.Int
 
-	chainID               *big.Int
-	privateKeys           []*ecdsa.PrivateKey
-	version               Version
-	validatorContractAddr common.Address
+		chainID                          *big.Int
+		privateKeys                      []*ecdsa.PrivateKey
+		validatorContractAddr            common.Address
+		validatorWithPayloadContractAddr common.Address
 
-	client              *ethclient.Client
-	validatorContract   *contract.TransferValidator
-	witnessListContract *contract.AddressListCaller
-	witnesses           map[string]bool
+		client              *ethclient.Client
+		validator           validatorContract
+		witnessListContract *contract.AddressListCaller
+		witnesses           map[string]bool
 
-	bonus         *big.Int
-	bonusTokens   map[common.Address]*big.Int
-	bonusRecorder map[common.Address]time.Time
+		bonus         *big.Int
+		bonusTokens   map[common.Address]*big.Int
+		bonusRecorder map[common.Address]time.Time
+	}
+
+	validatorContract interface {
+		WitnessListAddr(*bind.CallOpts) (common.Address, error)
+		SettledHeight(common.Hash) (*big.Int, error)
+		SettledTransaction(uint64, common.Hash) (common.Hash, error)
+		SubmitTransfer(*bind.TransactOpts, *Transfer, []byte) (*types.Transaction, error)
+	}
+
+	validatorWithPayload    contract.TransferValidatorWithPayload
+	validatorWithoutPayload contract.TransferValidator
+)
+
+func newValidatorContract(
+	version Version,
+	addr common.Address,
+	client *ethclient.Client,
+) (validatorContract, error) {
+	switch version {
+	case Payload:
+		validator, err := contract.NewTransferValidatorWithPayload(addr, client)
+		if err != nil {
+			return nil, err
+		}
+		return (*validatorWithPayload)(validator), nil
+	case NoPayload:
+		validator, err := contract.NewTransferValidator(addr, client)
+		if err != nil {
+			return nil, err
+		}
+		return (*validatorWithoutPayload)(validator), nil
+	default:
+		return nil, errors.New("")
+	}
+}
+
+func (v *validatorWithoutPayload) WitnessListAddr(callOpts *bind.CallOpts) (common.Address, error) {
+	return v.WitnessList(callOpts)
+}
+
+func (v *validatorWithPayload) WitnessListAddr(callOpts *bind.CallOpts) (common.Address, error) {
+	return v.WitnessList(callOpts)
+}
+
+func (v *validatorWithPayload) SettledHeight(id common.Hash) (*big.Int, error) {
+	return v.Settles(&bind.CallOpts{}, id)
+}
+
+func (v *validatorWithoutPayload) SettledHeight(id common.Hash) (*big.Int, error) {
+	return v.Settles(&bind.CallOpts{}, id)
+}
+
+func (v *validatorWithPayload) SettledTransaction(height uint64, id common.Hash) (common.Hash, error) {
+	end := height + 1
+	iter, err := v.FilterSettled(
+		&bind.FilterOpts{Start: height, End: &end},
+		[][32]byte{id},
+	)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if !iter.Next() {
+		return common.Hash{}, ethereum.NotFound
+
+	}
+	return iter.Event.Raw.TxHash, nil
+}
+
+func (v *validatorWithoutPayload) SettledTransaction(height uint64, id common.Hash) (common.Hash, error) {
+	iter, err := v.FilterSettled(
+		&bind.FilterOpts{Start: height},
+		[][32]byte{id},
+	)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if !iter.Next() {
+		return common.Hash{}, ethereum.NotFound
+	}
+	return iter.Event.Raw.TxHash, nil
+}
+
+func (v *validatorWithPayload) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signatures []byte) (*types.Transaction, error) {
+	return v.Submit(opts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, transfer.payload, signatures)
+}
+
+func (v *validatorWithoutPayload) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signatures []byte) (*types.Transaction, error) {
+	return v.Submit(opts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
 }
 
 // newTransferValidatorOnEthereum creates a new TransferValidator
@@ -69,7 +158,7 @@ func newTransferValidatorOnEthereum(
 	bonusTokens map[string]*big.Int,
 	bonus *big.Int,
 ) (*transferValidatorOnEthereum, error) {
-	validatorContract, err := contract.NewTransferValidator(validatorContractAddr, client)
+	validator, err := newValidatorContract(version, validatorContractAddr, client)
 	if err != nil {
 		return nil, err
 	}
@@ -91,11 +180,10 @@ func newTransferValidatorOnEthereum(
 
 		chainID:               chainID,
 		privateKeys:           privateKeys,
-		version:               version,
 		validatorContractAddr: validatorContractAddr,
 
-		client:            client,
-		validatorContract: validatorContract,
+		client:    client,
+		validator: validator,
 
 		bonusRecorder: map[common.Address]time.Time{},
 		bonusTokens:   map[common.Address]*big.Int{},
@@ -115,7 +203,7 @@ func newTransferValidatorOnEthereum(
 	if err != nil {
 		return nil, err
 	}
-	witnessContractAddr, err := tv.validatorContract.WitnessList(callOpts)
+	witnessContractAddr, err := tv.validator.WitnessListAddr(callOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -256,33 +344,30 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 	if err != nil {
 		return StatusOnChainUnknown, err
 	}
-	settleHeight, err := tv.validatorContract.Settles(&bind.CallOpts{}, transfer.id)
+	SettledHeight, err := tv.validator.SettledHeight(transfer.id)
 	if err == nil {
-		if settleHeight.Cmp(big.NewInt(0)) > 0 {
-			if new(big.Int).Add(settleHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
+		if SettledHeight.Cmp(big.NewInt(0)) > 0 {
+			if new(big.Int).Add(SettledHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
 				return StatusOnChainNotConfirmed, nil
 			}
 			tx, _, err := tv.client.TransactionByHash(context.Background(), transfer.txHash)
 			if errors.Cause(err) == ethereum.NotFound {
-				var iter *contract.TransferValidatorSettledIterator
-				iter, err = tv.validatorContract.FilterSettled(
-					&bind.FilterOpts{Start: settleHeight.Uint64()},
-					[][32]byte{transfer.id},
+				var txHash common.Hash
+				txHash, err = tv.validator.SettledTransaction(
+					SettledHeight.Uint64(),
+					transfer.id,
 				)
 				if err != nil {
 					return StatusOnChainNotConfirmed, err
 				}
-				if !iter.Next() {
-					return StatusOnChainNotConfirmed, ethereum.NotFound
-				}
-				transfer.txHash = iter.Event.Raw.TxHash
+				transfer.txHash = txHash
 				tx, _, err = tv.client.TransactionByHash(context.Background(), transfer.txHash)
 			}
 			if err != nil {
 				return StatusOnChainNotConfirmed, err
 			}
 			transfer.gas = tx.Gas()
-			settleBlockHeader, err := tv.client.HeaderByNumber(context.Background(), settleHeight)
+			settleBlockHeader, err := tv.client.HeaderByNumber(context.Background(), SettledHeight)
 			if err != nil {
 				return StatusOnChainUnknown, err
 			}
@@ -375,8 +460,7 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		}
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
-	// TODO: submit different format based on the version
-	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
+	transaction, err := tv.validator.SubmitTransfer(tOpts, transfer, signatures)
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil

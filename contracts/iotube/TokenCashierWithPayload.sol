@@ -15,6 +15,7 @@ contract TokenCashierWithPayload is Ownable {
     event Receipt(address indexed token, uint256 indexed id, address sender, address recipient, uint256 amount, uint256 fee, bytes payload);
     event Pause();
     event Unpause();
+    event TokenListAdded(ITokenList tokenList, address tokenSafe);
     modifier whenNotPaused() {
         require(!paused);
         _;
@@ -28,11 +29,8 @@ contract TokenCashierWithPayload is Ownable {
     uint256 public depositFee;
     IWrappedCoin public wrappedCoin;
 
-    constructor(IWrappedCoin _wrappedCoin, ITokenList[] memory _tokenLists, address[] memory _tokenSafes) {
-        require(_tokenLists.length == _tokenSafes.length, "# of token lists is not equal to # of safes");
+    constructor(IWrappedCoin _wrappedCoin) {
         wrappedCoin = _wrappedCoin;
-        tokenLists = _tokenLists;
-        tokenSafes = _tokenSafes;
     }
 
     fallback() external {
@@ -49,6 +47,12 @@ contract TokenCashierWithPayload is Ownable {
         require(paused, "already unpaused");
         paused = false;
         emit Unpause();
+    }
+
+    function addTokenList(ITokenList _tokenList, address _tokenSafe) public onlyOwner {
+        tokenLists.push(_tokenList);
+        tokenSafes.push(_tokenSafe);
+        emit TokenListAdded(_tokenList, _tokenSafe);
     }
 
     function count(address _token) public view returns (uint256) {
