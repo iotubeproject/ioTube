@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/iotex-address/address"
@@ -34,19 +35,18 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	Chain                 string          `json:"chain" yaml:"chain"`
-	ClientURL             string          `json:"clientURL" yaml:"clientURL"`
-	EthConfirmBlockNumber uint16          `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
-	EthDefaultGasPrice    uint64          `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
-	EthGasPriceLimit      uint64          `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
-	EthGasPriceHardLimit  uint64          `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
-	EthGasPriceDeviation  int64           `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
-	EthGasPriceGap        uint64          `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
-	PrivateKey            string          `json:"privateKey" yaml:"privateKey"`
-	Interval              time.Duration   `json:"interval" yaml:"interval"`
-	Version               relayer.Version `json:"version" yaml:"version"`
-	ValidatorAddress      string          `json:"validatorAddress" yaml:"validatorAddress"`
-	ValidatorWithPayload  string          `json:"validatorWithPayload" yaml:"validatorWithPayload"`
+	Chain                 string        `json:"chain" yaml:"chain"`
+	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
+	EthConfirmBlockNumber uint16        `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+	EthDefaultGasPrice    uint64        `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
+	EthGasPriceLimit      uint64        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+	EthGasPriceHardLimit  uint64        `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
+	EthGasPriceDeviation  int64         `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
+	EthGasPriceGap        uint64        `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
+	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
+	Interval              time.Duration `json:"interval" yaml:"interval"`
+	ValidatorAddress      string        `json:"validatorAddress" yaml:"validatorAddress"`
+	ValidatorWithPayload  string        `json:"validatorWithPayload" yaml:"validatorWithPayload"`
 
 	BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
 	Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
@@ -76,7 +76,6 @@ var defaultConfig = Configuration{
 	PrivateKey:            "",
 	SlackWebHook:          "",
 	LarkWebHook:           "",
-	Version:               relayer.NoPayload,
 	TransferTableName:     "relayer.transfers",
 	WitnessTableName:      "relayer.witnesses",
 }
@@ -139,6 +138,7 @@ func main() {
 	}
 	util.SetPrefix("relayer-" + cfg.Chain)
 
+	storeFactory := db.NewSQLStoreFactory()
 	log.Println("Creating service")
 	var service *relayer.Service
 	if chain, ok := os.LookupEnv("RELAYER_CHAIN"); ok {
@@ -164,14 +164,24 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to create eth client %v\n", err)
 		}
-		validatorAddr, err := util.ParseAddress(cfg.ValidatorAddress)
-		if err != nil {
-			log.Fatalf("failed to parse validator address %s: %+v", cfg.ValidatorAddress, err)
+		var validatorAddr *common.Address
+		if cfg.ValidatorAddress != "" {
+			*validatorAddr, err = util.ParseAddress(cfg.ValidatorAddress)
+			if err != nil {
+				log.Fatalf("failed to parse validator address %s: %+v", cfg.ValidatorAddress, err)
+			}
+		}
+		var validatorWithPayload *common.Address
+		if cfg.ValidatorWithPayload != "" {
+			*validatorWithPayload, err = util.ParseAddress(cfg.ValidatorWithPayload)
+			if err != nil {
+				log.Fatalf("failed to parse validator with payload address %s: %+v", cfg.ValidatorWithPayload, err)
+			}
 		}
 		service, err = relayer.NewServiceOnEthereum(
 			relayer.NewRecorder(
-				db.NewStore(cfg.Database),
-				db.NewStore(cfg.ExplorerDatabase),
+				storeFactory.NewStore(cfg.Database),
+				storeFactory.NewStore(cfg.ExplorerDatabase),
 				cfg.TransferTableName,
 				cfg.WitnessTableName,
 				cfg.ExplorerTableName,
@@ -185,8 +195,8 @@ func main() {
 			new(big.Int).SetUint64(cfg.EthGasPriceHardLimit),
 			new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
 			new(big.Int).SetUint64(cfg.EthGasPriceGap),
-			cfg.Version,
 			validatorAddr,
+			validatorWithPayload,
 			cfg.BonusTokens,
 			cfg.Bonus,
 		)
@@ -208,23 +218,33 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		validatorContractAddr, err := address.FromString(cfg.ValidatorAddress)
-		if err != nil {
-			log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
+		var validatorContractAddr *address.Address
+		if cfg.ValidatorAddress == "" {
+			*validatorContractAddr, err = address.FromString(cfg.ValidatorAddress)
+			if err != nil {
+				log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
+			}
+		}
+		var validatorWithPayload *address.Address
+		if cfg.ValidatorWithPayload == "" {
+			*validatorWithPayload, err = address.FromString(cfg.ValidatorWithPayload)
+			if err != nil {
+				log.Fatalf("failed to parse validator with payload address %s\n", cfg.ValidatorWithPayload)
+			}
 		}
 
 		service, err = relayer.NewServiceOnIoTeX(
 			relayer.NewRecorder(
-				db.NewStore(cfg.Database),
-				db.NewStore(cfg.ExplorerDatabase),
+				storeFactory.NewStore(cfg.Database),
+				storeFactory.NewStore(cfg.ExplorerDatabase),
 				cfg.TransferTableName,
 				cfg.WitnessTableName,
 				cfg.ExplorerTableName,
 			),
 			cfg.Interval,
 			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
-			cfg.Version,
 			validatorContractAddr,
+			validatorWithPayload,
 			cfg.BonusTokens,
 			cfg.Bonus,
 		)

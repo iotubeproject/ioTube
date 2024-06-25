@@ -20,7 +20,6 @@ import (
 
 	// mute lint error
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
@@ -182,19 +181,6 @@ func (recorder *Recorder) AddWitness(transfer *Transfer, witness *Witness) error
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	recorder.validateID(uint64(transfer.index))
-	if len(witness.signature) != 0 {
-		rpk, err := crypto.Ecrecover(transfer.id.Bytes(), witness.signature)
-		if err != nil {
-			return err
-		}
-		pk, err := crypto.UnmarshalPubkey(rpk)
-		if err != nil {
-			return errors.Wrap(err, "failed to unmarshal public key")
-		}
-		if crypto.PubkeyToAddress(*pk) != witness.addr {
-			return errors.New("invalid signature")
-		}
-	}
 	recorder.metric("new", transfer.amount)
 	tx, err := recorder.store.DB().Begin()
 	if err != nil {

@@ -240,7 +240,7 @@ func main() {
 
 	service, err := NewService(
 		relayer.NewRecorder(
-			db.NewStore(cfg.Database),
+			db.NewSQLStoreFactory().NewStore(cfg.Database),
 			nil,
 			cfg.TransferTableName,
 			"",

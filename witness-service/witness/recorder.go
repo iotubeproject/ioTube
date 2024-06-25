@@ -325,7 +325,7 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		}
 		tx.payload, err = util.DecodeNullString(payload)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to decode payload %s", payload)
+			return nil, errors.Wrapf(err, "failed to decode payload %s", payload.String)
 		}
 		tx.amount, ok = new(big.Int).SetString(rawAmount, 10)
 		if !ok || tx.amount.Sign() != 1 {

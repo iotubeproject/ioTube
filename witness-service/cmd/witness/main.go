@@ -186,6 +186,7 @@ func main() {
 		}
 	}
 
+	storeFactory := db.NewSQLStoreFactory()
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
 	switch cfg.Chain {
 	case "iotex":
@@ -208,7 +209,7 @@ func main() {
 				cashierContractAddr,
 				common.HexToAddress(cc.ValidatorContractAddress),
 				witness.NewRecorder(
-					db.NewStore(cfg.Database),
+					storeFactory.NewStore(cfg.Database),
 					cc.TransferTableName,
 					parseTokenPairs(cc.TokenPairs),
 				),
@@ -239,7 +240,7 @@ func main() {
 					pairs[common.HexToAddress(token)] = common.HexToAddress(token)
 				}
 				reverseRecorder = witness.NewRecorder(
-					db.NewStore(cfg.Database),
+					storeFactory.NewStore(cfg.Database),
 					cc.Reverse.TransferTableName,
 					pairs,
 				)
@@ -261,7 +262,7 @@ func main() {
 				tokenSafeAddr,
 				validatorAddr,
 				witness.NewRecorder(
-					db.NewStore(cfg.Database),
+					storeFactory.NewStore(cfg.Database),
 					cc.TransferTableName,
 					parseTokenPairs(cc.TokenPairs),
 				),
