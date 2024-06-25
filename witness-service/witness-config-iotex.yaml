@@ -78,6 +78,9 @@ cashiers:
       # NOIA
       - token1: "io1ns80pjvwra4qv70yymm5xly56j5a8gkednnl8f"
         token2: "0xedf708dcf579d4c6ea7889ae255ba66ad2cf9757"
+      # INJ
+      - token1: "io1xk48emnzhra9kplcv0aqmgddtpzfjs0gpj6n5z"
+        token2: "0x370f98048a45d04b57c6008b636ace4f6e8e1343"
   - id: "iotex-to-heco"
     relayerURL: ":7002"
     cashierContractAddress: "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
