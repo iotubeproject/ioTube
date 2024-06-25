@@ -223,6 +223,7 @@ func (s *SolProcessor) getTotalWitnessesWeight() (uint64, error) {
 		common.PublicKeyFromString(s.voteCfg.RealmAddr),
 		common.PublicKeyFromString(s.voteCfg.GoverningTokenMintAddr),
 	)
+	rl.Take()
 	resp, err := s.client.GetTokenAccountBalanceAndContextWithConfig(
 		context.Background(),
 		governingTokenHoldingAccount.String(),
@@ -283,6 +284,7 @@ func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction, totalWeight u
 	}
 	log.Printf("transaction %s is built, length: %d\n", base58.Encode(transfer.id[:]), len(raw))
 
+	rl.Take()
 	sig, err := s.client.SendTransaction(context.Background(), tx)
 	if err != nil {
 		log.Printf("failed to submit transaction %s, %v\n", transfer.id, err)
@@ -392,6 +394,7 @@ func (s *SolProcessor) buildInstructions(transfer *SOLRawTransaction, witnesses 
 }
 
 func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (soltypes.AddressLookupTableAccount, error) {
+	rl.Take()
 	slot, err := s.client.GetSlot(context.Background())
 	if err != nil {
 		return soltypes.AddressLookupTableAccount{}, err
@@ -429,6 +432,7 @@ func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (so
 		return soltypes.AddressLookupTableAccount{}, err
 	}
 
+	rl.Take()
 	sig, err := s.client.SendTransaction(context.Background(), tx)
 	if err != nil {
 		return soltypes.AddressLookupTableAccount{}, err
@@ -475,6 +479,7 @@ func (s *SolProcessor) executeTransfer(transfer *SOLRawTransaction) error {
 		return s.solRecorder.ResetExecutionInProcess(transfer.id)
 	}
 
+	rl.Take()
 	sig, err := s.client.SendTransaction(context.Background(), tx)
 	if err != nil {
 		log.Printf("failed to submit transaction %s, %v\n", transfer.id, err)
@@ -555,6 +560,7 @@ func (s *SolProcessor) buildOptimalTransaction(
 	}
 	log.Printf("priority fee: %d\n", priorityFee)
 
+	rl.Take()
 	recentBlockhashResponse, err := s.client.GetLatestBlockhash(context.Background())
 	if err != nil {
 		return soltypes.Transaction{}, 0, err
@@ -585,6 +591,11 @@ func (s *SolProcessor) buildOptimalTransaction(
 
 func (s *SolProcessor) computeBudget(instructions []soltypes.Instruction,
 	lookupTable []soltypes.AddressLookupTableAccount) (uint64, error) {
+	rl.Take()
+	recentBlockhashResponse, err := s.client.GetLatestBlockhash(context.Background())
+	if err != nil {
+		return 0, err
+	}
 	simulatedTX, err := soltypes.NewTransaction(soltypes.NewTransactionParam{
 		Message: soltypes.NewMessage(soltypes.NewMessageParam{
 			FeePayer: s.privateKey.PublicKey,
@@ -597,6 +608,7 @@ func (s *SolProcessor) computeBudget(instructions []soltypes.Instruction,
 				})},
 				instructions...,
 			),
+			RecentBlockhash:            recentBlockhashResponse.Blockhash,
 			AddressLookupTableAccounts: lookupTable,
 		}),
 		Signers: []soltypes.Account{*s.privateKey},

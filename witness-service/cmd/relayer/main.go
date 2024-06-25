@@ -226,7 +226,7 @@ func main() {
 			log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
 		}
 		if transferValidator, err = relayer.NewTransferValidatorOnIoTeX(
-			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 2, acc),
+			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
 			validatorContractAddr,
 			cfg.BonusTokens,
 			cfg.Bonus,
