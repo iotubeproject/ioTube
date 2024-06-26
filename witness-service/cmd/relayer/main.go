@@ -245,7 +245,7 @@ func main() {
 		abstractRecorder = recorder
 	case "solana":
 		transferValidator = nil
-		transferValidatorAddr, err = util.NewSOLAddressDecoder().DecodeString(cfg.ValidatorAddress)
+		transferValidatorAddr, err = util.NewSOLAddressDecoder().DecodeString(cfg.SolanaConfig.ProposalAddr)
 		if err != nil {
 			log.Fatalf("failed to decode validator address %v", err)
 		}

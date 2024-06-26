@@ -223,6 +223,7 @@ func main() {
 				}
 				pairs[common.BytesToAddress(ioAddr.Bytes())] = addr
 			}
+			// ValidatorContractAddress should be proposal address when destination chain is solana
 			validatorContractAddr, err := destAddrDecoder.DecodeString(cc.ValidatorContractAddress)
 			if err != nil {
 				log.Fatalf("failed to decode validator contract address %s, %v\n", cc.ValidatorContractAddress, err)

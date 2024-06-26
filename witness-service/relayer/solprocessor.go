@@ -2,6 +2,7 @@ package relayer
 
 import (
 	"context"
+	"crypto/ed25519"
 	"log"
 	"math"
 	"sort"
@@ -319,7 +320,7 @@ func (s *SolProcessor) buildTransaction(transfer *SOLRawTransaction, witnesses [
 
 func (s *SolProcessor) buildInstructions(transfer *SOLRawTransaction, witnesses []*Witness) ([]soltypes.Instruction, error) {
 	msg, err := instruction.SerializePayload(
-		common.PublicKeyFromString(s.voteCfg.ProgramID).Bytes(),
+		common.PublicKeyFromString(s.voteCfg.ProposalAddr).Bytes(),
 		transfer.cashier.Bytes(),
 		transfer.token.Bytes(),
 		transfer.index,
@@ -343,8 +344,13 @@ func (s *SolProcessor) buildInstructions(transfer *SOLRawTransaction, witnesses 
 		copy(msgs[i], id[:])
 		sigs[i] = witnesses[i].signature
 		pubkeys[i] = witnesses[i].addr
+
+		if ok := ed25519.Verify(pubkeys[i], msgs[i], sigs[i]); !ok {
+			log.Fatalf("invalid signature\n")
+		}
 	}
-	ed25519Instr, err := instruction.NewEd25519Instruction(msgs, sigs, pubkeys, 0)
+	// SetComputeUnitPrice and SetComputeUnitLimit are added as 1st and 2nd instruction
+	ed25519Instr, err := instruction.NewEd25519Instruction(msgs, sigs, pubkeys, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -441,6 +447,8 @@ func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (so
 	if err := s.confirmLookupTable(sig); err != nil {
 		return soltypes.AddressLookupTableAccount{}, err
 	}
+
+	log.Printf("lookup table %s is created\n", sig)
 
 	return soltypes.AddressLookupTableAccount{
 		Key:       lookupTablePubkey,
@@ -551,7 +559,7 @@ func (s *SolProcessor) buildOptimalTransaction(
 	if err != nil {
 		return soltypes.Transaction{}, 0, errors.Wrap(err, "failed to compute budget")
 	}
-	redundantBudget := uint32(1.1 * float32(computeBudget))
+	redundantBudget := uint32(1.05 * float32(computeBudget))
 	log.Printf("compute budget: %d, redundant budget: %d\n", computeBudget, redundantBudget)
 
 	priorityFee, err := s.getPriorityFee(instructions)
@@ -628,7 +636,11 @@ func (s *SolProcessor) computeBudget(instructions []soltypes.Instruction,
 		return 0, err
 	}
 	if simulationResp.Err != nil {
-		log.Printf("failed to simulate transaction, %+v\n", simulationResp.Err)
+		raw, err := simulatedTX.Serialize()
+		if err != nil {
+			return 0, errors.Errorf("failed to serialize transaction, err: %v", err)
+		}
+		log.Printf("failed to simulate transaction, err %+v, raw %s\n", simulationResp.Err, base58.Encode(raw))
 		return 0, errors.New("failed to simulate transaction")
 	}
 	if simulationResp.UnitConsumed == nil {
