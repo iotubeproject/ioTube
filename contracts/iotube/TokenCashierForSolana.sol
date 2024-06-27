@@ -49,9 +49,7 @@ contract TokenCashier is Pausable {
     }
 
     function depositTo(address _token, string memory _to, uint256 _amount, bytes memory _payload)
-        public
-        payable
-        whenNotPaused
+        public payable whenNotPaused
     {
         // require(_to != "", "invalid destination");
         bool isCoin = false;

@@ -65,16 +65,8 @@ contract TransferValidator is Pausable {
         }
     }
 
-    function submit(
-        bytes memory cashier,
-        address tokenAddr,
-        uint256 index,
-        bytes memory from,
-        address to,
-        uint256 amount,
-        bytes memory signatures,
-        bytes memory payload
-    ) public whenNotPaused {
+    function submit(bytes memory cashier, address tokenAddr, uint256 index, bytes memory from,
+        address to, uint256 amount, bytes memory signatures, bytes memory payload) public whenNotPaused {
         require(amount != 0, "amount cannot be zero");
         require(to != address(0), "recipient cannot be zero");
         require(signatures.length % 65 == 0, "invalid signature length");
