@@ -26,6 +26,7 @@ type RelayServiceClient interface {
 	Submit(ctx context.Context, in *types.Witness, opts ...grpc.CallOption) (*WitnessSubmissionResponse, error)
 	Reset(ctx context.Context, in *ResetTransferRequest, opts ...grpc.CallOption) (*ResetTransferResponse, error)
 	Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error)
+	Lookup(ctx context.Context, in *LookupRequest, opts ...grpc.CallOption) (*LookupResponse, error)
 	StaleHeights(ctx context.Context, in *StaleHeightsRequest, opts ...grpc.CallOption) (*StaleHeightsResponse, error)
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 }
@@ -65,6 +66,15 @@ func (c *relayServiceClient) Check(ctx context.Context, in *CheckRequest, opts .
 	return out, nil
 }
 
+func (c *relayServiceClient) Lookup(ctx context.Context, in *LookupRequest, opts ...grpc.CallOption) (*LookupResponse, error) {
+	out := new(LookupResponse)
+	err := c.cc.Invoke(ctx, "/services.RelayService/Lookup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *relayServiceClient) StaleHeights(ctx context.Context, in *StaleHeightsRequest, opts ...grpc.CallOption) (*StaleHeightsResponse, error) {
 	out := new(StaleHeightsResponse)
 	err := c.cc.Invoke(ctx, "/services.RelayService/StaleHeights", in, out, opts...)
@@ -90,6 +100,7 @@ type RelayServiceServer interface {
 	Submit(context.Context, *types.Witness) (*WitnessSubmissionResponse, error)
 	Reset(context.Context, *ResetTransferRequest) (*ResetTransferResponse, error)
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
+	Lookup(context.Context, *LookupRequest) (*LookupResponse, error)
 	StaleHeights(context.Context, *StaleHeightsRequest) (*StaleHeightsResponse, error)
 	List(context.Context, *ListRequest) (*ListResponse, error)
 	mustEmbedUnimplementedRelayServiceServer()
@@ -107,6 +118,9 @@ func (UnimplementedRelayServiceServer) Reset(context.Context, *ResetTransferRequ
 }
 func (UnimplementedRelayServiceServer) Check(context.Context, *CheckRequest) (*CheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Check not implemented")
+}
+func (UnimplementedRelayServiceServer) Lookup(context.Context, *LookupRequest) (*LookupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Lookup not implemented")
 }
 func (UnimplementedRelayServiceServer) StaleHeights(context.Context, *StaleHeightsRequest) (*StaleHeightsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StaleHeights not implemented")
@@ -181,6 +195,24 @@ func _RelayService_Check_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RelayService_Lookup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LookupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RelayServiceServer).Lookup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/services.RelayService/Lookup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RelayServiceServer).Lookup(ctx, req.(*LookupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RelayService_StaleHeights_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StaleHeightsRequest)
 	if err := dec(in); err != nil {
@@ -235,6 +267,10 @@ var RelayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Check",
 			Handler:    _RelayService_Check_Handler,
+		},
+		{
+			MethodName: "Lookup",
+			Handler:    _RelayService_Lookup_Handler,
 		},
 		{
 			MethodName: "StaleHeights",

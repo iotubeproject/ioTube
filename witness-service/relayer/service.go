@@ -160,6 +160,23 @@ func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeigh
 	}, nil
 }
 
+func (s *Service) Lookup(ctx context.Context, request *services.LookupRequest) (*services.LookupResponse, error) {
+	transfers, err := s.recorder.TransfersBySourceTxHash(common.BytesToHash(request.SourceTxHash))
+	if err != nil {
+		return nil, err
+	}
+	statuses := make([]*services.CheckResponse, len(transfers))
+	for i, transfer := range transfers {
+		statuses[i] = &services.CheckResponse{
+			Key:    transfer.id[:],
+			TxHash: transfer.txHash.Bytes(),
+			Status: s.convertStatus(transfer.status),
+		}
+	}
+
+	return &services.LookupResponse{Statuses: statuses}, nil
+}
+
 // List lists the recent transfers
 func (s *Service) List(ctx context.Context, request *services.ListRequest) (*services.ListResponse, error) {
 	first := request.First

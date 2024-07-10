@@ -259,9 +259,13 @@ func main() {
 			if err != nil {
 				log.Fatalf("invalid token safe address %s: %+v\n", cc.TokenSafeContractAddress, err)
 			}
+			version := witness.NoPayload
+			if cc.WithPayload {
+				version = witness.Payload
+			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
 				cc.ID,
-				cc.Version,
+				version,
 				cc.RelayerURL,
 				ethClient,
 				cashierAddr,
