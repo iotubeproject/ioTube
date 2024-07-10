@@ -25,24 +25,25 @@ type (
 	StatusOnChainType int
 	// Transfer defines a transfer structure
 	Transfer struct {
-		cashier     common.Address
-		token       common.Address
-		index       uint64
-		sender      common.Address
-		txSender    common.Address
-		recipient   common.Address
-		amount      *big.Int
-		fee         *big.Int
-		blockHeight uint64
-		id          common.Hash
-		txHash      common.Hash
-		timestamp   time.Time
-		gas         uint64
-		gasPrice    *big.Int
-		relayer     common.Address
-		nonce       uint64
-		updateTime  time.Time
-		status      ValidationStatusType
+		cashier      common.Address
+		token        common.Address
+		index        uint64
+		sender       common.Address
+		txSender     common.Address
+		recipient    common.Address
+		amount       *big.Int
+		fee          *big.Int
+		blockHeight  uint64
+		id           common.Hash
+		sourceTxHash common.Hash
+		txHash       common.Hash
+		timestamp    time.Time
+		gas          uint64
+		gasPrice     *big.Int
+		relayer      common.Address
+		nonce        uint64
+		updateTime   time.Time
+		status       ValidationStatusType
 	}
 	// Witness defines a witness structure
 	Witness struct {
@@ -140,19 +141,20 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 	)
 
 	return &Transfer{
-		cashier:     cashier,
-		token:       token,
-		index:       index,
-		sender:      sender,
-		recipient:   recipient,
-		amount:      amount,
-		fee:         fee,
-		id:          id,
-		gas:         transfer.Gas,
-		gasPrice:    gasPrice,
-		timestamp:   transfer.Timestamp.AsTime(),
-		txSender:    txSender,
-		blockHeight: transfer.BlockHeight,
+		cashier:      cashier,
+		token:        token,
+		index:        index,
+		sender:       sender,
+		recipient:    recipient,
+		amount:       amount,
+		fee:          fee,
+		id:           id,
+		gas:          transfer.Gas,
+		gasPrice:     gasPrice,
+		timestamp:    transfer.Timestamp.AsTime(),
+		txSender:     txSender,
+		blockHeight:  transfer.BlockHeight,
+		sourceTxHash: common.BytesToHash(transfer.SourceTxHash),
 	}, nil
 }
 

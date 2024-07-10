@@ -19,6 +19,7 @@ message Transfer {
     string fee = 10;
     bytes txSender = 11;
     uint64 blockHeight = 12;
+    bytes sourceTxHash = 13;
 }
 
 message Witness {

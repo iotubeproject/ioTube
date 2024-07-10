@@ -116,6 +116,7 @@ func (recorder *Recorder) initStore(
 			"`amount` varchar(78) NOT NULL,"+
 			"`fee` varchar(78),"+
 			"`blockHeight` bigint(20),"+
+			"`sourceTxHash` varchar(66) DEFAULT NULL,"+
 			"`id` varchar(66) NOT NULL,"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
@@ -132,6 +133,8 @@ func (recorder *Recorder) initStore(
 			"KEY `cashier_index` (`cashier`),"+
 			"KEY `token_index` (`token`),"+
 			"KEY `sender_index` (`sender`),"+
+			"KEY `txSender_index` (`txSender`),"+
+			"KEY `sourceTxHash_index` (`sourceTxHash`),"+
 			"KEY `recipient_index` (`recipient`),"+
 			"KEY `status_index` (`status`),"+
 			"KEY `txHash_index` (`txHash`)"+
@@ -256,6 +259,15 @@ func (recorder *Recorder) addWitness(
 			transfer.id.Hex(),
 		); err != nil {
 			return errors.Wrap(err, "failed to update block height")
+		}
+	}
+	if transfer.sourceTxHash != (common.Hash{}) {
+		if _, err := tx.Exec(
+			fmt.Sprintf("UPDATE `%s` SET `sourceTxHash`=? WHERE `id`=?", transferTableName),
+			transfer.sourceTxHash.Hex(),
+			transfer.id.Hex(),
+		); err != nil {
+			return errors.Wrap(err, "failed to update source tx hash")
 		}
 	}
 	if transfer.txSender != zeroAddress {
@@ -416,6 +428,28 @@ func (recorder *Recorder) Count(opts ...TransferQueryOption) (int, error) {
 		return 0, errors.Wrap(err, "failed to scan row")
 	}
 	return count, nil
+}
+
+func (recorder *Recorder) TransfersBySourceTxHash(hash common.Hash) ([]*Transfer, error) {
+	recorder.mutex.RLock()
+	defer recorder.mutex.RUnlock()
+	rows, err := recorder.store.DB().Query(
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `sourceTxHash`=?", recorder.transferTableName),
+		hash.Hex(),
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query transfers table")
+	}
+	defer rows.Close()
+	var txs []*Transfer
+	for rows.Next() {
+		tx, err := recorder.assembleTransfer(rows.Scan)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scan transfer")
+		}
+		txs = append(txs, tx)
+	}
+	return txs, nil
 }
 
 func (recorder *Recorder) HeightsOfStaleTransfers(cashier common.Address) ([]uint64, error) {
