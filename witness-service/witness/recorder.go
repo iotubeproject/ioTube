@@ -273,7 +273,7 @@ func (recorder *Recorder) TransfersToSubmit() ([]*Transfer, error) {
 func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
-			"SELECT cashier, token, tidx, sender, recipient, amount, fee, blockHeight, status, id, txSender "+
+			"SELECT cashier, token, tidx, sender, recipient, amount, fee, blockHeight, txHash, status, id, txSender "+
 				"FROM %s "+
 				"WHERE status=? "+
 				"ORDER BY creationTime",
@@ -297,7 +297,8 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		var fee sql.NullString
 		var id sql.NullString
 		var txSender sql.NullString
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &tx.blockHeight, &tx.status, &id, &txSender); err != nil {
+		var txHash sql.NullString
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &fee, &tx.blockHeight, &txHash, &tx.status, &id, &txSender); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -309,6 +310,9 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]*Transfer, error) 
 		}
 		if txSender.Valid {
 			tx.txSender = common.HexToAddress(txSender.String)
+		}
+		if txHash.Valid {
+			tx.txHash = common.HexToHash(txHash.String)
 		}
 		tx.fee = big.NewInt(0)
 		var ok bool
