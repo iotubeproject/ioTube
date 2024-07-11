@@ -19,6 +19,7 @@ message Transfer {
     string fee = 10;
     bytes txSender = 11;
     bytes payload = 12;
+    bytes sourceTxHash = 13;
 }
 
 message Witness {

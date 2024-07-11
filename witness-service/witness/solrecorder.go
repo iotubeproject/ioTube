@@ -388,3 +388,31 @@ func validateID(id uint64) error {
 	}
 	return nil
 }
+
+// UnsettledTransfers returns the list of unsettled transfers
+func (recorder *SOLRecorder) UnsettledTransfers() ([]string, error) {
+	rows, err := recorder.store.DB().Query(
+		fmt.Sprintf(
+			"SELECT txSignature "+
+				"FROM %s "+
+				"WHERE status!=? "+
+				"ORDER BY creationTime",
+			recorder.transferTableName,
+		),
+		TransferSettled,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rec []string
+	for rows.Next() {
+		var txSignature string
+		if err := rows.Scan(&txSignature); err != nil {
+			return nil, err
+		}
+		rec = append(rec, txSignature)
+	}
+	return rec, nil
+}

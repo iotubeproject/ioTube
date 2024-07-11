@@ -296,7 +296,7 @@ func (recorder *Recorder) TransfersToSubmit() ([]AbstractTransfer, error) {
 func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, error) {
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
-			"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, status, id, txSender "+
+			"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, status, id, txHash, txSender "+
 				"FROM %s "+
 				"WHERE status=? "+
 				"ORDER BY creationTime",
@@ -315,13 +315,14 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 		var cashier string
 		var token string
 		var sender string
+		var txHash string
 		var recipient string
 		var rawAmount string
 		var fee sql.NullString
 		var id sql.NullString
 		var payload sql.NullString
 		var txSender sql.NullString
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.status, &id, &txSender); err != nil {
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.status, &id, &txHash, &txSender); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -359,6 +360,8 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 			// skip if token is not in whitelist
 			continue
 		}
+
+		tx.txHash = common.HexToHash(txHash)
 		rec = append(rec, tx)
 	}
 	return rec, nil
@@ -366,7 +369,7 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 
 func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `status`, `id`, `txSender` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `status`, `id`, `txHash`, `txSender` FROM %s WHERE `id`=?", recorder.transferTableName),
 		_id.Hex(),
 	)
 
@@ -376,10 +379,11 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	var sender string
 	var recipient string
 	var rawAmount string
+	var txHash string
 	var id sql.NullString
 	var payload sql.NullString
 	var txSender sql.NullString
-	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &tx.status, &id, &txSender); err != nil {
+	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &tx.status, &id, &txHash, &txSender); err != nil {
 		return nil, err
 	}
 
@@ -411,6 +415,7 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	} else {
 		return nil, errors.New("invalid token")
 	}
+	tx.txHash = common.HexToHash(txHash)
 
 	return tx, nil
 }
@@ -464,4 +469,8 @@ func (recorder *Recorder) validateID(id uint64) error {
 		panic(overflow)
 	}
 	return nil
+}
+
+func (recorder *Recorder) UnsettledTransfers() ([]string, error) {
+	panic("unimplemented")
 }

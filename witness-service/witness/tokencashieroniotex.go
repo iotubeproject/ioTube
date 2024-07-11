@@ -182,6 +182,7 @@ func NewTokenCashier(
 		func(context.Context) error {
 			return nil
 		},
+		false,
 	), nil
 }
 

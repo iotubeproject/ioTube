@@ -534,3 +534,11 @@ func validateResult(res sql.Result) error {
 	}
 	return nil
 }
+
+func (s *SolRecorder) AddNewTX(height uint64, txHash []byte) error {
+	panic("unimplemented")
+}
+
+func (s *SolRecorder) NewTXs(count uint32) ([]uint64, [][]byte, error) {
+	panic("unimplemented")
+}

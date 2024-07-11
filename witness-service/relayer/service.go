@@ -285,6 +285,31 @@ func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*s
 	return s.assembleCheckResponse(transfer, witnesses), nil
 }
 
+// SubmitNewTX submits a new tx to be witnessed
+func (s *Service) SubmitNewTX(ctx context.Context, request *services.SubmitNewTXRequest) (*services.SubmitNewTXResponse, error) {
+	err := s.abstractRecorder.AddNewTX(request.Height, request.TxHash)
+	if err != nil {
+		return nil, err
+	}
+	return &services.SubmitNewTXResponse{Success: true}, nil
+}
+
+// ListNewTX lists txs to be witnessed
+func (s *Service) ListNewTX(ctx context.Context, request *services.ListNewTXRequest) (*services.ListNewTXResponse, error) {
+	heights, txHashes, err := s.abstractRecorder.NewTXs(request.Count)
+	if err != nil {
+		return nil, err
+	}
+	txs := make([]*services.SubmitNewTXRequest, 0, len(heights))
+	for i, height := range heights {
+		txs = append(txs, &services.SubmitNewTXRequest{
+			Height: height,
+			TxHash: txHashes[i],
+		})
+	}
+	return &services.ListNewTXResponse{Txs: txs}, nil
+}
+
 func (s *Service) process() error {
 	if s.transferValidator == nil {
 		return nil

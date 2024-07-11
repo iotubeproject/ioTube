@@ -174,5 +174,6 @@ func NewTokenCashierOnEthereum(
 			}
 			return nil
 		},
+		false,
 	), nil
 }

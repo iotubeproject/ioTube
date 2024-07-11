@@ -268,6 +268,7 @@ func main() {
 			cfg.TransferTableName,
 			"",
 			"",
+			"",
 		),
 		destAddrDecoder,
 	)

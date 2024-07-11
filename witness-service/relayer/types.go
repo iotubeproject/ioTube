@@ -27,24 +27,25 @@ type (
 	StatusOnChainType int
 	// Transfer defines a transfer structure
 	Transfer struct {
-		cashier    util.Address
-		token      util.Address
-		index      uint64
-		sender     util.Address
-		txSender   util.Address
-		recipient  util.Address
-		amount     *big.Int
-		payload    []byte
-		fee        *big.Int
-		id         common.Hash
-		txHash     []byte
-		timestamp  time.Time
-		gas        uint64
-		gasPrice   *big.Int
-		relayer    common.Address
-		nonce      uint64
-		updateTime time.Time
-		status     ValidationStatusType
+		cashier      util.Address
+		token        util.Address
+		index        uint64
+		sender       util.Address
+		txSender     util.Address
+		recipient    util.Address
+		amount       *big.Int
+		payload      []byte
+		fee          *big.Int
+		id           common.Hash
+		sourceTxHash []byte
+		txHash       []byte
+		timestamp    time.Time
+		gas          uint64
+		gasPrice     *big.Int
+		relayer      common.Address
+		nonce        uint64
+		updateTime   time.Time
+		status       ValidationStatusType
 	}
 	// Witness defines a witness structure
 	Witness struct {
@@ -84,6 +85,10 @@ type (
 		Witnesses(ids ...common.Hash) (map[common.Hash][]*Witness, error)
 		// Count returns the number of transfers
 		Count(opts ...TransferQueryOption) (int, error)
+		// AddNewTX adds a new tx to the new tx table
+		AddNewTX(height uint64, txHash []byte) error
+		// NewTXs returns the new txs to be witnessed
+		NewTXs(count uint32) ([]uint64, [][]byte, error)
 	}
 
 	SOLRawTransaction struct {
@@ -179,18 +184,19 @@ func UnmarshalTransferProto(transfer *types.Transfer, destAddrDecoder util.Addre
 		}
 	}
 	return &Transfer{
-		cashier:   cashier,
-		token:     token,
-		index:     index,
-		sender:    sender,
-		recipient: recipient,
-		amount:    amount,
-		payload:   transfer.Payload,
-		fee:       fee,
-		gas:       transfer.Gas,
-		gasPrice:  gasPrice,
-		timestamp: transfer.Timestamp.AsTime(),
-		txSender:  txSender,
+		cashier:      cashier,
+		token:        token,
+		index:        index,
+		sender:       sender,
+		recipient:    recipient,
+		amount:       amount,
+		payload:      transfer.Payload,
+		fee:          fee,
+		gas:          transfer.Gas,
+		gasPrice:     gasPrice,
+		timestamp:    transfer.Timestamp.AsTime(),
+		txSender:     txSender,
+		sourceTxHash: transfer.SourceTxHash,
 	}, nil
 }
 

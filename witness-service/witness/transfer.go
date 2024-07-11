@@ -74,18 +74,19 @@ func (t *Transfer) ToTypesTransfer() *types.Transfer {
 		gasPrice = t.gasPrice.String()
 	}
 	return &types.Transfer{
-		Cashier:   t.cashier.Bytes(),
-		Token:     t.coToken.Bytes(),
-		Index:     int64(t.index),
-		Sender:    t.sender.Bytes(),
-		Recipient: t.recipient.Bytes(),
-		Amount:    t.amount.String(),
-		Timestamp: timestamppb.New(t.timestamp),
-		Fee:       t.fee.String(),
-		TxSender:  t.txSender.Bytes(),
-		Gas:       t.gas,
-		GasPrice:  gasPrice,
-		Payload:   t.payload,
+		Cashier:      t.cashier.Bytes(),
+		Token:        t.coToken.Bytes(),
+		Index:        int64(t.index),
+		Sender:       t.sender.Bytes(),
+		Recipient:    t.recipient.Bytes(),
+		Amount:       t.amount.String(),
+		Timestamp:    timestamppb.New(t.timestamp),
+		Fee:          t.fee.String(),
+		TxSender:     t.txSender.Bytes(),
+		Gas:          t.gas,
+		GasPrice:     gasPrice,
+		Payload:      t.payload,
+		SourceTxHash: t.txHash.Bytes(),
 	}
 }
 
@@ -182,15 +183,16 @@ func (s *solTransfer) Status() TransferStatus {
 
 func (s *solTransfer) ToTypesTransfer() *types.Transfer {
 	return &types.Transfer{
-		Cashier:   s.cashier.Bytes(),
-		Token:     s.coToken.Bytes(),
-		Index:     int64(s.index),
-		Sender:    s.sender.Bytes(),
-		Recipient: s.recipient.Bytes(),
-		Amount:    s.amount.String(),
-		Timestamp: timestamppb.Now(),
-		Fee:       s.fee.String(),
-		TxSender:  s.txPayer.Bytes(),
-		Payload:   s.payload,
+		Cashier:      s.cashier.Bytes(),
+		Token:        s.coToken.Bytes(),
+		Index:        int64(s.index),
+		Sender:       s.sender.Bytes(),
+		Recipient:    s.recipient.Bytes(),
+		Amount:       s.amount.String(),
+		Timestamp:    timestamppb.Now(),
+		Fee:          s.fee.String(),
+		TxSender:     s.txPayer.Bytes(),
+		Payload:      s.payload,
+		SourceTxHash: s.txSignature,
 	}
 }

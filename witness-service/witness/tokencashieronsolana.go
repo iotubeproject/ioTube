@@ -31,7 +31,7 @@ var (
 )
 
 func NewTokenCashierOnSolana(id string, relayerURL string, solanaClient *client.Client, cashier solcommon.PublicKey,
-	validatorAddr common.Address, recorder *SOLRecorder, startBlockHeight uint64, qpsLimit uint32) (TokenCashier, error) {
+	validatorAddr common.Address, recorder *SOLRecorder, startBlockHeight uint64, qpsLimit uint32, disablePull bool) (TokenCashier, error) {
 	if qpsLimit > 0 {
 		rl = ratelimit.New(int(qpsLimit))
 	}
@@ -136,6 +136,7 @@ func NewTokenCashierOnSolana(id string, relayerURL string, solanaClient *client.
 		func(context.Context) error {
 			return nil
 		},
+		disablePull,
 	), nil
 }
 

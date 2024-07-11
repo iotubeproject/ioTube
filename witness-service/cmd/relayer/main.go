@@ -52,16 +52,17 @@ type Configuration struct {
 	BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
 	Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
 
-	AlwaysReset       bool      `json:"alwaysReset" yaml:"alwaysReset"`
-	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
-	LarkWebHook       string    `json:"larkWebHook" yaml:"larkWebHook"`
-	GrpcPort          int       `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort     int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	Database          db.Config `json:"database" yaml:"database"`
-	ExplorerDatabase  db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
-	TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
-	WitnessTableName  string    `json:"witnessTableName" yaml:"witnessTableName"`
-	ExplorerTableName string    `json:"explorerTableName" yaml:"explorerTableName"`
+	AlwaysReset             bool      `json:"alwaysReset" yaml:"alwaysReset"`
+	SlackWebHook            string    `json:"slackWebHook" yaml:"slackWebHook"`
+	LarkWebHook             string    `json:"larkWebHook" yaml:"larkWebHook"`
+	GrpcPort                int       `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort           int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	Database                db.Config `json:"database" yaml:"database"`
+	ExplorerDatabase        db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
+	TransferTableName       string    `json:"transferTableName" yaml:"transferTableName"`
+	NewTransactionTableName string    `json:"newTransactionTableName" yaml:"newTransactionTableName"`
+	WitnessTableName        string    `json:"witnessTableName" yaml:"witnessTableName"`
+	ExplorerTableName       string    `json:"explorerTableName" yaml:"explorerTableName"`
 
 	SolanaConfig struct {
 		RealmAddr               string  `json:"realmAddr" yaml:"realmAddr"`
@@ -203,6 +204,7 @@ func main() {
 			db.NewStore(cfg.ExplorerDatabase),
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
+			"",
 			cfg.ExplorerTableName,
 		)
 		abstractRecorder = recorder
@@ -240,6 +242,7 @@ func main() {
 			db.NewStore(cfg.ExplorerDatabase),
 			cfg.TransferTableName,
 			cfg.WitnessTableName,
+			cfg.NewTransactionTableName,
 			cfg.ExplorerTableName,
 		)
 		abstractRecorder = recorder

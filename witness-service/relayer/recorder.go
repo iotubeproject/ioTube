@@ -43,6 +43,7 @@ type (
 		mutex             sync.RWMutex
 		transferTableName string
 		witnessTableName  string
+		newTXTableName    string
 		explorerTableName string
 		// updateStatusQuery is a query to set status
 		updateStatusQuery            string
@@ -59,6 +60,7 @@ func NewRecorder(
 	explorerStore *db.SQLStore,
 	transferTableName string,
 	witnessTableName string,
+	newTXTableName string,
 	explorerTableName string,
 ) *Recorder {
 	return &Recorder{
@@ -66,6 +68,7 @@ func NewRecorder(
 		explorerStore:                   explorerStore,
 		transferTableName:               transferTableName,
 		witnessTableName:                witnessTableName,
+		newTXTableName:                  newTXTableName,
 		explorerTableName:               explorerTableName,
 		updateStatusQuery:               fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=? AND `status`=?", transferTableName),
 		updateStatusQueryForExplorer:    fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=?", explorerTableName),
@@ -92,17 +95,17 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 	defer recorder.mutex.Unlock()
 
 	if recorder.explorerStore != nil {
-		if err := recorder.initStore(ctx, recorder.explorerStore, recorder.explorerTableName, ""); err != nil {
+		if err := recorder.initStore(ctx, recorder.explorerStore, recorder.explorerTableName, "", ""); err != nil {
 			return errors.Wrap(err, "failed to init explorer db")
 		}
 	}
-	return recorder.initStore(ctx, recorder.store, recorder.transferTableName, recorder.witnessTableName)
+	return recorder.initStore(ctx, recorder.store, recorder.transferTableName, recorder.witnessTableName, recorder.newTXTableName)
 }
 
 func (recorder *Recorder) initStore(
 	ctx context.Context,
 	store *db.SQLStore,
-	transferTableName, witnessTableName string,
+	transferTableName, witnessTableName, newTXTableName string,
 ) error {
 	if err := store.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start db")
@@ -119,6 +122,7 @@ func (recorder *Recorder) initStore(
 			"`amount` varchar(78) NOT NULL,"+
 			"`payload` varchar(24576),"+
 			"`fee` varchar(78),"+
+			"`sourceTxHash` varchar(128) DEFAULT NULL,"+
 			"`id` varchar(66) NOT NULL,"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
@@ -135,6 +139,7 @@ func (recorder *Recorder) initStore(
 			"KEY `cashier_index` (`cashier`),"+
 			"KEY `token_index` (`token`),"+
 			"KEY `sender_index` (`sender`),"+
+			"KEY `sourceTxHash_index` (`sourceTxHash`),"+
 			"KEY `recipient_index` (`recipient`),"+
 			"KEY `status_index` (`status`),"+
 			"KEY `txHash_index` (`txHash`)"+
@@ -160,6 +165,20 @@ func (recorder *Recorder) initStore(
 			transferTableName,
 		)); err != nil {
 			return errors.Wrap(err, "failed to create witness table")
+		}
+	}
+
+	if newTXTableName != "" {
+		if _, err := store.DB().Exec(fmt.Sprintf(
+			"CREATE TABLE IF NOT EXISTS %s ("+
+				"`txHash` varchar(128) NOT NULL,"+
+				"`blockheight` bigint(20) NOT NULL,"+
+				"PRIMARY KEY (`txHash`),"+
+				"KEY `txHash_index` (`txHash`)"+
+				") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
+			newTXTableName,
+		)); err != nil {
+			return errors.Wrap(err, "failed to create new tx table")
 		}
 	}
 
@@ -262,6 +281,15 @@ func (recorder *Recorder) addWitness(
 		transfer.id.Hex(),
 	); err != nil {
 		return errors.Wrap(err, "failed to insert into transfer table")
+	}
+	if len(transfer.sourceTxHash) > 0 {
+		if _, err := tx.Exec(
+			fmt.Sprintf("UPDATE `%s` SET `sourceTxHash`=? WHERE `id`=?", transferTableName),
+			hex.EncodeToString(transfer.sourceTxHash),
+			transfer.id.Hex(),
+		); err != nil {
+			return errors.Wrap(err, "failed to update source tx hash")
+		}
 	}
 	if transfer.txSender != nil {
 		if _, err := tx.Exec(
@@ -797,6 +825,52 @@ func (recorder *Recorder) ResetCausedByNonce(id common.Hash) error {
 	}
 
 	return recorder.validateResult(result)
+}
+
+// AddNewTX adds a new tx to the new tx table
+func (recorder *Recorder) AddNewTX(height uint64, txHash []byte) error {
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
+	result, err := recorder.store.DB().Exec(fmt.Sprintf(
+		"INSERT INTO %s (txHash, blockheight) VALUES (?, ?)",
+		recorder.newTXTableName), hex.EncodeToString(txHash), height)
+	if err != nil {
+		return errors.Wrap(err, "failed to add new TX")
+	}
+	return recorder.validateResult(result)
+}
+
+// NewTXs returns the new txs requested by the witness
+func (recorder *Recorder) NewTXs(count uint32) ([]uint64, [][]byte, error) {
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
+	rows, err := recorder.store.DB().Query(fmt.Sprintf(
+		"SELECT `txHash`, `blockheight` FROM %s WHERE `txHash` NOT IN (SELECT `sourceTxHash` FROM %s WHERE `status`!=?  AND `status`!=? AND `status`!=?) LIMIT ?",
+		recorder.newTXTableName, recorder.transferTableName),
+		TransferSettled,
+		ValidationFailed,
+		ValidationRejected,
+		count)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to query new txs")
+	}
+	defer rows.Close()
+	var txHashes [][]byte
+	var heights []uint64
+	for rows.Next() {
+		var txHash string
+		var height uint64
+		if err := rows.Scan(&txHash, &height); err != nil {
+			return nil, nil, errors.Wrap(err, "failed to scan new tx")
+		}
+		txHashBytes, err := hex.DecodeString(txHash)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to decode tx hash")
+		}
+		txHashes = append(txHashes, txHashBytes)
+		heights = append(heights, height)
+	}
+	return heights, txHashes, nil
 }
 
 /////////////////////////////////

@@ -47,6 +47,7 @@ type (
 		TipHeight(id string) (uint64, error)
 		UpdateSyncHeight(id string, height uint64) error
 		Transfer(id common.Hash) (AbstractTransfer, error)
+		UnsettledTransfers() ([]string, error)
 		TransfersToSubmit() ([]AbstractTransfer, error)
 		TransfersToSettle() ([]AbstractTransfer, error)
 		SettleTransfer(tx AbstractTransfer) error

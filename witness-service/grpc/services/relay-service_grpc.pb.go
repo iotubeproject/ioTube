@@ -23,6 +23,8 @@ type RelayServiceClient interface {
 	Reset(ctx context.Context, in *ResetTransferRequest, opts ...grpc.CallOption) (*ResetTransferResponse, error)
 	Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error)
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
+	SubmitNewTX(ctx context.Context, in *SubmitNewTXRequest, opts ...grpc.CallOption) (*SubmitNewTXResponse, error)
+	ListNewTX(ctx context.Context, in *ListNewTXRequest, opts ...grpc.CallOption) (*ListNewTXResponse, error)
 }
 
 type relayServiceClient struct {
@@ -69,6 +71,24 @@ func (c *relayServiceClient) List(ctx context.Context, in *ListRequest, opts ...
 	return out, nil
 }
 
+func (c *relayServiceClient) SubmitNewTX(ctx context.Context, in *SubmitNewTXRequest, opts ...grpc.CallOption) (*SubmitNewTXResponse, error) {
+	out := new(SubmitNewTXResponse)
+	err := c.cc.Invoke(ctx, "/services.RelayService/SubmitNewTX", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *relayServiceClient) ListNewTX(ctx context.Context, in *ListNewTXRequest, opts ...grpc.CallOption) (*ListNewTXResponse, error) {
+	out := new(ListNewTXResponse)
+	err := c.cc.Invoke(ctx, "/services.RelayService/ListNewTX", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RelayServiceServer is the server API for RelayService service.
 // All implementations must embed UnimplementedRelayServiceServer
 // for forward compatibility
@@ -77,6 +97,8 @@ type RelayServiceServer interface {
 	Reset(context.Context, *ResetTransferRequest) (*ResetTransferResponse, error)
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
 	List(context.Context, *ListRequest) (*ListResponse, error)
+	SubmitNewTX(context.Context, *SubmitNewTXRequest) (*SubmitNewTXResponse, error)
+	ListNewTX(context.Context, *ListNewTXRequest) (*ListNewTXResponse, error)
 	mustEmbedUnimplementedRelayServiceServer()
 }
 
@@ -95,6 +117,12 @@ func (UnimplementedRelayServiceServer) Check(context.Context, *CheckRequest) (*C
 }
 func (UnimplementedRelayServiceServer) List(context.Context, *ListRequest) (*ListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
+}
+func (UnimplementedRelayServiceServer) SubmitNewTX(context.Context, *SubmitNewTXRequest) (*SubmitNewTXResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitNewTX not implemented")
+}
+func (UnimplementedRelayServiceServer) ListNewTX(context.Context, *ListNewTXRequest) (*ListNewTXResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListNewTX not implemented")
 }
 func (UnimplementedRelayServiceServer) mustEmbedUnimplementedRelayServiceServer() {}
 
@@ -181,6 +209,42 @@ func _RelayService_List_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RelayService_SubmitNewTX_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitNewTXRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RelayServiceServer).SubmitNewTX(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/services.RelayService/SubmitNewTX",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RelayServiceServer).SubmitNewTX(ctx, req.(*SubmitNewTXRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RelayService_ListNewTX_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListNewTXRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RelayServiceServer).ListNewTX(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/services.RelayService/ListNewTX",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RelayServiceServer).ListNewTX(ctx, req.(*ListNewTXRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RelayService_ServiceDesc is the grpc.ServiceDesc for RelayService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -203,6 +267,14 @@ var RelayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "List",
 			Handler:    _RelayService_List_Handler,
+		},
+		{
+			MethodName: "SubmitNewTX",
+			Handler:    _RelayService_SubmitNewTX_Handler,
+		},
+		{
+			MethodName: "ListNewTX",
+			Handler:    _RelayService_ListNewTX_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
