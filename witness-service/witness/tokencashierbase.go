@@ -326,7 +326,7 @@ func (tc *tokenCashierBase) fetchTransfers(count uint16) error {
 			continue
 		}
 		for _, transfer := range transfers {
-			if err := tc.recorder.AddTransfer(transfer, TransferNew); err != nil {
+			if err := tc.recorder.AddTransfer(transfer, TransferReady); err != nil {
 				return errors.Wrap(err, "failed to add transfer")
 			}
 		}
