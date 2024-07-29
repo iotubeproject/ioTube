@@ -152,28 +152,31 @@ type transferInfo struct {
 }
 
 const (
-	tubeProgramNumInstructions = 2
-	tubeProgramNumAccounts     = 7
-	tubeProgramSenderIdx       = 2
-	tubeProgramTokenIdx        = 4
+	tubeProgramNumAccounts = 7
+	tubeProgramSenderIdx   = 2
+	tubeProgramTokenIdx    = 4
+)
+
+var (
+	splTokenProgramID = solcommon.TokenProgramID.String()
 )
 
 func transferInfoFromAccounts(msg types.Message, cashier solcommon.PublicKey) (*transferInfo, error) {
 	if len(msg.Accounts) < 1 {
 		return nil, errors.New("no accounts in message")
 	}
-	if len(msg.Instructions) != tubeProgramNumInstructions {
-		return nil, errors.New("invalid instruction count")
+	if len(msg.Instructions) < 1 {
+		return nil, errors.New("no instructions in message")
 	}
-	if len(msg.Instructions[1].Accounts) != tubeProgramNumAccounts {
+	if len(msg.Instructions[len(msg.Instructions)-1].Accounts) != tubeProgramNumAccounts {
 		return nil, errors.New("invalid account count")
 	}
-	if msg.Accounts[msg.Instructions[1].ProgramIDIndex] != cashier {
+	if msg.Accounts[msg.Instructions[len(msg.Instructions)-1].ProgramIDIndex] != cashier {
 		return nil, errors.New("invalid cashier account")
 	}
 	return &transferInfo{
-		token:   msg.Accounts[msg.Instructions[1].Accounts[tubeProgramTokenIdx]],
-		sender:  msg.Accounts[msg.Instructions[1].Accounts[tubeProgramSenderIdx]],
+		token:   msg.Accounts[msg.Instructions[len(msg.Instructions)-1].Accounts[tubeProgramTokenIdx]],
+		sender:  msg.Accounts[msg.Instructions[len(msg.Instructions)-1].Accounts[tubeProgramSenderIdx]],
 		txPayer: msg.Accounts[0],
 	}, nil
 }
@@ -182,33 +185,40 @@ func filterTubeTransfer(prefilledTsf *transferInfo, cashier solcommon.PublicKey,
 	if prefilledTsf == nil {
 		return nil, errors.New("prefilledTsf is nil")
 	}
-	re1, err := regexp.Compile(fmt.Sprintf(`Program %s invoke \[1\]`, regexp.QuoteMeta(cashier.String())))
-	if err != nil {
-		return nil, err
-	}
-	re2, err := regexp.Compile(`Program log: Bridge: (.*)`)
-	if err != nil {
-		return nil, err
+	var (
+		patterns = []string{
+			fmt.Sprintf(`Program %s invoke \[1\]`, regexp.QuoteMeta(cashier.String())),
+			fmt.Sprintf(`Program %s invoke \[2\]`, regexp.QuoteMeta(splTokenProgramID)),
+			"Program log: Instruction: TransferChecked",
+			fmt.Sprintf(`Program %s consumed (\d+) of (\d+) compute units`, regexp.QuoteMeta(splTokenProgramID)),
+			fmt.Sprintf(`Program %s success`, regexp.QuoteMeta(splTokenProgramID)),
+			`Program log: Bridge: (.*)`,
+		}
+		regs = make([]*regexp.Regexp, 0)
+	)
+	for _, pattern := range patterns {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			return nil, err
+		}
+		regs = append(regs, re)
 	}
 	var (
-		_unfound = -1
-		re1Idx   = _unfound
+		matchStr = ""
+		j        = 0
 	)
-	matchStr := ""
-	for i, log := range logs {
-		if re1.MatchString(log) {
-			re1Idx = i
-			continue
-		}
-		if re2.MatchString(log) {
-			if re1Idx == _unfound {
+	for _, log := range logs {
+		if regs[j].MatchString(log) {
+			if j == len(regs)-1 {
+				matches := regs[j].FindStringSubmatch(log)
+				if len(matches) != 2 {
+					break
+				}
+				matchStr = matches[1]
 				break
 			}
-			matches := re2.FindStringSubmatch(log)
-			if len(matches) != 2 {
-				continue
-			}
-			matchStr = matches[1]
+			j++
+		} else if j > 0 {
 			break
 		}
 	}
