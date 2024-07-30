@@ -29,6 +29,7 @@ type (
 		cashierMetaTableName string
 		transferTableName    string
 		tokenPairs           map[solcommon.PublicKey]util.Address
+		tokenRound           map[solcommon.PublicKey]int
 		addrDecoder          util.AddressDecoder
 	}
 )
@@ -38,6 +39,7 @@ func NewSOLRecorder(
 	store *db.SQLStore,
 	transferTableName string,
 	tokenPairs map[solcommon.PublicKey]util.Address,
+	tokenRound map[solcommon.PublicKey]int,
 	addrDecoder util.AddressDecoder,
 ) *SOLRecorder {
 	return &SOLRecorder{
@@ -45,6 +47,7 @@ func NewSOLRecorder(
 		cashierMetaTableName: "solana_cashier_meta",
 		transferTableName:    transferTableName,
 		tokenPairs:           tokenPairs,
+		tokenRound:           tokenRound,
 		addrDecoder:          addrDecoder,
 	}
 }
@@ -331,6 +334,11 @@ func (recorder *SOLRecorder) transfers(status TransferStatus) ([]AbstractTransfe
 		} else {
 			// skip if token is not in whitelist
 			continue
+		}
+		if round, ok := recorder.tokenRound[tx.token]; ok {
+			tx.decimalRound = round
+		} else {
+			tx.decimalRound = 0
 		}
 		rec = append(rec, tx)
 	}

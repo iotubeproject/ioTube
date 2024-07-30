@@ -33,6 +33,7 @@ type (
 		cashierMetaTableName string
 		transferTableName    string
 		tokenPairs           map[common.Address]util.Address
+		tokenRound           map[common.Address]int
 		addrDecoder          util.AddressDecoder
 	}
 )
@@ -42,6 +43,7 @@ func NewRecorder(
 	store *db.SQLStore,
 	transferTableName string,
 	tokenPairs map[common.Address]util.Address,
+	tokenRound map[common.Address]int,
 	addrDecoder util.AddressDecoder,
 ) *Recorder {
 	return &Recorder{
@@ -49,6 +51,7 @@ func NewRecorder(
 		cashierMetaTableName: "cashier_meta",
 		transferTableName:    transferTableName,
 		tokenPairs:           tokenPairs,
+		tokenRound:           tokenRound,
 		addrDecoder:          addrDecoder,
 	}
 }
@@ -360,7 +363,11 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 			// skip if token is not in whitelist
 			continue
 		}
-
+		if round, ok := recorder.tokenRound[tx.token]; ok {
+			tx.decimalRound = round
+		} else {
+			tx.decimalRound = 0
+		}
 		tx.txHash = common.HexToHash(txHash)
 		rec = append(rec, tx)
 	}
@@ -414,6 +421,11 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 		tx.coToken = toToken
 	} else {
 		return nil, errors.New("invalid token")
+	}
+	if round, ok := recorder.tokenRound[tx.token]; ok {
+		tx.decimalRound = round
+	} else {
+		tx.decimalRound = 0
 	}
 	tx.txHash = common.HexToHash(txHash)
 

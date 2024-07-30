@@ -60,6 +60,10 @@ type Configuration struct {
 			Token1 string `json:"token1" yaml:"token1"`
 			Token2 string `json:"token2" yaml:"token2"`
 		} `json:"tokenPairs" yaml:"tokenPairs"`
+		DecimalRound []struct {
+			Token1 string `json:"token1" yaml:"token1"`
+			Amount int    `json:"amount" yaml:"amount"`
+		} `json:"decimalRound" yaml:"decimalRound"`
 		StartBlockHeight int `json:"startBlockHeight" yaml:"startBlockHeight"`
 		Reverse          struct {
 			TransferTableName      string   `json:"transferTableName" yaml:"transferTableName"`
@@ -224,6 +228,14 @@ func main() {
 				}
 				pairs[common.BytesToAddress(ioAddr.Bytes())] = addr
 			}
+			decimalRound := make(map[common.Address]int)
+			for _, r := range cc.DecimalRound {
+				addr, err := address.FromString(r.Token1)
+				if err != nil {
+					log.Fatalf("failed to parse token address %s, %v\n", r.Token1, err)
+				}
+				decimalRound[common.BytesToAddress(addr.Bytes())] = r.Amount
+			}
 			// ValidatorContractAddress should be proposal address when destination chain is solana
 			validatorContractAddr, err := destAddrDecoder.DecodeString(cc.ValidatorContractAddress)
 			if err != nil {
@@ -239,6 +251,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
+					decimalRound,
 					destAddrDecoder,
 				),
 				uint64(cc.StartBlockHeight),
@@ -283,6 +296,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.Reverse.TransferTableName,
 					pairs,
+					map[common.Address]int{},
 					destAddrDecoder,
 				)
 			}
@@ -297,6 +311,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
+					map[common.Address]int{},
 					destAddrDecoder,
 				),
 				uint64(cc.StartBlockHeight),
@@ -328,6 +343,11 @@ func main() {
 				}
 				pairs[token] = token2
 			}
+			decimalRound := make(map[solcommon.PublicKey]int)
+			for _, pair := range cc.DecimalRound {
+				token := solcommon.PublicKeyFromString(pair.Token1)
+				decimalRound[token] = pair.Amount
+			}
 			cashier, err := witness.NewTokenCashierOnSolana(
 				cc.ID,
 				cc.RelayerURL,
@@ -338,6 +358,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
+					decimalRound,
 					destAddrDecoder,
 				),
 				uint64(cc.StartBlockHeight),

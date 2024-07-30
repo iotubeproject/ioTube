@@ -16,23 +16,24 @@ import (
 
 // Transfer defines a record
 type Transfer struct {
-	cashier     common.Address
-	token       common.Address
-	coToken     util.Address
-	index       uint64
-	sender      common.Address
-	recipient   util.Address
-	amount      *big.Int
-	fee         *big.Int
-	id          common.Hash
-	status      TransferStatus
-	blockHeight uint64
-	txHash      common.Hash
-	timestamp   time.Time
-	gas         uint64
-	gasPrice    *big.Int
-	txSender    common.Address
-	payload     []byte
+	cashier      common.Address
+	token        common.Address
+	coToken      util.Address
+	index        uint64
+	sender       common.Address
+	recipient    util.Address
+	amount       *big.Int
+	decimalRound int
+	fee          *big.Int
+	id           common.Hash
+	status       TransferStatus
+	blockHeight  uint64
+	txHash       common.Hash
+	timestamp    time.Time
+	gas          uint64
+	gasPrice     *big.Int
+	txSender     common.Address
+	payload      []byte
 }
 
 func (t *Transfer) Cashier() util.Address {
@@ -79,7 +80,7 @@ func (t *Transfer) ToTypesTransfer() *types.Transfer {
 		Index:        int64(t.index),
 		Sender:       t.sender.Bytes(),
 		Recipient:    t.recipient.Bytes(),
-		Amount:       t.amount.String(),
+		Amount:       roundAmount(t.amount, t.decimalRound).String(),
 		Timestamp:    timestamppb.New(t.timestamp),
 		Fee:          t.fee.String(),
 		TxSender:     t.txSender.Bytes(),
@@ -103,7 +104,24 @@ func (t *Transfer) Payload() []byte {
 }
 
 func (t *Transfer) Amount() *big.Int {
-	return t.amount
+	return roundAmount(t.amount, t.decimalRound)
+}
+
+func roundAmount(raw *big.Int, cnt int) *big.Int {
+	ret := big.NewInt(0).Set(raw)
+	switch {
+	case cnt == 0:
+	case cnt < 0:
+		cnt = -cnt
+		for i := 0; i < cnt; i++ {
+			ret.Div(ret, big.NewInt(10))
+		}
+	case cnt > 0:
+		for i := 0; i < cnt; i++ {
+			ret.Mul(ret, big.NewInt(10))
+		}
+	}
+	return ret
 }
 
 func (t *Transfer) Status() TransferStatus {
@@ -112,20 +130,21 @@ func (t *Transfer) Status() TransferStatus {
 
 // solTransfer defines a SOL record
 type solTransfer struct {
-	cashier     solcommon.PublicKey
-	token       solcommon.PublicKey
-	coToken     util.Address
-	index       uint64
-	sender      solcommon.PublicKey
-	recipient   util.Address
-	amount      *big.Int
-	fee         *big.Int
-	id          common.Hash
-	status      TransferStatus
-	blockHeight uint64
-	txSignature soltypes.Signature
-	txPayer     solcommon.PublicKey
-	payload     []byte
+	cashier      solcommon.PublicKey
+	token        solcommon.PublicKey
+	coToken      util.Address
+	index        uint64
+	sender       solcommon.PublicKey
+	recipient    util.Address
+	amount       *big.Int
+	decimalRound int
+	fee          *big.Int
+	id           common.Hash
+	status       TransferStatus
+	blockHeight  uint64
+	txSignature  soltypes.Signature
+	txPayer      solcommon.PublicKey
+	payload      []byte
 }
 
 func (s *solTransfer) Cashier() util.Address {
@@ -166,7 +185,7 @@ func (s *solTransfer) Payload() []byte {
 }
 
 func (s *solTransfer) Amount() *big.Int {
-	return s.amount
+	return roundAmount(s.amount, s.decimalRound)
 }
 
 func (s *solTransfer) Sender() util.Address {
@@ -188,7 +207,7 @@ func (s *solTransfer) ToTypesTransfer() *types.Transfer {
 		Index:        int64(s.index),
 		Sender:       s.sender.Bytes(),
 		Recipient:    s.recipient.Bytes(),
-		Amount:       s.amount.String(),
+		Amount:       roundAmount(s.amount, s.decimalRound).String(),
 		Timestamp:    timestamppb.Now(),
 		Fee:          s.fee.String(),
 		TxSender:     s.txPayer.Bytes(),
