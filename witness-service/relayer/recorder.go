@@ -173,6 +173,7 @@ func (recorder *Recorder) initStore(
 			"CREATE TABLE IF NOT EXISTS %s ("+
 				"`txHash` varchar(128) NOT NULL,"+
 				"`blockheight` bigint(20) NOT NULL,"+
+				"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 				"PRIMARY KEY (`txHash`),"+
 				"KEY `txHash_index` (`txHash`)"+
 				") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
@@ -832,7 +833,7 @@ func (recorder *Recorder) AddNewTX(height uint64, txHash []byte) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(fmt.Sprintf(
-		"INSERT INTO %s (txHash, blockheight) VALUES (?, ?)",
+		"INSERT INTO %s (txHash, blockheight) VALUES (?, ?) ON DUPLICATE KEY UPDATE",
 		recorder.newTXTableName), hex.EncodeToString(txHash), height)
 	if err != nil {
 		return errors.Wrap(err, "failed to add new TX")
@@ -845,7 +846,7 @@ func (recorder *Recorder) NewTXs(count uint32) ([]uint64, [][]byte, error) {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	rows, err := recorder.store.DB().Query(fmt.Sprintf(
-		"SELECT `txHash`, `blockheight` FROM %s WHERE `txHash` NOT IN (SELECT `sourceTxHash` FROM %s WHERE `status`!=?  AND `status`!=? AND `status`!=?) LIMIT ?",
+		"SELECT `txHash`, `blockheight` FROM %s WHERE TIMESTAMPDIFF(HOUR, creationTime, NOW()) <= 48 AND `txHash` NOT IN (SELECT `sourceTxHash` FROM %s WHERE (`status`=?  OR `status`=? OR `status`=?) AND `sourceTxHash` IS NOT NULL) LIMIT ?",
 		recorder.newTXTableName, recorder.transferTableName),
 		TransferSettled,
 		ValidationFailed,
