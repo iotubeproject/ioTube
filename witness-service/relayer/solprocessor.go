@@ -26,9 +26,8 @@ import (
 )
 
 const (
-	_limitSize        = 64
-	_validBlockHeight = 150
-	_solanaRPCMaxQPS  = 10
+	_limitSize       = 64
+	_solanaRPCMaxQPS = 10
 )
 
 var (
@@ -117,11 +116,17 @@ func (s *SolProcessor) ConfirmTransfers() error {
 		if len(tsf.signature) == 0 {
 			continue
 		}
-		confirmed, failed, err := s.confirmTransfer(base58.Encode(tsf.signature[:]))
+		confirmed, failed, err := s.confirmTransfer(base58.Encode(tsf.signature[:]), tsf.lastValidBlockHeight)
 		if err != nil {
 			if failed {
-				if err := s.resetTransaction(tsf); err != nil {
-					log.Printf("failed to reset transaction for %s\n", base58.Encode(tsf.signature[:]))
+				if i < validatedTsfsSize {
+					if err := s.solRecorder.ResetFailedValidatedTransfer(tsf.id); err != nil {
+						log.Printf("failed to reset transaction for %s\n", base58.Encode(tsf.signature[:]))
+					}
+				} else {
+					if err := s.solRecorder.ResetFailedExecutedTransfer(tsf.id); err != nil {
+						log.Printf("failed to reset transaction for %s\n", base58.Encode(tsf.signature[:]))
+					}
 				}
 			}
 			continue
@@ -145,7 +150,17 @@ func (s *SolProcessor) ConfirmTransfers() error {
 	return nil
 }
 
-func (s *SolProcessor) confirmTransfer(sig string) (bool, bool, error) {
+func (s *SolProcessor) confirmTransfer(sig string, lastValidHeight uint64) (bool, bool, error) {
+	rl.Take()
+	currentHeight, err := s.client.RpcClient.GetBlockHeight(context.Background())
+	if err != nil || currentHeight.Error != nil {
+		log.Printf("failed to get current block height, %+v\n", err)
+		return false, false, errors.New("failed to get current block height")
+	}
+	if currentHeight.Result > lastValidHeight {
+		return false, true, errors.New("transaction is expired")
+	}
+
 	rl.Take()
 	status, err := s.client.GetSignatureStatusWithConfig(
 		context.Background(),
@@ -176,13 +191,6 @@ func (s *SolProcessor) confirmTransfer(sig string) (bool, bool, error) {
 func isTxConfirmed(status *rpc.SignatureStatus) bool {
 	return status.Err == nil && status.Slot > 0 && status.ConfirmationStatus != nil &&
 		*status.ConfirmationStatus == rpc.CommitmentFinalized
-}
-
-func (s *SolProcessor) resetTransaction(tx *SOLRawTransaction) error {
-	if err := s.solRecorder.ResetFailedTransfer(tx.id); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s *SolProcessor) SubmitTransfers() error {
@@ -272,7 +280,7 @@ func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction, totalWeight u
 		return s.solRecorder.ResetTransferInProcess(transfer.id)
 	}
 
-	tx, submmitedHeight, err := s.buildTransaction(transfer, validWitness)
+	tx, lastValidHeight, err := s.buildTransaction(transfer, validWitness)
 	if err != nil {
 		log.Printf("failed to build transaction for %s, %v\n", transfer.id, err)
 		return s.solRecorder.ResetTransferInProcess(transfer.id)
@@ -301,7 +309,7 @@ func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction, totalWeight u
 		return err
 	}
 	relayerAddr := ethcommon.BytesToAddress(s.privateKey.PublicKey.Bytes())
-	return s.solRecorder.MarkAsValidated(transfer.id, sigBytes, relayerAddr, submmitedHeight+_validBlockHeight)
+	return s.solRecorder.MarkAsValidated(transfer.id, sigBytes, relayerAddr, lastValidHeight)
 }
 
 func (s *SolProcessor) buildTransaction(transfer *SOLRawTransaction, witnesses []*Witness) (soltypes.Transaction, uint64, error) {
@@ -433,7 +441,7 @@ func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (so
 			Addresses:   addrs,
 		}),
 	}
-	tx, _, err := s.buildOptimalTransaction(instrs, nil)
+	tx, lastValidHeight, err := s.buildOptimalTransaction(instrs, nil)
 	if err != nil {
 		return soltypes.AddressLookupTableAccount{}, err
 	}
@@ -444,7 +452,7 @@ func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (so
 		return soltypes.AddressLookupTableAccount{}, err
 	}
 
-	if err := s.confirmLookupTable(sig); err != nil {
+	if err := s.confirmLookupTable(sig, lastValidHeight); err != nil {
 		return soltypes.AddressLookupTableAccount{}, err
 	}
 
@@ -456,14 +464,14 @@ func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (so
 	}, nil
 }
 
-func (s *SolProcessor) confirmLookupTable(sig string) error {
+func (s *SolProcessor) confirmLookupTable(sig string, lastValidHeight uint64) error {
 	timeout := time.After(60 * time.Second)
 	for {
 		select {
 		case <-timeout:
 			return errors.Errorf("timeout to confirm transaction %s", sig)
 		default:
-			confirmed, failed, err := s.confirmTransfer(sig)
+			confirmed, failed, err := s.confirmTransfer(sig, lastValidHeight)
 			if err != nil || failed {
 				return errors.Errorf("failed to confirm transaction %s", sig)
 			}
@@ -481,7 +489,7 @@ func (s *SolProcessor) executeTransfer(transfer *SOLRawTransaction) error {
 		return errors.Wrapf(err, "failed to mark %s as processing", transfer.id.String())
 	}
 
-	tx, submmitedHeight, err := s.buildTransactionForExecution(transfer)
+	tx, lastValidHeight, err := s.buildTransactionForExecution(transfer)
 	if err != nil {
 		log.Printf("failed to build transaction for %s, %v\n", transfer.id, err)
 		return s.solRecorder.ResetExecutionInProcess(transfer.id)
@@ -503,7 +511,7 @@ func (s *SolProcessor) executeTransfer(transfer *SOLRawTransaction) error {
 		return err
 	}
 	relayerAddr := ethcommon.BytesToAddress(s.privateKey.PublicKey.Bytes())
-	return s.solRecorder.MarkAsExecuted(transfer.id, sigBytes, relayerAddr, submmitedHeight+_validBlockHeight)
+	return s.solRecorder.MarkAsExecuted(transfer.id, sigBytes, relayerAddr, lastValidHeight)
 }
 
 func (s *SolProcessor) buildTransactionForExecution(transfer *SOLRawTransaction) (soltypes.Transaction, uint64, error) {

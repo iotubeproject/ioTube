@@ -489,26 +489,28 @@ func (s *SolRecorder) MarkAsSettled(id common.Hash) error {
 }
 
 func (s *SolRecorder) ResetFailedTransfer(id common.Hash) error {
-	return s.reset(id, ValidationInProcess)
+	return s.reset(id, WaitingForWitnesses, ValidationInProcess)
+}
+
+func (s *SolRecorder) ResetFailedValidatedTransfer(id common.Hash) error {
+	return s.reset(id, WaitingForWitnesses, ValidationSubmitted)
+}
+
+func (s *SolRecorder) ResetFailedExecutedTransfer(id common.Hash) error {
+	return s.reset(id, ValidationValidationSettled, ValidationExecuted)
 }
 
 func (s *SolRecorder) ResetTransferInProcess(id common.Hash) error {
-	return s.reset(id, ValidationInProcess)
+	return s.reset(id, WaitingForWitnesses, ValidationInProcess)
 }
 
 func (s *SolRecorder) ResetExecutionInProcess(id common.Hash) error {
-	log.Printf("reset transfer %s\n", id.Hex())
-	result, err := s.store.DB().Exec(s.updateStatusQuery, ValidationValidationSettled, id.Hex(), ValidationInProcess)
-	if err != nil {
-		return errors.Wrap(err, "failed to reset")
-	}
-
-	return validateResult(result)
+	return s.reset(id, ValidationValidationSettled, ValidationInProcess)
 }
 
-func (s *SolRecorder) reset(id common.Hash, status ValidationStatusType) error {
+func (s *SolRecorder) reset(id common.Hash, newStatus, oldStatus ValidationStatusType) error {
 	log.Printf("reset transfer %s\n", id.Hex())
-	result, err := s.store.DB().Exec(s.updateStatusQuery, WaitingForWitnesses, id.Hex(), status)
+	result, err := s.store.DB().Exec(s.updateStatusQuery, newStatus, id.Hex(), oldStatus)
 	if err != nil {
 		return errors.Wrap(err, "failed to reset")
 	}
