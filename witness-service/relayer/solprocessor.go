@@ -26,8 +26,9 @@ import (
 )
 
 const (
-	_limitSize       = 64
-	_solanaRPCMaxQPS = 10
+	_limitSize                               = 64
+	_solanaRPCMaxQPS                         = 10
+	DEFAULT_COMPUTE_UNIT_PRICE_MICROLAMPORTS = 100_000
 )
 
 var (
@@ -294,7 +295,12 @@ func (s *SolProcessor) submitTransfer(transfer *SOLRawTransaction, totalWeight u
 	log.Printf("transaction %s is built, length: %d\n", base58.Encode(transfer.id[:]), len(raw))
 
 	rl.Take()
-	sig, err := s.client.SendTransaction(context.Background(), tx)
+	sig, err := s.client.SendTransactionWithConfig(context.Background(), tx,
+		client.SendTransactionConfig{
+			SkipPreflight: true,
+			MaxRetries:    0,
+		},
+	)
 	if err != nil {
 		log.Printf("failed to submit transaction %s, %v\n", transfer.id, err)
 		if recorderErr := s.solRecorder.ResetTransferInProcess(transfer.id); recorderErr != nil {
@@ -447,7 +453,12 @@ func (s *SolProcessor) buildAddressLookupTable(accts []soltypes.AccountMeta) (so
 	}
 
 	rl.Take()
-	sig, err := s.client.SendTransaction(context.Background(), tx)
+	sig, err := s.client.SendTransactionWithConfig(context.Background(), tx,
+		client.SendTransactionConfig{
+			SkipPreflight: true,
+			MaxRetries:    0,
+		},
+	)
 	if err != nil {
 		return soltypes.AddressLookupTableAccount{}, err
 	}
@@ -496,7 +507,12 @@ func (s *SolProcessor) executeTransfer(transfer *SOLRawTransaction) error {
 	}
 
 	rl.Take()
-	sig, err := s.client.SendTransaction(context.Background(), tx)
+	sig, err := s.client.SendTransactionWithConfig(context.Background(), tx,
+		client.SendTransactionConfig{
+			SkipPreflight: true,
+			MaxRetries:    0,
+		},
+	)
 	if err != nil {
 		log.Printf("failed to submit transaction %s, %v\n", transfer.id, err)
 		if recorderErr := s.solRecorder.ResetExecutionInProcess(transfer.id); recorderErr != nil {
@@ -567,7 +583,8 @@ func (s *SolProcessor) buildOptimalTransaction(
 	if err != nil {
 		return soltypes.Transaction{}, 0, errors.Wrap(err, "failed to compute budget")
 	}
-	redundantBudget := uint32(1.05 * float32(computeBudget))
+	// redundantBudget := uint32(1.00 * float32(computeBudget))
+	redundantBudget := uint32(computeBudget)
 	log.Printf("compute budget: %d, redundant budget: %d\n", computeBudget, redundantBudget)
 
 	priorityFee, err := s.getPriorityFee(instructions)
@@ -671,6 +688,14 @@ func (s *SolProcessor) getPriorityFee(instructions []soltypes.Instruction) (uint
 		return 0, err
 	}
 
+	ret := medianFee(fees) + 1
+	if ret < DEFAULT_COMPUTE_UNIT_PRICE_MICROLAMPORTS {
+		return DEFAULT_COMPUTE_UNIT_PRICE_MICROLAMPORTS, nil
+	}
+	return ret, nil
+}
+
+func medianFee(fees rpc.PrioritizationFees) uint64 {
 	sort.Slice(fees, func(i, j int) bool {
 		return fees[i].PrioritizationFee < fees[j].PrioritizationFee
 	})
@@ -685,7 +710,17 @@ func (s *SolProcessor) getPriorityFee(instructions []soltypes.Instruction) (uint
 		fee = fees[n/2].PrioritizationFee
 	}
 	if fee < 1 {
-		return 1, nil
+		return 1
 	}
-	return fee, nil
+	return fee
+}
+
+func maxFee(fees rpc.PrioritizationFees) uint64 {
+	m := uint64(1)
+	for _, fee := range fees {
+		if fee.PrioritizationFee > m {
+			m = fee.PrioritizationFee
+		}
+	}
+	return m
 }
