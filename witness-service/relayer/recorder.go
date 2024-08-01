@@ -833,7 +833,7 @@ func (recorder *Recorder) AddNewTX(height uint64, txHash []byte) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	result, err := recorder.store.DB().Exec(fmt.Sprintf(
-		"INSERT INTO %s (txHash, blockheight) VALUES (?, ?) ON DUPLICATE KEY UPDATE",
+		"INSERT INTO %s (txHash, blockheight) VALUES (?, ?)",
 		recorder.newTXTableName), hex.EncodeToString(txHash), height)
 	if err != nil {
 		return errors.Wrap(err, "failed to add new TX")

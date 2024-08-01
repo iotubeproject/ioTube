@@ -78,7 +78,9 @@ func CTokenTransactionAccounts(
 		Token          solcommon.PublicKey
 		TokenMint      solcommon.PublicKey
 		Destination    uint32
-		Fee            uint64
+		Index          uint64
+		Max            uint64
+		Min            uint64
 	}{}
 	if err := borsh.Deserialize(&cTokenInfo, cTokenAccount.Data); err != nil {
 		panic(err)
