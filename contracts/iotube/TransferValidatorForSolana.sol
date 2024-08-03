@@ -70,6 +70,7 @@ contract TransferValidator is Pausable {
         require(amount != 0, "amount cannot be zero");
         require(to != address(0), "recipient cannot be zero");
         require(signatures.length % 65 == 0, "invalid signature length");
+        require((from.length == 20 && cashier.length == 20) || (from.length == 32 && cashier.length == 32), "illegal address length");
         bytes32 key = generateKey(cashier, tokenAddr, index, from, to, amount, payload);
         require(settles[key] == 0, "transfer has been settled");
         address[] memory witnesses = extractWitnesses(key, signatures);
