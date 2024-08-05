@@ -10,10 +10,15 @@ cashiers:
   - id: "iotex-to-solana"
     relayerURL: ":7007"
     startBlockHeight: 
-    validatorContractAddress: ""
-    cashierContractAddress: ""
+    validatorContractAddress: "7yDLTWW6DXf1UW87TkKusELA7N7xfq9bhRe3WRHCHHDK"
+    cashierContractAddress: "io1rjq9qlvj4pnfna3hxu3qy3mc359yhlg3hyjwl7"
     transferTableName: "iotex_transfers"
     tokenPairs:
-      - token1: ""
-        token2: ""
+      - token1: "io158elyywekvljpp4gqzzzsdkk0ufehxn6g3aa0u"
+        token2: "3qdPWqm2iEYkTXRk3XGkuabEeXfentCUwJP1cCWrkre5"
+      - token1: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
+        token2: "DABKRs16PqEmeysCp8fUXShQVMmLKYgBShbjZQgCHTo1"
+    decimalRound:
+      - token1: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
+        amount: -9
 destinationChain: "solana"

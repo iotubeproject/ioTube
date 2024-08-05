@@ -83,6 +83,10 @@ function downloadConfigFile() {
     copyFile "witness-config-bsc.secret.yaml" "witness-config-bsc.secret.yaml" 0
     copyFile "witness-config-matic.yaml" "witness-config-matic.yaml" 1
     copyFile "witness-config-matic.secret.yaml" "witness-config-matic.secret.yaml" 0
+    copyFile "witness-config-solana.yaml" "witness-config-solana.yaml" 1
+    copyFile "witness-config-solana.secret.yaml" "witness-config-solana.secret.yaml" 0
+    copyFile "witness-config-iotex-solana.yaml" "witness-config-iotex-solana.yaml" 1
+    copyFile "witness-config-iotex-solana.secret.yaml" "witness-config-iotex-solana.secret.yaml" 0
     envFile=${IOTEX_WITNESS}/etc/.env
     if [[ ! -f ${envFile} ]]; then
         touch ${envFile}
