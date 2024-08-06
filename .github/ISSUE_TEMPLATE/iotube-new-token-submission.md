@@ -26,7 +26,7 @@ Please read the token submission guide here: https://docs.iotube.org/introductio
 https://...
 
 ## Short description of your project
-Descrie your project here
+Describe your project here
 
 ## What is the blockchain (source blockchain) that your token is issued on
 
@@ -34,6 +34,7 @@ Descrie your project here
 * [ ] Binance Smart Chain
 * [ ] Polygon
 * [ ] IoTeX
+* [ ] Solana
 
 ## What blockchains (destination blockchain) would you like your token is bridged to
 
@@ -41,6 +42,7 @@ Descrie your project here
 * [ ] Binance Smart Chain
 * [ ] Polygon
 * [ ] IoTeX
+* [ ] Solana 
 
 (Please check https://docs.iotube.org/introduction/token-submission#integration-fee for integration fees of different blockchains)
 
@@ -55,8 +57,9 @@ Address:
 ## Your social channels
 
 - Telegram:
-- Twitter:
+- X:
 - Discord:
+- Website: 
 
 ## Verification of the token
 
@@ -71,6 +74,6 @@ Please provide the verification of your token in one of the following ways.
 Please send a few test tokens ($1-$10 worth) to our wallet address: `0x571e603e3B5c82Bd40998C538603dF4fb42bB051`.
 
 ## Integration fee 
-
+Please refer to https://docs.iotube.org/introduction/token-submission for the full list of integration fees. 
 
 Please send the payment to `0x571e603e3B5c82Bd40998C538603dF4fb42bB051` or `io12u0xq03mtjpt6sye33fcvq7lf76zhvz3yvt8q0` and post your txn link here.
