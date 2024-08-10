@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
-	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 var zeroAddress = common.Address{}
@@ -49,10 +48,6 @@ type (
 		validator           validatorContract
 		witnessListContract *contract.AddressListCaller
 		witnesses           map[string]bool
-
-		bonus         *big.Int
-		bonusTokens   map[common.Address]*big.Int
-		bonusRecorder map[common.Address]time.Time
 	}
 
 	validatorContract interface {
@@ -143,8 +138,8 @@ func (v *validatorWithoutPayload) SubmitTransfer(opts *bind.TransactOpts, transf
 	return v.Submit(opts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
 }
 
-// newTransferValidatorOnEthereum creates a new TransferValidator
-func newTransferValidatorOnEthereum(
+// NewTransferValidatorOnEthereum creates a new TransferValidator
+func NewTransferValidatorOnEthereum(
 	client *ethclient.Client,
 	privateKeys []*ecdsa.PrivateKey,
 	confirmBlockNumber uint16,
@@ -155,8 +150,6 @@ func newTransferValidatorOnEthereum(
 	gasPriceGap *big.Int,
 	version Version,
 	validatorContractAddr common.Address,
-	bonusTokens map[string]*big.Int,
-	bonus *big.Int,
 ) (*transferValidatorOnEthereum, error) {
 	validator, err := newValidatorContract(version, validatorContractAddr, client)
 	if err != nil {
@@ -184,19 +177,6 @@ func newTransferValidatorOnEthereum(
 
 		client:    client,
 		validator: validator,
-
-		bonusRecorder: map[common.Address]time.Time{},
-		bonusTokens:   map[common.Address]*big.Int{},
-		bonus:         bonus,
-	}
-	if bonus != nil && bonus.Cmp(big.NewInt(0)) > 0 {
-		for token, threshold := range bonusTokens {
-			addr, err := util.ParseAddress(token)
-			if err != nil {
-				return nil, err
-			}
-			tv.bonusTokens[addr] = threshold
-		}
 	}
 
 	callOpts, err := tv.callOpts()
@@ -262,70 +242,6 @@ func (tv *transferValidatorOnEthereum) isActiveWitness(witness common.Address) b
 	val, ok := tv.witnesses[witness.Hex()]
 
 	return ok && val
-}
-
-func (tv *transferValidatorOnEthereum) sendBonus(privateKey *ecdsa.PrivateKey, recipient common.Address) error {
-	ctx := context.Background()
-	balance, err := tv.client.PendingBalanceAt(ctx, recipient)
-	if err != nil {
-		return err
-	}
-	if balance.Cmp(big.NewInt(0)) > 0 {
-		log.Println("not a zero balance account")
-		return nil
-	}
-	code, err := tv.client.CodeAt(ctx, recipient, nil)
-	if err != nil {
-		return err
-	}
-	if len(code) != 0 {
-		log.Println("not a common account")
-		return nil
-	}
-	nonce, err := tv.client.PendingNonceAt(ctx, recipient)
-	if err != nil {
-		return err
-	}
-	if nonce != 0 {
-		log.Println("not a new account")
-		return nil
-	}
-	if _, ok := tv.bonusRecorder[recipient]; ok {
-		log.Println("bonus already sent")
-		return nil
-	}
-	gasPrice, err := tv.client.SuggestGasPrice(ctx)
-	if err != nil {
-		return err
-	}
-	pendingNonce, err := tv.client.PendingNonceAt(ctx, crypto.PubkeyToAddress(privateKey.PublicKey))
-	if err != nil {
-		return err
-	}
-	tx := types.NewTransaction(pendingNonce, recipient, tv.bonus, uint64(21000), gasPrice, []byte{})
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tv.chainID), privateKey)
-	if err != nil {
-		return err
-	}
-	if err := tv.client.SendTransaction(context.Background(), signedTx); err != nil {
-		return err
-	}
-	tv.bonusRecorder[recipient] = time.Now()
-
-	return nil
-}
-
-func (tv *transferValidatorOnEthereum) SendBonus(transfer *Transfer) error {
-	tv.mu.Lock()
-	defer tv.mu.Unlock()
-	threshold, ok := tv.bonusTokens[transfer.token]
-	if !ok || transfer.amount.Cmp(threshold) < 0 {
-		return nil
-	}
-	log.Printf("\t\tthreshold %d < amount %d\n", threshold, transfer.amount)
-	privateKey := tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
-
-	return tv.sendBonus(privateKey, transfer.recipient)
 }
 
 // Check returns true if a transfer has been settled

@@ -71,18 +71,18 @@ function copyFile() {
 
 function downloadConfigFile() {
     copyFile "docker-compose-witness.yml" "docker-compose.yml" 1
-    copyFile "witness-config-iotex.yaml" "witness-config-iotex.yaml" 1
-    copyFile "witness-config-iotex.secret.yaml" "witness-config-iotex.secret.yaml" 0
-    copyFile "witness-config-ethereum.yaml" "witness-config-ethereum.yaml" 1
-    copyFile "witness-config-ethereum.secret.yaml" "witness-config-ethereum.secret.yaml" 0
-    #copyFile "witness-config-heco.yaml" "witness-config-heco.yaml" 1
-    #copyFile "witness-config-heco.secret.yaml" "witness-config-heco.secret.yaml" 0
-    #copyFile "witness-config-polis.yaml" "witness-config-polis.yaml" 1
-    #copyFile "witness-config-polis.secret.yaml" "witness-config-polis.secret.yaml" 0
-    copyFile "witness-config-bsc.yaml" "witness-config-bsc.yaml" 1
-    copyFile "witness-config-bsc.secret.yaml" "witness-config-bsc.secret.yaml" 0
-    copyFile "witness-config-matic.yaml" "witness-config-matic.yaml" 1
-    copyFile "witness-config-matic.secret.yaml" "witness-config-matic.secret.yaml" 0
+    copyFile "configs/witness-config-iotex.yaml" "witness-config-iotex.yaml" 1
+    copyFile "configs/witness-config-iotex.secret.yaml" "witness-config-iotex.secret.yaml" 0
+    copyFile "configs/witness-config-ethereum.yaml" "witness-config-ethereum.yaml" 1
+    copyFile "configs/witness-config-ethereum.secret.yaml" "witness-config-ethereum.secret.yaml" 0
+    #copyFile "configs/witness-config-heco.yaml" "witness-config-heco.yaml" 1
+    #copyFile "configs/witness-config-heco.secret.yaml" "witness-config-heco.secret.yaml" 0
+    #copyFile "configs/witness-config-polis.yaml" "witness-config-polis.yaml" 1
+    #copyFile "configs/witness-config-polis.secret.yaml" "witness-config-polis.secret.yaml" 0
+    copyFile "configs/witness-config-bsc.yaml" "witness-config-bsc.yaml" 1
+    copyFile "configs/witness-config-bsc.secret.yaml" "witness-config-bsc.secret.yaml" 0
+    copyFile "configs/witness-config-matic.yaml" "witness-config-matic.yaml" 1
+    copyFile "configs/witness-config-matic.secret.yaml" "witness-config-matic.secret.yaml" 0
     envFile=${IOTEX_WITNESS}/etc/.env
     if [[ ! -f ${envFile} ]]; then
         touch ${envFile}

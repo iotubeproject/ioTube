@@ -379,7 +379,7 @@ func (recorder *Recorder) Transfer(_id common.Hash) (*Transfer, error) {
 	var err error
 	tx.payload, err = util.DecodeNullString(payload)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to decode payload %s", payload)
+		return nil, errors.Wrapf(err, "failed to decode payload %s", payload.String)
 	}
 	if toToken, ok := recorder.tokenPairs[tx.token]; ok {
 		tx.coToken = toToken

@@ -64,42 +64,42 @@ function downloadConfigFile() {
     fi
     
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-iotex.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/relayer-config-iotex.yaml ${IOTEX_RELAYER}/etc/relayer-config-iotex.yaml
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-iotex.yaml ${IOTEX_RELAYER}/etc/relayer-config-iotex.yaml
         if [ $? -ne 0 ];then
             echo "Get config error"
             exit 2
         fi
     fi
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-ethereum.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/relayer-config-ethereum.yaml ${IOTEX_RELAYER}/etc/relayer-config-ethereum.yaml
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-ethereum.yaml ${IOTEX_RELAYER}/etc/relayer-config-ethereum.yaml
         if [ $? -ne 0 ];then
             echo "Get config error"
             exit 2
         fi
     fi
 #    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-heco.yaml ]];then
-#        cp -f $PROJECT_ABS_DIR/relayer-config-heco.yaml ${IOTEX_RELAYER}/etc/relayer-config-heco.yaml
+#        cp -f $PROJECT_ABS_DIR/configs/relayer-config-heco.yaml ${IOTEX_RELAYER}/etc/relayer-config-heco.yaml
 #        if [ $? -ne 0 ];then
 #            echo "Get config error"
 #            exit 2
 #        fi
 #    fi
 #    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-polis.yaml ]];then
-#        cp -f $PROJECT_ABS_DIR/relayer-config-polis.yaml ${IOTEX_RELAYER}/etc/relayer-config-polis.yaml
+#        cp -f $PROJECT_ABS_DIR/configs/relayer-config-polis.yaml ${IOTEX_RELAYER}/etc/relayer-config-polis.yaml
 #        if [ $? -ne 0 ];then
 #            echo "Get config error"
 #            exit 2
 #        fi
 #    fi
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-bsc.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/relayer-config-bsc.yaml ${IOTEX_RELAYER}/etc/relayer-config-bsc.yaml
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-bsc.yaml ${IOTEX_RELAYER}/etc/relayer-config-bsc.yaml
         if [ $? -ne 0 ];then
             echo "Get config error"
             exit 2
         fi
     fi
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml ]];then
-        cp -f $PROJECT_ABS_DIR/relayer-config-matic.yaml ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-matic.yaml ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml
         if [ $? -ne 0 ];then
             echo "Get config error"
             exit 2

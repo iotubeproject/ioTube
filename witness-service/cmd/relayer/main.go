@@ -21,50 +21,51 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/iotexproject/iotex-address/address"
-	"github.com/iotexproject/iotex-antenna-go/v2/account"
-	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
-	"github.com/iotexproject/iotex-proto/golang/iotexapi"
 	"go.uber.org/config"
-	"google.golang.org/grpc"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/relayer"
 	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
-// Configuration defines the configuration of the witness service
-type Configuration struct {
-	Chain                 string        `json:"chain" yaml:"chain"`
-	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
-	EthConfirmBlockNumber uint16        `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
-	EthDefaultGasPrice    uint64        `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
-	EthGasPriceLimit      uint64        `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
-	EthGasPriceHardLimit  uint64        `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
-	EthGasPriceDeviation  int64         `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
-	EthGasPriceGap        uint64        `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
-	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
-	Interval              time.Duration `json:"interval" yaml:"interval"`
-	ValidatorAddress      string        `json:"validatorAddress" yaml:"validatorAddress"`
-	ValidatorWithPayload  string        `json:"validatorWithPayload" yaml:"validatorWithPayload"`
+type (
+	ValidatorConfig struct {
+		Address     string   `json:"address" yaml:"address"`
+		Cashiers    []string `json:"cashiers" yaml:"cashiers"`
+		WithPayload bool     `json:"withPayload" yaml:"withPayload"`
+	}
+	// Configuration defines the configuration of the witness service
+	Configuration struct {
+		Chain                 string            `json:"chain" yaml:"chain"`
+		ClientURL             string            `json:"clientURL" yaml:"clientURL"`
+		EthConfirmBlockNumber uint16            `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+		EthDefaultGasPrice    uint64            `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
+		EthGasPriceLimit      uint64            `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+		EthGasPriceHardLimit  uint64            `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
+		EthGasPriceDeviation  int64             `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
+		EthGasPriceGap        uint64            `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
+		PrivateKey            string            `json:"privateKey" yaml:"privateKey"`
+		Interval              time.Duration     `json:"interval" yaml:"interval"`
+		Validators            []ValidatorConfig `json:"validators" yaml:"validators"`
 
-	BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
-	Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
+		BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
+		Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
 
-	AlwaysReset       bool      `json:"alwaysReset" yaml:"alwaysReset"`
-	SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
-	LarkWebHook       string    `json:"larkWebHook" yaml:"larkWebHook"`
-	GrpcPort          int       `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort     int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	Database          db.Config `json:"database" yaml:"database"`
-	ExplorerDatabase  db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
-	TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
-	WitnessTableName  string    `json:"witnessTableName" yaml:"witnessTableName"`
-	ExplorerTableName string    `json:"explorerTableName" yaml:"explorerTableName"`
-}
+		AlwaysReset       bool      `json:"alwaysReset" yaml:"alwaysReset"`
+		SlackWebHook      string    `json:"slackWebHook" yaml:"slackWebHook"`
+		LarkWebHook       string    `json:"larkWebHook" yaml:"larkWebHook"`
+		GrpcPort          int       `json:"grpcPort" yaml:"grpcPort"`
+		GrpcProxyPort     int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+		Database          db.Config `json:"database" yaml:"database"`
+		ExplorerDatabase  db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
+		TransferTableName string    `json:"transferTableName" yaml:"transferTableName"`
+		WitnessTableName  string    `json:"witnessTableName" yaml:"witnessTableName"`
+		ExplorerTableName string    `json:"explorerTableName" yaml:"explorerTableName"`
+	}
+)
 
 var defaultConfig = Configuration{
-	Chain:                 "iotex",
+	Chain:                 "iotex-e",
 	Interval:              time.Hour,
 	ClientURL:             "",
 	EthConfirmBlockNumber: 20,
@@ -126,9 +127,6 @@ func main() {
 	if pk, ok := os.LookupEnv("RELAYER_PRIVATE_KEY"); ok {
 		cfg.PrivateKey = pk
 	}
-	if validatorAddr, ok := os.LookupEnv("RELAYER_VALIDATOR_ADDRESS"); ok {
-		cfg.ValidatorAddress = validatorAddr
-	}
 	// TODO: load more parameters from env
 	if cfg.SlackWebHook != "" {
 		util.SetSlackURL(cfg.SlackWebHook)
@@ -164,76 +162,47 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to create eth client %v\n", err)
 		}
-		var validatorAddr *common.Address
-		if cfg.ValidatorAddress != "" {
-			*validatorAddr, err = util.ParseAddress(cfg.ValidatorAddress)
+		validators := map[common.Address]relayer.TransferValidator{}
+		for _, vc := range cfg.Validators {
+			validatorAddr, err := util.ParseAddress(vc.Address)
 			if err != nil {
-				log.Fatalf("failed to parse validator address %s: %+v", cfg.ValidatorAddress, err)
+				log.Fatalf("failed to parse validator address %s: %+v", vc.Address, err)
+			}
+			version := relayer.NoPayload
+			if vc.WithPayload {
+				version = relayer.Payload
+			}
+			validator, err := relayer.NewTransferValidatorOnEthereum(
+				ethClient,
+				privateKeys,
+				cfg.EthConfirmBlockNumber,
+				new(big.Int).SetUint64(cfg.EthDefaultGasPrice),
+				new(big.Int).SetUint64(cfg.EthGasPriceLimit),
+				new(big.Int).SetUint64(cfg.EthGasPriceHardLimit),
+				new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
+				new(big.Int).SetUint64(cfg.EthGasPriceGap),
+				version,
+				validatorAddr,
+			)
+			if err != nil {
+				log.Fatalf("failed to create validator: %+v\n", err)
+			}
+			for _, cashier := range vc.Cashiers {
+				cashierAddr, err := util.ParseAddress(cashier)
+				if err != nil {
+					log.Fatalf("failed to parse cashier address %s: %+v", cashier, err)
+				}
+				validators[cashierAddr] = validator
 			}
 		}
-		var validatorWithPayload *common.Address
-		if cfg.ValidatorWithPayload != "" {
-			*validatorWithPayload, err = util.ParseAddress(cfg.ValidatorWithPayload)
-			if err != nil {
-				log.Fatalf("failed to parse validator with payload address %s: %+v", cfg.ValidatorWithPayload, err)
-			}
-		}
-		service, err = relayer.NewServiceOnEthereum(
-			relayer.NewRecorder(
-				storeFactory.NewStore(cfg.Database),
-				storeFactory.NewStore(cfg.ExplorerDatabase),
-				cfg.TransferTableName,
-				cfg.WitnessTableName,
-				cfg.ExplorerTableName,
-			),
-			cfg.Interval,
-			ethClient,
-			privateKeys,
-			cfg.EthConfirmBlockNumber,
-			new(big.Int).SetUint64(cfg.EthDefaultGasPrice),
-			new(big.Int).SetUint64(cfg.EthGasPriceLimit),
-			new(big.Int).SetUint64(cfg.EthGasPriceHardLimit),
-			new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
-			new(big.Int).SetUint64(cfg.EthGasPriceGap),
-			validatorAddr,
-			validatorWithPayload,
-			cfg.BonusTokens,
-			cfg.Bonus,
-		)
+		bonusSender, err := relayer.NewBonusSender(ethClient, privateKeys, cfg.BonusTokens, cfg.Bonus)
 		if err != nil {
-			log.Fatalf("failed to create relay service: %v\n", err)
-		}
-	case "iotex":
-		var conn *grpc.ClientConn
-		if strings.HasSuffix(cfg.ClientURL, ":443") {
-			conn, err = iotex.NewDefaultGRPCConn(cfg.ClientURL)
-		} else {
-			conn, err = iotex.NewGRPCConnWithoutTLS(cfg.ClientURL)
-		}
-		if err != nil {
-			log.Fatalf("failed to create a connection: %v\n", err)
-		}
-		// defer conn.Close()
-		acc, err := account.HexStringToAccount(cfg.PrivateKey)
-		if err != nil {
-			log.Fatal(err)
-		}
-		var validatorContractAddr *address.Address
-		if cfg.ValidatorAddress == "" {
-			*validatorContractAddr, err = address.FromString(cfg.ValidatorAddress)
-			if err != nil {
-				log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
-			}
-		}
-		var validatorWithPayload *address.Address
-		if cfg.ValidatorWithPayload == "" {
-			*validatorWithPayload, err = address.FromString(cfg.ValidatorWithPayload)
-			if err != nil {
-				log.Fatalf("failed to parse validator with payload address %s\n", cfg.ValidatorWithPayload)
-			}
+			log.Fatalf("failed to create bonus sender: %+v\n", err)
 		}
 
-		service, err = relayer.NewServiceOnIoTeX(
+		service, err = relayer.NewServiceOnEthereum(
+			validators,
+			bonusSender,
 			relayer.NewRecorder(
 				storeFactory.NewStore(cfg.Database),
 				storeFactory.NewStore(cfg.ExplorerDatabase),
@@ -242,11 +211,6 @@ func main() {
 				cfg.ExplorerTableName,
 			),
 			cfg.Interval,
-			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
-			validatorContractAddr,
-			validatorWithPayload,
-			cfg.BonusTokens,
-			cfg.Bonus,
 		)
 		if err != nil {
 			log.Fatalf("failed to create relay service: %v\n", err)

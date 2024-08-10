@@ -7,7 +7,10 @@ grpcPort: 7005
 grpcProxyPort: 8005
 privateKey: ""
 slackWebHook: "" 
-validatorAddress: "0xBa6DB98f32e66ad3eC20d79F062Eed50c6cb9F9f"
+validators:
+  address: "0xBa6DB98f32e66ad3eC20d79F062Eed50c6cb9F9f"
+  cashiers:
+    - "io1aw89kuzrlyekzvwqyw3e82c880qaxwup5hv7ee"
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
   driver: "mysql"

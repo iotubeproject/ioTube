@@ -2,15 +2,12 @@ package relayer
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"log"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -19,8 +16,6 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/iotexproject/ioTube/witness-service/util"
-	"github.com/iotexproject/iotex-address/address"
-	"github.com/iotexproject/iotex-antenna-go/v2/iotex"
 )
 
 type (
@@ -31,144 +26,45 @@ type (
 		response *services.ListResponse
 		ts       time.Time
 	}
+
 	// Service defines the relayer service
 	Service struct {
 		services.UnimplementedRelayServiceServer
-		transferValidators []TransferValidator
-		bonusSenders       []BonusSender
-		processor          dispatcher.Runner
-		recorder           *Recorder
-		cache              *lru.Cache
-		alwaysReset        bool
-		nonceTooLow        map[common.Hash]uint64
+		validators  map[common.Address]TransferValidator
+		bonusSender BonusSender
+		processor   dispatcher.Runner
+		recorder    *Recorder
+		cache       *lru.Cache
+		alwaysReset bool
+		nonceTooLow map[common.Hash]uint64
 	}
 )
 
-// NoPayload is the version without payload
-const NoPayload Version = "no-payload"
+const (
+	// NoPayload is the version without payload
+	NoPayload Version = "no-payload"
 
-// Payload is the version with payload
-const Payload Version = "payload"
+	// Payload is the version with payload
+	Payload Version = "payload"
+)
 
 // NewServiceOnEthereum creates a new relay service on Ethereum
 func NewServiceOnEthereum(
+	validators map[common.Address]TransferValidator,
+	bonusSender BonusSender,
 	recorder *Recorder,
 	interval time.Duration,
-	client *ethclient.Client,
-	privateKeys []*ecdsa.PrivateKey,
-	confirmBlockNumber uint16,
-	defaultGasPrice *big.Int,
-	gasPriceLimit *big.Int,
-	gasPriceHardLimit *big.Int,
-	gasPriceDeviation *big.Int,
-	gasPriceGap *big.Int,
-	validatorWithoutPayloadAddr *common.Address,
-	validatorWithPayloadAddr *common.Address,
-	bonusTokens map[string]*big.Int,
-	bonus *big.Int,
 ) (*Service, error) {
-	validators := make([]TransferValidator, 0, 2)
-	bonusSenders := make([]BonusSender, 0, 2)
-	if validatorWithoutPayloadAddr != nil {
-		validator, err := newTransferValidatorOnEthereum(
-			client,
-			privateKeys,
-			confirmBlockNumber,
-			defaultGasPrice,
-			gasPriceLimit,
-			gasPriceHardLimit,
-			gasPriceDeviation,
-			gasPriceGap,
-			NoPayload,
-			*validatorWithoutPayloadAddr,
-			bonusTokens,
-			bonus,
-		)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create transfer validator")
-		}
-		validators = append(validators, validator)
-		bonusSenders = append(bonusSenders, validator)
-	}
-	if validatorWithPayloadAddr != nil {
-		validatorWithPayload, err := newTransferValidatorOnEthereum(
-			client,
-			privateKeys,
-			confirmBlockNumber,
-			defaultGasPrice,
-			gasPriceLimit,
-			gasPriceHardLimit,
-			gasPriceDeviation,
-			gasPriceGap,
-			Payload,
-			*validatorWithPayloadAddr,
-			bonusTokens,
-			bonus,
-		)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create transfer validator")
-		}
-		validators = append(validators, validatorWithPayload)
-		bonusSenders = append(bonusSenders, validatorWithPayload)
-	}
-	return newService(validators, recorder, bonusSenders, interval)
-}
-
-// NewServiceOnIoTeX creates a new relay service on IoTeX
-func NewServiceOnIoTeX(
-	recorder *Recorder,
-	interval time.Duration,
-	client iotex.AuthedClient,
-	validatorContractAddr *address.Address,
-	validatorWithPayloadAddr *address.Address,
-	bonusTokens map[string]*big.Int,
-	bonus *big.Int,
-) (*Service, error) {
-	validators := make([]TransferValidator, 0, 2)
-	bonusSenders := make([]BonusSender, 0, 2)
-	if validatorContractAddr != nil {
-		validator, err := newTransferValidatorOnIoTeX(
-			client,
-			NoPayload,
-			*validatorContractAddr,
-			bonusTokens,
-			bonus,
-		)
-		if err != nil {
-			return nil, err
-		}
-		validators = append(validators, validator)
-		bonusSenders = append(bonusSenders, validator)
-	}
-	if validatorWithPayloadAddr != nil {
-		validatorWithPayload, err := newTransferValidatorOnIoTeX(
-			client,
-			Payload,
-			*validatorWithPayloadAddr,
-			bonusTokens,
-			bonus,
-		)
-		if err != nil {
-			return nil, err
-		}
-		validators = append(validators, validatorWithPayload)
-		bonusSenders = append(bonusSenders, validatorWithPayload)
-	}
-
-	return newService(validators, recorder, bonusSenders, interval)
-}
-
-func newService(validators []TransferValidator, recorder *Recorder, bonusSenders []BonusSender, interval time.Duration) (*Service, error) {
 	cache, err := lru.New(100)
 	if err != nil {
 		return nil, err
 	}
 	s := &Service{
-		transferValidators: validators,
-		bonusSenders:       bonusSenders,
-		recorder:           recorder,
-		cache:              cache,
-		nonceTooLow:        map[common.Hash]uint64{},
+		validators:  validators,
+		recorder:    recorder,
+		bonusSender: bonusSender,
+		cache:       cache,
+		nonceTooLow: map[common.Hash]uint64{},
 	}
 	processor, err := dispatcher.NewRunner(interval, s.process)
 	if err != nil {
@@ -202,32 +98,31 @@ func (s *Service) Stop(ctx context.Context) error {
 
 // Submit accepts a submission of witness
 func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
-	if s.transferValidators == nil {
+	if s.validators == nil {
 		return nil, errors.New("cannot accept new submission")
 	}
 	log.Printf("receive a witness from %x\n", w.Address)
-	for _, validator := range s.transferValidators {
-		transfer, err := UnmarshalTransferProto(validator.Address(), w.Transfer)
-		if err != nil {
-			return nil, err
-		}
-		witness, err := NewWitness(common.BytesToAddress(w.Address), w.Signature)
-		if err != nil {
-			return nil, err
-		}
-		if err := validateSignature(transfer.id.Bytes(), witness.addr, witness.signature); err != nil {
-			// log error for debugging
-			continue
-		}
-		if err := s.recorder.AddWitness(transfer, witness); err != nil {
-			return nil, err
-		}
-		return &services.WitnessSubmissionResponse{
-			Id:      transfer.id.Bytes(),
-			Success: true,
-		}, nil
+	transfer, err := UnmarshalTransferProto(w.Transfer)
+	if err != nil {
+		return nil, err
 	}
-	return nil, errors.New("no validator is found")
+	if _, ok := s.validators[common.BytesToAddress(w.Transfer.Cashier)]; !ok {
+		return nil, errors.New("no validator is found")
+	}
+	witness, err := NewWitness(common.BytesToAddress(w.Address), w.Signature)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateSignature(transfer.id.Bytes(), witness.addr, witness.signature); err != nil {
+		return nil, err
+	}
+	if err := s.recorder.AddWitness(transfer, witness); err != nil {
+		return nil, err
+	}
+	return &services.WitnessSubmissionResponse{
+		Id:      transfer.id.Bytes(),
+		Success: true,
+	}, nil
 }
 
 func validateSignature(id []byte, addr common.Address, signature []byte) error {
@@ -318,7 +213,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if skip+first > int32(count) {
 		first = int32(count) - skip
 	}
-	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), false, true, queryOpts...)
+	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), DESC, queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +311,7 @@ func (s *Service) Check(ctx context.Context, request *services.CheckRequest) (*s
 }
 
 func (s *Service) process() error {
-	if s.transferValidators == nil {
+	if s.validators == nil {
 		return nil
 	}
 	if err := s.sendBonus(); err != nil {
@@ -429,18 +324,21 @@ func (s *Service) process() error {
 }
 
 func (s *Service) sendBonus() error {
-	for _, sender := range s.bonusSenders {
-		transfers, err := s.recorder.Transfers(0, uint8(sender.Size()), false, false, StatusQueryOption(BonusPending))
-		if err != nil {
-			return errors.Wrap(err, "failed to read transfers to reward")
-		}
-		for _, transfer := range transfers {
-			if err := sender.SendBonus(transfer); err != nil {
-				util.Alert("failed to send reward" + err.Error())
-			} else {
-				if err := s.recorder.MarkAsSettled(transfer.id); err != nil {
-					util.Alert("failed to mark transfer as settled" + err.Error())
-				}
+	transfers, err := s.recorder.Transfers(
+		0,
+		uint8(s.bonusSender.Size()),
+		AESC,
+		StatusQueryOption(BonusPending),
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to read transfers to reward")
+	}
+	for _, transfer := range transfers {
+		if err := s.bonusSender.SendBonus(transfer); err != nil {
+			util.Alert("failed to send reward" + err.Error())
+		} else {
+			if err := s.recorder.MarkAsSettled(transfer.id); err != nil {
+				util.Alert("failed to mark transfer as settled" + err.Error())
 			}
 		}
 	}
@@ -448,8 +346,14 @@ func (s *Service) sendBonus() error {
 }
 
 func (s *Service) confirmTransfers() error {
-	for _, validator := range s.transferValidators {
-		validatedTransfers, err := s.recorder.Transfers(0, uint8(validator.Size())*2, false, false, StatusQueryOption(ValidationSubmitted))
+	for cashier, validator := range s.validators {
+		validatedTransfers, err := s.recorder.Transfers(
+			0,
+			uint8(validator.Size())*2,
+			AESC,
+			StatusQueryOption(ValidationSubmitted),
+			CashiersQueryOption([]common.Address{cashier}),
+		)
 		if err != nil {
 			return errors.Wrap(err, "failed to read transfers to confirm")
 		}
@@ -536,13 +440,26 @@ func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidato
 }
 
 func (s *Service) submitTransfers() error {
-	for _, validator := range s.transferValidators {
-		newTransfers, err := s.recorder.Transfers(0, uint8(validator.Size()), true, false, StatusQueryOption(WaitingForWitnesses), ExcludeTokenQueryOption(common.HexToAddress("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")))
+	for cashier, validator := range s.validators {
+		newTransfers, err := s.recorder.Transfers(
+			0,
+			uint8(validator.Size()),
+			AESC,
+			StatusQueryOption(WaitingForWitnesses),
+			ExcludeTokenQueryOption(common.HexToAddress("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")),
+			CashiersQueryOption([]common.Address{cashier}),
+		)
 		if err != nil {
 			return err
 		}
 		if len(newTransfers) == 0 {
-			newTransfers, err = s.recorder.Transfers(0, uint8(validator.Size()), false, false, StatusQueryOption(WaitingForWitnesses))
+			newTransfers, err = s.recorder.Transfers(
+				0,
+				uint8(validator.Size()),
+				AESC,
+				StatusQueryOption(WaitingForWitnesses),
+				CashiersQueryOption([]common.Address{cashier}),
+			)
 			if err != nil {
 				return err
 			}

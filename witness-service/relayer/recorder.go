@@ -495,21 +495,29 @@ func CashiersQueryOption(cashiers []common.Address) TransferQueryOption {
 	}
 }
 
+type (
+	// Order is the order of the records
+	Order bool
+)
+
+const (
+	// DESC is the descending order
+	DESC Order = true
+	// AESC is the ascending order
+	AESC Order = false
+)
+
 // Transfers returns the list of records of given status
 func (recorder *Recorder) Transfers(
 	offset uint32,
 	limit uint8,
-	byUpdateTime bool,
-	desc bool,
+	desc Order,
 	queryOpts ...TransferQueryOption,
 ) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	var query string
 	orderBy := "creationTime"
-	if byUpdateTime {
-		orderBy = "updateTime"
-	}
 	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())

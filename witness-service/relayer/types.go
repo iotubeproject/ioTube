@@ -105,7 +105,7 @@ var errGasPriceTooHigh = errors.New("gas price is too high")
 var errNoncritical = errors.New("error before submission")
 
 // UnmarshalTransferProto unmarshals a transfer proto
-func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transfer) (*Transfer, error) {
+func UnmarshalTransferProto(transfer *types.Transfer) (*Transfer, error) {
 	cashier := common.BytesToAddress(transfer.Cashier)
 	token := common.BytesToAddress(transfer.Token)
 	index := uint64(transfer.Index)
@@ -130,16 +130,6 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 			return nil, errors.Errorf("invalid gas price %s", transfer.GasPrice)
 		}
 	}
-	id := crypto.Keccak256Hash(
-		validatorAddr.Bytes(),
-		cashier.Bytes(),
-		token.Bytes(),
-		math.U256Bytes(new(big.Int).SetUint64(index)),
-		sender.Bytes(),
-		recipient.Bytes(),
-		math.U256Bytes(amount),
-		transfer.Payload,
-	)
 
 	return &Transfer{
 		cashier:     cashier,
@@ -149,13 +139,12 @@ func UnmarshalTransferProto(validatorAddr common.Address, transfer *types.Transf
 		recipient:   recipient,
 		amount:      amount,
 		fee:         fee,
-		id:          id,
 		gas:         transfer.Gas,
 		gasPrice:    gasPrice,
 		timestamp:   transfer.Timestamp.AsTime(),
 		txSender:    txSender,
 		blockHeight: transfer.BlockHeight,
-		payload:   transfer.Payload,
+		payload:     transfer.Payload,
 	}, nil
 }
 
@@ -168,6 +157,19 @@ func NewWitness(witnessAddr common.Address, signature []byte) (*Witness, error) 
 		addr:      witnessAddr,
 		signature: signature,
 	}, nil
+}
+
+func (transfer *Transfer) GenID(validatorAddr common.Address) {
+	transfer.id = crypto.Keccak256Hash(
+		validatorAddr.Bytes(),
+		transfer.cashier.Bytes(),
+		transfer.token.Bytes(),
+		math.U256Bytes(new(big.Int).SetUint64(transfer.index)),
+		transfer.sender.Bytes(),
+		transfer.recipient.Bytes(),
+		math.U256Bytes(transfer.amount),
+		transfer.payload,
+	)
 }
 
 func (transfer *Transfer) ID() common.Hash {

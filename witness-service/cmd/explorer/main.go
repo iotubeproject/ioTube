@@ -155,7 +155,7 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 	if skip+first > int32(count) {
 		first = int32(count) - skip
 	}
-	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), false, true, queryOpts...)
+	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), relayer.DESC, queryOpts...)
 	if err != nil {
 		return nil, err
 	}
