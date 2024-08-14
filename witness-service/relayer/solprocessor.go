@@ -11,6 +11,7 @@ import (
 	"github.com/blocto/solana-go-sdk/client"
 	"github.com/blocto/solana-go-sdk/common"
 	"github.com/blocto/solana-go-sdk/program/address_lookup_table"
+	"github.com/blocto/solana-go-sdk/program/associated_token_account"
 	"github.com/blocto/solana-go-sdk/program/compute_budget"
 	"github.com/blocto/solana-go-sdk/rpc"
 	soltypes "github.com/blocto/solana-go-sdk/types"
@@ -550,30 +551,62 @@ func (s *SolProcessor) buildExecutionInstruction(transfer *SOLRawTransaction) ([
 		voteRecordAddr,
 	)
 
+	token := common.PublicKeyFromBytes(transfer.token.Bytes())
+	userAccount := common.PublicKeyFromBytes(transfer.recipient.Bytes())
+	proposer := common.PublicKeyFromString(s.voteCfg.ProposalAddr)
+
+	instructions := make([]soltypes.Instruction, 0)
+
+	// check user account is wallet account
+	userAccountInfo, err := s.client.GetAccountInfo(context.Background(), userAccount.ToBase58())
+	if err != nil {
+		return nil, err
+	}
+	if userAccountInfo.Owner.String() != "11111111111111111111111111111111" {
+		return nil, errors.Wrap(err, "user account not wallet account")
+	}
+
+	// check and create ata if necessary
+	ata, _, err := common.FindAssociatedTokenAddress(userAccount, token)
+	if err != nil {
+		return nil, err
+	}
+	ataInfo, err := s.client.GetAccountInfo(context.Background(), ata.ToBase58())
+	if err != nil {
+		return nil, err
+	}
+	if ataInfo.Lamports == 0 {
+		// proposer as fee payer
+		instructions = append(instructions, associated_token_account.Create(associated_token_account.CreateParam{
+			Funder:                 proposer,
+			Owner:                  userAccount,
+			Mint:                   token,
+			AssociatedTokenAccount: ata,
+		}))
+	}
+
 	transactionAccounts, err := instruction.CTokenTransactionAccounts(
 		s.client,
-		common.PublicKeyFromBytes(transfer.token.Bytes()),
-		common.PublicKeyFromBytes(transfer.recipient.Bytes()),
+		token,
+		ata,
 		common.PublicKeyFromString(s.voteCfg.GovernanceAddr),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	executeTransactionInstr := instruction.ExecuteTransaction(
+	instructions = append(instructions, instruction.ExecuteTransaction(
 		common.PublicKeyFromString(s.voteCfg.ProgramID),
 		&instruction.ExecuteTransactionParam{
 			Governance:          common.PublicKeyFromString(s.voteCfg.GovernanceAddr),
-			Proposal:            common.PublicKeyFromString(s.voteCfg.ProposalAddr),
+			Proposal:            proposer,
 			VoteRecord:          voteRecordAddr,
 			RecordTranaction:    recordTranactionAddr,
 			TransactionAccounts: transactionAccounts,
 		},
-	)
+	))
 
-	return []soltypes.Instruction{
-		executeTransactionInstr,
-	}, nil
+	return instructions, nil
 }
 
 func (s *SolProcessor) buildOptimalTransaction(
