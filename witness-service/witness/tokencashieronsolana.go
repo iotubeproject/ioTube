@@ -189,7 +189,7 @@ func filterTubeTransfer(prefilledTsf *transferInfo, cashier solcommon.PublicKey,
 		patterns = []string{
 			fmt.Sprintf(`Program %s invoke \[1\]`, regexp.QuoteMeta(cashier.String())),
 			fmt.Sprintf(`Program %s invoke \[2\]`, regexp.QuoteMeta(splTokenProgramID)),
-			"Program log: Instruction: TransferChecked",
+			"Program log: Instruction: (TransferChecked|Burn)",
 			fmt.Sprintf(`Program %s consumed (\d+) of (\d+) compute units`, regexp.QuoteMeta(splTokenProgramID)),
 			fmt.Sprintf(`Program %s success`, regexp.QuoteMeta(splTokenProgramID)),
 			`Program log: Bridge: (.*)`,
