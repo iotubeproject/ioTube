@@ -562,7 +562,7 @@ func (s *SolProcessor) buildExecutionInstruction(transfer *SOLRawTransaction) ([
 	if err != nil {
 		return nil, err
 	}
-	if userAccountInfo.Owner.String() != "11111111111111111111111111111111" {
+	if userAccountInfo.Owner.String() != common.SystemProgramID.String() {
 		return nil, errors.Wrap(err, "user account not wallet account")
 	}
 
