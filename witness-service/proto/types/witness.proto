@@ -20,6 +20,7 @@ message Transfer {
     bytes txSender = 11;
     bytes payload = 12;
     bytes sourceTxHash = 13;
+    bytes ataOwner = 14;
 }
 
 message Witness {

@@ -45,6 +45,37 @@ func ExecuteTransaction(programID solcommon.PublicKey, param *ExecuteTransaction
 	}
 }
 
+type (
+	CTokenInfo struct {
+		Initialized    uint8
+		BumpSeed       uint8
+		TokenProgramId solcommon.PublicKey
+		Config         solcommon.PublicKey
+		Token          solcommon.PublicKey
+		TokenMint      solcommon.PublicKey
+		Destination    uint32
+		Index          uint64
+		Max            uint64
+		Min            uint64
+	}
+)
+
+func GetCTokenInfo(cli *client.Client, cToken solcommon.PublicKey) (*CTokenInfo, error) {
+	cTokenAccount, err := cli.GetAccountInfoWithConfig(context.Background(),
+		cToken.String(),
+		client.GetAccountInfoConfig{
+			Commitment: rpc.CommitmentFinalized,
+		})
+	if err != nil {
+		return nil, err
+	}
+	cTokenInfo := CTokenInfo{}
+	if err := borsh.Deserialize(&cTokenInfo, cTokenAccount.Data); err != nil {
+		panic(err)
+	}
+	return &cTokenInfo, nil
+}
+
 func CTokenTransactionAccounts(
 	cli *client.Client,
 	cToken solcommon.PublicKey,
@@ -70,18 +101,7 @@ func CTokenTransactionAccounts(
 	if err != nil {
 		panic(err)
 	}
-	cTokenInfo := struct {
-		Initialized    uint8
-		BumpSeed       uint8
-		TokenProgramId solcommon.PublicKey
-		Config         solcommon.PublicKey
-		Token          solcommon.PublicKey
-		TokenMint      solcommon.PublicKey
-		Destination    uint32
-		Index          uint64
-		Max            uint64
-		Min            uint64
-	}{}
+	cTokenInfo := CTokenInfo{}
 	if err := borsh.Deserialize(&cTokenInfo, cTokenAccount.Data); err != nil {
 		panic(err)
 	}

@@ -22,6 +22,7 @@ type Transfer struct {
 	index        uint64
 	sender       common.Address
 	recipient    util.Address
+	ataOwner     util.Address // ata owner on solana
 	amount       *big.Int
 	decimalRound int
 	fee          *big.Int
@@ -74,6 +75,10 @@ func (t *Transfer) ToTypesTransfer() *types.Transfer {
 	if t.gasPrice != nil {
 		gasPrice = t.gasPrice.String()
 	}
+	ataOwnerBytes := []byte{}
+	if t.ataOwner != nil {
+		ataOwnerBytes = t.ataOwner.Bytes()
+	}
 	return &types.Transfer{
 		Cashier:      t.cashier.Bytes(),
 		Token:        t.coToken.Bytes(),
@@ -88,6 +93,7 @@ func (t *Transfer) ToTypesTransfer() *types.Transfer {
 		GasPrice:     gasPrice,
 		Payload:      t.payload,
 		SourceTxHash: t.txHash.Bytes(),
+		AtaOwner:     ataOwnerBytes,
 	}
 }
 

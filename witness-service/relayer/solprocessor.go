@@ -1,6 +1,7 @@
 package relayer
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"log"
@@ -10,7 +11,9 @@ import (
 
 	"github.com/blocto/solana-go-sdk/client"
 	"github.com/blocto/solana-go-sdk/common"
+	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/blocto/solana-go-sdk/program/address_lookup_table"
+	"github.com/blocto/solana-go-sdk/program/associated_token_account"
 	"github.com/blocto/solana-go-sdk/program/compute_budget"
 	"github.com/blocto/solana-go-sdk/rpc"
 	soltypes "github.com/blocto/solana-go-sdk/types"
@@ -531,11 +534,63 @@ func (s *SolProcessor) executeTransfer(transfer *SOLRawTransaction) error {
 }
 
 func (s *SolProcessor) buildTransactionForExecution(transfer *SOLRawTransaction) (soltypes.Transaction, uint64, error) {
-	instr, err := s.buildExecutionInstruction(transfer)
+	instr1, err := s.buildCreateAssociatedTokenAccountInstruction(transfer)
 	if err != nil {
 		return soltypes.Transaction{}, 0, err
 	}
-	return s.buildOptimalTransaction(instr, nil)
+	instr2, err := s.buildExecutionInstruction(transfer)
+	if err != nil {
+		return soltypes.Transaction{}, 0, err
+	}
+	return s.buildOptimalTransaction(append(instr1, instr2...), nil)
+}
+
+func (s *SolProcessor) buildCreateAssociatedTokenAccountInstruction(transfer *SOLRawTransaction) ([]soltypes.Instruction, error) {
+	if transfer.ataOwner == nil {
+		return []soltypes.Instruction{}, nil
+	}
+
+	var (
+		recAddr      = transfer.recipient.Address().(solcommon.PublicKey)
+		ctokenAddr   = transfer.token.Address().(solcommon.PublicKey)
+		ataOwnerAddr = transfer.ataOwner.Address().(solcommon.PublicKey)
+	)
+
+	ctokeninfo, err := instruction.GetCTokenInfo(s.client, ctokenAddr)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get ctoken info")
+	}
+	ata, _, err := solcommon.FindAssociatedTokenAddress(ataOwnerAddr, ctokeninfo.TokenMint)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find associated token address")
+	}
+	if !bytes.Equal(ata[:], recAddr[:]) {
+		return nil, errors.Errorf("ata %s is not equal to %s", ata, recAddr)
+	}
+
+	// check user account is wallet account
+	userAccountInfo, err := s.client.GetAccountInfo(context.Background(), transfer.ataOwner.String())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user account info")
+	}
+	if userAccountInfo.Owner.String() != common.SystemProgramID.String() {
+		return nil, errors.Wrap(err, "user account is not wallet account")
+	}
+	// check existence of ata account
+	ataInfo, err := s.client.GetAccountInfo(context.Background(), transfer.recipient.String())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get ata account info")
+	}
+	if ataInfo.Lamports > 0 {
+		return []soltypes.Instruction{}, nil
+	}
+	return []soltypes.Instruction{
+		associated_token_account.Create(associated_token_account.CreateParam{
+			Funder:                 s.privateKey.PublicKey,
+			Owner:                  ataOwnerAddr,
+			Mint:                   ctokeninfo.TokenMint,
+			AssociatedTokenAccount: recAddr,
+		})}, nil
 }
 
 func (s *SolProcessor) buildExecutionInstruction(transfer *SOLRawTransaction) ([]soltypes.Instruction, error) {
@@ -713,14 +768,4 @@ func medianFee(fees rpc.PrioritizationFees) uint64 {
 		return 1
 	}
 	return fee
-}
-
-func maxFee(fees rpc.PrioritizationFees) uint64 {
-	m := uint64(1)
-	for _, fee := range fees {
-		if fee.PrioritizationFee > m {
-			m = fee.PrioritizationFee
-		}
-	}
-	return m
 }

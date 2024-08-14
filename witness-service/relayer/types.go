@@ -33,6 +33,7 @@ type (
 		sender       util.Address
 		txSender     util.Address
 		recipient    util.Address
+		ataOwner     util.Address
 		amount       *big.Int
 		payload      []byte
 		fee          *big.Int
@@ -99,6 +100,7 @@ type (
 		sender               util.Address
 		txSender             util.Address
 		recipient            util.Address
+		ataOwner             util.Address
 		amount               *big.Int
 		payload              []byte
 		fee                  *big.Int
@@ -168,6 +170,13 @@ func UnmarshalTransferProto(transfer *types.Transfer, destAddrDecoder util.Addre
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode recipient")
 	}
+	var ataOwner util.Address
+	if len(transfer.AtaOwner) > 0 {
+		ataOwner, err = destAddrDecoder.DecodeBytes(transfer.AtaOwner)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode ata owner")
+		}
+	}
 	amount, ok := new(big.Int).SetString(transfer.Amount, 10)
 	if !ok || amount.Sign() == -1 {
 		return nil, errors.Errorf("invalid amount %s", transfer.Amount)
@@ -189,6 +198,7 @@ func UnmarshalTransferProto(transfer *types.Transfer, destAddrDecoder util.Addre
 		index:        index,
 		sender:       sender,
 		recipient:    recipient,
+		ataOwner:     ataOwner,
 		amount:       amount,
 		payload:      transfer.Payload,
 		fee:          fee,
@@ -242,7 +252,6 @@ func (transfer *Transfer) ToTypesTransfer() *types.Transfer {
 	if transfer.gasPrice != nil {
 		gasPrice = transfer.gasPrice.String()
 	}
-
 	return &types.Transfer{
 		Cashier:   transfer.cashier.Bytes(),
 		Token:     transfer.token.Bytes(),

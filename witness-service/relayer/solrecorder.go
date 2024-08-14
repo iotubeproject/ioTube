@@ -64,6 +64,7 @@ func (s *SolRecorder) Start(ctx context.Context) error {
 			"`sender` varchar(64) NOT NULL,"+
 			"`txSender` varchar(64) NOT NULL,"+
 			"`recipient` varchar(64) NOT NULL,"+
+			"`ataOwner` varchar(64) DEFAULT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
 			"`payload` varchar(24576),"+
 			"`fee` varchar(78),"+
@@ -161,6 +162,15 @@ func (s *SolRecorder) AddWitness(validator util.Address, transfer *Transfer, wit
 		transfer.id.Hex(),
 	); err != nil {
 		return common.Hash{}, errors.Wrap(err, "failed to insert into transfer table")
+	}
+	if len(transfer.ataOwner.Bytes()) > 0 {
+		if _, err := tx.Exec(
+			fmt.Sprintf("UPDATE `%s` SET `ataOwner`=? WHERE `id`=?", s.transferTableName),
+			hex.EncodeToString(transfer.ataOwner.Bytes()),
+			transfer.id.Hex(),
+		); err != nil {
+			return common.Hash{}, errors.Wrap(err, "failed to update ata owner")
+		}
 	}
 	if s.witnessTableName != "" && len(witness.signature) != 0 {
 		if _, err := tx.Exec(
@@ -263,9 +273,9 @@ func (s *SolRecorder) assembleTransfer(scan func(dest ...interface{}) error) (*S
 	tx := &SOLRawTransaction{}
 	var rawAmount string
 	var cashier, token, sender, txSender, recipient, id string
-	var relayer, payload, signature, fee sql.NullString
+	var relayer, ataOwner, payload, signature, fee sql.NullString
 	var lastValidBlockHeight sql.NullInt64
-	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &payload, &fee, &id, &signature, &tx.status, &relayer, &lastValidBlockHeight); err != nil {
+	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &ataOwner, &rawAmount, &payload, &fee, &id, &signature, &tx.status, &relayer, &lastValidBlockHeight); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = hexToAddress(cashier, s.sourceAddrDecoder)
@@ -276,6 +286,9 @@ func (s *SolRecorder) assembleTransfer(scan func(dest ...interface{}) error) (*S
 	tx.id = common.HexToHash(id)
 	if relayer.Valid {
 		tx.relayer = common.HexToAddress(relayer.String)
+	}
+	if ataOwner.Valid {
+		tx.ataOwner = hexToAddress(ataOwner.String, s.destAddrDecoder)
 	}
 	if signature.Valid {
 		tx.signature = common.Hex2Bytes(signature.String)
@@ -329,7 +342,7 @@ func (s *SolRecorder) SOLTransfers(
 	if byUpdateTime {
 		orderBy = "updateTime"
 	}
-	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txSignature`, `status`, `relayer`, `lastValidBlockHeight` FROM %s", s.transferTableName)
+	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `ataOwner`, `amount`, `payload`, `fee`, `id`, `txSignature`, `status`, `relayer`, `lastValidBlockHeight` FROM %s", s.transferTableName)
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
 	conditions := []string{}

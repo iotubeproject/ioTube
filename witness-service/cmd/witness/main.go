@@ -57,8 +57,9 @@ type Configuration struct {
 		ValidatorContractAddress string `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
 		TransferTableName        string `json:"transferTableName" yaml:"transferTableName"`
 		TokenPairs               []struct {
-			Token1 string `json:"token1" yaml:"token1"`
-			Token2 string `json:"token2" yaml:"token2"`
+			Token1    string `json:"token1" yaml:"token1"`
+			Token2    string `json:"token2" yaml:"token2"`
+			TokenMint string `json:"tokenMint" yaml:"tokenMint"`
 		} `json:"tokenPairs" yaml:"tokenPairs"`
 		DecimalRound []struct {
 			Token1 string `json:"token1" yaml:"token1"`
@@ -214,6 +215,7 @@ func main() {
 				log.Fatalf("failed to parse cashier contract address %s, %v\n", cc.CashierContractAddress, err)
 			}
 			pairs := make(map[common.Address]util.Address)
+			tokenMintPairs := make(map[string]util.Address)
 			for _, pair := range cc.TokenPairs {
 				ioAddr, err := address.FromString(pair.Token1)
 				if err != nil {
@@ -227,6 +229,13 @@ func main() {
 					log.Fatalf("failed to decode destination address %s, %v\n", pair.Token2, err)
 				}
 				pairs[common.BytesToAddress(ioAddr.Bytes())] = addr
+				if cfg.DestinationChain == "solana" && len(pair.TokenMint) > 0 {
+					mint, err := destAddrDecoder.DecodeString(pair.TokenMint)
+					if err != nil {
+						log.Fatalf("failed to decode mint address %s, %v\n", pair.TokenMint, err)
+					}
+					tokenMintPairs[addr.String()] = mint
+				}
 			}
 			decimalRound := make(map[common.Address]int)
 			for _, r := range cc.DecimalRound {
@@ -251,6 +260,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
+					tokenMintPairs,
 					decimalRound,
 					destAddrDecoder,
 				),
@@ -296,6 +306,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.Reverse.TransferTableName,
 					pairs,
+					map[string]util.Address{},
 					map[common.Address]int{},
 					destAddrDecoder,
 				)
@@ -311,6 +322,7 @@ func main() {
 					db.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
+					map[string]util.Address{},
 					map[common.Address]int{},
 					destAddrDecoder,
 				),
