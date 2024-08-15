@@ -37,7 +37,7 @@ contract TransferValidatorWithPayload is Ownable {
     IAllowlist[] public tokenLists;
     IAllowlist public witnessList;
 
-    constructor(IAllowlist _witnessList) {
+    constructor(IAllowlist _witnessList) Ownable(msg.sender) {
         witnessList = _witnessList;
     }
 

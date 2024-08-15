@@ -1,0 +1,17 @@
+chain: "iotex-testnet"
+interval: 1m
+clientURL: "api.testnet.iotex.one:443"
+grpcPort: 7101
+grpcProxyPort: 8101
+privateKey: ""
+slackWebHook: "" 
+validators:
+  address: "0xaB64334E47b836D52b6EBbA85189139709F3207e"
+  cashiers:
+    - "0xBAe51dAad36A1fEA46492F35E04380B3db169A97"
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+  driver: "mysql"
+transferTableName: "iotex_testnet_transfers"
+witnessTableName: "iotex_testnet_witnesses"
+bonus: "200000000000000000"
