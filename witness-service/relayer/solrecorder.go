@@ -236,7 +236,7 @@ func (s *SolRecorder) Witnesses(ids ...common.Hash) (map[common.Hash][]*Witness,
 // Transfer returns the validation tx related information of a given transfer
 func (s *SolRecorder) Transfer(id common.Hash) (*Transfer, error) {
 	row := s.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txSignature`, `status`, `relayer`, `lastValidBlockHeight` FROM %s WHERE `id`=?", s.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `ataOwner`, `amount`, `payload`, `fee`, `id`, `txSignature`, `status`, `relayer`, `lastValidBlockHeight` FROM %s WHERE `id`=?", s.transferTableName),
 		id.Hex(),
 	)
 	solTX, err := s.assembleTransfer(row.Scan)
