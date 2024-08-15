@@ -574,7 +574,7 @@ func (s *SolProcessor) buildCreateAssociatedTokenAccountInstruction(transfer *SO
 		return nil, errors.Wrap(err, "failed to get user account info")
 	}
 	if userAccountInfo.Owner.String() != common.SystemProgramID.String() {
-		return nil, errors.Wrap(err, "user account is not wallet account")
+		return nil, errors.Errorf("ata owner %s is not a wallet account", transfer.ataOwner.String())
 	}
 	// check existence of ata account
 	ataInfo, err := s.client.GetAccountInfo(context.Background(), transfer.recipient.String())
