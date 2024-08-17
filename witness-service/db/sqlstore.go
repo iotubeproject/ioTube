@@ -45,6 +45,9 @@ func NewSQLStoreFactory() *SQLStoreFactory {
 func (f *SQLStoreFactory) NewStore(cfg Config) *SQLStore {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if cfg.Driver == "" && cfg.URI == "" {
+		return nil
+	}
 	key := cfg.Driver + "||" + cfg.URI
 	if store, ok := f.stores[key]; ok {
 		return store

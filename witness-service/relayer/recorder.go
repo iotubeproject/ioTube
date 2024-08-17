@@ -127,6 +127,7 @@ func (recorder *Recorder) initStore(
 			"`relayer` varchar(42) DEFAULT NULL,"+
 			"`gasPrice` varchar(78) DEFAULT NULL,"+
 			"`notes` varchar(45) DEFAULT NULL,"+
+			"`payload` varchar(24576),"+ // MaxCodeSize
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
 			"UNIQUE KEY `id_UNIQUE` (`id`),"+
 			"KEY `cashier_index` (`cashier`),"+

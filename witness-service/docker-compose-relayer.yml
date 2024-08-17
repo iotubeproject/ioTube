@@ -36,6 +36,32 @@ services:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum.yaml
 
+  iotex-testnet-relayer:
+    container_name: iotex-testnet-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7101:7101
+      - 8101:8101
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-iotex-testnet.yaml:/etc/iotube-relayer/relayer-config-iotex-testnet.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-testnet.yaml
+
+  sepolia-relayer:
+    container_name: sepolia-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7100:7100
+      - 8100:8100
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-sepolia.yaml:/etc/iotube-relayer/relayer-config-sepolia.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-sepolia.yaml
+
 #  heco-relayer:
 #    container_name: heco-relayer
 #    image: relayer:latest

@@ -8,6 +8,7 @@ database:
   driver: "mysql"
 cashiers:
   - id: "sepolia-to-iotex-testnet"
+    withPayload: true
     relayerURL: ":7101"
     startBlockHeight: 5676226
     validatorContractAddress: "0xaB64334E47b836D52b6EBbA85189139709F3207e"

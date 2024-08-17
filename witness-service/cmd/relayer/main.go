@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/pkg/errors"
 	"go.uber.org/config"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
@@ -103,7 +104,7 @@ func main() {
 	}
 	yaml, err := config.NewYAML(opts...)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln(errors.Wrap(err, "failed to create yaml config"))
 	}
 	var cfg Configuration
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
@@ -143,10 +144,7 @@ func main() {
 		cfg.Chain = chain
 	}
 	switch cfg.Chain {
-	case "heco", "bsc", "matic", "polis", "iotex-e":
-		// heco and bsc are idential to ethereum
-		fallthrough
-	case "ethereum":
+	case "ethereum", "heco", "bsc", "matic", "polis", "iotex-e", "iotex-testnet", "sepolia":
 		if cfg.ClientURL == "" {
 			break
 		}
@@ -215,6 +213,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to create relay service: %v\n", err)
 		}
+	case "iotex":
+		log.Fatalf("iotex chain is not supported anymore, please switch to iotex-e\n")
 	default:
 		log.Fatalf("unknown chain name '%s'\n", cfg.Chain)
 	}

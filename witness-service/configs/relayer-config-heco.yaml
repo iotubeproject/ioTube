@@ -8,9 +8,9 @@ grpcProxyPort: 8002
 privateKey: ""
 slackWebHook: "" 
 validators:
-  address: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"
-  cashiers:
-    - "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
+  - address: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"
+    cashiers:
+      - "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
   driver: "mysql"

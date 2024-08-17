@@ -75,6 +75,10 @@ function downloadConfigFile() {
     copyFile "configs/witness-config-iotex.secret.yaml" "witness-config-iotex.secret.yaml" 0
     copyFile "configs/witness-config-ethereum.yaml" "witness-config-ethereum.yaml" 1
     copyFile "configs/witness-config-ethereum.secret.yaml" "witness-config-ethereum.secret.yaml" 0
+    copyFile "configs/witness-config-iotex-testnet.yaml" "witness-config-iotex-testnet.yaml" 1
+    copyFile "configs/witness-config-iotex-testnet.secret.yaml" "witness-config-iotex-testnet.secret.yaml" 0
+    copyFile "configs/witness-config-sepolia.yaml" "witness-config-sepolia.yaml" 1
+    copyFile "configs/witness-config-sepolia.secret.yaml" "witness-config-sepolia.secret.yaml" 0
     #copyFile "configs/witness-config-heco.yaml" "witness-config-heco.yaml" 1
     #copyFile "configs/witness-config-heco.secret.yaml" "witness-config-heco.secret.yaml" 0
     #copyFile "configs/witness-config-polis.yaml" "witness-config-polis.yaml" 1

@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"regexp"
 	"strconv"
@@ -47,15 +48,15 @@ type Configuration struct {
 	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
 	Cashiers              []struct {
-		ID                       string          `json:"id" yaml:"id"`
-		RelayerURL               string          `json:"relayerURL" yaml:"relayerURL"`
-		Version                  witness.Version `json:"version" yaml:"version"`
-		CashierContractAddress   string          `json:"cashierContractAddress" yaml:"cashierContractAddress"`
-		TokenSafeContractAddress string          `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
-		ValidatorContractAddress string          `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
-		TransferTableName        string          `json:"transferTableName" yaml:"transferTableName"`
-		TokenPairs               []TokenPair     `json:"tokenPairs" yaml:"tokenPairs"`
-		StartBlockHeight         int             `json:"startBlockHeight" yaml:"startBlockHeight"`
+		ID                       string      `json:"id" yaml:"id"`
+		RelayerURL               string      `json:"relayerURL" yaml:"relayerURL"`
+		WithPayload              bool        `json:"withPayload" yaml:"withPayload"`
+		CashierContractAddress   string      `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+		TokenSafeContractAddress string      `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
+		ValidatorContractAddress string      `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
+		TransferTableName        string      `json:"transferTableName" yaml:"transferTableName"`
+		TokenPairs               []TokenPair `json:"tokenPairs" yaml:"tokenPairs"`
+		StartBlockHeight         int         `json:"startBlockHeight" yaml:"startBlockHeight"`
 		Reverse                  struct {
 			TransferTableName      string   `json:"transferTableName" yaml:"transferTableName"`
 			CashierContractAddress string   `json:"cashierContractAddress" yaml:"cashierContractAddress"`
@@ -136,24 +137,24 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok {
+	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok && pk != "" {
 		cfg.PrivateKey = pk
 	}
 
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok {
+	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok && port != "" {
 		cfg.GrpcPort, err = strconv.Atoi(port)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
 
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PROXY_PORT"); ok {
+	if port, ok := os.LookupEnv("WITNESS_GRPC_PROXY_PORT"); ok && port != "" {
 		cfg.GrpcProxyPort, err = strconv.Atoi(port)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
-	if relayerURL, ok := os.LookupEnv("RELAYER_URL"); ok {
+	if relayerURL, ok := os.LookupEnv("RELAYER_URL"); ok && relayerURL != "" {
 		cfg.RelayerURL = relayerURL
 	}
 
@@ -176,9 +177,13 @@ func main() {
 		log.Println("No Private Key")
 	}
 	if cfg.RelayerURL != "" {
+		_, port, err := net.SplitHostPort(cfg.RelayerURL)
+		if err != nil {
+			log.Fatalf("failed to split relayer url %s: %v\n", cfg.RelayerURL, err)
+		}
 		for i, cc := range cfg.Cashiers {
 			switch {
-			case strings.HasPrefix(cc.RelayerURL, ":"):
+			case strings.HasPrefix(cc.RelayerURL, ":") && port == "":
 				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL + cc.RelayerURL
 			case cc.RelayerURL == "":
 				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL
@@ -201,9 +206,13 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to parse cashier contract address %s, %v\n", cc.CashierContractAddress, err)
 			}
+			version := witness.NoPayload
+			if cc.WithPayload {
+				version = witness.Payload
+			}
 			cashier, err := witness.NewTokenCashier(
 				cc.ID,
-				cc.Version,
+				version,
 				cc.RelayerURL,
 				iotexClient,
 				cashierContractAddr,
@@ -220,10 +229,7 @@ func main() {
 			}
 			cashiers = append(cashiers, cashier)
 		}
-	case "heco", "bsc", "matic", "polis", "iotex-e":
-		// heco and bsc are identical to ethereum
-		fallthrough
-	case "ethereum":
+	case "heco", "bsc", "matic", "polis", "iotex-e", "sepolia", "iotex-testnet", "ethereum":
 		ethClient, err := ethclient.Dial(cfg.ClientURL)
 		if err != nil {
 			log.Fatal(err)
