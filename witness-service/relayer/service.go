@@ -106,9 +106,11 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := s.validators[common.BytesToAddress(w.Transfer.Cashier)]; !ok {
+	validator, ok := s.validators[common.BytesToAddress(w.Transfer.Cashier)]
+	if !ok {
 		return nil, errors.New("no validator is found")
 	}
+	transfer.GenID(validator.Address())
 	witness, err := NewWitness(common.BytesToAddress(w.Address), w.Signature)
 	if err != nil {
 		return nil, err

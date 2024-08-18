@@ -140,7 +140,6 @@ func UnmarshalTransferProto(transfer *types.Transfer) (*Transfer, error) {
 		recipient:    recipient,
 		amount:       amount,
 		fee:          fee,
-		id:           id,
 		gas:          transfer.Gas,
 		gasPrice:     gasPrice,
 		timestamp:    transfer.Timestamp.AsTime(),
