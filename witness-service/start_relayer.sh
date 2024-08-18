@@ -29,9 +29,9 @@ function checkDockerPermissions() {
 }
 
 function checkDockerCompose() {
-    docker compose --version > /dev/null 2>&1
+    docker-compose --version > /dev/null 2>&1
     if [ $? -eq 127 ];then
-        echo -e "$RED docker compose command not found $NC"
+        echo -e "$RED docker-compose command not found $NC"
         echo -e "Please install it first"
         exit 1
     fi
@@ -143,7 +143,7 @@ function grantPrivileges() {
         retryTimes=0
         maxRetryTime=10
         pushd $IOTEX_RELAYER/etc
-        docker compose up -d database
+        docker-compose up -d database
     
         echo -e "$YELLOW Waiting for the mysqld daemon in the relayer-db container to successful... $NC"
         while true;do
@@ -175,7 +175,7 @@ function buildService() {
 function startup() {
     echo -e "$YELLOW Start relayer and it's database. $NC"
     pushd $IOTEX_RELAYER/etc
-    docker compose up -d
+    docker-compose up -d
     if [ $? -eq 0 ];then
         echo -e "${YELLOW} Server port on 7000 & 7001. ${NC}"
     fi
@@ -185,7 +185,7 @@ function startup() {
 function cleanAll() {
     echo -e "$YELLOW Starting clean all containers... $NC"
     pushd $IOTEX_RELAYER/etc
-    docker compose rm -s -f -v
+    docker-compose rm -s -f -v
     popd
     echo -e "${YELLOW} Done. ${NC}"
 
