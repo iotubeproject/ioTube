@@ -332,7 +332,7 @@ func (recorder *Recorder) assembleTransfer(scan func(dest ...interface{}) error)
 	var relayer, hash, payload, gasPrice, fee, txSender sql.NullString
 	var gas, nonce sql.NullInt64
 	var timestamp sql.NullTime
-	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
+	if err := scan(&cashier, &token, &tx.index, &sender, &txSender, &recipient, &rawAmount, &payload, &fee, &id, &hash, &timestamp, &nonce, &gas, &gasPrice, &tx.status, &tx.updateTime, &relayer); err != nil {
 		return nil, errors.Wrap(err, "failed to scan transfer")
 	}
 	tx.cashier = common.HexToAddress(cashier)
@@ -428,7 +428,7 @@ func (recorder *Recorder) TransfersBySourceTxHash(hash common.Hash) ([]*Transfer
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
 	rows, err := recorder.store.DB().Query(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `sourceTxHash`=?", recorder.transferTableName),
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s WHERE `sourceTxHash`=?", recorder.transferTableName),
 		hash.Hex(),
 	)
 	if err != nil {
