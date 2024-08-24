@@ -8,7 +8,7 @@ grpcProxyPort: 8100
 privateKey: ""
 validators:
   - withPayload: true
-    address: "0xf9729F9050DACA12778d7D1d638fb24f6660AAa6"
+    address: "0xfbaDFfe2B6c7D700eF74B130f4154dF3412eB0E6"
     cashiers:
       - "0xe17f31649C42CE0304008C81Fb7A912cE4e82380"
 database:

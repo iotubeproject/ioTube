@@ -11,7 +11,7 @@ cashiers:
     withPayload: true
     relayerURL: ":7100"
     cashierContractAddress: "io1u9lnzeyugt8qxpqq3jqlk7539njwsguq4j2hu2"
-    validatorContractAddress: "0xf9729F9050DACA12778d7D1d638fb24f6660AAa6"
+    validatorContractAddress: "0xfbaDFfe2B6c7D700eF74B130f4154dF3412eB0E6"
     startBlockHeight: 25608929
     transferTableName: "iotex_testnet_transfers"
     tokenPairs:

@@ -11,7 +11,7 @@ cashiers:
     withPayload: true
     relayerURL: ":7101"
     startBlockHeight: 5676226
-    validatorContractAddress: "0xaB64334E47b836D52b6EBbA85189139709F3207e"
+    validatorContractAddress: "0xf8efCFF959Af393FdfA8fc0fccedf0E25Fc194e6"
     cashierContractAddress: "0xBAe51dAad36A1fEA46492F35E04380B3db169A97"
     transferTableName: "sepolia_transfers"
     tokenPairs:

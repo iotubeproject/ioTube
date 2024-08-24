@@ -7,7 +7,7 @@ privateKey: ""
 slackWebHook: "" 
 validators:
   - withPayload: true
-    address: "0xaB64334E47b836D52b6EBbA85189139709F3207e"
+    address: "0xf8efCFF959Af393FdfA8fc0fccedf0E25Fc194e6"
     cashiers:
       - "0xBAe51dAad36A1fEA46492F35E04380B3db169A97"
 database:
