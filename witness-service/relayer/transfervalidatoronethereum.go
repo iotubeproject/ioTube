@@ -227,14 +227,14 @@ func (tv *transferValidatorOnEthereum) sendBonus(privateKey *ecdsa.PrivateKey, r
 func (tv *transferValidatorOnEthereum) SendBonus(transfer *Transfer) error {
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
-	threshold, ok := tv.bonusTokens[transfer.token]
+	threshold, ok := tv.bonusTokens[transfer.token.Address().(common.Address)]
 	if !ok || transfer.amount.Cmp(threshold) < 0 {
 		return nil
 	}
 	log.Printf("\t\tthreshold %d < amount %d\n", threshold, transfer.amount)
 	privateKey := tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
 
-	return tv.sendBonus(privateKey, transfer.recipient)
+	return tv.sendBonus(privateKey, transfer.recipient.Address().(common.Address))
 }
 
 // Check returns true if a transfer has been settled
@@ -259,7 +259,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 			if new(big.Int).Add(settleHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
 				return StatusOnChainNotConfirmed, nil
 			}
-			tx, _, err := tv.client.TransactionByHash(context.Background(), transfer.txHash)
+			tx, _, err := tv.client.TransactionByHash(context.Background(), common.BytesToHash(transfer.txHash))
 			if errors.Cause(err) == ethereum.NotFound {
 				var iter *contract.TransferValidatorSettledIterator
 				iter, err = tv.validatorContract.FilterSettled(
@@ -272,8 +272,8 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 				if !iter.Next() {
 					return StatusOnChainNotConfirmed, ethereum.NotFound
 				}
-				transfer.txHash = iter.Event.Raw.TxHash
-				tx, _, err = tv.client.TransactionByHash(context.Background(), transfer.txHash)
+				transfer.txHash = iter.Event.Raw.TxHash.Bytes()
+				tx, _, err = tv.client.TransactionByHash(context.Background(), common.BytesToHash(transfer.txHash))
 			}
 			if err != nil {
 				return StatusOnChainNotConfirmed, err
@@ -287,7 +287,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 			return StatusOnChainSettled, nil
 		}
 		var r *types.Receipt
-		r, err = tv.client.TransactionReceipt(context.Background(), transfer.txHash)
+		r, err = tv.client.TransactionReceipt(context.Background(), common.BytesToHash(transfer.txHash))
 		if err == nil {
 			if r == nil {
 				return StatusOnChainNotConfirmed, nil
@@ -339,8 +339,8 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 	signatures := []byte{}
 	numOfValidSignatures := 0
 	for _, witness := range witnesses {
-		if !tv.isActiveWitness(witness.addr) {
-			log.Printf("witness %s is inactive\n", witness.addr.Hex())
+		if !tv.isActiveWitness(witness.Address()) {
+			log.Printf("witness %s is inactive\n", witness.Address().Hex())
 			continue
 		}
 		signatures = append(signatures, witness.signature...)
@@ -372,7 +372,8 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		}
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
-	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier, transfer.token, new(big.Int).SetUint64(transfer.index), transfer.sender, transfer.recipient, transfer.amount, signatures)
+	// TODO: support payload after the contract is updated
+	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier.Bytes(), transfer.token.Address().(common.Address), new(big.Int).SetUint64(transfer.index), transfer.sender.Bytes(), transfer.recipient.Address().(common.Address), transfer.amount, signatures, []byte{})
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil

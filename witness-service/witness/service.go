@@ -9,8 +9,8 @@ package witness
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"log"
-	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -21,11 +21,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
-	"github.com/iotexproject/ioTube/witness-service/grpc/types"
+	"github.com/iotexproject/ioTube/witness-service/util/instruction"
 )
 
 type service struct {
@@ -34,14 +33,13 @@ type service struct {
 	processor       dispatcher.Runner
 	batchSize       uint16
 	processInterval time.Duration
-	privateKey      *ecdsa.PrivateKey
-	witnessAddress  common.Address
+	signHandler     SignHandler
 	disableSubmit   bool
 }
 
 // NewService creates a new witness service
 func NewService(
-	privateKey *ecdsa.PrivateKey,
+	signHandler SignHandler,
 	cashiers []TokenCashier,
 	batchSize uint16,
 	processInterval time.Duration,
@@ -51,11 +49,8 @@ func NewService(
 		cashiers:        cashiers,
 		processInterval: processInterval,
 		batchSize:       batchSize,
-		privateKey:      privateKey,
+		signHandler:     signHandler,
 		disableSubmit:   disableSubmit,
-	}
-	if privateKey != nil {
-		s.witnessAddress = crypto.PubkeyToAddress(privateKey.PublicKey)
 	}
 	var err error
 	if s.processor, err = dispatcher.NewRunner(processInterval, s.process); err != nil {
@@ -86,24 +81,6 @@ func (s *service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *service) sign(transfer *Transfer, validatorContractAddr common.Address) (common.Hash, common.Address, []byte, error) {
-	id := crypto.Keccak256Hash(
-		validatorContractAddr.Bytes(),
-		transfer.cashier.Bytes(),
-		transfer.coToken.Bytes(),
-		math.U256Bytes(new(big.Int).SetUint64(transfer.index)),
-		transfer.sender.Bytes(),
-		transfer.recipient.Bytes(),
-		math.U256Bytes(transfer.amount),
-	)
-	if s.privateKey == nil {
-		return id, common.Address{}, nil, nil
-	}
-	signature, err := crypto.Sign(id.Bytes(), s.privateKey)
-
-	return id, s.witnessAddress, signature, err
-}
-
 func (s *service) process() error {
 	for _, cashier := range s.cashiers {
 		if err := cashier.PullTransfers(s.batchSize); err != nil {
@@ -113,8 +90,8 @@ func (s *service) process() error {
 		if s.disableSubmit {
 			continue
 		}
-		if s.privateKey != nil {
-			if err := cashier.SubmitTransfers(s.sign); err != nil {
+		if s.signHandler != nil {
+			if err := cashier.SubmitTransfers(s.signHandler); err != nil {
 				log.Println(errors.Wrapf(err, "failed to submit transfers for %s", cashier.ID()))
 				continue
 			}
@@ -175,7 +152,7 @@ func (s *service) FetchByHeights(ctx context.Context, request *services.FetchReq
 func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*services.QueryResponse, error) {
 	id := common.BytesToHash(request.Id)
 
-	var tx *Transfer
+	var tx AbstractTransfer
 	var e error
 	for _, c := range s.cashiers {
 		tx, e = c.GetRecorder().Transfer(id)
@@ -189,24 +166,53 @@ func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*s
 			Transfer: nil,
 		}, nil
 	}
-	gasPrice := "0"
-	if tx.gasPrice != nil {
-		gasPrice = tx.gasPrice.String()
-	}
+	return &services.QueryResponse{
+		Transfer: tx.ToTypesTransfer(),
+	}, nil
+}
 
-	response := &services.QueryResponse{
-		Transfer: &types.Transfer{
-			Cashier:   tx.cashier.Bytes(),
-			Token:     tx.token.Bytes(),
-			Index:     int64(tx.index),
-			Sender:    tx.sender.Bytes(),
-			Recipient: tx.recipient.Bytes(),
-			Amount:    tx.amount.String(),
-			Timestamp: timestamppb.New(tx.timestamp),
-			Gas:       tx.gas,
-			GasPrice:  gasPrice,
-		},
-	}
+func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
+	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
+		id := crypto.Keccak256Hash(
+			validatorContractAddr,
+			transfer.Cashier().Bytes(),
+			transfer.CoToken().Bytes(),
+			math.U256Bytes(transfer.Index()),
+			transfer.Sender().Bytes(),
+			transfer.Recipient().Bytes(),
+			math.U256Bytes(transfer.Amount()),
+			transfer.Payload(),
+		)
+		if privateKey == nil {
+			return id, nil, nil, nil
+		}
+		signature, err := crypto.Sign(id.Bytes(), privateKey)
 
-	return response, nil
+		return id, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), signature, err
+	}
+}
+
+func NewEd25519SignHandler(privateKey *ed25519.PrivateKey) SignHandler {
+	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
+		data, err := instruction.SerializePayload(
+			validatorContractAddr,
+			transfer.Cashier().Bytes(),
+			transfer.CoToken().Bytes(),
+			transfer.Index().Uint64(),
+			transfer.Sender().String(),
+			transfer.Recipient().Bytes(),
+			transfer.Amount().Uint64(),
+			transfer.Payload(),
+		)
+		if err != nil {
+			return common.Hash{}, nil, nil, err
+		}
+		id := crypto.Keccak256Hash(data)
+		if privateKey == nil {
+			return id, nil, nil, nil
+		}
+		signature := ed25519.Sign(*privateKey, id[:])
+
+		return id, privateKey.Public().(ed25519.PublicKey), signature, nil
+	}
 }

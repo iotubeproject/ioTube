@@ -185,11 +185,11 @@ func (tv *transferValidatorOnIoTeX) SendBonus(transfer *Transfer) error {
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
 
-	threshold, ok := tv.bonusTokens[transfer.token.Hex()]
+	threshold, ok := tv.bonusTokens[transfer.token.String()]
 	if !ok || transfer.amount.Cmp(threshold) < 0 {
 		return nil
 	}
-	return tv.sendBonus(transfer.recipient)
+	return tv.sendBonus(transfer.recipient.Address().(common.Address))
 }
 
 // Check returns true if a transfer has been settled
@@ -212,7 +212,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 	if settleHeight.Cmp(big.NewInt(0)) > 0 {
 		response, err := tv.client.API().GetReceiptByAction(
 			context.Background(),
-			&iotexapi.GetReceiptByActionRequest{ActionHash: transfer.txHash.String()[2:]},
+			&iotexapi.GetReceiptByActionRequest{ActionHash: common.BytesToHash(transfer.txHash).String()[2:]},
 		)
 		if err != nil {
 			return StatusOnChainUnknown, err
@@ -233,7 +233,7 @@ func (tv *transferValidatorOnIoTeX) Check(transfer *Transfer) (StatusOnChainType
 		return StatusOnChainSettled, nil
 	}
 	response, err := tv.client.API().GetReceiptByAction(context.Background(), &iotexapi.GetReceiptByActionRequest{
-		ActionHash: hex.EncodeToString(transfer.txHash.Bytes()),
+		ActionHash: hex.EncodeToString(transfer.txHash),
 	})
 	switch status.Code(err) {
 	case codes.NotFound:
@@ -288,8 +288,8 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 	signatures := []byte{}
 	numOfValidSignatures := 0
 	for _, witness := range witnesses {
-		if !tv.isActiveWitness(witness.addr) {
-			addr, err := address.FromBytes(witness.addr.Bytes())
+		if !tv.isActiveWitness(witness.Address()) {
+			addr, err := address.FromBytes(witness.Address().Bytes())
 			if err != nil {
 				return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 			}
@@ -323,13 +323,14 @@ func (tv *transferValidatorOnIoTeX) submit(transfer *Transfer, witnesses []*Witn
 
 	actionHash, err := tv.validatorContract.Execute(
 		"submit",
-		transfer.cashier,
-		transfer.token,
+		transfer.cashier.Bytes(),
+		transfer.token.Address().(common.Address),
 		new(big.Int).SetUint64(transfer.index),
-		transfer.sender,
-		transfer.recipient,
+		transfer.sender.Bytes(),
+		transfer.recipient.Address().(common.Address),
 		transfer.amount,
 		signatures,
+		transfer.payload,
 	).SetGasPrice(tv.gasPrice).
 		SetGasLimit(tv.gasLimit).
 		SetNonce(nonce).
