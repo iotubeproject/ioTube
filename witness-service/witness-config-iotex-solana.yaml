@@ -9,10 +9,10 @@ database:
 cashiers:
   - id: "iotex-to-solana"
     relayerURL: ":7007"
-    startBlockHeight: 
+    startBlockHeight: 31936000
     validatorContractAddress: "7yDLTWW6DXf1UW87TkKusELA7N7xfq9bhRe3WRHCHHDK"
     cashierContractAddress: "io1rjq9qlvj4pnfna3hxu3qy3mc359yhlg3hyjwl7"
-    transferTableName: "iotex_transfers"
+    transferTableName: "iotex_to_solana_transfers"
     tokenPairs:
       # WSOL
       - token1: "io158elyywekvljpp4gqzzzsdkk0ufehxn6g3aa0u"
