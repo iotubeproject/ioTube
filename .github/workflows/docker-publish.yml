@@ -1,8 +1,6 @@
 name: Docker
 
 on:
-  schedule:
-    - cron: '28 19 * * *'
   push:
     branches: [ "master" ]
     tags: [ 'v*.*.*' ]
@@ -25,12 +23,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
-      - name: Install cosign
-        if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@v3.1.1
-        with:
-          cosign-release: 'v2.1.1'
 
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v2
@@ -60,9 +52,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           
-      - name: Sign the published Docker image
-        if: ${{ github.event_name != 'pull_request' }}
-        env:
-          TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
