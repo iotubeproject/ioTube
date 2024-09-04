@@ -209,10 +209,15 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to decode private key %v\n", err)
 			}
-			if len(privateKeyBytes) != ed25519.PrivateKeySize {
+			var edPrivateKey ed25519.PrivateKey
+			switch len(privateKeyBytes) {
+			case ed25519.PrivateKeySize:
+				edPrivateKey = ed25519.PrivateKey(privateKeyBytes)
+			case 32: // Seed from 32 bytes
+				edPrivateKey = ed25519.NewKeyFromSeed(privateKeyBytes)
+			default:
 				log.Fatalf("invalid private key length %d\n", len(privateKeyBytes))
 			}
-			edPrivateKey := ed25519.PrivateKey(privateKeyBytes)
 			pbk := solcommon.PublicKeyFromBytes(edPrivateKey.Public().(ed25519.PublicKey)).String()
 			log.Println("Witness Service for " + pbk + " on chain " + cfg.Chain)
 			signHandler = witness.NewEd25519SignHandler(&edPrivateKey)
