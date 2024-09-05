@@ -81,28 +81,6 @@ cashiers:
       # INJ
       - token1: "io1xk48emnzhra9kplcv0aqmgddtpzfjs0gpj6n5z"
         token2: "0x370f98048a45d04b57c6008b636ace4f6e8e1343"
-  - id: "iotex-to-heco"
-    relayerURL: ":7002"
-    cashierContractAddress: "io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra"
-    validatorContractAddress: "0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7"
-    startBlockHeight: 2431000
-    transferTableName: "iotex_to_heco_transfers"
-    tokenPairs:
-  - id: "iotex-to-polis"
-    relayerURL: ":7005"
-    cashierContractAddress: "io1aw89kuzrlyekzvwqyw3e82c880qaxwup5hv7ee"
-    validatorContractAddress: "0xBa6DB98f32e66ad3eC20d79F062Eed50c6cb9F9f"
-    startBlockHeight: 15670000
-    transferTableName: "iotex_to_polis_transfers"
-    tokenPairs:
-      - token1: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
-        token2: "0xe55AcA08126342eE1c70f218d26e553986687227"
-      - token1: "io1d77dcytfk5fsck089eg7669gfpqunrx35ue5ln"
-        token2: "0x56704Fb558527DD7FeE2CaBa541d87Bf2c8cc6Ea"
-      - token1: "io18v4l9dfr74xyu320pz4zsmgrz9d07vnvy20yrh"
-        token2: "0x673Be93F4862D1d1F1B0E5Db62Aa853156DFb932"
-      - token1: "io1rjadsk4xdleuztwgf3vgrzrwav5urwumaakt0w"
-        token2: "0x3bAe1e38F6e1E7E29C11cC735334cFd9f881EED7"
   - id: "iotex-to-bsc"
     relayerURL: ":7003"
     cashierContractAddress: "io1zjlng7je02kxyvjq4eavswp6uxvfvcnh2a0a3d"
