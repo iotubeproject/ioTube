@@ -19,8 +19,8 @@ message Transfer {
     string fee = 10;
     bytes txSender = 11;
     uint64 blockHeight = 12;
-    bytes payload = 13;
-    bytes sourceTxHash = 14;
+    bytes sourceTxHash = 13;
+    bytes payload = 14;
     bytes ataOwner = 15;
 }
 
