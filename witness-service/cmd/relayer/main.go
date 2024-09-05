@@ -20,6 +20,7 @@ import (
 
 	"github.com/blocto/solana-go-sdk/client"
 	soltypes "github.com/blocto/solana-go-sdk/types"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/iotex-address/address"
@@ -29,6 +30,7 @@ import (
 	"go.uber.org/config"
 	"google.golang.org/grpc"
 
+	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/relayer"
 	"github.com/iotexproject/ioTube/witness-service/util"
@@ -72,6 +74,7 @@ type Configuration struct {
 		Threshold               float64 `json:"threshold" yaml:"threshold"`
 		QPSLimit                uint32  `json:"qpsLimit" yaml:"qpsLimit"`
 	} `json:"solanaConfig" yaml:"solanaConfig"`
+	SourceChain string `json:"sourceChain" yaml:"sourceChain"`
 }
 
 var defaultConfig = Configuration{
@@ -162,8 +165,6 @@ func main() {
 		if cfg.ClientURL == "" {
 			break
 		}
-		// TODO: remove when the new contract with payload is supported
-		log.Panicf("The chain %s have been not supported yet for the new contract with payload\n", cfg.Chain)
 		privateKeys := []*ecdsa.PrivateKey{}
 		for _, pk := range strings.Split(cfg.PrivateKey, ",") {
 			privateKey, err := crypto.HexToECDSA(pk)
@@ -224,6 +225,16 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to parse validator contract address %s\n", cfg.ValidatorAddress)
 		}
+		var validatorABI abi.ABI
+		switch cfg.SourceChain {
+		default:
+			validatorABI, err = abi.JSON(strings.NewReader(contract.TransferValidatorABI))
+		case "solana":
+			validatorABI, err = abi.JSON(strings.NewReader(contract.TransferValidatorForSolanaABI))
+		}
+		if err != nil {
+			log.Fatalf("failed to decode validator abi: %v\n", err)
+		}
 
 		service, err = relayer.NewServiceOnIoTeX(
 			relayer.NewRecorder(
@@ -237,6 +248,7 @@ func main() {
 			cfg.Interval,
 			iotex.NewAuthedClient(iotexapi.NewAPIServiceClient(conn), 1, acc),
 			validatorContractAddr,
+			validatorABI,
 			cfg.BonusTokens,
 			cfg.Bonus,
 		)

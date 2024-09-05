@@ -54,14 +54,11 @@ type transferValidatorOnIoTeX struct {
 func newTransferValidatorOnIoTeX(
 	client iotex.AuthedClient,
 	validatorContractAddr address.Address,
+	validatorABI abi.ABI,
 	bonusTokens map[string]*big.Int,
 	bonus *big.Int,
 ) (*transferValidatorOnIoTeX, error) {
 	validatorContractIoAddr, err := address.FromBytes(validatorContractAddr.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	validatorABI, err := abi.JSON(strings.NewReader(contract.TransferValidatorABI))
 	if err != nil {
 		return nil, err
 	}

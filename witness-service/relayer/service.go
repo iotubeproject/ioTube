@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	lru "github.com/hashicorp/golang-lru"
@@ -87,12 +88,14 @@ func NewServiceOnIoTeX(
 	interval time.Duration,
 	client iotex.AuthedClient,
 	validatorContractAddr address.Address,
+	validatorABI abi.ABI,
 	bonusTokens map[string]*big.Int,
 	bonus *big.Int,
 ) (*Service, error) {
 	validator, err := newTransferValidatorOnIoTeX(
 		client,
 		validatorContractAddr,
+		validatorABI,
 		bonusTokens,
 		bonus,
 	)
