@@ -153,24 +153,24 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok {
+	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok && cfg.PrivateKey == "" {
 		cfg.PrivateKey = pk
 	}
 
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok {
+	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok && cfg.GrpcPort == 0 {
 		cfg.GrpcPort, err = strconv.Atoi(port)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
 
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PROXY_PORT"); ok {
+	if port, ok := os.LookupEnv("WITNESS_GRPC_PROXY_PORT"); ok && cfg.GrpcProxyPort == 0 {
 		cfg.GrpcProxyPort, err = strconv.Atoi(port)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
-	if relayerURL, ok := os.LookupEnv("RELAYER_URL"); ok {
+	if relayerURL, ok := os.LookupEnv("RELAYER_URL"); ok && cfg.RelayerURL == "" {
 		cfg.RelayerURL = relayerURL
 	}
 
