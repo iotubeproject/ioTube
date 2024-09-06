@@ -42,7 +42,7 @@ func NewTokenCashier(
 	)
 	switch addrDecoder.(type) {
 	case *util.SOLAddressDecoder:
-		tokenSOLCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierABI))
+		tokenSOLCashierABI, err := abi.JSON(strings.NewReader(contract.TokenCashierForSolanaABI))
 		if err != nil {
 			log.Panicf("failed to decode token cashier abi, %+v", err)
 		}

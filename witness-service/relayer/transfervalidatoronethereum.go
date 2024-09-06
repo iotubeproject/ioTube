@@ -372,8 +372,9 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		}
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
 	}
-	// TODO: support payload after the contract is updated
-	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier.Bytes(), transfer.token.Address().(common.Address), new(big.Int).SetUint64(transfer.index), transfer.sender.Bytes(), transfer.recipient.Address().(common.Address), transfer.amount, signatures, []byte{})
+	transaction, err := tv.validatorContract.Submit(tOpts, transfer.cashier.Address().(common.Address),
+		transfer.token.Address().(common.Address), new(big.Int).SetUint64(transfer.index), transfer.sender.Address().(common.Address),
+		transfer.recipient.Address().(common.Address), transfer.amount, signatures)
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil
