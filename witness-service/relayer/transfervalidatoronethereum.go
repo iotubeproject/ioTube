@@ -177,7 +177,7 @@ func (v *validatorWithPayload) SubmitTransfer(opts *bind.TransactOpts, transfer 
 	if err != nil {
 		return nil, err
 	}
-	return v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, transfer.payload, signatures)
+	return v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signatures, transfer.payload)
 }
 
 func (v *validatorWithoutPayload) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signatures []byte) (*types.Transaction, error) {
@@ -209,7 +209,7 @@ func (v *validatorForSolana) SubmitTransfer(opts *bind.TransactOpts, transfer *T
 	if err != nil {
 		return nil, err
 	}
-	return v.Submit(opts, transfer.cashier.Bytes(), token, new(big.Int).SetUint64(transfer.index), transfer.sender.Bytes(), recipient, transfer.amount, transfer.payload, signatures)
+	return v.Submit(opts, transfer.cashier.Bytes(), token, new(big.Int).SetUint64(transfer.index), transfer.sender.Bytes(), recipient, transfer.amount, signatures, transfer.payload)
 }
 
 // NewTransferValidatorOnEthereum creates a new TransferValidator
