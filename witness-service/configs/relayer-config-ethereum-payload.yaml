@@ -3,8 +3,8 @@ interval: 5m
 clientURL: ""
 ethConfirmBlockNumber: 20
 ethGasPriceLimit: 10000000000
-grpcPort: 7000
-grpcProxyPort: 8000
+grpcPort: 7200
+grpcProxyPort: 8200
 privateKey: ""
 slackWebHook: "" 
 validators:

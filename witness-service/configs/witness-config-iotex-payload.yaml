@@ -1,4 +1,6 @@
 chain: "iotex"
+grpcPort: 9280
+grpcProxyPort: 9281
 interval: 1m
 batchSize: 1000
 database:
@@ -7,7 +9,7 @@ database:
 cashiers:
   - id: "iotex-to-ethereum"
     withPayload: true
-    relayerURL: ":7000"
+    relayerURL: ":7200"
     cashierContractAddress: "0x81F2260Ce0D19601d436A61B1b3a19be0F81920b"
     validatorContractAddress: "0xE7eBA1CEA51EC9B3AcCC16728e3B8786560c59d5"
     startBlockHeight: 9526978

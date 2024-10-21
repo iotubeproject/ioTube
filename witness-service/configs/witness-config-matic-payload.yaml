@@ -1,6 +1,6 @@
 chain: "matic"
-grpcPort: 9084
-grpcProxyPort: 9085
+grpcPort: 9284
+grpcProxyPort: 9285
 interval: 20s
 batchSize: 100
 confirmBlockNumber: 255
@@ -9,7 +9,7 @@ database:
   driver: "mysql"
 cashiers:
   - id: "matic-to-iotex"
-    relayerURL: ":7001"
+    relayerURL: ":7201"
     startBlockHeight: 51400000
     cashierContractAddress: "0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be"
     tokenSafeContractAddress: "0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45"

@@ -1,8 +1,8 @@
 chain: "iotex-e"
 interval: 1m
 clientURL: "https://babel-api.mainnet.iotex.one"
-grpcPort: 7001
-grpcProxyPort: 8001
+grpcPort: 7201
+grpcProxyPort: 8201
 privateKey: ""
 slackWebHook: "" 
 validators:
