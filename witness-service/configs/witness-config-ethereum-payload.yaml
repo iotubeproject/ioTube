@@ -1,0 +1,87 @@
+chain: "ethereum"
+grpcPort: 9282
+grpcProxyPort: 9283
+interval: 1m
+batchSize: 40
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
+  driver: "mysql"
+cashiers:
+  - id: "ethereum-to-iotex"
+    withPayload: true
+    relayerURL: ":7201"
+    startBlockHeight: 21007829
+    validatorContractAddress: "0x915241176a644A29F46F5F4F8Bd49309e461a9bD"
+    cashierContractAddress: "0xd57bde0a8bb77a2f65769316f6343e0a13a8d7d4"
+    tokenSafeContractAddress: "0xc2e0f31d739cb3153ba5760a203b3bd7c27f0d7a"
+    transferTableName: "ethereum_transfers"
+    tokenPairs:
+      # WETH
+      - token2: "io1qfvgvmk6lpxkpqwlzanqx4atyzs86ryqjnfuad"
+        token1: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+      # WBTC
+      - token2: "io1c7unwg8h8vph89xwqru4f7zfa4yy5002wxvlrm"
+        token1: "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+      # BUSD
+      - token2: "io14nhfkywdfvl40evgsqnh43ev33q6he8yez8c8a"
+        token1: "0x4Fabb145d64652a948d72533023f6E7A623C7C53"
+      # UNI
+      - token2: "io1ahh04jn2zkqlug6feh7rpq75a75p3rj42hp4ch"
+        token1: "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984"
+      # PAXG
+      - token2: "io19fsq8e9krrlng4ay5gyq6q5tqfym28yq9ly0fz"
+        token1: "0x45804880De22913dAFE09f4980848ECE6EcbAf78"
+      # CYC
+      - token2: "io1f4acssp65t6s90egjkzpvrdsrjjyysnvxgqjrh"
+        token1: "0x8861cfF2366C1128fd699B68304aD99a0764Ef9a"
+      # MIST
+      - token2: "io14xuv3gq2yzmcug9t0uwhate99djyux5zwdurtm"
+        token1: "0x88ACDd2a6425c3FaAE4Bc9650Fd7E27e0Bebb7aB"
+      # MCN
+      - token2: "io18lsyxgygtesjggcj2nyqyqzgwxlxsysc9lgmg8"
+        token1: "0xD227c3e4f3F8dE94180269eF9DC221a6efc1F4C4"
+      # USDT
+      - token2: "io1d77dcytfk5fsck089eg7669gfpqunrx35ue5ln"
+        token1: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+      # USDC
+      - token2: "io18v4l9dfr74xyu320pz4zsmgrz9d07vnvy20yrh"
+        token1: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+      # DAI
+      - token2: "io1rjadsk4xdleuztwgf3vgrzrwav5urwumaakt0w"
+        token1: "0x6b175474e89094c44da98b954eedeac495271d0f"
+      # iMagic
+      - token2: "io1cxfj43hs44nqhc6pkhycpezd7vdrpafgxnnzdt"
+        token1: "0xb0Ed1F44833C6b2Afa39a6a85ff62C8ad96F5275"
+      # CIOTX
+      - token2: "io1nxetpma4de3wx6tqcgxdtj5wc64a24t64dc76s"
+        token1: "0x9f90b457dea25ef802e38d470dda7343691d8fe1"
+      # CCCS
+      - token2: "io1daejpenv38639dw8xplp7c9zr4ff0c9p9kfx3g"
+        token1: "0xf79deaBc1406a3AD07c70877fBaEb90777B77E68"
+      # CTSI
+      - token2: "io16ajfjch2hlm56vnhlwvs7g7aptnvx40ksyvrz5"
+        token1: "0x30e68fACB9D4E04FEdc12A8Cc539639f90F40c63"
+      # ELA
+      - token2: "io18l9s83sftn2t727wa2qh0ze7c5jm5ru58832se"
+        token1: "0x77480e1E8441FAdf4D67dAb68249F08129d3dcA4"
+      # CRU
+      - token2: "io1mrm6dm4mudkau3sk9as0v9prysg5670vcx6rl8"
+        token1: "0x9c3af6ffccac8a4ccb31a4b769b84a517c6c13b5"
+      # ATOR
+      - token2: "io1mypw5gnl79d8t6436zfg9psd40llndr2x9ntp6"
+        token1: "0x6ed84215c7c4e94b0dc55c16e574d407586d2116"
+      # MXC
+      - token2: "io1t5cm7h7f2s0vxw2ft7p3yqdygycnx5hf03dxj7"
+        token1: "0xC4fFC19CB3dfE37152d07a5444254930e9FF7127"
+      # BZZ
+      - token2: "io125ncge9vg39m4u67dl8vpa0gxwqmkdq86plm7e"
+        token1: "0xDfF04A48baa71021e0221e9B26DD3C13cdC2FE7e"
+      # STOS
+      - token2: "io1dskaukl7ghuj6a3rflt7zkphdsxwyd3hhg43yx"
+        token1: "0xf96c9ea3b23d7ba69c90d506ecb54a7e77958d50"
+      # NOIA
+      - token2: "io1ns80pjvwra4qv70yymm5xly56j5a8gkednnl8f"
+        token1: "0xedf708dcf579d4c6ea7889ae255ba66ad2cf9757"
+      # INJ
+      - token2: "io1xk48emnzhra9kplcv0aqmgddtpzfjs0gpj6n5z"
+        token1: "0x370f98048a45d04b57c6008b636ace4f6e8e1343"

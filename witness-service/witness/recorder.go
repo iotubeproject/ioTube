@@ -290,25 +290,32 @@ func (recorder *Recorder) ConfirmTransfer(at AbstractTransfer) error {
 }
 
 // TransfersToSettle returns the list of transfers to confirm
-func (recorder *Recorder) TransfersToSettle() ([]AbstractTransfer, error) {
-	return recorder.transfers(SubmissionConfirmed)
+func (recorder *Recorder) TransfersToSettle(cashier string) ([]AbstractTransfer, error) {
+	return recorder.transfers(SubmissionConfirmed, cashier)
 }
 
 // TransfersToSubmit returns the list of transfers to submit
-func (recorder *Recorder) TransfersToSubmit() ([]AbstractTransfer, error) {
-	return recorder.transfers(TransferReady)
+func (recorder *Recorder) TransfersToSubmit(cashier string) ([]AbstractTransfer, error) {
+	return recorder.transfers(TransferReady, cashier)
 }
 
-func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, error) {
+func (recorder *Recorder) transfers(status TransferStatus, cashier string) ([]AbstractTransfer, error) {
+	query := fmt.Sprintf(
+		"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, blockHeight, txHash, status, id, txSender "+
+			"FROM %s "+
+			"WHERE status=? ",
+		recorder.transferTableName,
+	)
+	params := []interface{}{status}
+	if cashier != "" {
+		query += "AND cashier=? "
+		params = append(params, cashier)
+	}
+	query += "ORDER BY creationTime"
+
 	rows, err := recorder.store.DB().Query(
-		fmt.Sprintf(
-			"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, blockHeight, txHash, status, id, txSender "+
-				"FROM %s "+
-				"WHERE status=? "+
-				"ORDER BY creationTime",
-			recorder.transferTableName,
-		),
-		status,
+		query,
+		params...,
 	)
 	if err != nil {
 		return nil, err

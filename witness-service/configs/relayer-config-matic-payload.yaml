@@ -3,14 +3,15 @@ interval: 1m
 clientURL: "https://rpc-mainnet.maticvigil.com"
 ethConfirmBlockNumber: 255
 ethGasPriceLimit: 50000000000
-grpcPort: 7004
-grpcProxyPort: 8004
+grpcPort: 7204
+grpcProxyPort: 8204
 privateKey: ""
 slackWebHook: "" 
 validators:
-  - address: "0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B"
+  - withPayload: true
+    address: "0x87E2D48De6CC2029fFc1a915462e4Aa597890cd6"
     cashiers:
-      - "io12s9f9hv4zsr7umy5hxt6g0k0xr4x6pxdp5w998"
+      - "0x124B468860ac994ef28D11643d16e88dd4F26085"
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
   driver: "mysql"

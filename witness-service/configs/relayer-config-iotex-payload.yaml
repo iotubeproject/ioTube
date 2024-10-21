@@ -1,0 +1,20 @@
+chain: "iotex-e"
+interval: 1m
+clientURL: "https://babel-api.mainnet.iotex.one"
+grpcPort: 7201
+grpcProxyPort: 8201
+privateKey: ""
+slackWebHook: "" 
+validators:
+  - withPayload: true
+    address: "0x915241176a644A29F46F5F4F8Bd49309e461a9bD"
+    cashiers:
+      - "0xd57bde0a8bb77a2f65769316f6343e0a13a8d7d4"
+      - "0x6bba6bab7faa5aa720f84468cba6086e0821e049"
+      - "0xaEDCBf2776ceBDf96d8f4F5fb6CbE34CdE970096"
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+  driver: "mysql"
+transferTableName: "iotex_transfers"
+witnessTableName: "iotex_witnesses"
+bonus: "500000000000000000"

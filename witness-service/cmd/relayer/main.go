@@ -178,7 +178,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to create eth client %v\n", err)
 		}
-		validators := map[util.Address]relayer.TransferValidator{}
+		validators := map[string]relayer.TransferValidator{}
 		for _, vc := range cfg.Validators {
 			validatorAddr, err := util.ParseEthAddress(vc.Address)
 			if err != nil {
@@ -211,7 +211,7 @@ func main() {
 				if err != nil {
 					log.Fatalf("failed to parse cashier address %s: %+v", cashier, err)
 				}
-				validators[cashierAddr] = validator
+				validators[cashierAddr.String()] = validator
 			}
 		}
 		bonusSender, err := relayer.NewBonusSender(ethClient, privateKeys, cfg.BonusTokens, cfg.Bonus)

@@ -14,11 +14,11 @@ interface IWEth {
 
 contract Unwrapper is Ownable {
     event Whitelisted(address indexed);
-    event Blacklisted(address indexed);
+    event Unwhitelisted(address indexed);
     mapping(address => bool) public whitelist;
     IWEth public weth;
 
-    constructor(address _weth) Ownable() {
+    constructor(address _weth) Ownable(msg.sender) {
         weth = IWEth(_weth);
     }
 
@@ -48,6 +48,6 @@ contract Unwrapper is Ownable {
 
     function removeWhitelist(address _addr) external onlyOwner {
         whitelist[_addr] = false;
-        emit Blacklisted(_addr);
+        emit Unwhitelisted(_addr);
     }
 }

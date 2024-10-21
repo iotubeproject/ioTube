@@ -1,0 +1,19 @@
+chain: "bsc"
+interval: 1m
+clientURL: "https://bsc-dataseed.binance.org/"
+ethConfirmBlockNumber: 2
+ethGasPriceLimit: 10
+grpcPort: 7203
+grpcProxyPort: 8203
+privateKey: ""
+slackWebHook: "" 
+validators:
+  - withPayload: true
+    address: "0x95C6F6Af2c0Fa069768203FDa963d7626efC794a"
+    cashiers:
+      - "0xbF4C617fE41681b26221863e1F466feadA0B74ca"
+database:
+  uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
+  driver: "mysql"
+transferTableName: "bsc_transfers"
+witnessTableName: "bsc_witnesses"

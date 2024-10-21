@@ -51,6 +51,7 @@ func init() {
 type (
 	tokenCashierBase struct {
 		id                     string
+		cashierContractAddr    string
 		recorder               AbstractRecorder
 		relayerURL             string
 		validatorContractAddr  []byte
@@ -74,6 +75,7 @@ type (
 
 func newTokenCashierBase(
 	id string,
+	cashierContractAddr string,
 	recorder AbstractRecorder,
 	relayerURL string,
 	validatorContractAddr []byte,
@@ -88,6 +90,7 @@ func newTokenCashierBase(
 ) TokenCashier {
 	return &tokenCashierBase{
 		id:                     id,
+		cashierContractAddr:    cashierContractAddr,
 		recorder:               recorder,
 		relayerURL:             relayerURL,
 		startBlockHeight:       startBlockHeight,
@@ -225,7 +228,7 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 	if tc.signHandler == nil {
 		return nil
 	}
-	transfersToSubmit, err := tc.recorder.TransfersToSubmit()
+	transfersToSubmit, err := tc.recorder.TransfersToSubmit(tc.cashierContractAddr)
 	if err != nil {
 		return err
 	}
@@ -290,7 +293,7 @@ func (tc *tokenCashierBase) ProcessStales() error {
 }
 
 func (tc *tokenCashierBase) CheckTransfers() error {
-	transfersToSettle, err := tc.recorder.TransfersToSettle()
+	transfersToSettle, err := tc.recorder.TransfersToSettle(tc.cashierContractAddr)
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch transfers to settle")
 	}

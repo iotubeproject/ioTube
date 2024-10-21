@@ -29,7 +29,7 @@ contract TokenCashierWithPayload is Ownable {
     uint256 public depositFee;
     IWrappedCoin public wrappedCoin;
 
-    constructor(IWrappedCoin _wrappedCoin) {
+    constructor(IWrappedCoin _wrappedCoin) Ownable(msg.sender) {
         wrappedCoin = _wrappedCoin;
     }
 

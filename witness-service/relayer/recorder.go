@@ -120,7 +120,6 @@ func (recorder *Recorder) initStore(
 			"`txSender` varchar(64),"+
 			"`recipient` varchar(42) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
-			"`payload` varchar(24576),"+
 			"`fee` varchar(78),"+
 			"`blockHeight` bigint(20),"+
 			"`sourceTxHash` varchar(128) DEFAULT NULL,"+
@@ -588,13 +587,13 @@ func RecipientQueryOption(recipient util.Address) TransferQueryOption {
 	}
 }
 
-func CashiersQueryOption(cashiers []util.Address) TransferQueryOption {
+func CashiersQueryOption(cashiers []string) TransferQueryOption {
 	return func() (string, []interface{}) {
 		questions := make([]string, len(cashiers))
 		params := make([]interface{}, len(cashiers))
 		for i, cashier := range cashiers {
 			questions[i] = "?"
-			params[i] = cashier.String()
+			params[i] = cashier
 		}
 		return "cashier in (" + strings.Join(questions, ",") + ")", params
 	}
