@@ -77,6 +77,20 @@ function downloadConfigFile() {
             exit 2
         fi
     fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-iotex-payload.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-iotex-payload.yaml ${IOTEX_RELAYER}/etc/relayer-config-iotex-payload.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-ethereum-payload.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-ethereum-payload.yaml ${IOTEX_RELAYER}/etc/relayer-config-ethereum-payload.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
 #    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-heco.yaml ]];then
 #        cp -f $PROJECT_ABS_DIR/configs/relayer-config-heco.yaml ${IOTEX_RELAYER}/etc/relayer-config-heco.yaml
 #        if [ $? -ne 0 ];then
@@ -100,6 +114,20 @@ function downloadConfigFile() {
     fi
     if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml ]];then
         cp -f $PROJECT_ABS_DIR/configs/relayer-config-matic.yaml ${IOTEX_RELAYER}/etc/relayer-config-matic.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-bsc-payload.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-bsc-payload.yaml ${IOTEX_RELAYER}/etc/relayer-config-bsc-payload.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-matic-payload.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-matic-payload.yaml ${IOTEX_RELAYER}/etc/relayer-config-matic-payload.yaml
         if [ $? -ne 0 ];then
             echo "Get config error"
             exit 2
