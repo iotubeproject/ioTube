@@ -30,7 +30,7 @@ type (
 	// Service defines the relayer service
 	Service struct {
 		services.UnimplementedRelayServiceServer
-		validators      map[util.Address]TransferValidator
+		validators      map[string]TransferValidator
 		bonusSender     BonusSender
 		processor       dispatcher.Runner
 		recorder        *Recorder
@@ -54,7 +54,7 @@ const (
 
 // NewServiceOnEthereum creates a new relay service on Ethereum
 func NewServiceOnEthereum(
-	validators map[util.Address]TransferValidator,
+	validators map[string]TransferValidator,
 	bonusSender BonusSender,
 	recorder *Recorder,
 	interval time.Duration,
@@ -120,7 +120,7 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	if err != nil {
 		return nil, err
 	}
-	validator, ok := s.validators[cashier]
+	validator, ok := s.validators[cashier.String()]
 	if !ok {
 		return nil, errors.New("no validator is found")
 	}
@@ -439,7 +439,7 @@ func (s *Service) confirmTransfers() error {
 			uint8(validator.Size())*2,
 			AESC,
 			StatusQueryOption(ValidationSubmitted),
-			CashiersQueryOption([]util.Address{cashier}),
+			CashiersQueryOption([]string{cashier}),
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to read transfers to confirm")
@@ -535,7 +535,7 @@ func (s *Service) submitTransfers() error {
 			AESC,
 			StatusQueryOption(WaitingForWitnesses),
 			ExcludeTokenQueryOption(excludedAddr),
-			CashiersQueryOption([]util.Address{cashier}),
+			CashiersQueryOption([]string{cashier}),
 		)
 		if err != nil {
 			return err
@@ -546,7 +546,7 @@ func (s *Service) submitTransfers() error {
 				uint8(validator.Size()),
 				AESC,
 				StatusQueryOption(WaitingForWitnesses),
-				CashiersQueryOption([]util.Address{cashier}),
+				CashiersQueryOption([]string{cashier}),
 			)
 			if err != nil {
 				return err

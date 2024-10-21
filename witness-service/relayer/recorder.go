@@ -588,13 +588,13 @@ func RecipientQueryOption(recipient util.Address) TransferQueryOption {
 	}
 }
 
-func CashiersQueryOption(cashiers []util.Address) TransferQueryOption {
+func CashiersQueryOption(cashiers []string) TransferQueryOption {
 	return func() (string, []interface{}) {
 		questions := make([]string, len(cashiers))
 		params := make([]interface{}, len(cashiers))
 		for i, cashier := range cashiers {
 			questions[i] = "?"
-			params[i] = cashier.String()
+			params[i] = cashier
 		}
 		return "cashier in (" + strings.Join(questions, ",") + ")", params
 	}
