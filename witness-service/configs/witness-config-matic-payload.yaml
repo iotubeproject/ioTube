@@ -10,10 +10,10 @@ database:
 cashiers:
   - id: "matic-to-iotex"
     relayerURL: ":7201"
-    startBlockHeight: 51400000
-    cashierContractAddress: "0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be"
+    startBlockHeight: 63196610
+    cashierContractAddress: "0x6bba6bab7faa5aa720f84468cba6086e0821e049"
     tokenSafeContractAddress: "0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45"
-    validatorContractAddress: "io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y"
+    validatorContractAddress: "0x915241176a644A29F46F5F4F8Bd49309e461a9bD"
     transferTableName: "matic_transfers"
     tokenPairs:
       - token2: "io13envp44hps9j85ulfvs6r6k99wagaky60pzl2c"

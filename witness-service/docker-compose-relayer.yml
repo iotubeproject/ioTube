@@ -41,8 +41,8 @@ services:
     image: relayer:latest
     restart: on-failure
     ports:
-      - 7001:7001
-      - 8001:8001
+      - 7201:7201
+      - 8201:8201
     volumes:
       - $IOTEX_RELAYER/etc/relayer-config-iotex-payload.yaml:/etc/iotube-relayer/relayer-config-iotex-payload.yaml:ro
     links:
@@ -54,8 +54,8 @@ services:
     image: relayer:latest
     restart: on-failure
     ports:
-      - 7000:7000
-      - 8000:8000
+      - 7200:7200
+      - 8200:8200
     volumes:
       - $IOTEX_RELAYER/etc/relayer-config-ethereum-payload.yaml:/etc/iotube-relayer/relayer-config-ethereum-payload.yaml:ro
     links:
@@ -145,8 +145,8 @@ services:
     image: relayer:latest
     restart: on-failure
     ports:
-      - 7003:7003
-      - 8003:8003
+      - 7203:7203
+      - 8203:8203
     volumes:
       - $IOTEX_RELAYER/etc/relayer-config-bsc-payload.yaml:/etc/iotube-relayer/relayer-config-bsc-payload.yaml:ro
     links:
@@ -158,8 +158,8 @@ services:
     image: relayer:latest
     restart: on-failure
     ports:
-      - 7004:7004
-      - 8004:8004
+      - 7204:7204
+      - 8204:8204
     volumes:
       - $IOTEX_RELAYER/etc/relayer-config-matic-payload.yaml:/etc/iotube-relayer/relayer-config-matic-payload.yaml:ro
     links:

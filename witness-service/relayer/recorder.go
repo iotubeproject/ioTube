@@ -120,7 +120,6 @@ func (recorder *Recorder) initStore(
 			"`txSender` varchar(64),"+
 			"`recipient` varchar(42) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
-			"`payload` varchar(24576),"+
 			"`fee` varchar(78),"+
 			"`blockHeight` bigint(20),"+
 			"`sourceTxHash` varchar(128) DEFAULT NULL,"+

@@ -239,6 +239,7 @@ func NewTokenCashierOnEthereum(
 	}
 	return newTokenCashierBase(
 		id,
+		cashierContractAddr.String(),
 		recorder,
 		relayerURL,
 		validatorContractAddr,

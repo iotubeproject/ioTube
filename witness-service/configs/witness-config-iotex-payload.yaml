@@ -12,7 +12,7 @@ cashiers:
     relayerURL: ":7200"
     cashierContractAddress: "0x81F2260Ce0D19601d436A61B1b3a19be0F81920b"
     validatorContractAddress: "0xE7eBA1CEA51EC9B3AcCC16728e3B8786560c59d5"
-    startBlockHeight: 9526978
+    startBlockHeight: 32739910
     transferTableName: "iotex_transfers"
     tokenPairs:
       # WETH
@@ -86,10 +86,10 @@ cashiers:
         token2: "0x370f98048a45d04b57c6008b636ace4f6e8e1343"
   - id: "iotex-to-bsc"
     withPayload: true
-    relayerURL: ":7003"
+    relayerURL: ":7203"
     cashierContractAddress: "0xbF4C617fE41681b26221863e1F466feadA0B74ca"
     validatorContractAddress: "0x95C6F6Af2c0Fa069768203FDa963d7626efC794a"
-    startBlockHeight: 5177821
+    startBlockHeight: 32739491
     transferTableName: "iotex_to_bsc_transfers"
     tokenPairs:
       # WBNB
@@ -130,10 +130,10 @@ cashiers:
         token2: "0x02dF5253Bc4EfC9F8f744133Ff99981b18Df0473"
   - id: "iotex-to-matic"
     withPayload: true
-    relayerURL: ":7004"
+    relayerURL: ":7204"
     cashierContractAddress: "0x124B468860ac994ef28D11643d16e88dd4F26085"
     validatorContractAddress: "0x87E2D48De6CC2029fFc1a915462e4Aa597890cd6"
-    startBlockHeight: 10000000
+    startBlockHeight: 32723537
     transferTableName: "iotex_to_matic_transfers"
     tokenPairs:
       # WMATIC

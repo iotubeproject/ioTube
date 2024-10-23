@@ -256,12 +256,12 @@ func (recorder *SOLRecorder) ConfirmTransfer(at AbstractTransfer) error {
 }
 
 // TransfersToSettle returns the list of transfers to confirm
-func (recorder *SOLRecorder) TransfersToSettle() ([]AbstractTransfer, error) {
+func (recorder *SOLRecorder) TransfersToSettle(string) ([]AbstractTransfer, error) {
 	return recorder.transfers(SubmissionConfirmed)
 }
 
 // TransfersToSubmit returns the list of transfers to submit
-func (recorder *SOLRecorder) TransfersToSubmit() ([]AbstractTransfer, error) {
+func (recorder *SOLRecorder) TransfersToSubmit(string) ([]AbstractTransfer, error) {
 	return recorder.transfers(TransferReady)
 }
 
