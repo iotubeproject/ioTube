@@ -12,7 +12,7 @@ interface IWrappedCoin {
     function deposit() external payable;
 }
 
-contract TokenCashier is Pausable {
+contract TokenCashierForSolana is Pausable {
     event Receipt(
         address indexed token,
         uint256 indexed id,
