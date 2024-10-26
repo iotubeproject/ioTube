@@ -13,6 +13,8 @@ import (
 
 	soltypes "github.com/blocto/solana-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -87,7 +89,7 @@ type (
 		// ResetFailedTransfer resets a failed transfer
 		ResetFailedTransfer(id common.Hash) error
 		// Transfers returns a list of transfers
-		Transfers(offset uint32, limit uint8, byUpdateTime bool, desc bool,
+		Transfers(offset uint32, limit uint8, order Order,
 			queryOpts ...TransferQueryOption) ([]*Transfer, error)
 		// Transfer returns a transfer by id
 		Transfer(id common.Hash) (*Transfer, error)
@@ -101,6 +103,8 @@ type (
 		NewTXs(count uint32) ([]uint64, [][]byte, error)
 		// HeightsOfStaleTransfers returns the heights of stale transfers
 		HeightsOfStaleTransfers(cashier util.Address) ([]uint64, error)
+		// TransfersBySourceTxHash returns transfers by source tx hash
+		TransfersBySourceTxHash(hash common.Hash) ([]*Transfer, error)
 	}
 
 	SOLRawTransaction struct {
@@ -215,7 +219,6 @@ func UnmarshalTransferProto(transfer *types.Transfer, destAddrDecoder util.Addre
 		recipient:    recipient,
 		ataOwner:     ataOwner,
 		amount:       amount,
-		payload:      transfer.Payload,
 		fee:          fee,
 		gas:          transfer.Gas,
 		gasPrice:     gasPrice,
@@ -223,6 +226,7 @@ func UnmarshalTransferProto(transfer *types.Transfer, destAddrDecoder util.Addre
 		txSender:     txSender,
 		sourceTxHash: transfer.SourceTxHash,
 		blockHeight:  transfer.BlockHeight,
+		payload:      transfer.Payload,
 	}, nil
 }
 
@@ -251,6 +255,19 @@ func NewWitness(witnessBytes []byte, signature []byte) (*Witness, error) {
 	}, nil
 }
 
+func (transfer *Transfer) GenID(validatorAddr common.Address) {
+	transfer.id = crypto.Keccak256Hash(
+		validatorAddr.Bytes(),
+		transfer.cashier.Bytes(),
+		transfer.token.Bytes(),
+		math.U256Bytes(new(big.Int).SetUint64(transfer.index)),
+		transfer.sender.Bytes(),
+		transfer.recipient.Bytes(),
+		math.U256Bytes(transfer.amount),
+		transfer.payload,
+	)
+}
+
 func (transfer *Transfer) ID() common.Hash {
 	return transfer.id
 }
@@ -273,6 +290,7 @@ func (transfer *Transfer) ToTypesTransfer() *types.Transfer {
 		Token:     transfer.token.Bytes(),
 		Index:     int64(transfer.index),
 		Sender:    transfer.sender.Bytes(),
+		TxSender:  transfer.txSender.Bytes(),
 		Recipient: transfer.recipient.Bytes(),
 		Amount:    transfer.amount.String(),
 		Payload:   transfer.payload,

@@ -105,11 +105,11 @@ func (s *SolProcessor) process() error {
 // https://solana.com/docs/advanced/retry
 // https://solana.com/docs/advanced/confirmation#how-does-transaction-expiration-work
 func (s *SolProcessor) ConfirmTransfers() error {
-	validatedTsfs, err := s.solRecorder.SOLTransfers(0, uint8(_limitSize)*2, false, false, StatusQueryOption(ValidationSubmitted))
+	validatedTsfs, err := s.solRecorder.SOLTransfers(0, uint8(_limitSize)*2, DESC, StatusQueryOption(ValidationSubmitted))
 	if err != nil {
 		return errors.Wrap(err, "failed to read transfers to confirm")
 	}
-	executedTsfs, err := s.solRecorder.SOLTransfers(0, uint8(_limitSize)*2, false, false, StatusQueryOption(ValidationExecuted))
+	executedTsfs, err := s.solRecorder.SOLTransfers(0, uint8(_limitSize)*2, DESC, StatusQueryOption(ValidationExecuted))
 	if err != nil {
 		return errors.Wrap(err, "failed to read transfers to confirm")
 	}
@@ -199,7 +199,7 @@ func isTxConfirmed(status *rpc.SignatureStatus) bool {
 
 func (s *SolProcessor) SubmitTransfers() error {
 	// submit new transfer and its witnesses to be validated on chain
-	newTransfers, err := s.solRecorder.SOLTransfers(0, uint8(_limitSize)*2, false, false, StatusQueryOption(WaitingForWitnesses))
+	newTransfers, err := s.solRecorder.SOLTransfers(0, uint8(_limitSize)*2, DESC, StatusQueryOption(WaitingForWitnesses))
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (s *SolProcessor) SubmitTransfers() error {
 	}
 
 	// execute validated transfer on chain
-	validatedTransfers, err := s.solRecorder.SOLTransfers(0, uint8(_limitSize)*2, false, false, StatusQueryOption(ValidationValidationSettled))
+	validatedTransfers, err := s.solRecorder.SOLTransfers(0, uint8(_limitSize)*2, DESC, StatusQueryOption(ValidationValidationSettled))
 	if err != nil {
 		return err
 	}

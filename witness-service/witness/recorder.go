@@ -81,7 +81,7 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 			"`sender` varchar(42) NOT NULL,"+
 			"`recipient` varchar(256) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
-			"`payload` varchar(24576),"+
+			"`payload` varchar(24576),"+ // MaxCodeSize
 			"`fee` varchar(78),"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
@@ -194,8 +194,8 @@ func (recorder *Recorder) UpsertTransfer(at AbstractTransfer) error {
 	if affected == 0 {
 		log.Printf("duplicate transfer (%s, %s, %d) ignored\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
 	}
-	return nil
 
+	return nil
 }
 
 func (recorder *Recorder) AmountOfTransferred(cashier, token common.Address) (*big.Int, error) {
@@ -290,25 +290,32 @@ func (recorder *Recorder) ConfirmTransfer(at AbstractTransfer) error {
 }
 
 // TransfersToSettle returns the list of transfers to confirm
-func (recorder *Recorder) TransfersToSettle() ([]AbstractTransfer, error) {
-	return recorder.transfers(SubmissionConfirmed)
+func (recorder *Recorder) TransfersToSettle(cashier string) ([]AbstractTransfer, error) {
+	return recorder.transfers(SubmissionConfirmed, cashier)
 }
 
 // TransfersToSubmit returns the list of transfers to submit
-func (recorder *Recorder) TransfersToSubmit() ([]AbstractTransfer, error) {
-	return recorder.transfers(TransferReady)
+func (recorder *Recorder) TransfersToSubmit(cashier string) ([]AbstractTransfer, error) {
+	return recorder.transfers(TransferReady, cashier)
 }
 
-func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, error) {
+func (recorder *Recorder) transfers(status TransferStatus, cashier string) ([]AbstractTransfer, error) {
+	query := fmt.Sprintf(
+		"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, blockHeight, txHash, status, id, txSender "+
+			"FROM %s "+
+			"WHERE status=? ",
+		recorder.transferTableName,
+	)
+	params := []interface{}{status}
+	if cashier != "" {
+		query += "AND cashier=? "
+		params = append(params, cashier)
+	}
+	query += "ORDER BY creationTime"
+
 	rows, err := recorder.store.DB().Query(
-		fmt.Sprintf(
-			"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, blockHeight, status, id, txHash, txSender "+
-				"FROM %s "+
-				"WHERE status=? "+
-				"ORDER BY creationTime",
-			recorder.transferTableName,
-		),
-		status,
+		query,
+		params...,
 	)
 	if err != nil {
 		return nil, err
@@ -321,14 +328,14 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 		var cashier string
 		var token string
 		var sender string
-		var txHash string
 		var recipient string
 		var rawAmount string
 		var fee sql.NullString
 		var id sql.NullString
+		var txHash sql.NullString
 		var payload sql.NullString
 		var txSender sql.NullString
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.blockHeight, &tx.status, &id, &txHash, &txSender); err != nil {
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.blockHeight, &txHash, &tx.status, &id, &txSender); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -343,6 +350,9 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 		}
 		if txSender.Valid {
 			tx.txSender = common.HexToAddress(txSender.String)
+		}
+		if txHash.Valid {
+			tx.txHash = common.HexToHash(txHash.String)
 		}
 		tx.fee = big.NewInt(0)
 		var ok bool
@@ -381,7 +391,6 @@ func (recorder *Recorder) transfers(status TransferStatus) ([]AbstractTransfer, 
 		} else {
 			tx.decimalRound = 0
 		}
-		tx.txHash = common.HexToHash(txHash)
 		rec = append(rec, tx)
 	}
 	return rec, nil

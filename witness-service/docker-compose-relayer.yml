@@ -36,6 +36,58 @@ services:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum.yaml
 
+  iotex-payload-relayer:
+    container_name: iotex-payload-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7201:7201
+      - 8201:8201
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-iotex-payload.yaml:/etc/iotube-relayer/relayer-config-iotex-payload.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-payload.yaml
+
+  ethereum-payload-relayer:
+    container_name: ethereum-payload-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7200:7200
+      - 8200:8200
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-ethereum-payload.yaml:/etc/iotube-relayer/relayer-config-ethereum-payload.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum-payload.yaml
+
+  iotex-testnet-relayer:
+    container_name: iotex-testnet-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7101:7101
+      - 8101:8101
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-iotex-testnet.yaml:/etc/iotube-relayer/relayer-config-iotex-testnet.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-testnet.yaml
+
+  sepolia-relayer:
+    container_name: sepolia-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7100:7100
+      - 8100:8100
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-sepolia.yaml:/etc/iotube-relayer/relayer-config-sepolia.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-sepolia.yaml
+
 #  heco-relayer:
 #    container_name: heco-relayer
 #    image: relayer:latest
@@ -87,6 +139,32 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-matic.yaml
+
+  bsc-payload-relayer:
+    container_name: bsc-payload-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7203:7203
+      - 8203:8203
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-bsc-payload.yaml:/etc/iotube-relayer/relayer-config-bsc-payload.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-bsc-payload.yaml
+
+  matic-payload-relayer:
+    container_name: matic-payload-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7204:7204
+      - 8204:8204
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-matic-payload.yaml:/etc/iotube-relayer/relayer-config-matic-payload.yaml:ro
+    links:
+      - database
+    command: relayer -config=/etc/iotube-relayer/relayer-config-matic-payload.yaml
 
   iotex-solana-relayer:
     container_name: iotex-solana-relayer

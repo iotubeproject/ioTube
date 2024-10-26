@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 require('dotenv').config();
+require('@nomiclabs/hardhat-truffle5');
 
 const accounts = [
   process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -24,6 +25,15 @@ module.exports = {
       },
       {
         version: "0.8.17",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+      {
+        version: "0.8.20",
         settings: {
           optimizer: {
             enabled: true,

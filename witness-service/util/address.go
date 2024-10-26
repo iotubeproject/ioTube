@@ -15,7 +15,7 @@ import (
 	"github.com/iotexproject/iotex-address/address"
 )
 
-func ParseAddress(addr string) (common.Address, error) {
+func ParseEthAddress(addr string) (common.Address, error) {
 	if strings.HasPrefix(addr, "io") {
 		ioAddr, err := address.FromString(addr)
 		if err != nil {
@@ -24,6 +24,24 @@ func ParseAddress(addr string) (common.Address, error) {
 		return common.BytesToAddress(ioAddr.Bytes()), nil
 	}
 	return common.HexToAddress(addr), nil
+}
+
+func ParseAddress(addr string) (Address, error) {
+	if len(addr) == 44 {
+		return SOLAddressToAddress(solcommon.PublicKeyFromString(addr)), nil
+	}
+	ethaddr, err := ParseEthAddress(addr)
+	if err != nil {
+		return nil, err
+	}
+	return ETHAddressToAddress(ethaddr), nil
+}
+
+func ParseAddressBytes(b []byte) (Address, error) {
+	if len(b) == 32 {
+		return SOLAddressToAddress(solcommon.PublicKeyFromBytes(b)), nil
+	}
+	return ETHAddressToAddress(common.BytesToAddress(b)), nil
 }
 
 type Address interface {

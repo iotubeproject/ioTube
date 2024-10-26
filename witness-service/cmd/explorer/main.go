@@ -143,13 +143,13 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 		queryOpts = append(queryOpts, relayer.RecipientQueryOption(addr))
 	}
 	if len(request.Cashiers) > 0 {
-		cashiers := make([]util.Address, len(request.Cashiers))
+		cashiers := make([]string, len(request.Cashiers))
 		for i, cashier := range request.Cashiers {
 			addr, err := relayer.DecodeSourceAddrBytes(cashier)
 			if err != nil {
 				return nil, err
 			}
-			cashiers[i] = addr
+			cashiers[i] = addr.String()
 		}
 		queryOpts = append(queryOpts, relayer.CashiersQueryOption(cashiers))
 	}
@@ -173,7 +173,7 @@ func (s *Service) Query(ctx context.Context, request *services.ExplorerQueryRequ
 	if skip+first > int32(count) {
 		first = int32(count) - skip
 	}
-	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), false, true, queryOpts...)
+	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), relayer.DESC, queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func main() {
 	)
 	service, err := NewService(
 		relayer.NewRecorder(
-			db.NewStore(cfg.Database),
+			db.NewSQLStoreFactory().NewStore(cfg.Database),
 			nil,
 			cfg.TransferTableName,
 			"",
