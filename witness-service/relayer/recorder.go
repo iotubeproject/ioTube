@@ -118,7 +118,7 @@ func (recorder *Recorder) initStore(
 			"`tidx` bigint(20) NOT NULL,"+
 			"`sender` varchar(64) NOT NULL,"+
 			"`txSender` varchar(64),"+
-			"`recipient` varchar(42) NOT NULL,"+
+			"`recipient` varchar(256) NOT NULL,"+
 			"`amount` varchar(78) NOT NULL,"+
 			"`fee` varchar(78),"+
 			"`blockHeight` bigint(20),"+
