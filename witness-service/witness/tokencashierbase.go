@@ -183,7 +183,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		return errors.Wrapf(err, "failed to get end height and tip height with start height %d, count %d", startHeight, count)
 	}
 	if confirmHeight < startHeight {
-		return errors.Wrapf(err, "failed to get end height with start height %d, count %d, confirm height %d", startHeight, count, confirmHeight)
+		return errors.Errorf("failed to get end height with start height %d, count %d, confirm height %d", startHeight, count, confirmHeight)
 	}
 	var transfers []AbstractTransfer
 	tc.lastPullTimestamp = time.Now()

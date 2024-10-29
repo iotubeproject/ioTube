@@ -7,7 +7,7 @@ database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
   driver: "mysql"
 cashiers:
-  - id: "bsc-to-iotex"
+  - id: "bsc-to-iotex-payload"
     withPayload: true
     relayerURL: ":7201"
     startBlockHeight: 43283329

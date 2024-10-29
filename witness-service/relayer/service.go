@@ -411,11 +411,16 @@ func (s *Service) process() error {
 }
 
 func (s *Service) sendBonus() error {
+	cashiers := []string{}
+	for cashier := range s.validators {
+		cashiers = append(cashiers, cashier)
+	}
 	transfers, err := s.recorder.Transfers(
 		0,
 		uint8(s.bonusSender.Size()),
 		AESC,
 		StatusQueryOption(BonusPending),
+		CashiersQueryOption(cashiers),
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to read transfers to reward")

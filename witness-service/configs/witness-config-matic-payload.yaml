@@ -8,7 +8,7 @@ database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
   driver: "mysql"
 cashiers:
-  - id: "matic-to-iotex"
+  - id: "matic-to-iotex-payload"
     relayerURL: ":7201"
     startBlockHeight: 63196610
     cashierContractAddress: "0x6bba6bab7faa5aa720f84468cba6086e0821e049"

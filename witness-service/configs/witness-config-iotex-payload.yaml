@@ -7,7 +7,7 @@ database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
   driver: "mysql"
 cashiers:
-  - id: "iotex-to-ethereum"
+  - id: "iotex-to-ethereum-payload"
     withPayload: true
     relayerURL: ":7200"
     cashierContractAddress: "0x81F2260Ce0D19601d436A61B1b3a19be0F81920b"
@@ -84,7 +84,7 @@ cashiers:
       # INJ
       - token1: "io1xk48emnzhra9kplcv0aqmgddtpzfjs0gpj6n5z"
         token2: "0x370f98048a45d04b57c6008b636ace4f6e8e1343"
-  - id: "iotex-to-bsc"
+  - id: "iotex-to-bsc-payload"
     withPayload: true
     relayerURL: ":7203"
     cashierContractAddress: "0xbF4C617fE41681b26221863e1F466feadA0B74ca"
@@ -128,7 +128,7 @@ cashiers:
       # DRF
       - token1: "io1mm5eya89mz3dmp0lqtlfuydf67nrdhnwg92dy4"
         token2: "0x02dF5253Bc4EfC9F8f744133Ff99981b18Df0473"
-  - id: "iotex-to-matic"
+  - id: "iotex-to-matic-payload"
     withPayload: true
     relayerURL: ":7204"
     cashierContractAddress: "0x124B468860ac994ef28D11643d16e88dd4F26085"

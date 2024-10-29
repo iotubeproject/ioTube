@@ -7,7 +7,7 @@ database:
   uri: "root:kdfjjrU64fjK58H@tcp(localhost:13306)/witness?parseTime=true"
   driver: "mysql"
 cashiers:
-  - id: "ethereum-to-iotex"
+  - id: "ethereum-to-iotex-payload"
     withPayload: true
     relayerURL: ":7201"
     startBlockHeight: 21007829
