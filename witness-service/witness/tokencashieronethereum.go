@@ -224,6 +224,7 @@ func NewTokenCashierOnEthereum(
 	relayerURL string,
 	ethereumClient *ethclient.Client,
 	cashierContractAddr common.Address,
+	previousCashierAddr common.Address,
 	tokenSafeContractAddr common.Address,
 	validatorContractAddr []byte,
 	recorder *Recorder,
@@ -237,9 +238,14 @@ func NewTokenCashierOnEthereum(
 	if err != nil {
 		return nil, err
 	}
+	pa := previousCashierAddr.String()
+	if pa == "0x0000000000000000000000000000000000000000" {
+		pa = ""
+	}
 	return newTokenCashierBase(
 		id,
 		cashierContractAddr.String(),
+		pa,
 		recorder,
 		relayerURL,
 		validatorContractAddr,

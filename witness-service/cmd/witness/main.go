@@ -49,17 +49,18 @@ type Configuration struct {
 	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
 	Cashiers              []struct {
-		ID                       string      `json:"id" yaml:"id"`
-		RelayerURL               string      `json:"relayerURL" yaml:"relayerURL"`
-		WithPayload              bool        `json:"withPayload" yaml:"withPayload"`
-		CashierContractAddress   string      `json:"cashierContractAddress" yaml:"cashierContractAddress"`
-		TokenSafeContractAddress string      `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
-		ValidatorContractAddress string      `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
-		TransferTableName        string      `json:"transferTableName" yaml:"transferTableName"`
-		TokenPairs               []TokenPair `json:"tokenPairs" yaml:"tokenPairs"`
-		StartBlockHeight         int         `json:"startBlockHeight" yaml:"startBlockHeight"`
-		ToSolana                 bool        `json:"toSolana" yaml:"toSolana"`
-		DecimalRound             []struct {
+		ID                             string      `json:"id" yaml:"id"`
+		RelayerURL                     string      `json:"relayerURL" yaml:"relayerURL"`
+		WithPayload                    bool        `json:"withPayload" yaml:"withPayload"`
+		CashierContractAddress         string      `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+		PreviousCashierContractAddress string      `json:"previousCashierContractAddress" yaml:"previousCashierContractAddress"`
+		TokenSafeContractAddress       string      `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
+		ValidatorContractAddress       string      `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
+		TransferTableName              string      `json:"transferTableName" yaml:"transferTableName"`
+		TokenPairs                     []TokenPair `json:"tokenPairs" yaml:"tokenPairs"`
+		StartBlockHeight               int         `json:"startBlockHeight" yaml:"startBlockHeight"`
+		ToSolana                       bool        `json:"toSolana" yaml:"toSolana"`
+		DecimalRound                   []struct {
 			Token1 string `json:"token1" yaml:"token1"`
 			Amount int    `json:"amount" yaml:"amount"`
 		} `json:"decimalRound" yaml:"decimalRound"`
@@ -276,6 +277,10 @@ func main() {
 			if err != nil {
 				log.Fatalf("invalid cashier address %s: %+v\n", cc.CashierContractAddress, err)
 			}
+			previousCashierAddr, err := util.ParseEthAddress(cc.PreviousCashierContractAddress)
+			if err != nil {
+				log.Fatalf("invalid previous cashier address %s: %+v\n", cc.PreviousCashierContractAddress, err)
+			}
 			tokenSafeAddr, err := util.ParseEthAddress(cc.TokenSafeContractAddress)
 			if err != nil {
 				log.Fatalf("invalid token safe address %s: %+v\n", cc.TokenSafeContractAddress, err)
@@ -300,6 +305,7 @@ func main() {
 				cc.RelayerURL,
 				ethClient,
 				cashierAddr,
+				previousCashierAddr,
 				tokenSafeAddr,
 				validatorAddr.Bytes(),
 				witness.NewRecorder(

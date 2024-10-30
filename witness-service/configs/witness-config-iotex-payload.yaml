@@ -132,6 +132,7 @@ cashiers:
     withPayload: true
     relayerURL: ":7204"
     cashierContractAddress: "0x124B468860ac994ef28D11643d16e88dd4F26085"
+    previousCashierContractAddress: "0x540a92Dd951407Ee6c94b997a43ecF30Ea6D04Cd"
     validatorContractAddress: "0x87E2D48De6CC2029fFc1a915462e4Aa597890cd6"
     startBlockHeight: 32723537
     transferTableName: "iotex_to_matic_transfers"

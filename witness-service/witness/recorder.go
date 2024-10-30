@@ -9,6 +9,7 @@ package witness
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math"
@@ -104,6 +105,24 @@ func (recorder *Recorder) Start(ctx context.Context) error {
 		TransferNew,
 	)); err != nil {
 		return errors.Wrapf(err, "failed to create table %s", recorder.transferTableName)
+	}
+	if _, err := recorder.store.DB().Exec(fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s ("+
+			"`cashier` varchar(42) NOT NULL,"+
+			"`token` varchar(42) NOT NULL,"+
+			"`tidx` bigint(20) NOT NULL,"+
+			"`recipient` varchar(256),"+
+			"`payload` varchar(24576),"+ // MaxCodeSize
+			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
+			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
+			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
+			"KEY `cashier_index` (`cashier`),"+
+			"KEY `token_index` (`token`),"+
+			"KEY `tidx_index` (`tidx`)"+
+			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
+		recorder.transferTableName+"_shadow",
+	)); err != nil {
+		return errors.Wrapf(err, "failed to create table %s", recorder.transferTableName+"_shadow")
 	}
 
 	return nil
@@ -301,17 +320,19 @@ func (recorder *Recorder) TransfersToSubmit(cashier string) ([]AbstractTransfer,
 
 func (recorder *Recorder) transfers(status TransferStatus, cashier string) ([]AbstractTransfer, error) {
 	query := fmt.Sprintf(
-		"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, blockHeight, txHash, status, id, txSender "+
-			"FROM %s "+
-			"WHERE status=? ",
+		"SELECT a.cashier, a.token, a.tidx, a.sender, a.recipient, a.amount, a.payload, a.fee, a.blockHeight, a.txHash, a.status, a.id, a.txSender, b.recipient, b.payload "+
+			"FROM %s a LEFT JOIN %s b "+
+			"ON a.cashier = b.cashier AND a.token = b.token AND a.tidx = b.tidx "+
+			"WHERE a.status=? ",
 		recorder.transferTableName,
+		recorder.transferTableName+"_shadow",
 	)
 	params := []interface{}{status}
 	if cashier != "" {
-		query += "AND cashier=? "
+		query += "AND a.cashier=? "
 		params = append(params, cashier)
 	}
-	query += "ORDER BY creationTime"
+	query += "ORDER BY a.creationTime"
 
 	rows, err := recorder.store.DB().Query(
 		query,
@@ -335,7 +356,9 @@ func (recorder *Recorder) transfers(status TransferStatus, cashier string) ([]Ab
 		var txHash sql.NullString
 		var payload sql.NullString
 		var txSender sql.NullString
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.blockHeight, &txHash, &tx.status, &id, &txSender); err != nil {
+		var shadowRecipient sql.NullString
+		var shadowPayload sql.NullString
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.blockHeight, &txHash, &tx.status, &id, &txSender, &shadowRecipient, &shadowPayload); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -370,6 +393,18 @@ func (recorder *Recorder) transfers(status TransferStatus, cashier string) ([]Ab
 		if !ok || tx.amount.Sign() != 1 {
 			return nil, errors.Errorf("invalid amount %s", rawAmount)
 		}
+		if shadowRecipient.Valid {
+			tx.recipient, err = recorder.addrDecoder.DecodeString(shadowRecipient.String)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to decode shadow recipient")
+			}
+		}
+		if shadowPayload.Valid {
+			tx.payload, err = hex.DecodeString(shadowPayload.String)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to decode shadow payload")
+			}
+		}
 		if toToken, ok := recorder.tokenPairs[tx.token]; ok {
 			tx.coToken = toToken
 		} else {
@@ -398,7 +433,14 @@ func (recorder *Recorder) transfers(status TransferStatus, cashier string) ([]Ab
 
 func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	row := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `status`, `id`, `txHash`, `txSender` FROM %s WHERE `id`=?", recorder.transferTableName),
+		fmt.Sprintf(
+			"SELECT `a.cashier`, `a.token`, `a.tidx`, `a.sender`, `a.recipient`, `a.amount`, `a.payload`, `a.status`, `a.id`, `a.txHash`, `a.txSender`, `b.recipient`, `b.payload` "+
+				"FROM %s a JOIN %s b "+
+				"ON a.cashier = b.cashier AND a.token = b.token AND a.tidx = b.tidx "+
+				"WHERE `a.id`=?",
+			recorder.transferTableName,
+			recorder.transferTableName+"_shadow",
+		),
 		_id.Hex(),
 	)
 
@@ -412,7 +454,9 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	var id sql.NullString
 	var payload sql.NullString
 	var txSender sql.NullString
-	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &tx.status, &id, &txHash, &txSender); err != nil {
+	var shadowRecipient sql.NullString
+	var shadowPayload sql.NullString
+	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &tx.status, &id, &txHash, &txSender, &shadowRecipient, &shadowPayload); err != nil {
 		return nil, err
 	}
 
@@ -438,6 +482,18 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	tx.payload, err = util.DecodeNullString(payload)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to decode payload %s", payload.String)
+	}
+	if shadowRecipient.Valid {
+		tx.recipient, err = recorder.addrDecoder.DecodeString(shadowRecipient.String)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode shadow recipient")
+		}
+	}
+	if shadowPayload.Valid {
+		tx.payload, err = hex.DecodeString(shadowPayload.String)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode shadow payload")
+		}
 	}
 	if toToken, ok := recorder.tokenPairs[tx.token]; ok {
 		tx.coToken = toToken

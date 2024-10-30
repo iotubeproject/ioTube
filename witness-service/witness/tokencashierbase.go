@@ -52,6 +52,7 @@ type (
 	tokenCashierBase struct {
 		id                     string
 		cashierContractAddr    string
+		previousCashierAddr    string
 		recorder               AbstractRecorder
 		relayerURL             string
 		validatorContractAddr  []byte
@@ -76,6 +77,7 @@ type (
 func newTokenCashierBase(
 	id string,
 	cashierContractAddr string,
+	previousCashierAddr string,
 	recorder AbstractRecorder,
 	relayerURL string,
 	validatorContractAddr []byte,
@@ -91,6 +93,7 @@ func newTokenCashierBase(
 	return &tokenCashierBase{
 		id:                     id,
 		cashierContractAddr:    cashierContractAddr,
+		previousCashierAddr:    previousCashierAddr,
 		recorder:               recorder,
 		relayerURL:             relayerURL,
 		startBlockHeight:       startBlockHeight,
@@ -232,6 +235,13 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 	if err != nil {
 		return err
 	}
+	if tc.previousCashierAddr != "" {
+		transfersFromPreviousCashier, err := tc.recorder.TransfersToSubmit("0x540a92Dd951407Ee6c94b997a43ecF30Ea6D04Cd")
+		if err != nil {
+			return err
+		}
+		transfersToSubmit = append(transfersToSubmit, transfersFromPreviousCashier...)
+	}
 	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
 	if err != nil {
 		return err
@@ -296,6 +306,13 @@ func (tc *tokenCashierBase) CheckTransfers() error {
 	transfersToSettle, err := tc.recorder.TransfersToSettle(tc.cashierContractAddr)
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch transfers to settle")
+	}
+	if tc.previousCashierAddr != "" {
+		transfersFromPreviousCashier, err := tc.recorder.TransfersToSettle(tc.previousCashierAddr)
+		if err != nil {
+			return errors.Wrap(err, "failed to fetch transfers from previous cashier to settle")
+		}
+		transfersToSettle = append(transfersToSettle, transfersFromPreviousCashier...)
 	}
 	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
 	if err != nil {
