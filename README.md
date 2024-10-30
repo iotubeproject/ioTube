@@ -1,44 +1,46 @@
 [![tests](https://github.com/iotubeproject/ioTube/actions/workflows/main.yml/badge.svg)](https://github.com/iotubeproject/ioTube/actions?query=workflow%3Atests)
 
 <p align="center">
-<img src="https://user-images.githubusercontent.com/448293/123823874-6aa66480-d8b2-11eb-9c0f-c268ae19e18c.jpg" width="720">
+<img src="https://github.com/user-attachments/assets/9f249713-25d3-4de1-9458-69972b976699" width="720">
 </p>
 
-# ioTube - the decentralized bridge for Ethereum, Binance Smart Chain, Polygon(Matic) and IoTeX
+# ioTube - the decentralized bridge for Ethereum, Binance Smart Chain, Polygon(Matic), Solana and IoTeX
 <a href="https://iotex.io/devdiscord" target="_blank">
   <img src="https://github.com/iotexproject/halogrants/blob/880eea4af074b082a75608c7376bd7a8eaa1ac21/img/btn-discord.svg" height="36px">
 </a>
 
 ## Version history 
 
-### V1.0 IOTX tube 
-Launch date: Apr 2019 (<a href="https://iotex.medium.com/everything-you-need-to-know-about-iotex-mainnet-alpha-b8d790e0bd55">Announcement</a>)
+### V7.0 Payload support
+TBD
 
-The first version of ioTube was built by core-dev in Apr. 2019 to facilitate the swap of IOTX-E (ERC20 version of IOTX on Ethereum) and IOTX mainnet token.
+### V6.0 Solana Bridge
+Announcement: https://depinscan.io/news/2024-09-16/iotex-launches-solana-bridge
 
-### V2.0 Multi Token Tube (IoTeX <-> Ethereum)
-Launch date: Aug 31, 2020 (<a href="https://iotex.medium.com/iotube-cross-chain-bridge-to-connect-iotex-with-the-blockchain-universe-b0f5b08c1943">Announcement</a>)
-
-V2 generalizes the ioTube V1 to support multiple assets on Ethereum & IoTeX blockchains.
-
-### V3.0 Rebuilt with largely fee reduction
-Launch date: Feb 8, 2021 (<a href="https://community.iotex.io/t/iotube-v3-faster-cheaper-and-unified/2001">Announcement</a>)
-
-Ethereum has been suffering high gas cost for a long period. The core-dev team rebuilt ioTube to largely reduced the gas cost on ETH side by introducing a relayer and putting signature offchain.
+### V5.0 Web3 Support + Transactions + More Assets + Crosschain Tokens
+Announcement: https://iotex.io/blog/cross-chain-polygon-web3/
 
 ### V4.0 Multi-Chain support
 Launch date: Apr 13, 2021 ([Annoucement](https://medium.com/iotex/iotube-v4-cross-chain-bridge-for-iotex-ethereum-and-binance-smart-chain-9670c86723e2))
 
 Because of Ethereum's high gas cost, many projects and users also adopted Binance Smart Chain (BSC) and Huobi Eco Chain (Heco). The need of supporting BSC and Heco is increasing. The demand of cross-chain support from Ethereum and BSC or other blockchains are increasing. We'd love to support them in ioTube.  
 
-
 Matic support is launched on Jun 10, 2021 ([Annoucement](https://iotex.medium.com/iotube-v4-iotex-polygon-matic-cross-chain-token-swaps-are-live-bb2ae5bf41b4))
 
-### V5.0 Web3 (Babel) Support + Transactions + More Assets + Crosschain Tokens
+### V3.0 Rebuilt with largely fee reduction
+Launch date: Feb 8, 2021 (<a href="https://community.iotex.io/t/iotube-v3-faster-cheaper-and-unified/2001">Announcement</a>)
 
-Beta is open to public: https://tube-v5.iotex.io/
+Ethereum has been suffering high gas cost for a long period. The core-dev team rebuilt ioTube to largely reduced the gas cost on ETH side by introducing a relayer and putting signature offchain.
 
-Any bug report or feedback? Please submit an issue or discuss in https://discord.gg/jRqqSyGfUD.
+### V2.0 Multi Token Tube (IoTeX <-> Ethereum)
+Launch date: Aug 31, 2020 (<a href="https://iotex.medium.com/iotube-cross-chain-bridge-to-connect-iotex-with-the-blockchain-universe-b0f5b08c1943">Announcement</a>)
+
+V2 generalizes the ioTube V1 to support multiple assets on Ethereum & IoTeX blockchains.
+
+### V1.0 IOTX tube 
+Launch date: Apr 2019 (<a href="https://iotex.medium.com/everything-you-need-to-know-about-iotex-mainnet-alpha-b8d790e0bd55">Announcement</a>)
+
+The first version of ioTube was built by core-dev in Apr. 2019 to facilitate the swap of IOTX-E (ERC20 version of IOTX on Ethereum) and IOTX mainnet token.
 
 
 <h3>
@@ -49,7 +51,7 @@ Any bug report or feedback? Please submit an issue or discuss in https://discord
       <a href="https://github.com/iotexproject/ioTube/tree/master/docs">Documentation</a>
 </h3>
 
-&nbsp;
+Any bug report or feedback? Please submit an issue or discuss in https://discord.gg/jRqqSyGfUD.
 
 ## Submit a token to ioTube?
 
