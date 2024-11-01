@@ -127,19 +127,6 @@ services:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-bsc.yaml
 
-  matic-relayer:
-    container_name: matic-relayer
-    image: relayer:latest
-    restart: on-failure
-    ports:
-      - 7004:7004
-      - 8004:8004
-    volumes:
-      - $IOTEX_RELAYER/etc/relayer-config-matic.yaml:/etc/iotube-relayer/relayer-config-matic.yaml:ro
-    links:
-      - database
-    command: relayer -config=/etc/iotube-relayer/relayer-config-matic.yaml
-
   bsc-payload-relayer:
     container_name: bsc-payload-relayer
     image: relayer:latest
