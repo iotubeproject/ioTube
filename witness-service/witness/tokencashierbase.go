@@ -236,7 +236,7 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 		return err
 	}
 	if tc.previousCashierAddr != "" {
-		transfersFromPreviousCashier, err := tc.recorder.TransfersToSubmit("0x540a92Dd951407Ee6c94b997a43ecF30Ea6D04Cd")
+		transfersFromPreviousCashier, err := tc.recorder.TransfersToSubmit(tc.previousCashierAddr)
 		if err != nil {
 			return err
 		}
