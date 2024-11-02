@@ -76,9 +76,10 @@ type Configuration struct {
 
 // TokenPair defines a token pair
 type TokenPair struct {
-	Token1    string `json:"token1" yaml:"token1"`
-	Token2    string `json:"token2" yaml:"token2"`
-	TokenMint string `json:"tokenMint" yaml:"tokenMint"`
+	Token1    string   `json:"token1" yaml:"token1"`
+	Token2    string   `json:"token2" yaml:"token2"`
+	TokenMint string   `json:"tokenMint" yaml:"tokenMint"`
+	Whitelist []string `json:"whitelist" yaml:"whitelist"`
 }
 
 var (
@@ -110,10 +111,13 @@ func init() {
 	}
 }
 
-func parseTokenPairs(tokenPairs []TokenPair, destAddrDecoder util.AddressDecoder,
-) (map[common.Address]util.Address, map[string]util.Address) {
+func parseTokenPairs(
+	tokenPairs []TokenPair,
+	destAddrDecoder util.AddressDecoder,
+) (map[common.Address]util.Address, map[string]util.Address, map[common.Address]map[common.Address]struct{}) {
 	pairs := make(map[common.Address]util.Address)
 	tokenMintPairs := make(map[string]util.Address)
+	whitelists := make(map[common.Address]map[common.Address]struct{})
 	for _, pair := range tokenPairs {
 		token1, err := util.ParseEthAddress(pair.Token1)
 		if err != nil {
@@ -134,8 +138,19 @@ func parseTokenPairs(tokenPairs []TokenPair, destAddrDecoder util.AddressDecoder
 			}
 			tokenMintPairs[token2.String()] = mint
 		}
+		if len(pair.Whitelist) > 0 {
+			whitelist := make(map[common.Address]struct{})
+			for _, addr := range pair.Whitelist {
+				a, err := util.ParseEthAddress(addr)
+				if err != nil {
+					log.Fatalf("failed to parse whitelist address %s, %v\n", addr, err)
+				}
+				whitelist[a] = struct{}{}
+			}
+			whitelists[token1] = whitelist
+		}
 	}
-	return pairs, tokenMintPairs
+	return pairs, tokenMintPairs, whitelists
 }
 
 func main() {
@@ -268,6 +283,7 @@ func main() {
 					storeFactory.NewStore(cfg.Database),
 					cc.Reverse.TransferTableName,
 					pairs,
+					map[common.Address]map[common.Address]struct{}{},
 					map[string]util.Address{},
 					map[common.Address]int{},
 					destAddrDecoder,
@@ -285,7 +301,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("invalid token safe address %s: %+v\n", cc.TokenSafeContractAddress, err)
 			}
-			pairs, tokenMintPairs := parseTokenPairs(cc.TokenPairs, destAddrDecoder)
+			pairs, tokenMintPairs, whitelists := parseTokenPairs(cc.TokenPairs, destAddrDecoder)
 			version := witness.NoPayload
 			if cc.WithPayload {
 				version = witness.Payload
@@ -312,6 +328,7 @@ func main() {
 					storeFactory.NewStore(cfg.Database),
 					cc.TransferTableName,
 					pairs,
+					whitelists,
 					tokenMintPairs,
 					decimalRound,
 					destAddrDecoder,

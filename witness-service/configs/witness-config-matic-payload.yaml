@@ -9,6 +9,7 @@ database:
   driver: "mysql"
 cashiers:
   - id: "matic-to-iotex-payload"
+    withPayload: true
     relayerURL: ":7201"
     startBlockHeight: 63196610
     cashierContractAddress: "0x6bba6bab7faa5aa720f84468cba6086e0821e049"

@@ -82,12 +82,12 @@ const (
 	TransferNew TransferStatus = "new"
 	// TransferReady stands for a new transfer ready to sign
 	TransferReady = "ready"
-	// WitnessSubmitted stands for a witnessed transfer
-	WitnessSubmitted = "submitted"
 	// SubmissionConfirmed stands for a confirmed witness
 	SubmissionConfirmed = "confirmed"
 	// TransferSettled stands for a settled transfer
 	TransferSettled = "settled"
+	// TransferInvalid stands for an invalid transfer
+	TransferInvalid = "invalid"
 
 	// NoPayload is version without payload
 	NoPayload Version = "no-payload"

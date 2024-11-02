@@ -34,6 +34,7 @@ type (
 		cashierMetaTableName string
 		transferTableName    string
 		tokenPairs           map[common.Address]util.Address
+		tokenWhitelists      map[common.Address]map[common.Address]struct{}
 		tokenMintPairs       map[string]util.Address
 		tokenRound           map[common.Address]int
 		addrDecoder          util.AddressDecoder
@@ -45,6 +46,7 @@ func NewRecorder(
 	store *db.SQLStore,
 	transferTableName string,
 	tokenPairs map[common.Address]util.Address,
+	tokenWhitelists map[common.Address]map[common.Address]struct{},
 	tokenMintPairs map[string]util.Address,
 	tokenRound map[common.Address]int,
 	addrDecoder util.AddressDecoder,
@@ -54,6 +56,7 @@ func NewRecorder(
 		cashierMetaTableName: "cashier_meta",
 		transferTableName:    transferTableName,
 		tokenPairs:           tokenPairs,
+		tokenWhitelists:      tokenWhitelists,
 		tokenMintPairs:       tokenMintPairs,
 		tokenRound:           tokenRound,
 		addrDecoder:          addrDecoder,
@@ -144,6 +147,11 @@ func (recorder *Recorder) AddTransfer(at AbstractTransfer, status TransferStatus
 	}
 	if tx.amount.Sign() != 1 {
 		return errors.New("amount should be larger than 0")
+	}
+	if whitelist, ok := recorder.tokenWhitelists[tx.token]; ok {
+		if _, ok := whitelist[tx.sender]; !ok {
+			status = TransferInvalid
+		}
 	}
 	query := fmt.Sprintf("INSERT IGNORE INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txHash`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
