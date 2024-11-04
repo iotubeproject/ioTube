@@ -51,8 +51,8 @@ func init() {
 type (
 	tokenCashierBase struct {
 		id                     string
-		cashierContractAddr    string
-		previousCashierAddr    string
+		cashierContractAddr    util.Address
+		previousCashierAddr    util.Address
 		recorder               AbstractRecorder
 		relayerURL             string
 		validatorContractAddr  []byte
@@ -76,8 +76,8 @@ type (
 
 func newTokenCashierBase(
 	id string,
-	cashierContractAddr string,
-	previousCashierAddr string,
+	cashierContractAddr util.Address,
+	previousCashierAddr util.Address,
 	recorder AbstractRecorder,
 	relayerURL string,
 	validatorContractAddr []byte,
@@ -231,12 +231,12 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 	if tc.signHandler == nil {
 		return nil
 	}
-	transfersToSubmit, err := tc.recorder.TransfersToSubmit(tc.cashierContractAddr)
+	transfersToSubmit, err := tc.recorder.TransfersToSubmit(tc.cashierContractAddr.String())
 	if err != nil {
 		return err
 	}
-	if tc.previousCashierAddr != "" {
-		transfersFromPreviousCashier, err := tc.recorder.TransfersToSubmit(tc.previousCashierAddr)
+	if tc.previousCashierAddr != nil {
+		transfersFromPreviousCashier, err := tc.recorder.TransfersToSubmit(tc.previousCashierAddr.String())
 		if err != nil {
 			return err
 		}
@@ -289,7 +289,7 @@ func (tc *tokenCashierBase) ProcessStales() error {
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
 	response, err := relayer.StaleHeights(context.Background(), &services.StaleHeightsRequest{
-		Cashier: common.HexToAddress(tc.id).Bytes(),
+		Cashier: tc.cashierContractAddr.Bytes(),
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch stale heights")
@@ -303,12 +303,12 @@ func (tc *tokenCashierBase) ProcessStales() error {
 }
 
 func (tc *tokenCashierBase) CheckTransfers() error {
-	transfersToSettle, err := tc.recorder.TransfersToSettle(tc.cashierContractAddr)
+	transfersToSettle, err := tc.recorder.TransfersToSettle(tc.cashierContractAddr.String())
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch transfers to settle")
 	}
-	if tc.previousCashierAddr != "" {
-		transfersFromPreviousCashier, err := tc.recorder.TransfersToSettle(tc.previousCashierAddr)
+	if tc.previousCashierAddr != nil {
+		transfersFromPreviousCashier, err := tc.recorder.TransfersToSettle(tc.previousCashierAddr.String())
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch transfers from previous cashier to settle")
 		}

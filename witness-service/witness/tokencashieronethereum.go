@@ -238,13 +238,15 @@ func NewTokenCashierOnEthereum(
 	if err != nil {
 		return nil, err
 	}
-	pa := previousCashierAddr.String()
-	if pa == "0x0000000000000000000000000000000000000000" {
-		pa = ""
+	var pa util.Address
+	if previousCashierAddr.String() == "0x0000000000000000000000000000000000000000" {
+		pa = nil
+	} else {
+		pa = util.ETHAddressToAddress(previousCashierAddr)
 	}
 	return newTokenCashierBase(
 		id,
-		cashierContractAddr.String(),
+		util.ETHAddressToAddress(cashierContractAddr),
 		pa,
 		recorder,
 		relayerURL,

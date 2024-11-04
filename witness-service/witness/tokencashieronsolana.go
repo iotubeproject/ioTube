@@ -47,8 +47,8 @@ func NewTokenCashierOnSolana(
 	}
 	return newTokenCashierBase(
 		id,
-		cashier.String(),
-		"",
+		util.SOLAddressToAddress(cashier),
+		nil,
 		recorder,
 		relayerURL,
 		validatorAddr.Bytes(),
