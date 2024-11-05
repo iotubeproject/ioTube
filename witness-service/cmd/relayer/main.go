@@ -128,22 +128,22 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	if port, ok := os.LookupEnv("RELAYER_GRPC_PORT"); ok {
+	if port, ok := os.LookupEnv("RELAYER_GRPC_PORT"); ok && cfg.GrpcPort == 0 {
 		cfg.GrpcPort, err = strconv.Atoi(port)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
-	if port, ok := os.LookupEnv("RELAYER_GRPC_PROXY_PORT"); ok {
+	if port, ok := os.LookupEnv("RELAYER_GRPC_PROXY_PORT"); ok && cfg.GrpcProxyPort == 0 {
 		cfg.GrpcProxyPort, err = strconv.Atoi(port)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
-	if client, ok := os.LookupEnv("RELAYER_CLIENT_URL"); ok {
+	if client, ok := os.LookupEnv("RELAYER_CLIENT_URL"); ok && cfg.ClientURL == "" {
 		cfg.ClientURL = client
 	}
-	if pk, ok := os.LookupEnv("RELAYER_PRIVATE_KEY"); ok {
+	if pk, ok := os.LookupEnv("RELAYER_PRIVATE_KEY"); ok && cfg.PrivateKey == "" {
 		cfg.PrivateKey = pk
 	}
 	// TODO: load more parameters from env
@@ -158,7 +158,7 @@ func main() {
 	storeFactory := db.NewSQLStoreFactory()
 	log.Println("Creating service")
 	var service services.RelayServiceServer
-	if chain, ok := os.LookupEnv("RELAYER_CHAIN"); ok {
+	if chain, ok := os.LookupEnv("RELAYER_CHAIN"); ok && cfg.Chain == "" {
 		cfg.Chain = chain
 	}
 	switch cfg.Chain {
