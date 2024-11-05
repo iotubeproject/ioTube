@@ -87,6 +87,6 @@ cashiers:
         token1: "0x370f98048a45d04b57c6008b636ace4f6e8e1343"
       # USDa
       - token2: "0xeaa38983d3370e35fb42229f89e816e28035a74b"
-        token1: "0x0a60b06d8B2C0bE447Df6192911DAb650d9c0B3a"
+        token1: "0xBB76063476A79F73624386795f4CcA855954C891"
         whitelist:
           - "0x0000000000000000000000000000000000000000"
