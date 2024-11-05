@@ -11,7 +11,7 @@ validators:
   - withPayload: true
     address: "0xE7eBA1CEA51EC9B3AcCC16728e3B8786560c59d5"
     cashiers:
-      - "0x81F2260Ce0D19601d436A61B1b3a19be0F81920b"
+      - "0x4Aad62e13cBd5cD6F5BcEc649cc24f6185011fe1"
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
   driver: "mysql"

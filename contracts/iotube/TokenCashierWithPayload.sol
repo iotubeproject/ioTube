@@ -72,6 +72,10 @@ contract TokenCashierWithPayload is Ownable {
         return address(0);
     }
 
+    function depositTo(address _token, address _to, uint256 _amount) public payable {
+        depositTo(_token, _to, _amount, "");
+    }
+
     function depositTo(address _token, address _to, uint256 _amount, bytes memory _payload) public whenNotPaused payable {
         require(_to != address(0), "invalid destination");
         bool isCoin = false;
@@ -99,6 +103,10 @@ contract TokenCashierWithPayload is Ownable {
         }
         counts[_token] += 1;
         emit Receipt(_token, counts[_token], msg.sender, _to, _amount, fee, _payload);
+    }
+
+    function deposit(address _token, uint256 _amount) public payable {
+        depositTo(_token, msg.sender, _amount);
     }
 
     function deposit(address _token, uint256 _amount, bytes memory _payload) public payable {

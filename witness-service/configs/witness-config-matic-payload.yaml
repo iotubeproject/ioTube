@@ -12,7 +12,7 @@ cashiers:
     withPayload: true
     relayerURL: ":7201"
     startBlockHeight: 63196610
-    cashierContractAddress: "0x6bba6bab7faa5aa720f84468cba6086e0821e049"
+    cashierContractAddress: "0x990B503f8C7353f1caB6f9D5bbF8f0Be2718D731"
     tokenSafeContractAddress: "0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45"
     validatorContractAddress: "0x915241176a644A29F46F5F4F8Bd49309e461a9bD"
     transferTableName: "matic_transfers"

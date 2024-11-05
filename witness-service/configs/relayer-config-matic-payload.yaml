@@ -12,6 +12,7 @@ validators:
     address: "0x87E2D48De6CC2029fFc1a915462e4Aa597890cd6"
     cashiers:
       - "0x124B468860ac994ef28D11643d16e88dd4F26085"
+      - "0x8114746E4308a4d3Ff2a74B66414fF35657Fa0E2"
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
   driver: "mysql"

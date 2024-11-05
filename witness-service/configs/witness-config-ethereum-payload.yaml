@@ -12,7 +12,7 @@ cashiers:
     relayerURL: ":7201"
     startBlockHeight: 21007829
     validatorContractAddress: "0x915241176a644A29F46F5F4F8Bd49309e461a9bD"
-    cashierContractAddress: "0xd57bde0a8bb77a2f65769316f6343e0a13a8d7d4"
+    cashierContractAddress: "0x1B9AA865d74b2B77fFdbCF507B56a7b3AB43Bac4"
     tokenSafeContractAddress: "0xc2e0f31d739cb3153ba5760a203b3bd7c27f0d7a"
     transferTableName: "ethereum_transfers"
     tokenPairs:

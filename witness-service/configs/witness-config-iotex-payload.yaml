@@ -10,7 +10,7 @@ cashiers:
   - id: "iotex-to-ethereum-payload"
     withPayload: true
     relayerURL: ":7200"
-    cashierContractAddress: "0x81F2260Ce0D19601d436A61B1b3a19be0F81920b"
+    cashierContractAddress: "0x4Aad62e13cBd5cD6F5BcEc649cc24f6185011fe1"
     validatorContractAddress: "0xE7eBA1CEA51EC9B3AcCC16728e3B8786560c59d5"
     startBlockHeight: 32739910
     transferTableName: "iotex_transfers"
@@ -92,7 +92,7 @@ cashiers:
   - id: "iotex-to-bsc-payload"
     withPayload: true
     relayerURL: ":7203"
-    cashierContractAddress: "0xbF4C617fE41681b26221863e1F466feadA0B74ca"
+    cashierContractAddress: "0xa016f866a606221E9C9E6ab3a942Bfc81F6074f4"
     validatorContractAddress: "0x95C6F6Af2c0Fa069768203FDa963d7626efC794a"
     startBlockHeight: 32739491
     transferTableName: "iotex_to_bsc_transfers"
@@ -136,8 +136,8 @@ cashiers:
   - id: "iotex-to-matic-payload"
     withPayload: true
     relayerURL: ":7204"
-    cashierContractAddress: "0x124B468860ac994ef28D11643d16e88dd4F26085"
-    previousCashierContractAddress: "0x540a92Dd951407Ee6c94b997a43ecF30Ea6D04Cd"
+    cashierContractAddress: "0x8114746E4308a4d3Ff2a74B66414fF35657Fa0E2"
+    previousCashierContractAddress: "0x124B468860ac994ef28D11643d16e88dd4F26085"
     validatorContractAddress: "0x87E2D48De6CC2029fFc1a915462e4Aa597890cd6"
     startBlockHeight: 32723537
     transferTableName: "iotex_to_matic_transfers"

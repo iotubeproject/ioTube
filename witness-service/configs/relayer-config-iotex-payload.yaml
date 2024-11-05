@@ -9,9 +9,9 @@ validators:
   - withPayload: true
     address: "0x915241176a644A29F46F5F4F8Bd49309e461a9bD"
     cashiers:
-      - "0xd57bde0a8bb77a2f65769316f6343e0a13a8d7d4"
-      - "0x6bba6bab7faa5aa720f84468cba6086e0821e049"
-      - "0xaEDCBf2776ceBDf96d8f4F5fb6CbE34CdE970096"
+      - "0x1B9AA865d74b2B77fFdbCF507B56a7b3AB43Bac4"
+      - "0x990B503f8C7353f1caB6f9D5bbF8f0Be2718D731"
+      - "0x78de1E0b76523Ac6E190F89FFC46571346940204"
 database:
   uri: "root:kdfjjrU64fjK58H@tcp(database:3306)/relayer?parseTime=true"
   driver: "mysql"

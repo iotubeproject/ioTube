@@ -77,7 +77,6 @@ function downloadConfigFile() {
     copyFile "configs/relayer-config-ethereum-payload.yaml" "relayer-config-ethereum-payload.yaml" 1
     copyFile "configs/relayer-config-bsc.yaml" "relayer-config-bsc.yaml" 1
     copyFile "configs/relayer-config-bsc-payload.yaml" "relayer-config-bsc-payload.yaml" 1
-    copyFile "configs/relayer-config-matic.yaml" "relayer-config-matic.yaml" 1
     copyFile "configs/relayer-config-matic-payload.yaml" "relayer-config-matic-payload.yaml" 1
     copyFile "configs/relayer-config-iotex-testnet.yaml" "relayer-config-iotex-testnet.yaml" 1
     copyFile "configs/relayer-config-sepolia.yaml" "relayer-config-sepolia.yaml" 1

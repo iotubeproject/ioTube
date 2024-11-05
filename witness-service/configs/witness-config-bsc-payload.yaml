@@ -11,7 +11,7 @@ cashiers:
     withPayload: true
     relayerURL: ":7201"
     startBlockHeight: 43283329
-    cashierContractAddress: "0xaEDCBf2776ceBDf96d8f4F5fb6CbE34CdE970096"
+    cashierContractAddress: "0x78de1E0b76523Ac6E190F89FFC46571346940204"
     tokenSafeContractAddress: "0xfbe9a4138afdf1fa639a8c2818a0c4513fc4ce4b"
     validatorContractAddress: "0x915241176a644A29F46F5F4F8Bd49309e461a9bD"
     transferTableName: "bsc_transfers"
