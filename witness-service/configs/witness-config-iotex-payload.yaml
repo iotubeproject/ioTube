@@ -87,8 +87,6 @@ cashiers:
       # USDa
       - token1: "0xeaa38983d3370e35fb42229f89e816e28035a74b"
         token2: "0xBB76063476A79F73624386795f4CcA855954C891"
-        whitelist:
-          - "0x0000000000000000000000000000000000000000"
   - id: "iotex-to-bsc-payload"
     withPayload: true
     relayerURL: ":7203"
