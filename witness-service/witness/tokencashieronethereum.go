@@ -26,14 +26,16 @@ type iterator struct {
 	client                *ethclient.Client
 	cashierContractAddr   common.Address
 	tokenSafeContractAddr common.Address
+	previous              *iterator
 }
 
-func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr common.Address, client *ethclient.Client) (*iterator, error) {
+func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr common.Address, client *ethclient.Client, previous *iterator) (*iterator, error) {
 	iter := &iterator{
 		version:               version,
 		cashierContractAddr:   cashierContractAddr,
 		tokenSafeContractAddr: tokenSafeContractAddr,
 		client:                client,
+		previous:              previous,
 	}
 	var err error
 	switch version {
@@ -115,7 +117,7 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 		if err != nil {
 			return nil, err
 		}
-		iterator, err := filter.FilterReceipt(
+		i, err := filter.FilterReceipt(
 			&bind.FilterOpts{
 				Start: start,
 				End:   &end,
@@ -126,16 +128,16 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 		if err != nil {
 			return nil, err
 		}
-		for iterator.Next() {
+		for i.Next() {
 			tsf, err := iter.extract(
-				iterator.Event.Token,
-				iterator.Event.Sender,
-				util.ETHAddressToAddress(iterator.Event.Recipient),
-				iterator.Event.Id.Uint64(),
-				iterator.Event.Amount,
-				iterator.Event.Fee,
+				i.Event.Token,
+				i.Event.Sender,
+				util.ETHAddressToAddress(i.Event.Recipient),
+				i.Event.Id.Uint64(),
+				i.Event.Amount,
+				i.Event.Fee,
 				nil,
-				iterator.Event.Raw,
+				i.Event.Raw,
 			)
 			if err != nil {
 				return nil, err
@@ -147,7 +149,7 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 		if err != nil {
 			return nil, err
 		}
-		iterator, err := filter.FilterReceipt(
+		i, err := filter.FilterReceipt(
 			&bind.FilterOpts{
 				Start: start,
 				End:   &end,
@@ -158,16 +160,16 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 		if err != nil {
 			return nil, err
 		}
-		for iterator.Next() {
+		for i.Next() {
 			tsf, err := iter.extract(
-				iterator.Event.Token,
-				iterator.Event.Sender,
-				util.ETHAddressToAddress(iterator.Event.Recipient),
-				iterator.Event.Id.Uint64(),
-				iterator.Event.Amount,
-				iterator.Event.Fee,
-				iterator.Event.Payload,
-				iterator.Event.Raw,
+				i.Event.Token,
+				i.Event.Sender,
+				util.ETHAddressToAddress(i.Event.Recipient),
+				i.Event.Id.Uint64(),
+				i.Event.Amount,
+				i.Event.Fee,
+				i.Event.Payload,
+				i.Event.Raw,
 			)
 			if err != nil {
 				return nil, err
@@ -179,7 +181,7 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 		if err != nil {
 			return nil, err
 		}
-		iterator, err := filter.FilterReceipt(
+		i, err := filter.FilterReceipt(
 			&bind.FilterOpts{
 				Start: start,
 				End:   &end,
@@ -190,20 +192,20 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 		if err != nil {
 			return nil, err
 		}
-		recipient, err := util.ParseAddress(iterator.Event.Recipient)
+		recipient, err := util.ParseAddress(i.Event.Recipient)
 		if err != nil {
 			return nil, err
 		}
-		for iterator.Next() {
+		for i.Next() {
 			tsf, err := iter.extract(
-				iterator.Event.Token,
-				iterator.Event.Sender,
+				i.Event.Token,
+				i.Event.Sender,
 				recipient,
-				iterator.Event.Id.Uint64(),
-				iterator.Event.Amount,
-				iterator.Event.Fee,
-				iterator.Event.Payload,
-				iterator.Event.Raw,
+				i.Event.Id.Uint64(),
+				i.Event.Amount,
+				i.Event.Fee,
+				i.Event.Payload,
+				i.Event.Raw,
 			)
 			if err != nil {
 				return nil, err
@@ -212,6 +214,13 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 		}
 	default:
 		return nil, errors.New("invalid version")
+	}
+	if iter.previous != nil {
+		previousTransfers, err := iter.previous.Transfers(start, end)
+		if err != nil {
+			return nil, err
+		}
+		transfers = append(transfers, previousTransfers...)
 	}
 
 	return transfers, nil
@@ -234,7 +243,7 @@ func NewTokenCashierOnEthereum(
 	reverseRecorder *Recorder,
 	reverseCashierContractAddr common.Address,
 ) (TokenCashier, error) {
-	iter, err := newIterator(version, cashierContractAddr, tokenSafeContractAddr, ethereumClient)
+	iter, err := newIterator(version, cashierContractAddr, tokenSafeContractAddr, ethereumClient, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -242,6 +251,10 @@ func NewTokenCashierOnEthereum(
 	if previousCashierAddr.String() == "0x0000000000000000000000000000000000000000" {
 		pa = nil
 	} else {
+		iter, err = newIterator(version, previousCashierAddr, tokenSafeContractAddr, ethereumClient, iter)
+		if err != nil {
+			return nil, err
+		}
 		pa = util.ETHAddressToAddress(previousCashierAddr)
 	}
 	return newTokenCashierBase(
