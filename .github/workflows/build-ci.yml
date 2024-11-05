@@ -20,7 +20,7 @@ jobs:
         include:
           - name: witness
             image_name: iotubeproject/witness
-            dockerfile: Dockerfile.witness
+            dockerfile: witness-service/Dockerfile.witness
     permissions:
       contents: read
       packages: write
