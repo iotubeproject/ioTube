@@ -294,6 +294,15 @@ func (tc *tokenCashierBase) ProcessStales() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch stale heights")
 	}
+	if tc.previousCashierAddr != nil {
+		previousResponse, err := relayer.StaleHeights(context.Background(), &services.StaleHeightsRequest{
+			Cashier: tc.previousCashierAddr.Bytes(),
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to fetch stale heights from previous cashier")
+		}
+		response.Heights = append(response.Heights, previousResponse.Heights...)
+	}
 	for _, height := range response.Heights {
 		if err := tc.PullTransfersByHeight(height); err != nil {
 			return errors.Wrap(err, "failed to pull transfers by height")
