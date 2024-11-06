@@ -105,8 +105,8 @@ function downloadConfigFile() {
     fi
     echo "" >> $envFile
     echo "IOTEX_WITNESS=$IOTEX_WITNESS" >> ${envFile}
-    if grep -q "/^DB_ROOT_PASSWORD=" ${envFile}; then
-        sed "/^DB_ROOT_PASSWORD=.*//" ${envFile} > ${envFile}.tmp
+    if grep -q "^DB_ROOT_PASSWORD=" ${envFile}; then
+        sed "s/^DB_ROOT_PASSWORD=.*//" ${envFile} > ${envFile}.tmp
         mv ${envFile}.tmp $envFile
     fi
     echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${envFile}
