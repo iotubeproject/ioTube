@@ -184,8 +184,13 @@ func (recorder *Recorder) initStore(
 			return errors.Wrap(err, "failed to create new tx table")
 		}
 	}
+	_, err := recorder.store.DB().Exec(
+		fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `status`=?", transferTableName),
+		WaitingForWitnesses,
+		ValidationInProcess,
+	)
 
-	return nil
+	return err
 }
 
 // Stop stops the recorder
@@ -257,7 +262,7 @@ func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer,
 			if err := explorerTx.Commit(); err == nil {
 				break
 			}
-			fmt.Println("failed to commit explorer transaction", err)
+			log.Println("failed to commit explorer transaction", err)
 		}
 	}
 
@@ -676,11 +681,11 @@ func (recorder *Recorder) MarkAsProcessing(id common.Hash) error {
 			if err == nil {
 				break
 			}
-			fmt.Println("failed to update explorer db", err)
+			log.Println("failed to update explorer db", err)
 		}
 	}
 
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // UpdateRecord updates a transfer gas price
@@ -716,11 +721,11 @@ func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, relay
 			if err == nil {
 				break
 			}
-			fmt.Println("failed to update explorer db", err)
+			log.Println("failed to update explorer db", err)
 		}
 	}
 
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // MarkAsValidated marks a transfer as validated
@@ -755,11 +760,11 @@ func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, re
 			if err == nil {
 				break
 			}
-			fmt.Println("failed to update explorer db", err)
+			log.Println("failed to update explorer db", err)
 		}
 	}
 
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // MarkAsSettled marks a record as settled
@@ -777,7 +782,7 @@ func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
 		return errors.Wrap(err, "failed to mark as settled")
 	}
 
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // MarkAsBonusPending marks a record as bonus pending
@@ -809,11 +814,11 @@ func (recorder *Recorder) MarkAsBonusPending(id common.Hash, txHash common.Hash,
 			if err == nil {
 				break
 			}
-			fmt.Println("failed to update explorer db", err)
+			log.Println("failed to update explorer db", err)
 		}
 	}
 
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // MarkAsFailed marks a record as failed
@@ -831,11 +836,11 @@ func (recorder *Recorder) MarkAsFailed(id common.Hash) error {
 			if err == nil {
 				break
 			}
-			fmt.Println("failed to update explorer db", err)
+			log.Println("failed to update explorer db", err)
 		}
 	}
 
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // MarkAsRejected marks a record as failed
@@ -853,11 +858,11 @@ func (recorder *Recorder) MarkAsRejected(id common.Hash) error {
 			if err == nil {
 				break
 			}
-			fmt.Println("failed to update explorer db", err)
+			log.Println("failed to update explorer db", err)
 		}
 	}
 
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // ResetTransferInProcess marks a record as new
@@ -884,11 +889,11 @@ func (recorder *Recorder) reset(id common.Hash, status ValidationStatusType) err
 			if err == nil {
 				break
 			}
-			fmt.Println("failed to update explorer db", err)
+			log.Println("failed to update explorer db", err)
 		}
 	}
 
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // ResetCausedByNonce marks a record as new
@@ -906,11 +911,11 @@ func (recorder *Recorder) ResetCausedByNonce(id common.Hash) error {
 			if err == nil {
 				break
 			}
-			fmt.Println("failed to update explorer db", err)
+			log.Println("failed to update explorer db", err)
 		}
 	}
 
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // AddNewTX adds a new tx to the new tx table
@@ -923,7 +928,7 @@ func (recorder *Recorder) AddNewTX(height uint64, txHash []byte) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to add new TX")
 	}
-	return recorder.validateResult(result)
+	return recorder.validateResult(result, 1)
 }
 
 // NewTXs returns the new txs requested by the witness
@@ -963,13 +968,13 @@ func (recorder *Recorder) NewTXs(count uint32) ([]uint64, [][]byte, error) {
 // Private functions
 /////////////////////////////////
 
-func (recorder *Recorder) validateResult(res sql.Result) error {
+func (recorder *Recorder) validateResult(res sql.Result, expected int64) error {
 	affected, err := res.RowsAffected()
 	if err != nil {
 		return err
 	}
-	if affected != 1 {
-		return errors.Errorf("The number of rows %d updated is not as expected", affected)
+	if affected != expected {
+		return errors.Errorf("The number of rows %d updated is not as expected %d", affected, expected)
 	}
 	return nil
 }

@@ -1,5 +1,5 @@
 chain: "ethereum"
-interval: 5m
+interval: 2m
 clientURL: ""
 ethConfirmBlockNumber: 20
 ethGasPriceLimit: 10000000000

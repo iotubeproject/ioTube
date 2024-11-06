@@ -22,6 +22,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   ethereum-relayer:
     container_name: ethereum-relayer
@@ -35,6 +37,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   iotex-payload-relayer:
     container_name: iotex-payload-relayer
@@ -48,6 +52,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-payload.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   ethereum-payload-relayer:
     container_name: ethereum-payload-relayer
@@ -61,6 +67,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum-payload.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   iotex-testnet-relayer:
     container_name: iotex-testnet-relayer
@@ -74,6 +82,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-testnet.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   sepolia-relayer:
     container_name: sepolia-relayer
@@ -87,6 +97,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-sepolia.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
 #  heco-relayer:
 #    container_name: heco-relayer
@@ -126,6 +138,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-bsc.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   bsc-payload-relayer:
     container_name: bsc-payload-relayer
@@ -139,6 +153,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-bsc-payload.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   matic-payload-relayer:
     container_name: matic-payload-relayer
@@ -152,6 +168,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-matic-payload.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   iotex-solana-relayer:
     container_name: iotex-solana-relayer
@@ -165,6 +183,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-solana.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   solana-relayer:
     container_name: solana-relayer
@@ -178,6 +198,8 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-solana.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   cron:
     image: schnitzler/mysqldump

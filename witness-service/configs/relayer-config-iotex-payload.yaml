@@ -3,6 +3,7 @@ interval: 1m
 clientURL: "https://babel-api.mainnet.iotex.one"
 grpcPort: 7201
 grpcProxyPort: 8201
+ethGasPriceLimit: 2000000000000
 privateKey: ""
 slackWebHook: "" 
 validators:

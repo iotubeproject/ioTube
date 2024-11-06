@@ -2,7 +2,7 @@ chain: "bsc"
 interval: 1m
 clientURL: "https://bsc-dataseed.binance.org/"
 ethConfirmBlockNumber: 2
-ethGasPriceLimit: 10
+ethGasPriceLimit: 1000000001
 grpcPort: 7003
 grpcProxyPort: 8003
 privateKey: ""
