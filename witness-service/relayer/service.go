@@ -3,10 +3,12 @@ package relayer
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
@@ -507,6 +509,11 @@ func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidato
 			return false, s.recorder.ResetTransferInProcess(transfer.id)
 		case errNoncritical:
 			log.Printf("failed to prepare speed up: %+v\n", err)
+		case vm.ErrExecutionReverted:
+			if strings.Contains(err.Error(), "transfer has been settled") {
+				return false, s.recorder.MarkAsSettled(transfer.id)
+			}
+			fallthrough
 		default:
 			return false, errors.Wrap(err, "failed to speed up")
 		}
@@ -594,6 +601,11 @@ func (s *Service) submitTransfer(transfer *Transfer, validator TransferValidator
 	case errNoncritical:
 		log.Printf("failed to prepare submission: %v\n", err)
 		return s.recorder.ResetTransferInProcess(transfer.id)
+	case vm.ErrExecutionReverted:
+		if strings.Contains(err.Error(), "transfer has been settled") {
+			return s.recorder.MarkAsSettled(transfer.id)
+		}
+		fallthrough
 	default:
 		log.Printf("failed to submit %x, %+v", transfer.id, err)
 		var recorderErr error

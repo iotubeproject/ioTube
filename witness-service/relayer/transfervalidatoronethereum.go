@@ -177,6 +177,14 @@ func (v *validatorWithPayload) SubmitTransfer(opts *bind.TransactOpts, transfer 
 	if err != nil {
 		return nil, err
 	}
+	opts.GasLimit = 0
+	opts.NoSend = true
+	tx, err := v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signatures, transfer.payload)
+	if err != nil {
+		return nil, err
+	}
+	opts.NoSend = false
+	opts.GasLimit = tx.Gas()
 	return v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signatures, transfer.payload)
 }
 
