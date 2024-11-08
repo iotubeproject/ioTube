@@ -141,9 +141,13 @@ func main() {
 
 	storeFactory := db.NewSQLStoreFactory()
 	log.Println("Creating service")
+	support1559 := true
 	var service services.RelayServiceServer
 	switch cfg.Chain {
-	case "ethereum", "heco", "bsc", "matic", "polis", "iotex-e", "iotex", "iotex-testnet", "sepolia":
+	case "iotex-e", "iotex", "iotex-testnet":
+		support1559 = false
+		fallthrough
+	case "ethereum", "heco", "bsc", "matic", "polis", "sepolia":
 		if cfg.ClientURL == "" {
 			break
 		}
@@ -183,6 +187,7 @@ func main() {
 				new(big.Int).SetUint64(cfg.EthGasPriceGap),
 				version,
 				validatorAddr,
+				support1559,
 			)
 			if err != nil {
 				log.Fatalf("failed to create validator: %+v\n", err)

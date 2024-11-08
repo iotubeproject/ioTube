@@ -39,11 +39,11 @@ type (
 		gasPriceHardLimit  *big.Int
 		gasPriceDeviation  *big.Int
 		gasPriceGap        *big.Int
+		support1559        bool
 
-		chainID                          *big.Int
-		privateKeys                      []*ecdsa.PrivateKey
-		validatorContractAddr            common.Address
-		validatorWithPayloadContractAddr common.Address
+		chainID               *big.Int
+		privateKeys           []*ecdsa.PrivateKey
+		validatorContractAddr common.Address
 
 		client              *ethclient.Client
 		validator           validatorContract
@@ -177,14 +177,7 @@ func (v *validatorWithPayload) SubmitTransfer(opts *bind.TransactOpts, transfer 
 	if err != nil {
 		return nil, err
 	}
-	opts.GasLimit = 0
-	opts.NoSend = true
-	tx, err := v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signatures, transfer.payload)
-	if err != nil {
-		return nil, err
-	}
-	opts.NoSend = false
-	opts.GasLimit = tx.Gas()
+	// opts.GasLimit = 0
 	return v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signatures, transfer.payload)
 }
 
@@ -232,6 +225,7 @@ func NewTransferValidatorOnEthereum(
 	gasPriceGap *big.Int,
 	version Version,
 	validatorContractAddr common.Address,
+	support1559 bool,
 ) (*transferValidatorOnEthereum, error) {
 	validator, err := newValidatorContract(version, validatorContractAddr, client)
 	if err != nil {
@@ -252,6 +246,7 @@ func NewTransferValidatorOnEthereum(
 		gasPriceHardLimit:  gasPriceHardLimit,
 		gasPriceDeviation:  gasPriceDeviation,
 		gasPriceGap:        gasPriceGap,
+		support1559:        support1559,
 
 		chainID:               chainID,
 		privateKeys:           privateKeys,
@@ -445,15 +440,18 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 	} else {
 		privateKey = tv.privateKeys[transfer.index%uint64(len(tv.privateKeys))]
 	}
-	tOpts, err := tv.transactionOpts(300000, privateKey, transfer.timestamp)
+	tOpts, err := tv.transactionOpts(privateKey, transfer.timestamp)
 	if err != nil {
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
-	if tv.gasPriceDeviation != nil && new(big.Int).Add(tv.gasPriceDeviation, tOpts.GasPrice).Sign() > 0 {
-		tOpts.GasPrice = new(big.Int).Add(tv.gasPriceDeviation, tOpts.GasPrice)
-	}
 	if isSpeedUp {
-		if new(big.Int).Sub(tOpts.GasPrice, transfer.gasPrice).Cmp(tv.gasPriceGap) < 0 {
+		var gasPrice *big.Int
+		if tv.support1559 {
+			gasPrice = tOpts.GasFeeCap
+		} else {
+			gasPrice = tOpts.GasPrice
+		}
+		if new(big.Int).Sub(gasPrice, transfer.gasPrice).Cmp(tv.gasPriceGap) < 0 {
 			return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "current gas price %s is not significantly larger than old gas price %s", tOpts.GasPrice, transfer.gasPrice)
 		}
 		tOpts.Nonce = tOpts.Nonce.SetUint64(transfer.nonce)
@@ -490,7 +488,7 @@ func (tv *transferValidatorOnEthereum) SpeedUp(transfer *Transfer, witnesses []*
 	return tv.submit(transfer, witnesses, true)
 }
 
-func (tv *transferValidatorOnEthereum) transactionOpts(gasLimit uint64, privateKey *ecdsa.PrivateKey, ts time.Time) (*bind.TransactOpts, error) {
+func (tv *transferValidatorOnEthereum) transactionOpts(privateKey *ecdsa.PrivateKey, ts time.Time) (*bind.TransactOpts, error) {
 	relayerAddr := crypto.PubkeyToAddress(privateKey.PublicKey)
 
 	opts, err := bind.NewKeyedTransactorWithChainID(privateKey, tv.chainID)
@@ -498,13 +496,15 @@ func (tv *transferValidatorOnEthereum) transactionOpts(gasLimit uint64, privateK
 		return nil, err
 	}
 	opts.Value = big.NewInt(0)
-	opts.GasLimit = gasLimit
 	gasPrice, err := tv.client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get suggested gas price")
 	}
 	if gasPrice.Cmp(big.NewInt(0)) == 0 {
 		gasPrice = tv.defaultGasPrice
+	}
+	if tv.gasPriceDeviation != nil && new(big.Int).Add(tv.gasPriceDeviation, gasPrice).Sign() > 0 {
+		gasPrice = new(big.Int).Add(tv.gasPriceDeviation, gasPrice)
 	}
 	gasPriceLimit := tv.gasPriceLimit
 	if time.Now().Before(ts.Add(30 * time.Minute)) {
@@ -513,14 +513,21 @@ func (tv *transferValidatorOnEthereum) transactionOpts(gasLimit uint64, privateK
 	if gasPrice.Cmp(gasPriceLimit) >= 0 {
 		return nil, errors.Wrapf(errGasPriceTooHigh, "suggested gas price %d > limit %d", gasPrice, gasPriceLimit)
 	}
-	opts.GasPrice = gasPrice
-	balance, err := tv.client.BalanceAt(context.Background(), relayerAddr, nil)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get balance of operator account")
-	}
-	gasFee := new(big.Int).Mul(new(big.Int).SetUint64(opts.GasLimit), opts.GasPrice)
-	if gasFee.Cmp(balance) > 0 {
-		return nil, errors.Errorf("insuffient balance for gas fee")
+	if tv.support1559 {
+		opts.GasFeeCap = gasPrice
+		gasTipCap, err := tv.client.SuggestGasTipCap(context.Background())
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get suggested gas tip cap")
+		}
+		if gasTipCap.Cmp(big.NewInt(0)) == 0 {
+			gasTipCap = big.NewInt(1)
+		}
+		if gasTipCap.Cmp(gasPrice) > 0 {
+			return nil, errors.Errorf("suggested gas tip cap %d > gas price %d", gasTipCap, gasPrice)
+		}
+		opts.GasTipCap = gasTipCap
+	} else {
+		opts.GasPrice = gasPrice
 	}
 	nonce, err := tv.client.PendingNonceAt(context.Background(), relayerAddr)
 	if err != nil {
