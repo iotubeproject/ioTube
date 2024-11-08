@@ -12,7 +12,9 @@
 ## Version history 
 
 ### V7.0 Payload support
-TBD
+Launch date: Nov 6, 2024
+
+This new version enables crosschain calls by adding a new field 'payload'. The payload of a crosschain transfer will be decoded by the whitelisted recipient contracts. For example, an unwrapper for the crosschain tokens is whitelisted such that users don't need to unwrap the crosschain tokens by themselves.
 
 ### V6.0 Solana Bridge
 Announcement: https://depinscan.io/news/2024-09-16/iotex-launches-solana-bridge
@@ -77,26 +79,11 @@ Different from traditional bridges, ioTube comes with two components:
 * Add witnesses to `wl`
 * Add tokens to `tl1` or `tl2`
 
-### Join as a Relayer
-
-1. Edit `witness-service/relayer-config-iotex.yaml` and `witness-service/relayer-config-ethereum.yaml` to fill in the following fields:
-* privateKey
-* clientURL
-* validatorContractAddress
-
-2. start containers
-```
-cd witness-service
-./start_relayer.sh
-```
-
 ### Join as a Witness
 
-1. Edit `witness-service/witness-config-iotex.yaml` and `witness-service/witness-config-ethereum.yaml` to fill in the following fields:
-* privateKey
-* clientURL
-* validatorContractAddress
-* cashierContractAddress
+1. Prepare the working directory $IOTEX_WITNESS, default ~/iotex-witness. Create file $IOTEX_WINTESS/etc/.env and add:
+* WITNESS_PRIVATE_KEY
+* RELAYER_URL
 
 2. start containers
 ```
@@ -104,7 +91,10 @@ cd witness-service
 ./start_witness.sh
 ```
 
-3. Clean up everything by running
+3. modify some configs in $IOTEX_WITNESS/etc/*.secret.yaml:
+* clientURL
+
+4. Clean up everything by running
 ```
 ./clean-all.sh
 ```
@@ -137,8 +127,11 @@ Tube fees: `0`
 
 Network fees: 
 
-1. from ERC20 to XRC20: `0`
-2. from XRC20 to ERC20: `2000 IOTX` (to cover the high ETH gas fee for witnesses)
+1. from the other chains to IoTeX: `0`
+2. from IoTeX to Ethereum: `500 IOTX`
+3. from IoTeX to BSC: `20 IOTX`
+4. from IoTeX to Polygon: `2 IOTX`
+all the fees are used to cover the gas fee
 
 
 ### Add an ERC20 token to ioTube
@@ -167,8 +160,8 @@ Contracts on IoTeX
 - Standard Token List: io1t89whrwyfr0supctsqcx9n7ex5dd8yusfqhyfz 
 - Proxy Token List: io1dn8nqk3pmmll990xz6a94fpradtrljxmmx5p8j 
 - Witness List: io1hezp6d7y3246c5gklnnkh0z95qfld4zdsphhsw
-- Token Cashier: io1gsr52ahqzklaf7flqar8r0269f2utkw9349qg8
-- Transfer Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y <del>io1dwaxh2ml4fd2wg8cg35vhfsgdcyzrczffp3vus</del>
+- Token Cashier: 0x4Aad62e13cBd5cD6F5BcEc649cc24f6185011fe1
+- Transfer Validator: 0x915241176a644A29F46F5F4F8Bd49309e461a9bD
 
 Contacts on Ethereum
 
@@ -178,17 +171,16 @@ Contacts on Ethereum
 - Witness List: 0x8598dF1Ec0ac7dfBa802f4bDD93A6B93bd0AD83f 
 - Token Safe: 0xc2e0f31d739cb3153ba5760a203b3bd7c27f0d7a 
 - Minter Pool: 0x964f4f19bc823e72cc1f806021937cfc06f63b45 
-- Token Cashier: 0xa0fd7430852361931b23a31f84374ba3314e1682
-- Transfer Validator: 0xd8165188ccc135b3a3b2a5d2bc3af9d94753d955
-
+- Token Cashier: 0x1B9AA865d74b2B77fFdbCF507B56a7b3AB43Bac4
+- Transfer Validator: 0xE7eBA1CEA51EC9B3AcCC16728e3B8786560c59d5
 
 ## Tube of IoTeX <-> BSC (Binance Smart Chain) 
 
 IoTeX Side
-- Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y  (same for all)
+- Validator: 0x915241176a644A29F46F5F4F8Bd49309e461a9bD  (same for all)
 - Standard Token list: io1h2d3r0d20t58sv6h707ppc959kvs8wjsurrtnk
 - Proxy Token list: io17r9ehjstwj4gfqzwpm08fjnd606h04h2m6r92f
-- Token Cashier: io1zjlng7je02kxyvjq4eavswp6uxvfvcnh2a0a3d
+- Token Cashier: 0xa016f866a606221E9C9E6ab3a942Bfc81F6074f4
 
 BSC Side
 
@@ -197,28 +189,8 @@ BSC Side
 - Token Safe Address:  0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B
 - Mintable Token List Address:  0xa6ae9312D0AA3CC74d969Fcd4806d7729A321EE3
 - Standard Token List Address:  0x0d793F4D4287265B9bdA86b7a4083193E8743b34
-- Token Cashier Address:  0x797f1465796fd89ea7135e76dbc7cdb136bba1ca <del>0x082020Ae0B38fD1bef48895c6cFf4428e420F400</del>
-- Transfer Validator Address:  0x116404F86e97846110EA08cd52fC2882d4AD3123
-
-## Tube of IoTeX <-> Heco (Huobi Eco Chain)
-
-Please note this is still being added. They are not in production use yet. Please contact us if you want to use them without interfaces.
-
-IoTeX Side:
-- Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y  (same for all)
-- Standard Token list: io1kh0vgtxyamdkzvrlvga3r8l7r2plm7phd9ywv9
-- Proxy Token list:  io18uqxuel6d93hluua4d9jxs8rjw3r2qe5g3adgk
-- Token Cashier:  io1s6m6j3cdj0j7hlgupx0pww7wscvkepdjfwgkra
-
-Heco Side:
-
-- Witness List Address:  0x2f1a0BCa4005eBfD6A589850F436c8D8f9c2aEd2
-- Minter Pool Address:  0xd2165D222B3dAF2528Fc1b1Aa2DB18B8821EE623
-- Token Safe Address:  0x1E58cA53d90fe9B37F7f6AEB548b4BC7c6292C17
-- Mintable Token List Address:  0x12af43ef94B05A0a3447A05eEE629C7D88A30a5f
-- Standard Token List Address:  0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45
-- Token Cashier Address:  0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E
-- Transfer Validator Address:  0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7
+- Token Cashier Address:  0x78de1E0b76523Ac6E190F89FFC46571346940204
+- Transfer Validator Address:  0x95C6F6Af2c0Fa069768203FDa963d7626efC794a
 
 ## Tube of IoTeX <-> Polygon (formerly Matic) 
 
@@ -228,15 +200,12 @@ We started adding 0x address to this doc because of IoTeX start supporting 0x ad
 
 IoTeX side:
 
-- Validator: io10xr64as4krm5nufd5l2ddc43al6tl0smumkg7y 
-  - (0x7987aaf615b0f749f12da7d4d6e2b1eff4bfbe1b)
+- Validator: 0x915241176a644A29F46F5F4F8Bd49309e461a9bD
 - Standard Token list: io197rk3nff9622pkncvuvhfwyms73esdtwph4rlq
   - (0x2F8768cD292E94A0Da78671974B89B87a398356E)
 - Proxy Token list: io16at6mlcwcsrqutz2zhuhwam87h988r9fcdauk8
   - (0xD757adFF0eC4060e2c4A15f9777767f5Ca738Ca9)
-- Token Cashier:   
-  - io12s9f9hv4zsr7umy5hxt6g0k0xr4x6pxdp5w998
-  - (0x540a92dd951407ee6c94b997a43ecf30ea6d04cd)
+- Token Cashier: 0x8114746E4308a4d3Ff2a74B66414fF35657Fa0E2
 - Token safe: from old. 
   - (0xc4A29a94f12be03033daa4e6Ce9b9678c26275a2)
 - Minter pool (old); io1g7va274ltufv5nh4xawfmt0clel6tfz58p7n5r
@@ -249,8 +218,8 @@ Matic side:
 - Token Safe Address:  0xA239F03Cda98A7d2AaAA51e7bF408e5d73399e45
 - Mintable Token List Address:  0xC8DC8dCDFd94f9Cb953f379a7aD8Da5fdC303F3E
 - Standard Token List Address:  0xDe9395d2f4940aA501f9a27B98592589D14Bb0f7
-- Token Cashier Address:  0xf72CFb704d49aC7BB7FFa420AE5f084C671A29be
-- Transfer Validator Address: 0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B
+- Token Cashier Address:  0x990B503f8C7353f1caB6f9D5bbF8f0Be2718D731
+- Transfer Validator Address: 0x87E2D48De6CC2029fFc1a915462e4Aa597890cd6
 
 
 ## Crosschain IOTX (WIP)
