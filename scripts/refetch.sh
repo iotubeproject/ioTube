@@ -1,8 +1,11 @@
 chain=$1
 shift
-IOTEX_WITNESS=/path/to/witness_config/
-set -o allexport
-source $IOTEX_WITNESS/etc/.env
-set +o allexport
-cd /path/to/ioTube_home/
-go run cmd/witness/main.go -config $IOTEX_WITNESS/etc/witness-config-${chain}.yaml -secret $IOTEX_WITNESS/etc/witness-config-${chain}.secret.yaml -blocks $@
+declare -A chainmap
+chainmap["iotex"]="9281"
+chainmap["ethereum"]="9283"
+chainmap["matic"]="9285"
+chainmap["bsc"]="9287"
+port=${chainmap[$chain]}
+echo "refetch from port:${port}"
+curl -X POST http://localhost:$port/fetch -d '{"heights": "'$@'"}'
+echo "...done"
