@@ -33,6 +33,7 @@ type (
 	Service struct {
 		services.UnimplementedRelayServiceServer
 		validators      map[string]TransferValidator
+		unwrappers      map[string]map[string]common.Address
 		bonusSender     BonusSender
 		processor       dispatcher.Runner
 		recorder        *Recorder
@@ -57,6 +58,7 @@ const (
 // NewServiceOnEthereum creates a new relay service on Ethereum
 func NewServiceOnEthereum(
 	validators map[string]TransferValidator,
+	unwrappers map[string]map[string]common.Address,
 	bonusSender BonusSender,
 	recorder *Recorder,
 	interval time.Duration,
@@ -67,6 +69,7 @@ func NewServiceOnEthereum(
 	}
 	s := &Service{
 		validators:      validators,
+		unwrappers:      unwrappers,
 		bonusSender:     bonusSender,
 		recorder:        recorder,
 		cache:           cache,
@@ -134,10 +137,20 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 	if err := validateSignature(transfer.id.Bytes(), common.BytesToAddress(witness.addr), witness.signature); err != nil {
 		return nil, err
 	}
+	var fboToken, fboRecipient *common.Address
+	if t, ok := s.unwrappers[cashier.String()][transfer.token.String()]; ok {
+		fboToken = &t
+		if len(transfer.payload) == 32 {
+			decodedRecipient := common.BytesToAddress(transfer.payload)
+			fboRecipient = &decodedRecipient
+		}
+	}
 	transferID, err := s.recorder.AddWitness(
 		util.ETHAddressToAddress(validator.Address()),
 		transfer,
 		witness,
+		fboToken,
+		fboRecipient,
 	)
 	if err != nil {
 		return nil, err
@@ -273,7 +286,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	if skip+first > int32(count) {
 		first = int32(count) - skip
 	}
-	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), DESC, queryOpts...)
+	transfers, err := s.recorder.TransfersWithFBO(uint32(skip), uint8(first), DESC, queryOpts...)
 	if err != nil {
 		return nil, err
 	}

@@ -19,3 +19,13 @@ docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.io
 docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.iotex_to_polis_transfers ADD recipient varchar(256);"
 docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.iotex_to_bsc_transfers ADD recipient varchar(256);"
 docker exec witness-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE witness.iotex_to_matic_transfers ADD recipient varchar(256);"
+
+docker exec relayer-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE relayer.bsc_transfers ADD fbo_recipient varchar(256);"
+docker exec relayer-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE relayer.ethereum_transfers ADD fbo_recipient varchar(256);"
+docker exec relayer-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE relayer.iotex_transfers ADD fbo_recipient varchar(256);"
+docker exec relayer-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE relayer.matic_transfers ADD fbo_recipient varchar(256);"
+
+docker exec relayer-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE relayer.bsc_transfers ADD fbo_token varchar(42);"
+docker exec relayer-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE relayer.ethereum_transfers ADD fbo_token varchar(42);"
+docker exec relayer-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE relayer.iotex_transfers ADD fbo_token varchar(42);"
+docker exec relayer-db mysql -uroot -pkdfjjrU64fjK58H -e "ALTER TABLE relayer.matic_transfers ADD fbo_token varchar(42);"

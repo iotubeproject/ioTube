@@ -135,6 +135,8 @@ func (recorder *Recorder) initStore(
 			"`gasPrice` varchar(78) DEFAULT NULL,"+
 			"`notes` varchar(45) DEFAULT NULL,"+
 			"`payload` varchar(24576),"+ // MaxCodeSize
+			"`fbo_recipient` varchar(256),"+
+			"`fbo_token` varchar(42),"+
 			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
 			"UNIQUE KEY `id_UNIQUE` (`id`),"+
 			"KEY `cashier_index` (`cashier`),"+
@@ -143,6 +145,8 @@ func (recorder *Recorder) initStore(
 			"KEY `txSender_index` (`txSender`),"+
 			"KEY `sourceTxHash_index` (`sourceTxHash`),"+
 			"KEY `recipient_index` (`recipient`),"+
+			"KEY `fbo_recipient_index` (`fbo_recipient`),"+
+			"KEY `fbo_token_index` (`fbo_token`),"+
 			"KEY `status_index` (`status`),"+
 			"KEY `txHash_index` (`txHash`)"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
@@ -207,7 +211,7 @@ func (recorder *Recorder) Stop(ctx context.Context) error {
 }
 
 // AddWitness records a new witness
-func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer, witness *Witness) (common.Hash, error) {
+func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer, witness *Witness, fboToken *common.Address, fboRecipient *common.Address) (common.Hash, error) {
 	transfer.id = crypto.Keccak256Hash(
 		validator.Bytes(),
 		transfer.cashier.Bytes(),
@@ -240,7 +244,7 @@ func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer,
 		return common.Hash{}, err
 	}
 	defer tx.Rollback()
-	if err := recorder.addWitness(tx, transfer, witness, recorder.transferTableName, recorder.witnessTableName); err != nil {
+	if err := recorder.addWitness(tx, transfer, witness, recorder.transferTableName, recorder.witnessTableName, fboToken, fboRecipient); err != nil {
 		return common.Hash{}, errors.Wrap(err, "failed to add witness")
 	}
 	var explorerTx *sql.Tx
@@ -250,7 +254,7 @@ func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer,
 			return common.Hash{}, err
 		}
 		defer explorerTx.Rollback()
-		if err := recorder.addWitness(explorerTx, transfer, witness, recorder.explorerTableName, ""); err != nil {
+		if err := recorder.addWitness(explorerTx, transfer, witness, recorder.explorerTableName, "", fboToken, fboRecipient); err != nil {
 			return common.Hash{}, err
 		}
 	}
@@ -274,6 +278,8 @@ func (recorder *Recorder) addWitness(
 	transfer *Transfer,
 	witness *Witness,
 	transferTableName, witnessTableName string,
+	fboToken *common.Address,
+	fboRecipient *common.Address,
 ) error {
 	if _, err := tx.Exec(
 		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, payload, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
@@ -315,6 +321,24 @@ func (recorder *Recorder) addWitness(
 			transfer.id.Hex(),
 		); err != nil {
 			return errors.Wrap(err, "failed to update tx sender")
+		}
+	}
+	if fboToken != nil {
+		if _, err := tx.Exec(
+			fmt.Sprintf("UPDATE `%s` SET `fbo_token`=? WHERE `id`=?", transferTableName),
+			fboToken.String(),
+			transfer.id.Hex(),
+		); err != nil {
+			return errors.Wrap(err, "failed to update fbo token")
+		}
+	}
+	if fboRecipient != nil {
+		if _, err := tx.Exec(
+			fmt.Sprintf("UPDATE `%s` SET `fbo_recipient`=? WHERE `id`=?", transferTableName),
+			fboRecipient.String(),
+			transfer.id.Hex(),
+		); err != nil {
+			return errors.Wrap(err, "failed to update fbo recipient")
 		}
 	}
 	if witnessTableName != "" && len(witness.signature) != 0 {
@@ -616,6 +640,24 @@ const (
 	AESC Order = false
 )
 
+// TransfersWithFBO returns the list of records with fbo fields of given status
+func (recorder *Recorder) TransfersWithFBO(
+	offset uint32,
+	limit uint8,
+	desc Order,
+	queryOpts ...TransferQueryOption,
+) ([]*Transfer, error) {
+	recorder.mutex.RLock()
+	defer recorder.mutex.RUnlock()
+	return recorder.transfers(
+		fmt.Sprintf("SELECT `cashier`, IFNULL(`fbo_token`, `token`), `tidx`, `sender`, `txSender`, IFNULL(`fbo_recipient`, `recipient`), `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName),
+		offset,
+		limit,
+		desc,
+		queryOpts,
+	)
+}
+
 // Transfers returns the list of records of given status
 func (recorder *Recorder) Transfers(
 	offset uint32,
@@ -625,9 +667,23 @@ func (recorder *Recorder) Transfers(
 ) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
-	var query string
+	return recorder.transfers(
+		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName),
+		offset,
+		limit,
+		desc,
+		queryOpts,
+	)
+}
+
+func (recorder *Recorder) transfers(
+	query string,
+	offset uint32,
+	limit uint8,
+	desc Order,
+	queryOpts []TransferQueryOption,
+) ([]*Transfer, error) {
 	orderBy := "creationTime"
-	query = fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName)
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
 	conditions := []string{}
