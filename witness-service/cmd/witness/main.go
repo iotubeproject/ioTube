@@ -302,9 +302,14 @@ func main() {
 				log.Fatalf("invalid token safe address %s: %+v\n", cc.TokenSafeContractAddress, err)
 			}
 			pairs, tokenMintPairs, whitelists := parseTokenPairs(cc.TokenPairs, destAddrDecoder)
-			version := witness.NoPayload
-			if cc.WithPayload {
+			var version witness.Version
+			switch {
+			case cc.ToSolana:
+				version = witness.ToSolana
+			case cc.WithPayload:
 				version = witness.Payload
+			default:
+				version = witness.NoPayload
 			}
 			decimalRound := make(map[common.Address]int)
 			for _, r := range cc.DecimalRound {

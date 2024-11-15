@@ -192,11 +192,11 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 		if err != nil {
 			return nil, err
 		}
-		recipient, err := util.ParseAddress(i.Event.Recipient)
-		if err != nil {
-			return nil, err
-		}
 		for i.Next() {
+			recipient, err := util.ParseAddress(i.Event.Recipient)
+			if err != nil {
+				return nil, err
+			}
 			tsf, err := iter.extract(
 				i.Event.Token,
 				i.Event.Sender,
