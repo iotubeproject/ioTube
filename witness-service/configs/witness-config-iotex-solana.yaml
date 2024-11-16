@@ -11,6 +11,7 @@ cashiers:
     relayerURL: ":7007"
     startBlockHeight: 31936000
     validatorContractAddress: "7yDLTWW6DXf1UW87TkKusELA7N7xfq9bhRe3WRHCHHDK"
+    tokenSafeContractAddress: "0x127A3aC5F19833D2CCA091231DCf550213Fe4Fac"
     cashierContractAddress: "0x1c80507d92a86699f63737220247788d0a4bfd11"
     transferTableName: "iotex_to_solana_transfers"
     tokenPairs:
