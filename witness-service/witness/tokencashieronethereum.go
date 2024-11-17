@@ -193,7 +193,7 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 			return nil, err
 		}
 		for i.Next() {
-			recipient, err := util.ParseAddress(i.Event.Recipient)
+			recipient, err := util.NewSOLAddressDecoder().DecodeString(i.Event.Recipient)
 			if err != nil {
 				return nil, err
 			}
