@@ -30,3 +30,4 @@ typechain-types
 # Hardhat files
 cache
 artifacts
+bun.lockb
