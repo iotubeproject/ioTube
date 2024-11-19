@@ -11,6 +11,7 @@ import (
 	"crypto/ecdsa"
 	"log"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -382,7 +383,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 	switch errors.Cause(err) {
 	case ethereum.NotFound:
 		if transfer.nonce <= nonce {
-			if transfer.updateTime.Add(5 * time.Minute).Before(time.Now()) {
+			if transfer.updateTime.Add(10 * time.Minute).Before(time.Now()) {
 				return StatusOnChainNonceOverwritten, nil
 			}
 			return StatusOnChainNotConfirmed, nil
@@ -397,7 +398,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 	default:
 		return StatusOnChainUnknown, err
 	}
-	if transfer.updateTime.After(time.Now().Add(-10 * time.Minute)) {
+	if transfer.updateTime.After(time.Now().Add(-20 * time.Minute)) {
 		return StatusOnChainNotConfirmed, nil
 	}
 	// no matter what the receipt status is, mark the validation as failure
@@ -465,6 +466,9 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 	case ethereum.NotFound:
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	default:
+		if strings.Contains(err.Error(), "could not replace existing tx") {
+			return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+		}
 		return common.Hash{}, common.Address{}, 0, nil, err
 	}
 }

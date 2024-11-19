@@ -581,7 +581,7 @@ func (s *Service) submitTransfers() error {
 			if err := s.submitTransfer(transfer, validator); err != nil {
 				util.Alert("failed to submit transfer" + err.Error())
 			}
-			time.Sleep(2 * time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}
 	return nil

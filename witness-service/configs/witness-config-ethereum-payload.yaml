@@ -88,3 +88,6 @@ cashiers:
       # USDa
       - token2: "0xeaa38983d3370e35fb42229f89e816e28035a74b"
         token1: "0xBB76063476A79F73624386795f4CcA855954C891"
+      # W-IOTX
+      - token2: "io15qr5fzpxsnp7garl4m7k355rafzqn8grrm0grz"
+        token1: "0x6fB3e0A217407EFFf7Ca062D46c26E5d60a14d69"
