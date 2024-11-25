@@ -1,5 +1,5 @@
 {
-  "name": "iotex-emerald-contract",
+  "name": "iotube-contracts",
   "version": "1.0.0",
   "description": "The IoTeX Emerald token contract is an ERC20-compatible token that is designed to be “pausable”, which means that we can pause transfers in case of a major security vulnerability or attack.",
   "main": "truffle-config.js",
@@ -12,21 +12,20 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/iotexproject/IOTX-token-contracts.git"
+    "url": "git+https://github.com/iotubeproject/ioTube.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/iotexproject/IOTX-token-contracts/issues"
+    "url": "https://github.com/iotubeproject/ioTube/issues"
   },
-  "homepage": "https://github.com/iotexproject/IOTX-token-contracts#readme",
+  "homepage": "https://github.com/iotubeproject/ioTube",
   "dependencies": {
-    "@openzeppelin/contracts-upgradeable": "^5.0.2",
-    "@truffle/hdwallet-provider": "^1.7.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.2",    
+    "openzeppelin-5": "npm:@openzeppelin/contracts@^5.0.0",
     "eth-lib": "^0.2.8",
     "ganache": "^7.9.2",
-    "ganache-cli": "^6.12.2",
-    "truffle": "^5.0.22",
+    "ganache-cli": "^6.12.2",    
     "web3-utils": "^1.0.0-beta.55"
   },
   "devDependencies": {
