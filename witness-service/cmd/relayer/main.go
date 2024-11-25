@@ -14,13 +14,13 @@ import (
 	"log"
 	"math/big"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	soltypes "github.com/blocto/solana-go-sdk/types"
 
 	"github.com/blocto/solana-go-sdk/client"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
@@ -42,17 +42,18 @@ type (
 	}
 	// Configuration defines the configuration of the witness service
 	Configuration struct {
-		Chain                 string            `json:"chain" yaml:"chain"`
-		ClientURL             string            `json:"clientURL" yaml:"clientURL"`
-		EthConfirmBlockNumber uint16            `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
-		EthDefaultGasPrice    uint64            `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
-		EthGasPriceLimit      uint64            `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
-		EthGasPriceHardLimit  uint64            `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
-		EthGasPriceDeviation  int64             `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
-		EthGasPriceGap        uint64            `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
-		PrivateKey            string            `json:"privateKey" yaml:"privateKey"`
-		Interval              time.Duration     `json:"interval" yaml:"interval"`
-		Validators            []ValidatorConfig `json:"validators" yaml:"validators"`
+		Chain                 string                       `json:"chain" yaml:"chain"`
+		ClientURL             string                       `json:"clientURL" yaml:"clientURL"`
+		EthConfirmBlockNumber uint16                       `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+		EthDefaultGasPrice    uint64                       `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
+		EthGasPriceLimit      uint64                       `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+		EthGasPriceHardLimit  uint64                       `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
+		EthGasPriceDeviation  int64                        `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
+		EthGasPriceGap        uint64                       `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
+		PrivateKey            string                       `json:"privateKey" yaml:"privateKey"`
+		Interval              time.Duration                `json:"interval" yaml:"interval"`
+		Validators            []ValidatorConfig            `json:"validators" yaml:"validators"`
+		Unwrappers            map[string]map[string]string `json:"unwrappers" yaml:"unwrappers"`
 
 		BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
 		Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
@@ -128,22 +129,7 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
-	if port, ok := os.LookupEnv("RELAYER_GRPC_PORT"); ok {
-		cfg.GrpcPort, err = strconv.Atoi(port)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-	if port, ok := os.LookupEnv("RELAYER_GRPC_PROXY_PORT"); ok {
-		cfg.GrpcProxyPort, err = strconv.Atoi(port)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-	if client, ok := os.LookupEnv("RELAYER_CLIENT_URL"); ok {
-		cfg.ClientURL = client
-	}
-	if pk, ok := os.LookupEnv("RELAYER_PRIVATE_KEY"); ok {
+	if pk, ok := os.LookupEnv("RELAYER_PRIVATE_KEY"); ok && cfg.PrivateKey == "" {
 		cfg.PrivateKey = pk
 	}
 	// TODO: load more parameters from env
@@ -157,12 +143,13 @@ func main() {
 
 	storeFactory := db.NewSQLStoreFactory()
 	log.Println("Creating service")
+	support1559 := true
 	var service services.RelayServiceServer
-	if chain, ok := os.LookupEnv("RELAYER_CHAIN"); ok {
-		cfg.Chain = chain
-	}
 	switch cfg.Chain {
-	case "ethereum", "heco", "bsc", "matic", "polis", "iotex-e", "iotex", "iotex-testnet", "sepolia":
+	case "iotex-e", "iotex", "iotex-testnet":
+		support1559 = false
+		fallthrough
+	case "ethereum", "heco", "bsc", "matic", "polis", "sepolia":
 		if cfg.ClientURL == "" {
 			break
 		}
@@ -177,6 +164,17 @@ func main() {
 		ethClient, err := ethclient.Dial(cfg.ClientURL)
 		if err != nil {
 			log.Fatalf("failed to create eth client %v\n", err)
+		}
+		unwrappers := map[string]map[string]common.Address{}
+		for unwrapper, tokens := range cfg.Unwrappers {
+			unwrappers[unwrapper] = map[string]common.Address{}
+			for token, fbo := range tokens {
+				addr, err := util.ParseEthAddress(fbo)
+				if err != nil {
+					log.Fatalf("failed to parse fbo address %s: %+v", fbo, err)
+				}
+				unwrappers[unwrapper][token] = addr
+			}
 		}
 		validators := map[string]relayer.TransferValidator{}
 		for _, vc := range cfg.Validators {
@@ -202,6 +200,7 @@ func main() {
 				new(big.Int).SetUint64(cfg.EthGasPriceGap),
 				version,
 				validatorAddr,
+				support1559,
 			)
 			if err != nil {
 				log.Fatalf("failed to create validator: %+v\n", err)
@@ -221,6 +220,7 @@ func main() {
 
 		ethService, err := relayer.NewServiceOnEthereum(
 			validators,
+			unwrappers,
 			bonusSender,
 			relayer.NewRecorder(
 				storeFactory.NewStore(cfg.Database),

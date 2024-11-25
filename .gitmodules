@@ -1,0 +1,4 @@
+[submodule "witness-service/configs"]
+	path = witness-service/configs
+	url = https://github.com/iotubeproject/iotube-configs.git
+	branch = main

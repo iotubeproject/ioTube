@@ -72,24 +72,16 @@ function copyFile() {
 function downloadConfigFile() {
     copyFile "docker-compose-witness.yml" "docker-compose.yml" 1
     copyFile "configs/witness-config-iotex-payload.yaml" "witness-config-iotex-payload.yaml" 1
-    copyFile "configs/witness-config-iotex.yaml" "witness-config-iotex.yaml" 1
     copyFile "configs/witness-config-iotex.secret.yaml" "witness-config-iotex.secret.yaml" 0
     copyFile "configs/witness-config-ethereum-payload.yaml" "witness-config-ethereum-payload.yaml" 1
-    copyFile "configs/witness-config-ethereum.yaml" "witness-config-ethereum.yaml" 1
     copyFile "configs/witness-config-ethereum.secret.yaml" "witness-config-ethereum.secret.yaml" 0
     copyFile "configs/witness-config-iotex-testnet.yaml" "witness-config-iotex-testnet.yaml" 1
     copyFile "configs/witness-config-iotex-testnet.secret.yaml" "witness-config-iotex-testnet.secret.yaml" 0
     copyFile "configs/witness-config-sepolia.yaml" "witness-config-sepolia.yaml" 1
     copyFile "configs/witness-config-sepolia.secret.yaml" "witness-config-sepolia.secret.yaml" 0
-    #copyFile "configs/witness-config-heco.yaml" "witness-config-heco.yaml" 1
-    #copyFile "configs/witness-config-heco.secret.yaml" "witness-config-heco.secret.yaml" 0
-    #copyFile "configs/witness-config-polis.yaml" "witness-config-polis.yaml" 1
-    #copyFile "configs/witness-config-polis.secret.yaml" "witness-config-polis.secret.yaml" 0
     copyFile "configs/witness-config-bsc-payload.yaml" "witness-config-bsc-payload.yaml" 1
-    copyFile "configs/witness-config-bsc.yaml" "witness-config-bsc.yaml" 1
     copyFile "configs/witness-config-bsc.secret.yaml" "witness-config-bsc.secret.yaml" 0
     copyFile "configs/witness-config-matic-payload.yaml" "witness-config-matic-payload.yaml" 1
-    copyFile "configs/witness-config-matic.yaml" "witness-config-matic.yaml" 1
     copyFile "configs/witness-config-matic.secret.yaml" "witness-config-matic.secret.yaml" 0
     copyFile "configs/witness-config-solana.yaml" "witness-config-solana.yaml" 1
     copyFile "configs/witness-config-solana.secret.yaml" "witness-config-solana.secret.yaml" 0
@@ -105,8 +97,8 @@ function downloadConfigFile() {
     fi
     echo "" >> $envFile
     echo "IOTEX_WITNESS=$IOTEX_WITNESS" >> ${envFile}
-    if grep -q "/^DB_ROOT_PASSWORD=" ${envFile}; then
-        sed "/^DB_ROOT_PASSWORD=.*//" ${envFile} > ${envFile}.tmp
+    if grep -q "^DB_ROOT_PASSWORD=" ${envFile}; then
+        sed "s/^DB_ROOT_PASSWORD=.*//" ${envFile} > ${envFile}.tmp
         mv ${envFile}.tmp $envFile
     fi
     echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${envFile}
@@ -114,6 +106,13 @@ function downloadConfigFile() {
     mv ${envFile}.tmp $envFile
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_WITNESS}/etc/crontab
     cp -f $PROJECT_ABS_DIR/backup_witness ${IOTEX_WITNESS}/etc/backup
+}
+
+function stopService() {
+    if [[ -f ${IOTEX_WITNESS}/etc/docker-compose.yml ]]; then
+        pushd $IOTEX_WITNESS/etc
+        docker compose down
+    fi
 }
 
 function makeWorkspace() {
@@ -203,11 +202,12 @@ function main() {
     determinIotexWitness
     confirmEnvironmentVariable
 
-    makeWorkspace
-
     exportAll
 
     buildService
+
+    stopService
+    makeWorkspace
     grantPrivileges
 
     startup

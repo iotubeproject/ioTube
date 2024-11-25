@@ -71,13 +71,9 @@ function copyFile() {
 
 function downloadConfigFile() {
     copyFile "docker-compose-relayer.yml" "docker-compose.yml" 1
-    copyFile "configs/relayer-config-iotex.yaml" "relayer-config-iotex.yaml" 1
     copyFile "configs/relayer-config-iotex-payload.yaml" "relayer-config-iotex-payload.yaml" 1
-    copyFile "configs/relayer-config-ethereum.yaml" "relayer-config-ethereum.yaml" 1
     copyFile "configs/relayer-config-ethereum-payload.yaml" "relayer-config-ethereum-payload.yaml" 1
-    copyFile "configs/relayer-config-bsc.yaml" "relayer-config-bsc.yaml" 1
     copyFile "configs/relayer-config-bsc-payload.yaml" "relayer-config-bsc-payload.yaml" 1
-    copyFile "configs/relayer-config-matic.yaml" "relayer-config-matic.yaml" 1
     copyFile "configs/relayer-config-matic-payload.yaml" "relayer-config-matic-payload.yaml" 1
     copyFile "configs/relayer-config-iotex-testnet.yaml" "relayer-config-iotex-testnet.yaml" 1
     copyFile "configs/relayer-config-sepolia.yaml" "relayer-config-sepolia.yaml" 1
