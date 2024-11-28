@@ -22,15 +22,36 @@ module.exports = {
         "router": ""
     },
     "iotex": {
-        "wiotx": "0xa00744882684c3e4747faefd68d283ea44099d03",
-        "token_safe": "0xc4a29a94f12be03033daa4e6ce9b9678c26275a2",
-        "minter_pool": "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454",
-        "standard_token_list": "0x59caeb8dc448df0e070b803062cfd9351ad39390",
-        "proxy_token_list": "0x6ccf305a21defff295e616ba5aa423eb563fc8db",
-        "witness_list": "0xbe441d37c48aabac5116fce76bbc45a013f6d44d",
-        "token_cashier": "0x44074576e015bfd4f93f074671bd5a2a55c5d9c5",
-        "transfer_validator": "0x7987aaf615b0f749f12da7d4d6e2b1eff4bfbe1b",
-        "router": ""
+        "mainnet": {
+            "token_safe": "0xc4a29a94f12be03033daa4e6ce9b9678c26275a2",
+            "minter_pool": "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454",
+            "standard_token_list": "0x59caeb8dc448df0e070b803062cfd9351ad39390",
+            "proxy_token_list": "0x6ccf305a21defff295e616ba5aa423eb563fc8db",
+            "witness_list": "0xbe441d37c48aabac5116fce76bbc45a013f6d44d",
+            "token_cashier": "0x44074576e015bfd4f93f074671bd5a2a55c5d9c5",
+            "transfer_validator": "0x7987aaf615b0f749f12da7d4d6e2b1eff4bfbe1b",
+            "router": ""
+        },
+        "bsc": {
+            "token_safe": "0xc4A29a94f12be03033daa4e6Ce9b9678c26275a2",
+            "minter_pool": "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454",
+            "standard_token_list": "0xba9b11bdaa7ae8783357f3fc10e0b42d9903ba50",
+            "proxy_token_list": "0xf0cb9bca0b74aa84804e0ede74ca6dd3f577d6ea",
+            "witness_list": "",
+            "token_cashier": "0x14bf347a597aac623240ae7ac8383ae198966277",
+            "transfer_validator": "",
+            "router": "0xDe7a42CAE046cb10D2d00f276C36bC7265431879"
+        },
+        "polygon": {
+            "token_safe": "0xc4a29a94f12be03033daa4e6ce9b9678c26275a2",
+            "minter_pool": "0x4799d57abf5f12ca4ef5375c9dadf8fe7fa5a454",
+            "standard_token_list": "0x2f8768cd292e94a0da78671974b89b87a398356e",
+            "proxy_token_list": "0xd757adff0ec4060e2c4a15f9777767f5ca738ca9",
+            "witness_list": "",
+            "token_cashier": "0x540a92dd951407ee6c94b997a43ecf30ea6d04cd",
+            "transfer_validator": "",
+            "router": "0xfdf1d22478019f7275A5Bac4a538df8be6B1fd8E"
+        },
     },
     "bsc": {
         "token_safe": "0xFBe9A4138AFDF1fA639a8c2818a0C4513fc4CE4B",
