@@ -179,6 +179,18 @@ func (v *validatorWithPayload) SubmitTransfer(opts *bind.TransactOpts, transfer 
 		return nil, err
 	}
 	// opts.GasLimit = 0
+	opts.NoSend = true
+	nonceSet := opts.Nonce != nil
+	tx, err := v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signatures, transfer.payload)
+	if err != nil {
+		return nil, err
+	}
+	if !nonceSet {
+		opts.Nonce = nil
+	}
+	opts.NoSend = false
+	opts.GasLimit = tx.Gas() * 11 / 10
+
 	return v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signatures, transfer.payload)
 }
 
@@ -493,8 +505,6 @@ func (tv *transferValidatorOnEthereum) SpeedUp(transfer *Transfer, witnesses []*
 }
 
 func (tv *transferValidatorOnEthereum) transactionOpts(privateKey *ecdsa.PrivateKey, ts time.Time) (*bind.TransactOpts, error) {
-	relayerAddr := crypto.PubkeyToAddress(privateKey.PublicKey)
-
 	opts, err := bind.NewKeyedTransactorWithChainID(privateKey, tv.chainID)
 	if err != nil {
 		return nil, err
@@ -533,11 +543,6 @@ func (tv *transferValidatorOnEthereum) transactionOpts(privateKey *ecdsa.Private
 	} else {
 		opts.GasPrice = gasPrice
 	}
-	nonce, err := tv.client.PendingNonceAt(context.Background(), relayerAddr)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to fetch pending nonce for %s", relayerAddr)
-	}
-	opts.Nonce = new(big.Int).SetUint64(nonce)
 
 	return opts, nil
 }
