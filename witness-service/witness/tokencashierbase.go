@@ -211,7 +211,12 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 				return errors.Wrap(err, "failed to upsert transfer")
 			}
 		} else {
-			if err := tc.recorder.AddTransfer(transfer, TransferNew); err != nil {
+			status := TransferNew
+			if transfer.Amount().Sign() != 1 {
+				status = TransferInvalid
+				log.Printf("amount %d should be larger than 0 for new transfer %s\n", transfer.Amount(), transfer.ID())
+			}
+			if err := tc.recorder.AddTransfer(transfer, status); err != nil {
 				return errors.Wrap(err, "failed to add transfer")
 			}
 		}

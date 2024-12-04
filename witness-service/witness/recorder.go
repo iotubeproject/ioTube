@@ -145,7 +145,7 @@ func (recorder *Recorder) AddTransfer(at AbstractTransfer, status TransferStatus
 	if err := recorder.validateID(tx.index); err != nil {
 		return err
 	}
-	if tx.amount.Sign() != 1 {
+	if tx.amount.Sign() != 1 && status != TransferInvalid {
 		return errors.New("amount should be larger than 0")
 	}
 	if whitelist, ok := recorder.tokenWhitelists[tx.token]; ok {
@@ -190,8 +190,10 @@ func (recorder *Recorder) UpsertTransfer(at AbstractTransfer) error {
 	if err := recorder.validateID(tx.index); err != nil {
 		return err
 	}
+	status := TransferReady
 	if tx.amount.Sign() != 1 {
-		return errors.New("amount should be larger than 0")
+		status = TransferInvalid
+		log.Printf("amount %d should be larger than 0 for transfer %s\n", tx.amount, tx.id.Hex())
 	}
 	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txHash`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
@@ -207,7 +209,7 @@ func (recorder *Recorder) UpsertTransfer(at AbstractTransfer) error {
 		tx.blockHeight,
 		tx.txHash.Hex(),
 		tx.txSender.Hex(),
-		TransferReady,
+		status,
 		TransferNew,
 		TransferReady,
 	)
