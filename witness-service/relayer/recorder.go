@@ -225,7 +225,7 @@ func (recorder *Recorder) AddTransferAndWitness(validator util.Address, transfer
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	recorder.validateID(uint64(transfer.index))
-	if len(witness.signature) != 0 {
+	if witness != nil && len(witness.signature) != 0 {
 		rpk, err := crypto.Ecrecover(transfer.id.Bytes(), witness.signature)
 		if err != nil {
 			return err

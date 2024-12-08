@@ -139,11 +139,15 @@ func (s *Service) submit(w *types.Witness) ([]byte, error) {
 		}
 	}
 	var fboToken, fboRecipient *common.Address
-	if t, ok := s.unwrappers[cashier.String()][transfer.token.String()]; ok {
-		fboToken = &t
-		if len(transfer.payload) == 32 {
-			decodedRecipient := common.BytesToAddress(transfer.payload)
-			fboRecipient = &decodedRecipient
+	unwrapper, ok := s.unwrappers[cashier.String()]
+	if ok {
+		t, ok := unwrapper[transfer.token.String()]
+		if ok {
+			fboToken = &t
+			if len(transfer.payload) == 32 {
+				decodedRecipient := common.BytesToAddress(transfer.payload)
+				fboRecipient = &decodedRecipient
+			}
 		}
 	}
 
