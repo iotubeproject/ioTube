@@ -465,7 +465,7 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 			gasPrice = tOpts.GasPrice
 		}
 		if new(big.Int).Sub(gasPrice, transfer.gasPrice).Cmp(tv.gasPriceGap) < 0 {
-			return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "current gas price %s is not significantly larger than old gas price %s", tOpts.GasPrice, transfer.gasPrice)
+			return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "current gas price %s is not significantly larger than old gas price %s", gasPrice, transfer.gasPrice)
 		}
 		tOpts.Nonce = big.NewInt(0).SetUint64(transfer.nonce)
 	}
