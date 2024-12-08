@@ -210,8 +210,8 @@ func (recorder *Recorder) Stop(ctx context.Context) error {
 	return recorder.store.Stop(ctx)
 }
 
-// AddWitness records a new witness
-func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer, witness *Witness, fboToken *common.Address, fboRecipient *common.Address) (common.Hash, error) {
+// AddTransferAndWitness records a new transfer and its witness
+func (recorder *Recorder) AddTransferAndWitness(validator util.Address, transfer *Transfer, witness *Witness, fboToken *common.Address, fboRecipient *common.Address) error {
 	transfer.id = crypto.Keccak256Hash(
 		validator.Bytes(),
 		transfer.cashier.Bytes(),
@@ -228,38 +228,38 @@ func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer,
 	if len(witness.signature) != 0 {
 		rpk, err := crypto.Ecrecover(transfer.id.Bytes(), witness.signature)
 		if err != nil {
-			return common.Hash{}, err
+			return err
 		}
 		pk, err := crypto.UnmarshalPubkey(rpk)
 		if err != nil {
-			return common.Hash{}, errors.Wrap(err, "failed to unmarshal public key")
+			return errors.Wrap(err, "failed to unmarshal public key")
 		}
 		if crypto.PubkeyToAddress(*pk) != witness.Address() {
-			return common.Hash{}, errors.New("invalid signature")
+			return errors.New("invalid signature")
 		}
 	}
 	recorder.metric("new", transfer.amount)
 	tx, err := recorder.store.DB().Begin()
 	if err != nil {
-		return common.Hash{}, err
+		return err
 	}
 	defer tx.Rollback()
-	if err := recorder.addWitness(tx, transfer, witness, recorder.transferTableName, recorder.witnessTableName, fboToken, fboRecipient); err != nil {
-		return common.Hash{}, errors.Wrap(err, "failed to add witness")
+	if err := recorder.addTransferAndWitness(tx, transfer, witness, recorder.transferTableName, recorder.witnessTableName, fboToken, fboRecipient); err != nil {
+		return errors.Wrap(err, "failed to add witness")
 	}
 	var explorerTx *sql.Tx
 	if recorder.explorerStore != nil {
 		explorerTx, err = recorder.explorerStore.DB().Begin()
 		if err != nil {
-			return common.Hash{}, err
+			return err
 		}
 		defer explorerTx.Rollback()
-		if err := recorder.addWitness(explorerTx, transfer, witness, recorder.explorerTableName, "", fboToken, fboRecipient); err != nil {
-			return common.Hash{}, err
+		if err := recorder.addTransferAndWitness(explorerTx, transfer, witness, recorder.explorerTableName, "", fboToken, fboRecipient); err != nil {
+			return err
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return common.Hash{}, errors.Wrap(err, "failed to commit transaction")
+		return errors.Wrap(err, "failed to commit transaction")
 	}
 	if explorerTx != nil {
 		for {
@@ -270,16 +270,15 @@ func (recorder *Recorder) AddWitness(validator util.Address, transfer *Transfer,
 		}
 	}
 
-	return transfer.id, nil
+	return nil
 }
 
-func (recorder *Recorder) addWitness(
+func (recorder *Recorder) addTransferAndWitness(
 	tx *sql.Tx,
 	transfer *Transfer,
 	witness *Witness,
 	transferTableName, witnessTableName string,
-	fboToken *common.Address,
-	fboRecipient *common.Address,
+	fboToken, fboRecipient *common.Address,
 ) error {
 	if _, err := tx.Exec(
 		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, payload, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
@@ -341,7 +340,7 @@ func (recorder *Recorder) addWitness(
 			return errors.Wrap(err, "failed to update fbo recipient")
 		}
 	}
-	if witnessTableName != "" && len(witness.signature) != 0 {
+	if witnessTableName != "" && witness != nil && len(witness.signature) != 0 {
 		if _, err := tx.Exec(
 			fmt.Sprintf("INSERT IGNORE INTO %s (`transferId`, `witness`, `signature`) VALUES (?, ?, ?)", witnessTableName),
 			transfer.id.Hex(),

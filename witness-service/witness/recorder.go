@@ -14,6 +14,7 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"strings"
 
 	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/ethereum/go-ethereum/common"
@@ -195,7 +196,7 @@ func (recorder *Recorder) UpsertTransfer(at AbstractTransfer) error {
 		status = TransferInvalid
 		log.Printf("amount %d should be larger than 0 for transfer %s\n", tx.amount, tx.id.Hex())
 	}
-	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txHash`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status = ?, ?, status)", recorder.transferTableName)
+	query := fmt.Sprintf("INSERT INTO %s (`cashier`, `token`, `tidx`, `sender`, `recipient`, `amount`, `payload`, `fee`, `blockHeight`, `txHash`, `txSender`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `status` = IF(status in (?, ?), ?, status)", recorder.transferTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
 		tx.cashier.Hex(),
@@ -211,6 +212,7 @@ func (recorder *Recorder) UpsertTransfer(at AbstractTransfer) error {
 		tx.txSender.Hex(),
 		status,
 		TransferNew,
+		TransferPending,
 		TransferReady,
 	)
 	if err != nil {
@@ -295,6 +297,26 @@ func (recorder *Recorder) SettleTransfer(at AbstractTransfer) error {
 	return validateResult(result)
 }
 
+// MarkTransferAsPending marks a record as pending
+func (recorder *Recorder) MarkTransferAsPending(at AbstractTransfer) error {
+	tx, ok := at.(*Transfer)
+	if !ok {
+		return errors.Errorf("invalid transfer type %T", at)
+	}
+	log.Printf("mark transfer %s as pending", tx.id.Hex())
+	result, err := recorder.store.DB().Exec(
+		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
+		TransferPending,
+		tx.cashier.Hex(),
+		tx.token.Hex(),
+		tx.index,
+		TransferNew,
+	)
+	if err != nil {
+	}
+	return validateResult(result)
+}
+
 // ConfirmTransfer marks a record as confirmed
 func (recorder *Recorder) ConfirmTransfer(at AbstractTransfer) error {
 	tx, ok := at.(*Transfer)
@@ -320,24 +342,27 @@ func (recorder *Recorder) ConfirmTransfer(at AbstractTransfer) error {
 
 // TransfersToSettle returns the list of transfers to confirm
 func (recorder *Recorder) TransfersToSettle(cashier string) ([]AbstractTransfer, error) {
-	return recorder.transfers(SubmissionConfirmed, cashier)
+	return recorder.transfers(cashier, SubmissionConfirmed)
 }
 
 // TransfersToSubmit returns the list of transfers to submit
 func (recorder *Recorder) TransfersToSubmit(cashier string) ([]AbstractTransfer, error) {
-	return recorder.transfers(TransferReady, cashier)
+	return recorder.transfers(cashier, TransferNew, TransferReady)
 }
 
-func (recorder *Recorder) transfers(status TransferStatus, cashier string) ([]AbstractTransfer, error) {
+func (recorder *Recorder) transfers(cashier string, status ...TransferStatus) ([]AbstractTransfer, error) {
 	query := fmt.Sprintf(
 		"SELECT a.cashier, a.token, a.tidx, a.sender, a.recipient, a.amount, a.payload, a.fee, a.blockHeight, a.txHash, a.status, a.id, a.txSender, b.recipient, b.payload "+
 			"FROM %s a LEFT JOIN %s b "+
 			"ON a.cashier = b.cashier AND a.token = b.token AND a.tidx = b.tidx "+
-			"WHERE a.status=? ",
+			"WHERE a.status in (?"+strings.Repeat(",?", len(status)-1)+")",
 		recorder.transferTableName,
 		recorder.transferTableName+"_shadow",
 	)
-	params := []interface{}{status}
+	params := []interface{}{}
+	for _, s := range status {
+		params = append(params, s)
+	}
 	if cashier != "" {
 		query += "AND a.cashier=? "
 		params = append(params, cashier)

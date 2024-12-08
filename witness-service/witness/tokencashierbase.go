@@ -262,25 +262,39 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 			return err
 		}
 		transfer.SetID(id)
-		if signature != nil {
-			response, err := relayer.Submit(
-				context.Background(),
-				&types.Witness{
-					Transfer:  transfer.ToTypesTransfer(),
-					Address:   pubkey,
-					Signature: signature,
-				},
-			)
-			if err != nil {
-				return err
+		if signature == nil {
+			continue
+		}
+		var witness *types.Witness
+		if transfer.Status() == TransferReady {
+			witness = &types.Witness{
+				Transfer:  transfer.ToTypesTransfer(),
+				Address:   pubkey,
+				Signature: signature,
 			}
-			if !response.Success {
-				log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
-				continue
+		} else {
+			witness = &types.Witness{
+				Transfer:  transfer.ToTypesTransfer(),
+				Address:   pubkey,
+				Signature: []byte{},
 			}
 		}
-		if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
+		response, err := relayer.Submit(context.Background(), witness)
+		if err != nil {
 			return err
+		}
+		if !response.Success {
+			log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
+			continue
+		}
+		if transfer.Status() == TransferReady {
+			if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
+				return err
+			}
+		} else {
+			if err := tc.recorder.MarkTransferAsPending(transfer); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

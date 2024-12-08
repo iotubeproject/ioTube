@@ -56,6 +56,7 @@ type (
 		TransfersToSettle(string) ([]AbstractTransfer, error)
 		SettleTransfer(tx AbstractTransfer) error
 		ConfirmTransfer(tx AbstractTransfer) error
+		MarkTransferAsPending(tx AbstractTransfer) error
 	}
 
 	AbstractTransfer interface {
@@ -80,6 +81,8 @@ type (
 const (
 	// TransferNew stands for a new transfer
 	TransferNew TransferStatus = "new"
+	// TransferPending stands for a pending transfer
+	TransferPending = "pending"
 	// TransferReady stands for a new transfer ready to sign
 	TransferReady = "ready"
 	// SubmissionConfirmed stands for a confirmed witness

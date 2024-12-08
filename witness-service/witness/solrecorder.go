@@ -232,6 +232,11 @@ func (recorder *SOLRecorder) SettleTransfer(at AbstractTransfer) error {
 	return validateResult(result)
 }
 
+// MarkTransferAsPending marks a record as pending
+func (recorder *SOLRecorder) MarkTransferAsPending(at AbstractTransfer) error {
+	return nil
+}
+
 // ConfirmTransfer marks a record as confirmed
 func (recorder *SOLRecorder) ConfirmTransfer(at AbstractTransfer) error {
 	tx, ok := at.(*solTransfer)

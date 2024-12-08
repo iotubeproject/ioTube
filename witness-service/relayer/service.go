@@ -111,12 +111,10 @@ func (s *Service) Stop(ctx context.Context) error {
 	return s.recorder.Stop(ctx)
 }
 
-// Submit accepts a submission of witness
-func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
+func (s *Service) submit(w *types.Witness) ([]byte, error) {
 	if s.validators == nil {
 		return nil, errors.New("cannot accept new submission")
 	}
-	log.Printf("receive a witness from %x\n", w.Address)
 	transfer, err := UnmarshalTransferProto(w.Transfer, s.destAddrDecoder)
 	if err != nil {
 		return nil, err
@@ -130,12 +128,15 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 		return nil, errors.New("no validator is found")
 	}
 	transfer.GenID(validator.Address())
-	witness, err := NewWitness(w.Address, w.Signature)
-	if err != nil {
-		return nil, err
-	}
-	if err := validateSignature(transfer.id.Bytes(), common.BytesToAddress(witness.addr), witness.signature); err != nil {
-		return nil, err
+	var witness *Witness
+	if len(w.Signature) != 0 {
+		if err := validateSignature(transfer.id.Bytes(), common.BytesToAddress(w.Address), w.Signature); err != nil {
+			return nil, err
+		}
+		witness, err = NewWitness(w.Address, w.Signature)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var fboToken, fboRecipient *common.Address
 	if t, ok := s.unwrappers[cashier.String()][transfer.token.String()]; ok {
@@ -145,18 +146,25 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 			fboRecipient = &decodedRecipient
 		}
 	}
-	transferID, err := s.recorder.AddWitness(
+
+	return transfer.ID().Bytes(), s.recorder.AddTransferAndWitness(
 		util.ETHAddressToAddress(validator.Address()),
 		transfer,
 		witness,
 		fboToken,
 		fboRecipient,
 	)
+}
+
+// Submit accepts a submission of witness
+func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.WitnessSubmissionResponse, error) {
+	log.Printf("receive a witness from %x\n", w.Address)
+	id, err := s.submit(w)
 	if err != nil {
 		return nil, err
 	}
 	return &services.WitnessSubmissionResponse{
-		Id:      transferID.Bytes(),
+		Id:      id,
 		Success: true,
 	}, nil
 }
