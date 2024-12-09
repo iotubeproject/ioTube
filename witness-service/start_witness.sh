@@ -70,6 +70,7 @@ function copyFile() {
 }
 
 function downloadConfigFile() {
+    git submodule update --remote --merge
     copyFile "docker-compose-witness.yml" "docker-compose.yml" 1
     copyFile "configs/witness-config-iotex-payload.yaml" "witness-config-iotex-payload.yaml" 1
     copyFile "configs/witness-config-iotex.secret.yaml" "witness-config-iotex.secret.yaml" 0
