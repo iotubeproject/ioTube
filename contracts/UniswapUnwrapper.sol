@@ -51,18 +51,18 @@ contract UniswapUnwrapper {
             path = new address[](3);
             path[2] = swapData.tokenOut;
         }
-        path[0] = _token;
+        path[0] = address(_token);
         path[1] = weth;
 
         uint256[] memory amounts;
         try IUniswapV2Router02(router).getAmountsOut(_amount, path) returns (uint256[] memory _amounts) {
             amounts = _amounts;
         } catch {
-            this.transfer(_token, _amount, recipient);
+            this.transfer(_token, recipient, _amount);
             return;
         }
         if (amounts[amounts.length - 1] < swapData.amountOutMin) {
-            this.transfer(_token, _amount, recipient);
+            this.transfer(_token, recipient, _amount);
             return;
         }
         require(_token.approve(router, _amount), "UniswapUnwrapper: approve failed");
@@ -73,6 +73,6 @@ contract UniswapUnwrapper {
         } else {
             amounts = IUniswapV2Router02(router).swapExactTokensForTokens(_amount, swapData.amountOutMin, path, recipient, swapData.deadline);
         }
-        emit Swap(_token, swapData.tokenOut, _amount, amounts[amounts.length - 1], recipient);
+        emit Swap(address(_token), swapData.tokenOut, _amount, amounts[amounts.length - 1], recipient);
     }
 }
