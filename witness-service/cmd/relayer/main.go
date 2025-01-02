@@ -146,10 +146,7 @@ func main() {
 	support1559 := true
 	var service services.RelayServiceServer
 	switch cfg.Chain {
-	case "iotex-e", "iotex", "iotex-testnet":
-		support1559 = false
-		fallthrough
-	case "ethereum", "heco", "bsc", "matic", "polis", "sepolia":
+	case "iotex-e", "iotex", "iotex-testnet", "ethereum", "heco", "bsc", "matic", "polis", "sepolia":
 		if cfg.ClientURL == "" {
 			break
 		}
@@ -206,11 +203,7 @@ func main() {
 				log.Fatalf("failed to create validator: %+v\n", err)
 			}
 			for _, cashier := range vc.Cashiers {
-				cashierAddr, err := util.ParseAddress(cashier)
-				if err != nil {
-					log.Fatalf("failed to parse cashier address %s: %+v", cashier, err)
-				}
-				validators[cashierAddr.String()] = validator
+				validators[cashier] = validator
 			}
 		}
 		bonusSender, err := relayer.NewBonusSender(ethClient, privateKeys, cfg.BonusTokens, cfg.Bonus)
@@ -227,7 +220,7 @@ func main() {
 				storeFactory.NewStore(cfg.ExplorerDatabase),
 				cfg.TransferTableName,
 				cfg.WitnessTableName,
-				"",
+				cfg.NewTransactionTableName,
 				cfg.ExplorerTableName,
 			),
 			cfg.Interval,
@@ -239,7 +232,7 @@ func main() {
 			ethService.SetAlwaysRetry()
 		}
 		if err := ethService.Start(context.Background()); err != nil {
-			log.Fatalf("failed to start solana relay service: %v\n", err)
+			log.Fatalf("failed to start eth relay service: %v\n", err)
 		}
 		defer ethService.Stop(context.Background())
 		service = ethService
