@@ -80,7 +80,6 @@ type (
 			Threshold               float64 `json:"threshold" yaml:"threshold"`
 			QPSLimit                uint32  `json:"qpsLimit" yaml:"qpsLimit"`
 		} `json:"solanaConfig" yaml:"solanaConfig"`
-		SourceChain string `json:"sourceChain" yaml:"sourceChain"`
 	}
 )
 
