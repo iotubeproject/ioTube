@@ -341,8 +341,8 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 	if transfer.relayer == zeroAddress {
 		return StatusOnChainUnknown, errors.New("relayer is null")
 	}
-	// Fetch confirmed nonce before all the other checks
-	nonce, err := tv.client.NonceAt(context.Background(), transfer.relayer, nil)
+	// Fetch confirmed pendingNonce before all the other checks
+	pendingNonce, err := tv.client.PendingNonceAt(context.Background(), transfer.relayer)
 	if err != nil {
 		return StatusOnChainUnknown, err
 	}
@@ -391,17 +391,17 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 			}
 		}
 	}
-	log.Println(err)
+	log.Printf("encounter an error when processing %s, %v\n", transfer.id, err)
 	switch errors.Cause(err) {
 	case ethereum.NotFound:
-		if transfer.nonce <= nonce {
+		if transfer.nonce < pendingNonce {
 			if transfer.updateTime.Add(10 * time.Minute).Before(time.Now()) {
 				return StatusOnChainNonceOverwritten, nil
 			}
 			return StatusOnChainNotConfirmed, nil
 		}
-		if transfer.updateTime.Before(time.Now().Add(-10*time.Minute)) && transfer.nonce == nonce+1 {
-			log.Printf("transfer %s with nonce %d needs speed up, %s %s %d\n", transfer.id, transfer.nonce, transfer.updateTime.String(), time.Now(), nonce)
+		if transfer.updateTime.Before(time.Now().Add(-10*time.Minute)) && transfer.nonce == pendingNonce {
+			log.Printf("transfer %s with nonce %d needs speed up, %s %s %d\n", transfer.id, transfer.nonce, transfer.updateTime.String(), time.Now(), pendingNonce)
 			return StatusOnChainNeedSpeedUp, nil
 		}
 		return StatusOnChainNotConfirmed, nil
