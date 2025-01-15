@@ -125,6 +125,7 @@ func (s *Service) submit(w *types.Witness) ([]byte, error) {
 	}
 	validator, ok := s.validators[cashier.String()]
 	if !ok {
+		log.Printf("no validator is found for %x\n", cashier)
 		return nil, errors.New("no validator is found")
 	}
 	transfer.GenID(validator.Address())

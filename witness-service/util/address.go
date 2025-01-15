@@ -26,17 +26,6 @@ func ParseEthAddress(addr string) (common.Address, error) {
 	return common.HexToAddress(addr), nil
 }
 
-func ParseAddress(addr string) (Address, error) {
-	if len(addr) == 44 {
-		return SOLAddressToAddress(solcommon.PublicKeyFromString(addr)), nil
-	}
-	ethaddr, err := ParseEthAddress(addr)
-	if err != nil {
-		return nil, err
-	}
-	return ETHAddressToAddress(ethaddr), nil
-}
-
 func ParseAddressBytes(b []byte) (Address, error) {
 	if len(b) == 32 {
 		return SOLAddressToAddress(solcommon.PublicKeyFromBytes(b)), nil
@@ -94,6 +83,7 @@ func SOLAddressToAddress(addr solcommon.PublicKey) Address {
 	}
 }
 
+// TODO: remove error return, panic inside if failed
 type AddressDecoder interface {
 	DecodeBytes([]byte) (Address, error)
 	DecodeString(string) (Address, error)

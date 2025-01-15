@@ -227,7 +227,7 @@ func main() {
 			log.Fatal(err)
 		}
 		for _, cc := range cfg.Cashiers {
-			validatorAddr, err := util.ParseAddress(cc.ValidatorContractAddress)
+			validatorAddr, err := util.ParseEthAddress(cc.ValidatorContractAddress)
 			if err != nil {
 				log.Fatalf("failed to parse validator contract address %s: %v\n", cc.ValidatorContractAddress, err)
 			}
