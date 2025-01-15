@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity <6.0 >=0.4.24;
 pragma experimental ABIEncoderV2;
 
@@ -20,7 +21,8 @@ interface IReceiver {
 
 contract TransferValidatorForSolana is Pausable {
     event Settled(bytes32 indexed key, address[] witnesses);
-
+    event ReceiverAdded(address receiver);
+    event ReceiverRemoved(address receiver);
     mapping(bytes32 => uint256) public settles;
     mapping(address => bool) public receivers;
 
