@@ -82,7 +82,7 @@ contract TransferValidatorForSolana is Pausable {
         require(minters[getTokenGroup(tokenAddr)].mint(tokenAddr, to, amount), "failed to mint token");
         if (receivers[to]) {
             require(payload.length == 32, "invalid payload length");
-            IReceiver(to).onReceive(address(0), tokenAddr, amount, payload);
+            IReceiver(to).onReceive(this.owner(), tokenAddr, amount, payload);
         }
         emit Settled(key, witnesses);
     }
