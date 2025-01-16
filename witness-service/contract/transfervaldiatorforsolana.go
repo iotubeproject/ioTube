@@ -31,7 +31,7 @@ var (
 
 // TransferValidatorForSolanaMetaData contains all meta data concerning the TransferValidatorForSolana contract.
 var TransferValidatorForSolanaMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"_witnessList\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address[]\",\"name\":\"witnesses\",\"type\":\"address[]\"}],\"name\":\"Settled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"_tokenList\",\"type\":\"address\"},{\"internalType\":\"contractIMinter\",\"name\":\"_minter\",\"type\":\"address\"}],\"name\":\"addPair\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"keys\",\"type\":\"bytes32[]\"}],\"name\":\"concatKeys\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"pure\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"signatures\",\"type\":\"bytes\"}],\"name\":\"extractWitnesses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"witnesses\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"cashier\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"from\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"}],\"name\":\"generateKey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"getTokenGroup\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"minters\",\"outputs\":[{\"internalType\":\"contractIMinter\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"numOfPairs\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"settles\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"cashier\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"from\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"signatures\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"}],\"name\":\"submit\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenLists\",\"outputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_newValidator\",\"type\":\"address\"}],\"name\":\"upgrade\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"witnessList\",\"outputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"_witnessList\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Pause\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"}],\"name\":\"ReceiverAdded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"}],\"name\":\"ReceiverRemoved\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address[]\",\"name\":\"witnesses\",\"type\":\"address[]\"}],\"name\":\"Settled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Unpause\",\"type\":\"event\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"_tokenList\",\"type\":\"address\"},{\"internalType\":\"contractIMinter\",\"name\":\"_minter\",\"type\":\"address\"}],\"name\":\"addPair\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_receiver\",\"type\":\"address\"}],\"name\":\"addReceiver\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"signatures\",\"type\":\"bytes\"}],\"name\":\"extractWitnesses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"witnesses\",\"type\":\"address[]\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"cashier\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"from\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"}],\"name\":\"generateKey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"getTokenGroup\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"minters\",\"outputs\":[{\"internalType\":\"contractIMinter\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"numOfPairs\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"pause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"paused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"receivers\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_receiver\",\"type\":\"address\"}],\"name\":\"removeReceiver\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"settles\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"cashier\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"from\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"signatures\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"}],\"name\":\"submit\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"tokenLists\",\"outputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"unpause\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_newValidator\",\"type\":\"address\"}],\"name\":\"upgrade\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"witnessList\",\"outputs\":[{\"internalType\":\"contractIAllowlist\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // TransferValidatorForSolanaABI is the input ABI used to generate the binding from.
@@ -178,37 +178,6 @@ func (_TransferValidatorForSolana *TransferValidatorForSolanaTransactorRaw) Tran
 // Transact invokes the (paid) contract method with params as input values.
 func (_TransferValidatorForSolana *TransferValidatorForSolanaTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
 	return _TransferValidatorForSolana.Contract.contract.Transact(opts, method, params...)
-}
-
-// ConcatKeys is a free data retrieval call binding the contract method 0xc836fef0.
-//
-// Solidity: function concatKeys(bytes32[] keys) pure returns(bytes32)
-func (_TransferValidatorForSolana *TransferValidatorForSolanaCaller) ConcatKeys(opts *bind.CallOpts, keys [][32]byte) ([32]byte, error) {
-	var out []interface{}
-	err := _TransferValidatorForSolana.contract.Call(opts, &out, "concatKeys", keys)
-
-	if err != nil {
-		return *new([32]byte), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
-
-	return out0, err
-
-}
-
-// ConcatKeys is a free data retrieval call binding the contract method 0xc836fef0.
-//
-// Solidity: function concatKeys(bytes32[] keys) pure returns(bytes32)
-func (_TransferValidatorForSolana *TransferValidatorForSolanaSession) ConcatKeys(keys [][32]byte) ([32]byte, error) {
-	return _TransferValidatorForSolana.Contract.ConcatKeys(&_TransferValidatorForSolana.CallOpts, keys)
-}
-
-// ConcatKeys is a free data retrieval call binding the contract method 0xc836fef0.
-//
-// Solidity: function concatKeys(bytes32[] keys) pure returns(bytes32)
-func (_TransferValidatorForSolana *TransferValidatorForSolanaCallerSession) ConcatKeys(keys [][32]byte) ([32]byte, error) {
-	return _TransferValidatorForSolana.Contract.ConcatKeys(&_TransferValidatorForSolana.CallOpts, keys)
 }
 
 // ExtractWitnesses is a free data retrieval call binding the contract method 0xba390a64.
@@ -428,6 +397,37 @@ func (_TransferValidatorForSolana *TransferValidatorForSolanaCallerSession) Paus
 	return _TransferValidatorForSolana.Contract.Paused(&_TransferValidatorForSolana.CallOpts)
 }
 
+// Receivers is a free data retrieval call binding the contract method 0x0cb8150f.
+//
+// Solidity: function receivers(address ) view returns(bool)
+func (_TransferValidatorForSolana *TransferValidatorForSolanaCaller) Receivers(opts *bind.CallOpts, arg0 common.Address) (bool, error) {
+	var out []interface{}
+	err := _TransferValidatorForSolana.contract.Call(opts, &out, "receivers", arg0)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+// Receivers is a free data retrieval call binding the contract method 0x0cb8150f.
+//
+// Solidity: function receivers(address ) view returns(bool)
+func (_TransferValidatorForSolana *TransferValidatorForSolanaSession) Receivers(arg0 common.Address) (bool, error) {
+	return _TransferValidatorForSolana.Contract.Receivers(&_TransferValidatorForSolana.CallOpts, arg0)
+}
+
+// Receivers is a free data retrieval call binding the contract method 0x0cb8150f.
+//
+// Solidity: function receivers(address ) view returns(bool)
+func (_TransferValidatorForSolana *TransferValidatorForSolanaCallerSession) Receivers(arg0 common.Address) (bool, error) {
+	return _TransferValidatorForSolana.Contract.Receivers(&_TransferValidatorForSolana.CallOpts, arg0)
+}
+
 // Settles is a free data retrieval call binding the contract method 0xf98b2332.
 //
 // Solidity: function settles(bytes32 ) view returns(uint256)
@@ -542,6 +542,27 @@ func (_TransferValidatorForSolana *TransferValidatorForSolanaTransactorSession) 
 	return _TransferValidatorForSolana.Contract.AddPair(&_TransferValidatorForSolana.TransactOpts, _tokenList, _minter)
 }
 
+// AddReceiver is a paid mutator transaction binding the contract method 0x69d83ed1.
+//
+// Solidity: function addReceiver(address _receiver) returns()
+func (_TransferValidatorForSolana *TransferValidatorForSolanaTransactor) AddReceiver(opts *bind.TransactOpts, _receiver common.Address) (*types.Transaction, error) {
+	return _TransferValidatorForSolana.contract.Transact(opts, "addReceiver", _receiver)
+}
+
+// AddReceiver is a paid mutator transaction binding the contract method 0x69d83ed1.
+//
+// Solidity: function addReceiver(address _receiver) returns()
+func (_TransferValidatorForSolana *TransferValidatorForSolanaSession) AddReceiver(_receiver common.Address) (*types.Transaction, error) {
+	return _TransferValidatorForSolana.Contract.AddReceiver(&_TransferValidatorForSolana.TransactOpts, _receiver)
+}
+
+// AddReceiver is a paid mutator transaction binding the contract method 0x69d83ed1.
+//
+// Solidity: function addReceiver(address _receiver) returns()
+func (_TransferValidatorForSolana *TransferValidatorForSolanaTransactorSession) AddReceiver(_receiver common.Address) (*types.Transaction, error) {
+	return _TransferValidatorForSolana.Contract.AddReceiver(&_TransferValidatorForSolana.TransactOpts, _receiver)
+}
+
 // Pause is a paid mutator transaction binding the contract method 0x8456cb59.
 //
 // Solidity: function pause() returns()
@@ -561,6 +582,27 @@ func (_TransferValidatorForSolana *TransferValidatorForSolanaSession) Pause() (*
 // Solidity: function pause() returns()
 func (_TransferValidatorForSolana *TransferValidatorForSolanaTransactorSession) Pause() (*types.Transaction, error) {
 	return _TransferValidatorForSolana.Contract.Pause(&_TransferValidatorForSolana.TransactOpts)
+}
+
+// RemoveReceiver is a paid mutator transaction binding the contract method 0x6552d8b4.
+//
+// Solidity: function removeReceiver(address _receiver) returns()
+func (_TransferValidatorForSolana *TransferValidatorForSolanaTransactor) RemoveReceiver(opts *bind.TransactOpts, _receiver common.Address) (*types.Transaction, error) {
+	return _TransferValidatorForSolana.contract.Transact(opts, "removeReceiver", _receiver)
+}
+
+// RemoveReceiver is a paid mutator transaction binding the contract method 0x6552d8b4.
+//
+// Solidity: function removeReceiver(address _receiver) returns()
+func (_TransferValidatorForSolana *TransferValidatorForSolanaSession) RemoveReceiver(_receiver common.Address) (*types.Transaction, error) {
+	return _TransferValidatorForSolana.Contract.RemoveReceiver(&_TransferValidatorForSolana.TransactOpts, _receiver)
+}
+
+// RemoveReceiver is a paid mutator transaction binding the contract method 0x6552d8b4.
+//
+// Solidity: function removeReceiver(address _receiver) returns()
+func (_TransferValidatorForSolana *TransferValidatorForSolanaTransactorSession) RemoveReceiver(_receiver common.Address) (*types.Transaction, error) {
+	return _TransferValidatorForSolana.Contract.RemoveReceiver(&_TransferValidatorForSolana.TransactOpts, _receiver)
 }
 
 // Submit is a paid mutator transaction binding the contract method 0x87726554.
@@ -927,6 +969,274 @@ func (_TransferValidatorForSolana *TransferValidatorForSolanaFilterer) WatchPaus
 func (_TransferValidatorForSolana *TransferValidatorForSolanaFilterer) ParsePause(log types.Log) (*TransferValidatorForSolanaPause, error) {
 	event := new(TransferValidatorForSolanaPause)
 	if err := _TransferValidatorForSolana.contract.UnpackLog(event, "Pause", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// TransferValidatorForSolanaReceiverAddedIterator is returned from FilterReceiverAdded and is used to iterate over the raw logs and unpacked data for ReceiverAdded events raised by the TransferValidatorForSolana contract.
+type TransferValidatorForSolanaReceiverAddedIterator struct {
+	Event *TransferValidatorForSolanaReceiverAdded // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *TransferValidatorForSolanaReceiverAddedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(TransferValidatorForSolanaReceiverAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(TransferValidatorForSolanaReceiverAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *TransferValidatorForSolanaReceiverAddedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *TransferValidatorForSolanaReceiverAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// TransferValidatorForSolanaReceiverAdded represents a ReceiverAdded event raised by the TransferValidatorForSolana contract.
+type TransferValidatorForSolanaReceiverAdded struct {
+	Receiver common.Address
+	Raw      types.Log // Blockchain specific contextual infos
+}
+
+// FilterReceiverAdded is a free log retrieval operation binding the contract event 0xbec1e1ee82037bd0301ab4218c8c148e3be5be35bdf180546d4ff862df359f35.
+//
+// Solidity: event ReceiverAdded(address receiver)
+func (_TransferValidatorForSolana *TransferValidatorForSolanaFilterer) FilterReceiverAdded(opts *bind.FilterOpts) (*TransferValidatorForSolanaReceiverAddedIterator, error) {
+
+	logs, sub, err := _TransferValidatorForSolana.contract.FilterLogs(opts, "ReceiverAdded")
+	if err != nil {
+		return nil, err
+	}
+	return &TransferValidatorForSolanaReceiverAddedIterator{contract: _TransferValidatorForSolana.contract, event: "ReceiverAdded", logs: logs, sub: sub}, nil
+}
+
+// WatchReceiverAdded is a free log subscription operation binding the contract event 0xbec1e1ee82037bd0301ab4218c8c148e3be5be35bdf180546d4ff862df359f35.
+//
+// Solidity: event ReceiverAdded(address receiver)
+func (_TransferValidatorForSolana *TransferValidatorForSolanaFilterer) WatchReceiverAdded(opts *bind.WatchOpts, sink chan<- *TransferValidatorForSolanaReceiverAdded) (event.Subscription, error) {
+
+	logs, sub, err := _TransferValidatorForSolana.contract.WatchLogs(opts, "ReceiverAdded")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(TransferValidatorForSolanaReceiverAdded)
+				if err := _TransferValidatorForSolana.contract.UnpackLog(event, "ReceiverAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseReceiverAdded is a log parse operation binding the contract event 0xbec1e1ee82037bd0301ab4218c8c148e3be5be35bdf180546d4ff862df359f35.
+//
+// Solidity: event ReceiverAdded(address receiver)
+func (_TransferValidatorForSolana *TransferValidatorForSolanaFilterer) ParseReceiverAdded(log types.Log) (*TransferValidatorForSolanaReceiverAdded, error) {
+	event := new(TransferValidatorForSolanaReceiverAdded)
+	if err := _TransferValidatorForSolana.contract.UnpackLog(event, "ReceiverAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// TransferValidatorForSolanaReceiverRemovedIterator is returned from FilterReceiverRemoved and is used to iterate over the raw logs and unpacked data for ReceiverRemoved events raised by the TransferValidatorForSolana contract.
+type TransferValidatorForSolanaReceiverRemovedIterator struct {
+	Event *TransferValidatorForSolanaReceiverRemoved // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *TransferValidatorForSolanaReceiverRemovedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(TransferValidatorForSolanaReceiverRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(TransferValidatorForSolanaReceiverRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *TransferValidatorForSolanaReceiverRemovedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *TransferValidatorForSolanaReceiverRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// TransferValidatorForSolanaReceiverRemoved represents a ReceiverRemoved event raised by the TransferValidatorForSolana contract.
+type TransferValidatorForSolanaReceiverRemoved struct {
+	Receiver common.Address
+	Raw      types.Log // Blockchain specific contextual infos
+}
+
+// FilterReceiverRemoved is a free log retrieval operation binding the contract event 0x2771977f239a332de92ab37b7275685268f164e51cda8f1356692695f4708f2f.
+//
+// Solidity: event ReceiverRemoved(address receiver)
+func (_TransferValidatorForSolana *TransferValidatorForSolanaFilterer) FilterReceiverRemoved(opts *bind.FilterOpts) (*TransferValidatorForSolanaReceiverRemovedIterator, error) {
+
+	logs, sub, err := _TransferValidatorForSolana.contract.FilterLogs(opts, "ReceiverRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return &TransferValidatorForSolanaReceiverRemovedIterator{contract: _TransferValidatorForSolana.contract, event: "ReceiverRemoved", logs: logs, sub: sub}, nil
+}
+
+// WatchReceiverRemoved is a free log subscription operation binding the contract event 0x2771977f239a332de92ab37b7275685268f164e51cda8f1356692695f4708f2f.
+//
+// Solidity: event ReceiverRemoved(address receiver)
+func (_TransferValidatorForSolana *TransferValidatorForSolanaFilterer) WatchReceiverRemoved(opts *bind.WatchOpts, sink chan<- *TransferValidatorForSolanaReceiverRemoved) (event.Subscription, error) {
+
+	logs, sub, err := _TransferValidatorForSolana.contract.WatchLogs(opts, "ReceiverRemoved")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(TransferValidatorForSolanaReceiverRemoved)
+				if err := _TransferValidatorForSolana.contract.UnpackLog(event, "ReceiverRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseReceiverRemoved is a log parse operation binding the contract event 0x2771977f239a332de92ab37b7275685268f164e51cda8f1356692695f4708f2f.
+//
+// Solidity: event ReceiverRemoved(address receiver)
+func (_TransferValidatorForSolana *TransferValidatorForSolanaFilterer) ParseReceiverRemoved(log types.Log) (*TransferValidatorForSolanaReceiverRemoved, error) {
+	event := new(TransferValidatorForSolanaReceiverRemoved)
+	if err := _TransferValidatorForSolana.contract.UnpackLog(event, "ReceiverRemoved", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
