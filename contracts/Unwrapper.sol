@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >= 0.8.0;
 
-import "openzeppelin-5/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface ICrosschainToken {
     function withdrawTo(address, uint256) external;
@@ -18,7 +18,7 @@ contract Unwrapper is Ownable {
     mapping(address => bool) public whitelist;
     IWEth public weth;
 
-    constructor(address _weth) Ownable(msg.sender) {
+    constructor(address _weth) Ownable() {
         weth = IWEth(_weth);
     }
 

@@ -19,7 +19,7 @@ contract EthereumHubPrepaid is Ownable {
     address immutable public cashier;
     mapping(address => bool) operators;
 
-    constructor(address _cashier) {
+    constructor(address _cashier) payable {
         cashier = _cashier;
     }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >= 0.8.0;
 
-import "openzeppelin-5/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface IAllowlist {
     function isAllowed(address) external view returns (bool);
@@ -37,7 +37,7 @@ contract TransferValidatorWithPayload is Ownable {
     IAllowlist[] public tokenLists;
     IAllowlist public witnessList;
 
-    constructor(IAllowlist _witnessList) Ownable(msg.sender) {
+    constructor(IAllowlist _witnessList) Ownable() {
         witnessList = _witnessList;
     }
 
