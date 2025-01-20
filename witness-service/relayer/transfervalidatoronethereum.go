@@ -350,65 +350,47 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 	if err != nil {
 		return StatusOnChainUnknown, err
 	}
-	SettledHeight, err := tv.validator.SettledHeight(transfer.id)
-	if err == nil {
-		if SettledHeight.Cmp(big.NewInt(0)) > 0 {
-			if new(big.Int).Add(SettledHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
-				return StatusOnChainNotConfirmed, nil
-			}
-			tx, _, err := tv.client.TransactionByHash(context.Background(), common.BytesToHash(transfer.txHash))
-			if errors.Cause(err) == ethereum.NotFound {
-				var txHash common.Hash
-				txHash, err = tv.validator.SettledTransaction(
-					SettledHeight.Uint64(),
-					transfer.id,
-				)
-				if err != nil {
-					return StatusOnChainNotConfirmed, err
-				}
-				transfer.txHash = txHash.Bytes()
-				tx, _, err = tv.client.TransactionByHash(context.Background(), common.BytesToHash(transfer.txHash))
-			}
+	settledHeight, err := tv.validator.SettledHeight(transfer.id)
+	if err != nil {
+		return StatusOnChainUnknown, err
+	}
+	if settledHeight.Cmp(big.NewInt(0)) > 0 {
+		if new(big.Int).Add(settledHeight, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
+			return StatusOnChainNotConfirmed, nil
+		}
+		tx, _, err := tv.client.TransactionByHash(context.Background(), common.BytesToHash(transfer.txHash))
+		if errors.Cause(err) == ethereum.NotFound {
+			var txHash common.Hash
+			txHash, err = tv.validator.SettledTransaction(
+				settledHeight.Uint64(),
+				transfer.id,
+			)
 			if err != nil {
 				return StatusOnChainNotConfirmed, err
 			}
-			transfer.gas = tx.Gas()
-			settleBlockHeader, err := tv.client.HeaderByNumber(context.Background(), SettledHeight)
-			if err != nil {
-				return StatusOnChainUnknown, err
-			}
-			transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
-			return StatusOnChainSettled, nil
+			transfer.txHash = txHash.Bytes()
+			tx, _, err = tv.client.TransactionByHash(context.Background(), common.BytesToHash(transfer.txHash))
 		}
-		var r *types.Receipt
-		r, err = tv.client.TransactionReceipt(context.Background(), common.BytesToHash(transfer.txHash))
-		if err == nil {
-			if r == nil {
-				return StatusOnChainNotConfirmed, nil
-			}
-			if new(big.Int).Add(r.BlockNumber, big.NewInt(int64(tv.confirmBlockNumber))).Cmp(header.Number) > 0 {
-				return StatusOnChainNotConfirmed, nil
-			}
+		if err != nil {
+			return StatusOnChainNotConfirmed, err
 		}
+		transfer.gas = tx.Gas()
+		settleBlockHeader, err := tv.client.HeaderByNumber(context.Background(), settledHeight)
+		if err != nil {
+			return StatusOnChainNotConfirmed, err
+		}
+		transfer.timestamp = time.Unix(int64(settleBlockHeader.Time), 0)
+		return StatusOnChainSettled, nil
 	}
-	log.Printf("encounter an error when processing %s, %v\n", transfer.id, err)
-	switch errors.Cause(err) {
-	case ethereum.NotFound:
-		if transfer.nonce < pendingNonce {
-			if transfer.updateTime.Add(10 * time.Minute).Before(time.Now()) {
-				return StatusOnChainNonceOverwritten, nil
-			}
-			return StatusOnChainNotConfirmed, nil
+	if transfer.nonce < pendingNonce {
+		if transfer.updateTime.Add(10 * time.Minute).Before(time.Now()) {
+			return StatusOnChainNonceOverwritten, nil
 		}
-		if transfer.updateTime.Before(time.Now().Add(-10*time.Minute)) && transfer.nonce == pendingNonce {
-			log.Printf("transfer %s with nonce %d needs speed up, %s %s %d\n", transfer.id, transfer.nonce, transfer.updateTime.String(), time.Now(), pendingNonce)
-			return StatusOnChainNeedSpeedUp, nil
-		}
-		return StatusOnChainNotConfirmed, nil
-	case nil:
-		break
-	default:
-		return StatusOnChainUnknown, err
+		return StatusOnChainPending, nil
+	}
+	if transfer.updateTime.Before(time.Now().Add(-10*time.Minute)) && transfer.nonce == pendingNonce {
+		log.Printf("transfer %s with nonce %d needs speed up, %s %s %d\n", transfer.id, transfer.nonce, transfer.updateTime.String(), time.Now(), pendingNonce)
+		return StatusOnChainNeedSpeedUp, nil
 	}
 	if transfer.updateTime.After(time.Now().Add(-20 * time.Minute)) {
 		return StatusOnChainNotConfirmed, nil

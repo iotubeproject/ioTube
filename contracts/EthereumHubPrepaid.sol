@@ -44,7 +44,7 @@ contract EthereumHubPrepaid is Ownable {
     }
 
     function onReceive(address, ICrosschainToken _token, uint256 _amount, bytes calldata _payload) external {
-        require(operators[msg.sender], "EthereumHubPrepaid: not an operator");
+        require(operators[tx.origin], "EthereumHubPrepaid: not an operator");
         ICashier c = ICashier(cashier);
         uint256 fee = c.depositFee();
         require(fee <= address(this).balance, "EthereumHubPrepaid: insufficient balance");

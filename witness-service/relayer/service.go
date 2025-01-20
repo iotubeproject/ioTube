@@ -432,8 +432,13 @@ func (s *Service) process() error {
 	if err := s.sendBonus(); err != nil {
 		util.LogErr(err)
 	}
-	if err := s.confirmTransfers(); err != nil {
+	skipSubmit, err := s.confirmTransfers()
+	switch {
+	case err != nil:
 		util.LogErr(err)
+	case skipSubmit:
+		log.Println("skip submitting new transfers")
+		return nil
 	}
 	return s.submitTransfers()
 }
@@ -465,21 +470,23 @@ func (s *Service) sendBonus() error {
 	return nil
 }
 
-func (s *Service) confirmTransfers() error {
+func (s *Service) confirmTransfers() (bool, error) {
 	for cashier, validator := range s.validators {
+		expectedSize := validator.Size() * 2
 		validatedTransfers, err := s.recorder.Transfers(
 			0,
-			uint8(validator.Size())*2,
+			uint8(expectedSize),
 			AESC,
 			StatusQueryOption(ValidationSubmitted),
 			CashiersQueryOption([]string{cashier}),
 		)
 		if err != nil {
-			return errors.Wrap(err, "failed to read transfers to confirm")
+			return false, errors.Wrap(err, "failed to read transfers to confirm")
 		}
 		for _, transfer := range validatedTransfers {
-			speedup, err := s.confirmTransfer(transfer, validator)
-			if err != nil {
+			speedup, merged, err := s.confirmTransfer(transfer, validator)
+			switch {
+			case err != nil:
 				log.Printf("failed to confirm transfer %s, %+v\n", transfer.id.String(), err)
 				if errors.Cause(err).Error() == "rpc error: code = Internal desc = nonce too low" {
 					if _, ok := s.nonceTooLow[transfer.id]; !ok {
@@ -493,16 +500,21 @@ func (s *Service) confirmTransfers() error {
 						delete(s.nonceTooLow, transfer.id)
 					}
 				}
-			} else if speedup {
+			case speedup:
 				log.Printf("transfer %s has been speeded up, skip other transfers\n", transfer.id.String())
-				return nil
+				return true, nil
+			case merged:
+				expectedSize += 1
 			}
 		}
+		if expectedSize == len(validatedTransfers) {
+			return true, nil
+		}
 	}
-	return nil
+	return false, nil
 }
 
-func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidator) (bool, error) {
+func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidator) (bool, bool, error) {
 	statusOnChain, err := validator.Check(transfer)
 	switch errors.Cause(err) {
 	case nil:
@@ -513,55 +525,59 @@ func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidato
 		// }
 		fallthrough
 	default:
-		return false, errors.Wrapf(err, "failed to check status of transfer %s", transfer.id)
+		return false, false, errors.Wrapf(err, "failed to check status of transfer %s", transfer.id)
 	}
 	switch statusOnChain {
 	case StatusOnChainNeedSpeedUp:
 		witnesses, err := s.recorder.Witnesses(transfer.id)
 		if err != nil {
-			return false, errors.Wrapf(err, "failed to read witnesses of %s", transfer.id)
+			return false, false, errors.Wrapf(err, "failed to read witnesses of %s", transfer.id)
 		}
 		if _, ok := witnesses[transfer.id]; !ok {
-			return false, errors.Errorf("no witness are found for %x", transfer.id)
+			return false, false, errors.Errorf("no witness are found for %x", transfer.id)
 		}
 		txHash, relayer, nonce, gasPrice, err := validator.SpeedUp(transfer, witnesses[transfer.id])
 		switch errors.Cause(err) {
 		case nil:
-			return true, s.recorder.UpdateRecord(transfer.id, txHash, relayer, nonce, gasPrice)
+			time.Sleep(5 * time.Second)
+			return true, false, s.recorder.UpdateRecord(transfer.id, txHash, relayer, nonce, gasPrice)
 		case errGasPriceTooHigh:
 			log.Printf("gas price %s is too high, %v\n", gasPrice, err)
 		case errInsufficientWitnesses:
 			log.Printf("waiting for more witnesses for %s\n", transfer.id.Hex())
-			return false, s.recorder.ResetTransferInProcess(transfer.id)
+			return false, false, s.recorder.ResetTransferInProcess(transfer.id)
 		case errNoncritical:
 			log.Printf("failed to prepare speed up: %+v\n", err)
 		case vm.ErrExecutionReverted:
 			if strings.Contains(err.Error(), "transfer has been settled") {
-				return false, s.recorder.MarkAsSettled(transfer.id)
+				return false, false, s.recorder.MarkAsSettled(transfer.id)
 			}
 			fallthrough
 		default:
-			return false, errors.Wrap(err, "failed to speed up")
+			return false, false, errors.Wrap(err, "failed to speed up")
 		}
-	case StatusOnChainNotConfirmed:
+	case StatusOnChainPending:
 		// do nothing
+	case StatusOnChainNotConfirmed:
+		return false, true, nil
 	case StatusOnChainRejected:
 		if err := s.recorder.MarkAsRejected(transfer.id); err != nil {
-			return false, errors.Wrap(err, "failed to reject")
+			return false, false, errors.Wrap(err, "failed to reject")
 		}
 	case StatusOnChainNonceOverwritten:
 		// nonce has been overwritten
 		if err := s.recorder.ResetCausedByNonce(transfer.id); err != nil {
-			return false, errors.Wrap(err, "failed to reset nonce")
+			return false, false, errors.Wrap(err, "failed to reset nonce")
 		}
 	case StatusOnChainSettled:
 		if err := s.recorder.MarkAsBonusPending(transfer.id, common.BytesToHash(transfer.txHash), transfer.gas, transfer.timestamp); err != nil {
-			return false, errors.Wrap(err, "failed to update status")
+			return false, false, errors.Wrap(err, "failed to update status")
 		}
+		return false, true, nil
 	default:
-		return false, errors.New("unexpected error")
+		return false, false, errors.New("unexpected error")
 	}
-	return false, nil
+	return false, false, nil
 }
 
 func (s *Service) submitTransfers() error {
