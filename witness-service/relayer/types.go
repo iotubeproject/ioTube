@@ -150,6 +150,7 @@ const (
 
 const (
 	StatusOnChainUnknown StatusOnChainType = iota
+	StatusOnChainPending
 	StatusOnChainNotConfirmed
 	StatusOnChainNeedSpeedUp
 	StatusOnChainRejected

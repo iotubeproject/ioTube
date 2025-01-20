@@ -43,16 +43,17 @@ contract("UniswapUnwrapper", function([owner, recipient]) {
     await router.sendTransaction({value: Number(amountOutMin)});
   
     const swapData = {
-      tokenIn: token.address,
+      // tokenIn: token.address,
       tokenOut: ethers.ZeroAddress, // ETH
-      amountIn: amountIn,
+      // amountIn: amountIn,
       amountOutMin: amountOutMin,
       to: recipient,
       deadline: deadline
     };
   
     const encodedData = AbiCoder.defaultAbiCoder().encode(
-        ["tuple(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin, address to, uint256 deadline)"],
+        // ["tuple(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin, address to, uint256 deadline)"],
+        ["tuple(address tokenOut, uint256 amountOutMin, address to, uint256 deadline)"],
         [swapData]
     );
 
@@ -71,16 +72,17 @@ contract("UniswapUnwrapper", function([owner, recipient]) {
     await token2.transfer(router.address, amountOutMin);
 
     const swapData = {
-      tokenIn: token.address,
+      // tokenIn: token.address,
       tokenOut: token2.address,
-      amountIn: amountIn,
+      // amountIn: amountIn,
       amountOutMin: amountOutMin,
       to: recipient,
       deadline: deadline
     };
 
     const encodedData = AbiCoder.defaultAbiCoder().encode(
-      ["tuple(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin, address to, uint256 deadline)"],
+      // ["tuple(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin, address to, uint256 deadline)"],
+      ["tuple(address tokenOut, uint256 amountOutMin, address to, uint256 deadline)"],
       [swapData]
     );
 
@@ -96,16 +98,17 @@ contract("UniswapUnwrapper", function([owner, recipient]) {
     const deadline = Math.floor(Date.now() / 1000) - 3600; // Passed deadline
 
     const swapData = {
-      tokenIn: token.address,
+      // tokenIn: token.address,
       tokenOut: ethers.ZeroAddress,
-      amountIn: amountIn,
+      // amountIn: amountIn,
       amountOutMin: amountOutMin,
       to: recipient,
       deadline: deadline
     };
 
     const encodedData = AbiCoder.defaultAbiCoder().encode(
-      ["tuple(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin, address to, uint256 deadline)"],
+      // ["tuple(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin, address to, uint256 deadline)"],
+      ["tuple(address tokenOut, uint256 amountOutMin, address to, uint256 deadline)"],
       [swapData]
     );
 
@@ -120,16 +123,17 @@ contract("UniswapUnwrapper", function([owner, recipient]) {
     const deadline = Math.floor(Date.now() / 1000) + 3600;
 
     const swapData = {
-      tokenIn: token.address,
+      // tokenIn: token.address,
       tokenOut: ethers.ZeroAddress,
-      amountIn: amountIn,
+      // amountIn: amountIn,
       amountOutMin: amountOutMin,
       to: recipient,
       deadline: deadline
     };
 
     const encodedData = AbiCoder.defaultAbiCoder().encode(
-      ["tuple(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin, address to, uint256 deadline)"],
+      // ["tuple(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin, address to, uint256 deadline)"],
+      ["tuple(address tokenOut, uint256 amountOutMin, address to, uint256 deadline)"],
       [swapData]
     );
 

@@ -205,7 +205,14 @@ function main() {
 
     exportAll
 
-    buildService
+    if [[ $# -ge 1 ]]; then
+        if [[ $1 != 'restart' ]]; then
+            echo -e "invalid parameter '$1'"
+            exit
+        fi
+    else
+        buildService
+    fi
 
     stopService
     makeWorkspace
