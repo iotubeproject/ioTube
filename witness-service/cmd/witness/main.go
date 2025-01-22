@@ -227,10 +227,6 @@ func main() {
 			log.Fatal(err)
 		}
 		for _, cc := range cfg.Cashiers {
-			validatorAddr, err := util.ParseEthAddress(cc.ValidatorContractAddress)
-			if err != nil {
-				log.Fatalf("failed to parse validator contract address %s: %v\n", cc.ValidatorContractAddress, err)
-			}
 			var (
 				signHandler     witness.SignHandler
 				destAddrDecoder util.AddressDecoder
@@ -273,6 +269,12 @@ func main() {
 					log.Println("No Private Key")
 				}
 			}
+
+			validatorAddr, err := destAddrDecoder.DecodeString(cc.ValidatorContractAddress)
+			if err != nil {
+				log.Fatalf("failed to parse validator contract address %s: %v\n", cc.ValidatorContractAddress, err)
+			}
+
 			var reverseRecorder *witness.Recorder
 			if cc.Reverse.CashierContractAddress != "" && cc.Reverse.TransferTableName != "" {
 				pairs := make(map[common.Address]util.Address)
