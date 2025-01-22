@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity <6.0 >=0.4.24;
 pragma experimental ABIEncoderV2;
 
@@ -14,10 +15,16 @@ interface IMinter {
     function owner() external view returns (address);
 }
 
+interface IReceiver {
+    function onReceive(address sender, address token, uint256 amount, bytes calldata payload) external;
+}
+
 contract TransferValidatorForSolana is Pausable {
     event Settled(bytes32 indexed key, address[] witnesses);
-
+    event ReceiverAdded(address receiver);
+    event ReceiverRemoved(address receiver);
     mapping(bytes32 => uint256) public settles;
+    mapping(address => bool) public receivers;
 
     IMinter[] public minters;
     IAllowlist[] public tokenLists;
@@ -37,10 +44,6 @@ contract TransferValidatorForSolana is Pausable {
         bytes memory payload
     ) public view returns (bytes32) {
         return keccak256(abi.encodePacked(address(this), cashier, tokenAddr, index, from, to, amount, payload));
-    }
-
-    function concatKeys(bytes32[] memory keys) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(keys));
     }
 
     function getTokenGroup(address tokenAddr) public view returns (uint256) {
@@ -77,6 +80,9 @@ contract TransferValidatorForSolana is Pausable {
         require(witnesses.length > 0 && witnesses.length * 3 > witnessList.numOfActive() * 2, "insufficient witnesses");
         settles[key] = block.number;
         require(minters[getTokenGroup(tokenAddr)].mint(tokenAddr, to, amount), "failed to mint token");
+        if (receivers[to]) {
+            IReceiver(to).onReceive(this.owner(), tokenAddr, amount, payload);
+        }
         emit Settled(key, witnesses);
     }
 
@@ -87,6 +93,18 @@ contract TransferValidatorForSolana is Pausable {
     function addPair(IAllowlist _tokenList, IMinter _minter) external onlyOwner {
         tokenLists.push(_tokenList);
         minters.push(_minter);
+    }
+
+    function addReceiver(address _receiver) external onlyOwner {
+        require(!receivers[_receiver], "already a receiver");
+        receivers[_receiver] = true;
+        emit ReceiverAdded(_receiver);
+    }
+
+    function removeReceiver(address _receiver) external onlyOwner {
+        require(receivers[_receiver], "invalid receiver");
+        receivers[_receiver] = false;
+        emit ReceiverRemoved(_receiver);
     }
 
     function upgrade(address _newValidator) external onlyOwner {
