@@ -140,7 +140,7 @@ func (s *Service) submit(w *types.Witness) ([]byte, error) {
 		}
 	}
 	var fboToken, fboRecipient *common.Address
-	unwrapper, ok := s.unwrappers[cashier.String()]
+	unwrapper, ok := s.unwrappers[transfer.recipient.String()]
 	if ok {
 		t, ok := unwrapper[transfer.token.String()]
 		if ok {
@@ -429,21 +429,14 @@ func (s *Service) process() error {
 	if s.validators == nil {
 		return nil
 	}
-	if err := s.sendBonus(); err != nil {
-		util.LogErr(err)
-	}
-	skipSubmit, err := s.confirmTransfers()
-	switch {
-	case err != nil:
-		util.LogErr(err)
-	case skipSubmit:
-		log.Println("skip submitting new transfers")
-		return nil
+	s.sendBonus()
+	if _, err := s.confirmTransfers(); err != nil {
+		return err
 	}
 	return s.submitTransfers()
 }
 
-func (s *Service) sendBonus() error {
+func (s *Service) sendBonus() {
 	cashiers := []string{}
 	for cashier := range s.validators {
 		cashiers = append(cashiers, cashier)
@@ -456,7 +449,8 @@ func (s *Service) sendBonus() error {
 		CashiersQueryOption(cashiers),
 	)
 	if err != nil {
-		return errors.Wrap(err, "failed to read transfers to reward")
+		log.Printf("failed to read transfers to reward: %v\n", err)
+		return
 	}
 	for _, transfer := range transfers {
 		if err := s.bonusSender.SendBonus(transfer); err != nil {
@@ -467,10 +461,9 @@ func (s *Service) sendBonus() error {
 			}
 		}
 	}
-	return nil
 }
 
-func (s *Service) confirmTransfers() (bool, error) {
+func (s *Service) confirmTransfers() error {
 	for cashier, validator := range s.validators {
 		expectedSize := validator.Size() * 2
 		validatedTransfers, err := s.recorder.Transfers(
@@ -481,7 +474,7 @@ func (s *Service) confirmTransfers() (bool, error) {
 			CashiersQueryOption([]string{cashier}),
 		)
 		if err != nil {
-			return false, errors.Wrap(err, "failed to read transfers to confirm")
+			return errors.Wrap(err, "failed to read transfers to confirm")
 		}
 		for _, transfer := range validatedTransfers {
 			speedup, merged, err := s.confirmTransfer(transfer, validator)
@@ -501,17 +494,16 @@ func (s *Service) confirmTransfers() (bool, error) {
 					}
 				}
 			case speedup:
-				log.Printf("transfer %s has been speeded up, skip other transfers\n", transfer.id.String())
-				return true, nil
+				return errors.Errorf("transfer %s has been speeded up", transfer.id.String())
 			case merged:
 				expectedSize += 1
 			}
 		}
 		if expectedSize == len(validatedTransfers) {
-			return true, nil
+			return errors.New("waiting to more transfers to be confirmed")
 		}
 	}
-	return false, nil
+	return nil
 }
 
 func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidator) (bool, bool, error) {
@@ -556,8 +548,6 @@ func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidato
 		default:
 			return false, false, errors.Wrap(err, "failed to speed up")
 		}
-	case StatusOnChainPending:
-		// do nothing
 	case StatusOnChainNotConfirmed:
 		return false, true, nil
 	case StatusOnChainRejected:
