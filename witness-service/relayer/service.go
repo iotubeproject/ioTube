@@ -430,7 +430,7 @@ func (s *Service) process() error {
 		return nil
 	}
 	s.sendBonus()
-	if _, err := s.confirmTransfers(); err != nil {
+	if err := s.confirmTransfers(); err != nil {
 		return err
 	}
 	return s.submitTransfers()
