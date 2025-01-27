@@ -85,36 +85,18 @@ func NewTokenCashierOnSolana(
 		func(startHeight uint64, endHeight uint64) ([]AbstractTransfer, error) {
 			fmt.Println("startHeight: ", startHeight, "endHeight: ", endHeight)
 			potentialTxs := make([]string, 0)
-			for h := startHeight; h <= endHeight; h++ {
-				rl.Take()
-				resp, err := solanaClient.RpcClient.GetBlockWithConfig(context.Background(),
-					h, rpc.GetBlockConfig{
-						Encoding:                       rpc.GetBlockConfigEncodingJson,
-						TransactionDetails:             "accounts",
-						Rewards:                        pointer.Get(false),
-						Commitment:                     rpc.CommitmentFinalized,
-						MaxSupportedTransactionVersion: pointer.Get[uint8](0),
-					})
+			if startHeight == endHeight {
+				txs, err := fetchTxsFromBlock(solanaClient, startHeight, cashier)
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to get block %d", h)
+					return nil, errors.Wrap(err, "failed to fetch tx from block")
 				}
-				if resp.Result == nil {
-					continue
+				potentialTxs = append(potentialTxs, txs...)
+			} else {
+				txs, err := fetchTxsFromAddress(solanaClient, startHeight, endHeight, cashier)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to fetch tx from address")
 				}
-				for _, tx := range resp.Result.Transactions {
-					if tx.Meta.Err != nil {
-						continue
-					}
-					txMap := tx.Transaction.(map[string]interface{})
-					for _, account := range txMap["accountKeys"].([]any) {
-						if cashier.String() == account.(map[string]interface{})["pubkey"].(string) {
-							sig := txMap["signatures"].([]any)[0].(string)
-							potentialTxs = append(potentialTxs, sig)
-							log.Printf("found potential tx %s in block %d\n", sig, h)
-							break
-						}
-					}
-				}
+				potentialTxs = append(potentialTxs, txs...)
 			}
 			tsfs := make([]AbstractTransfer, 0)
 			for _, txHash := range potentialTxs {
@@ -158,6 +140,74 @@ func NewTokenCashierOnSolana(
 		},
 		disablePull,
 	), nil
+}
+
+func fetchTxsFromBlock(solanaClient *client.Client, blockHeight uint64, cashier solcommon.PublicKey) ([]string, error) {
+	rl.Take()
+	resp, err := solanaClient.RpcClient.GetBlockWithConfig(context.Background(),
+		blockHeight, rpc.GetBlockConfig{
+			Encoding:                       rpc.GetBlockConfigEncodingJson,
+			TransactionDetails:             "accounts",
+			Rewards:                        pointer.Get(false),
+			Commitment:                     rpc.CommitmentFinalized,
+			MaxSupportedTransactionVersion: pointer.Get[uint8](0),
+		})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get block %d", blockHeight)
+	}
+	if resp.Result == nil {
+		return nil, nil
+	}
+	potentialTxs := make([]string, 0)
+	for _, tx := range resp.Result.Transactions {
+		if tx.Meta.Err != nil {
+			continue
+		}
+		txMap := tx.Transaction.(map[string]interface{})
+		for _, account := range txMap["accountKeys"].([]any) {
+			if cashier.String() == account.(map[string]interface{})["pubkey"].(string) {
+				sig := txMap["signatures"].([]any)[0].(string)
+				potentialTxs = append(potentialTxs, sig)
+				log.Printf("found potential tx %s in block %d\n", sig, blockHeight)
+				break
+			}
+		}
+	}
+	return potentialTxs, nil
+}
+
+// TODO: Avoid refetching from the top with txs cache
+func fetchTxsFromAddress(solanaClient *client.Client, startHeight uint64, endHeight uint64, cashier solcommon.PublicKey) ([]string, error) {
+	ret := make([]string, 0)
+	before := ""
+	for {
+		rl.Take()
+		resp, err := solanaClient.GetSignaturesForAddressWithConfig(
+			context.Background(),
+			cashier.String(),
+			client.GetSignaturesForAddressConfig{
+				Limit:      1000, // 1000 is the maximum limit by API
+				Before:     before,
+				Commitment: rpc.CommitmentFinalized,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		for i := range resp {
+			if resp[i].Slot >= startHeight && resp[i].Slot <= endHeight {
+				ret = append(ret, resp[i].Signature)
+			}
+		}
+
+		if len(resp) == 0 || resp[len(resp)-1].Slot <= startHeight {
+			break
+		}
+		before = resp[len(resp)-1].Signature
+	}
+
+	return ret, nil
 }
 
 type transferInfo struct {
