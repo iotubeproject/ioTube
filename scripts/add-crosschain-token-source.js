@@ -3,6 +3,15 @@ const addresses = require("./addresses");
 
 async function main() {
   const tubeAddress = addresses[hre.network.name];
+  if (hre.network.name == "iotex") {
+    const ref = process.env.REF_CHAIN;
+    if (ref === undefined || ref === "") {
+      console.log("Must use env variable to provide ref chain: export REF_CHAIN=bsc");
+      return;
+    }
+    tubeAddress = tubeAddress[ref.toLowerCase()];
+  }
+
   const owner = new hre.ethers.Wallet(
     process.env[`PRIVATE_KEY_${hre.network.name.toUpperCase()}`],
     hre.ethers.provider
