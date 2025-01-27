@@ -33,12 +33,17 @@ import (
 )
 
 type (
+	// CashierConfig defines the configuration of a cashier
+	CashierConfig struct {
+		Address string                         `json:"address" yaml:"address"`
+		Tokens  map[string]map[string]*big.Int `json:"tokens" yaml:"tokens"`
+	}
 	// ValidatorConfig defines the configuration of a validator
 	ValidatorConfig struct {
-		Address     string   `json:"address" yaml:"address"`
-		Cashiers    []string `json:"cashiers" yaml:"cashiers"`
-		WithPayload bool     `json:"withPayload" yaml:"withPayload"`
-		FromSolana  bool     `json:"fromSolana" yaml:"fromSolana"`
+		Address     string          `json:"address" yaml:"address"`
+		Cashiers    []CashierConfig `json:"cashiers" yaml:"cashiers"`
+		WithPayload bool            `json:"withPayload" yaml:"withPayload"`
+		FromSolana  bool            `json:"fromSolana" yaml:"fromSolana"`
 	}
 	// Configuration defines the configuration of the witness service
 	Configuration struct {
@@ -173,6 +178,7 @@ func main() {
 			}
 		}
 		validators := map[string]relayer.TransferValidator{}
+		checkers := map[string]*relayer.FeeChecker{}
 		for _, vc := range cfg.Validators {
 			validatorAddr, err := util.ParseEthAddress(vc.Address)
 			if err != nil {
@@ -202,7 +208,22 @@ func main() {
 				log.Fatalf("failed to create validator: %+v\n", err)
 			}
 			for _, cashier := range vc.Cashiers {
-				validators[cashier] = validator
+				validators[cashier.Address] = validator
+				checker := relayer.NewFeeChecker()
+				for token, recipients := range cashier.Tokens {
+					tokenAddr, err := util.ParseEthAddress(token)
+					if err != nil {
+						log.Fatalf("failed to parse token address %s: %+v", token, err)
+					}
+					for recipient, fee := range recipients {
+						addr, err := util.ParseEthAddress(recipient)
+						if err != nil {
+							log.Fatalf("failed to parse recipient address %s: %+v", recipient, err)
+						}
+						checker.SetFee(tokenAddr.String(), addr.String(), fee)
+					}
+					checkers[cashier.Address] = checker
+				}
 			}
 		}
 		bonusSender, err := relayer.NewBonusSender(ethClient, privateKeys, cfg.BonusTokens, cfg.Bonus)
@@ -213,6 +234,7 @@ func main() {
 		ethService, err := relayer.NewServiceOnEthereum(
 			validators,
 			unwrappers,
+			checkers,
 			bonusSender,
 			relayer.NewRecorder(
 				storeFactory.NewStore(cfg.Database),

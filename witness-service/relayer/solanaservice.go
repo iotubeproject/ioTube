@@ -191,7 +191,7 @@ func (s *SolanaService) List(ctx context.Context, request *services.ListRequest)
 	case services.Status_CREATED, services.Status_CONFIRMING:
 		queryOpts = append(queryOpts, StatusQueryOption(WaitingForWitnesses))
 	case services.Status_FAILED:
-		queryOpts = append(queryOpts, StatusQueryOption(ValidationFailed, ValidationRejected))
+		queryOpts = append(queryOpts, StatusQueryOption(ValidationFailed, ValidationRejected, InsufficientFeeRejected))
 	}
 	count, err := s.abstractRecorder.Count(queryOpts...)
 	if err != nil {
@@ -273,7 +273,7 @@ func (s *SolanaService) convertStatus(status ValidationStatusType) services.Stat
 		return services.Status_SUBMITTED
 	case TransferSettled, BonusPending:
 		return services.Status_SETTLED
-	case ValidationFailed, ValidationRejected:
+	case ValidationFailed, ValidationRejected, InsufficientFeeRejected:
 		return services.Status_FAILED
 	}
 

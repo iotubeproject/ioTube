@@ -783,6 +783,28 @@ func (recorder *Recorder) UpdateRecord(id common.Hash, txhash common.Hash, relay
 	return recorder.validateResult(result, 1)
 }
 
+// MarkAsInsufficientFee marks a transfer as insufficient fee
+func (recorder *Recorder) MarkAsInsufficientFee(id common.Hash) error {
+	log.Printf("mark transfer %s as insufficient fee\n", id.Hex())
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
+	result, err := recorder.store.DB().Exec(recorder.updateStatusQuery, InsufficientFeeRejected, id.Hex(), ValidationInProcess)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as insufficient fee")
+	}
+	if recorder.explorerStore != nil {
+		for {
+			_, err := recorder.explorerStore.DB().Exec(recorder.updateStatusQueryForExplorer, InsufficientFeeRejected, id.Hex())
+			if err == nil {
+				break
+			}
+			log.Println("failed to update explorer db", err)
+		}
+	}
+
+	return recorder.validateResult(result, 1)
+}
+
 // MarkAsValidated marks a transfer as validated
 func (recorder *Recorder) MarkAsValidated(id common.Hash, txhash common.Hash, relayer common.Address, nonce uint64, gasPrice *big.Int) error {
 	log.Printf("mark transfer %s as validated (%s, %s, %d)\n", id.Hex(), txhash.Hex(), relayer.Hex(), nonce)
@@ -991,11 +1013,12 @@ func (recorder *Recorder) NewTXs(count uint32) ([]uint64, [][]byte, error) {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
 	rows, err := recorder.store.DB().Query(fmt.Sprintf(
-		"SELECT `txHash`, `blockheight` FROM %s WHERE TIMESTAMPDIFF(HOUR, creationTime, NOW()) <= 48 AND `txHash` NOT IN (SELECT `sourceTxHash` FROM %s WHERE (`status`=?  OR `status`=? OR `status`=?) AND `sourceTxHash` IS NOT NULL) LIMIT ?",
+		"SELECT `txHash`, `blockheight` FROM %s WHERE TIMESTAMPDIFF(HOUR, creationTime, NOW()) <= 48 AND `txHash` NOT IN (SELECT `sourceTxHash` FROM %s WHERE `status` in (?, ?, ?, ?) AND `sourceTxHash` IS NOT NULL) LIMIT ?",
 		recorder.newTXTableName, recorder.transferTableName),
 		TransferSettled,
 		ValidationFailed,
 		ValidationRejected,
+		InsufficientFeeRejected,
 		count)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to query new txs")

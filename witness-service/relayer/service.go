@@ -34,6 +34,7 @@ type (
 		services.UnimplementedRelayServiceServer
 		validators      map[string]TransferValidator
 		unwrappers      map[string]map[string]common.Address
+		checkers        map[string]*FeeChecker
 		bonusSender     BonusSender
 		processor       dispatcher.Runner
 		recorder        *Recorder
@@ -59,6 +60,7 @@ const (
 func NewServiceOnEthereum(
 	validators map[string]TransferValidator,
 	unwrappers map[string]map[string]common.Address,
+	checkers map[string]*FeeChecker,
 	bonusSender BonusSender,
 	recorder *Recorder,
 	interval time.Duration,
@@ -70,6 +72,7 @@ func NewServiceOnEthereum(
 	s := &Service{
 		validators:      validators,
 		unwrappers:      unwrappers,
+		checkers:        checkers,
 		bonusSender:     bonusSender,
 		recorder:        recorder,
 		cache:           cache,
@@ -287,7 +290,7 @@ func (s *Service) List(ctx context.Context, request *services.ListRequest) (*ser
 	case services.Status_CREATED, services.Status_CONFIRMING:
 		queryOpts = append(queryOpts, StatusQueryOption(WaitingForWitnesses))
 	case services.Status_FAILED:
-		queryOpts = append(queryOpts, StatusQueryOption(ValidationFailed, ValidationRejected))
+		queryOpts = append(queryOpts, StatusQueryOption(ValidationFailed, ValidationRejected, InsufficientFeeRejected))
 	}
 	count, err := s.recorder.Count(queryOpts...)
 	if err != nil {
@@ -369,7 +372,7 @@ func (s *Service) convertStatus(status ValidationStatusType) services.Status {
 		return services.Status_SUBMITTED
 	case TransferSettled, BonusPending:
 		return services.Status_SETTLED
-	case ValidationFailed, ValidationRejected:
+	case ValidationFailed, ValidationRejected, InsufficientFeeRejected:
 		return services.Status_FAILED
 	}
 
@@ -477,7 +480,7 @@ func (s *Service) confirmTransfers() error {
 			return errors.Wrap(err, "failed to read transfers to confirm")
 		}
 		for _, transfer := range validatedTransfers {
-			speedup, merged, err := s.confirmTransfer(transfer, validator)
+			speedup, merged, err := s.confirmTransfer(transfer, validator, s.checkers[cashier])
 			switch {
 			case err != nil:
 				log.Printf("failed to confirm transfer %s, %+v\n", transfer.id.String(), err)
@@ -506,7 +509,13 @@ func (s *Service) confirmTransfers() error {
 	return nil
 }
 
-func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidator) (bool, bool, error) {
+func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidator, checker *FeeChecker) (bool, bool, error) {
+	if checker != nil {
+		if err := checker.Check(transfer); err != nil {
+			log.Printf("failed to check fee of transfer %s, %v\n", transfer.id.String(), err)
+			return false, true, s.recorder.MarkAsInsufficientFee(transfer.id)
+		}
+	}
 	statusOnChain, err := validator.Check(transfer)
 	switch errors.Cause(err) {
 	case nil:

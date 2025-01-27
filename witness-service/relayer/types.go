@@ -132,6 +132,8 @@ const (
 	WaitingForWitnesses ValidationStatusType = "new"
 	// ValidationInProcess stands for a transfer in process
 	ValidationInProcess = "processing"
+	// InsufficientFeeRejected stands for a transfer with insufficient fee
+	InsufficientFeeRejected = "insufficient"
 	// ValidationSubmitted stands for a transfer with validation submitted
 	ValidationSubmitted = "validated"
 	// BonusPending stands for a transfer with pending bonus
