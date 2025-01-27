@@ -178,7 +178,7 @@ func fetchTxsFromBlock(solanaClient *client.Client, blockHeight uint64, cashier 
 
 // TODO: Avoid refetching from the top with txs cache
 func fetchTxsFromAddress(solanaClient *client.Client, startHeight uint64, endHeight uint64, cashier solcommon.PublicKey) ([]string, error) {
-	txs := make([]rpc.SignatureWithStatus, 0)
+	ret := make([]string, 0)
 	before := ""
 	for {
 		rl.Take()
@@ -194,19 +194,19 @@ func fetchTxsFromAddress(solanaClient *client.Client, startHeight uint64, endHei
 		if err != nil {
 			return nil, err
 		}
-		txs = append(txs, resp...)
+
+		for i := range resp {
+			if resp[i].Slot >= startHeight && resp[i].Slot <= endHeight {
+				ret = append(ret, resp[i].Signature)
+			}
+		}
+
 		if len(resp) == 0 || resp[len(resp)-1].Slot <= startHeight {
 			break
 		}
 		before = resp[len(resp)-1].Signature
 	}
 
-	ret := make([]string, 0)
-	for i := len(txs) - 1; i >= 0; i-- {
-		if txs[i].Slot >= startHeight && txs[i].Slot <= endHeight {
-			ret = append(ret, txs[i].Signature)
-		}
-	}
 	return ret, nil
 }
 
