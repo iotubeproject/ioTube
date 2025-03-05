@@ -21,6 +21,8 @@ contract TokenConfigList is Ownable {
     mapping(address => uint256) private tokenIndex;
     Config[] private configs;
 
+    constructor() Ownable(msg.sender) {}
+
     function mustIndexByToken(address _token) internal view returns (uint256) {
         uint256 idx = tokenIndex[_token];
         require(idx != 0, "TokenList: token not exists");
@@ -111,7 +113,7 @@ contract CashierConfig is Ownable {
         address _validator,
         address _tokenSafe,
         address _tokenList
-    ) {
+    ) Ownable(msg.sender) {
         id = _id;
         withPayload = _withPayload;
         startBlockHeight = _startBlockHeight;

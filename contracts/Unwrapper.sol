@@ -18,7 +18,7 @@ contract Unwrapper is Ownable {
     mapping(address => bool) public whitelist;
     IWEth public weth;
 
-    constructor(address _weth) Ownable() {
+    constructor(address _weth) Ownable(msg.sender) {
         weth = IWEth(_weth);
     }
 

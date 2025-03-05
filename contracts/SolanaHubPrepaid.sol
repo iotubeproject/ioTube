@@ -19,7 +19,7 @@ contract SolanaHubPrepaid is Ownable {
     address immutable public cashier;
     mapping(address => bool) operators;
 
-    constructor(address _cashier) payable {
+    constructor(address _cashier) Ownable(msg.sender) payable {
         cashier = _cashier;
     }
 

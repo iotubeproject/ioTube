@@ -275,6 +275,7 @@ contract TetherToken is Pausable, NonStandardToken, BlackList {
 
     // deprecate current contract in favour of a new one
     function deprecate(address _upgradedAddress) public onlyOwner {
+        require(!deprecated);
         deprecated = true;
         upgradedAddress = _upgradedAddress;
         emit Deprecate(_upgradedAddress);
