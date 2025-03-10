@@ -33,4 +33,27 @@ contract('WitnessList', function([owner, stranger, witness1, witness2, witness3]
         assert.equal(await this.witnessList.isAllowed(witness2), false);
         assert.equal(await this.witnessList.numOfActive(), 2);
     });
+    it('switch witness', async function() {
+        await this.witnessList.addWitness(witness1);
+        await this.witnessList.addWitness(witness2);
+        assert.equal(await this.witnessList.isAllowed(witness1), true);
+        assert.equal(await this.witnessList.isAllowed(witness2), true);
+        assert.equal(await this.witnessList.isAllowed(stranger), false);
+        assert.equal(await this.witnessList.isAllowed(witness3), false);
+        await assertAsyncThrows(this.witnessList.switchWitness(witness3, {from: stranger}));
+        assert.equal(await this.witnessList.isAllowed(witness1), true);
+        assert.equal(await this.witnessList.isAllowed(witness2), true);
+        assert.equal(await this.witnessList.isAllowed(stranger), false);
+        assert.equal(await this.witnessList.isAllowed(witness3), false);
+        await assertAsyncThrows(this.witnessList.switchWitness(witness1, {from: witness2}));
+        assert.equal(await this.witnessList.isAllowed(witness1), true);
+        assert.equal(await this.witnessList.isAllowed(witness2), true);
+        assert.equal(await this.witnessList.isAllowed(stranger), false);
+        assert.equal(await this.witnessList.isAllowed(witness3), false);
+        await this.witnessList.switchWitness(witness3, {from: witness2});
+        assert.equal(await this.witnessList.isAllowed(witness1), true);
+        assert.equal(await this.witnessList.isAllowed(witness2), false);
+        assert.equal(await this.witnessList.isAllowed(stranger), false);
+        assert.equal(await this.witnessList.isAllowed(witness3), true);
+    });
 });

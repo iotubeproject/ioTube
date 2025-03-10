@@ -25,4 +25,12 @@ contract WitnessList is Ownable, UniqueAppendOnlyAddressList {
         }
     }
 
+    function switchWitness(address _newWitness) public {
+        address witness = msg.sender;
+        require(deactivateItem(witness), "WitnessList: deactivate witness failed");
+        emit WitnessRemoved(witness);
+        require(activateItem(_newWitness), "WitnessList: activate witness failed");
+        emit WitnessAdded(_newWitness);
+    }
+
 }
