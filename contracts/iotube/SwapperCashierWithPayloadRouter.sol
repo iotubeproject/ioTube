@@ -18,7 +18,7 @@ interface ICashier {
     function depositTo(address _token, address _to, uint256 _amount, bytes memory _payload) external payable;
 }
 
-contract SwapperCashierRouter {
+contract SwapperCashierWithPayloadRouter {
     ISwapper public swapper;
     address public target_token;
     address public source_token;
