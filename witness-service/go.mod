@@ -29,6 +29,7 @@ require (
 
 require (
 	github.com/blocto/solana-go-sdk v1.30.0
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/mr-tron/base58 v1.2.0
 	github.com/near/borsh-go v0.3.2-0.20220516180422-1ff87d108454
 	go.uber.org/ratelimit v0.3.1
