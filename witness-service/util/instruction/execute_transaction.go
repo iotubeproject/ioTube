@@ -114,7 +114,7 @@ func CTokenTransactionAccounts(
 		{PubKey: userAccount, IsSigner: false, IsWritable: true},
 		{PubKey: governanceAddress, IsSigner: false, IsWritable: false},
 		{PubKey: cTokenInfo.TokenMint, IsSigner: false, IsWritable: true},
-		{PubKey: solcommon.TokenProgramID, IsSigner: false, IsWritable: false},
+		{PubKey: cTokenInfo.TokenProgramId, IsSigner: false, IsWritable: false},
 		{PubKey: cTokenInfo.Config, IsSigner: false, IsWritable: false},
 	}, nil
 }

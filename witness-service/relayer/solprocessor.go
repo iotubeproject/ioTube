@@ -13,7 +13,6 @@ import (
 	"github.com/blocto/solana-go-sdk/common"
 	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/blocto/solana-go-sdk/program/address_lookup_table"
-	"github.com/blocto/solana-go-sdk/program/associated_token_account"
 	"github.com/blocto/solana-go-sdk/program/compute_budget"
 	"github.com/blocto/solana-go-sdk/rpc"
 	soltypes "github.com/blocto/solana-go-sdk/types"
@@ -560,12 +559,12 @@ func (s *SolProcessor) buildCreateAssociatedTokenAccountInstruction(transfer *SO
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get ctoken info")
 	}
-	ata, _, err := solcommon.FindAssociatedTokenAddress(ataOwnerAddr, ctokeninfo.TokenMint)
+	ata, _, err := instruction.FindAssociatedTokenAddress(ataOwnerAddr, ctokeninfo.TokenMint, ctokeninfo.TokenProgramId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find associated token address")
 	}
 	if !bytes.Equal(ata[:], recAddr[:]) {
-		return nil, errors.Errorf("ata %s is not equal to %s", ata, recAddr)
+		return nil, errors.Errorf("ata %s is not equal to %s", ata.String(), recAddr.String())
 	}
 
 	// check user account is wallet account
@@ -583,16 +582,12 @@ func (s *SolProcessor) buildCreateAssociatedTokenAccountInstruction(transfer *SO
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get ata account info")
 	}
-	if ataInfo.Lamports > 0 {
+	if ataInfo.Owner.String() == common.TokenProgramID.String() || ataInfo.Owner.String() == common.Token2022ProgramID.String() {
 		return []soltypes.Instruction{}, nil
 	}
 	return []soltypes.Instruction{
-		associated_token_account.Create(associated_token_account.CreateParam{
-			Funder:                 s.privateKey.PublicKey,
-			Owner:                  ataOwnerAddr,
-			Mint:                   ctokeninfo.TokenMint,
-			AssociatedTokenAccount: recAddr,
-		})}, nil
+		instruction.CreateAssociatedTokenAddress(s.privateKey.PublicKey, recAddr, ataOwnerAddr, ctokeninfo.TokenMint, ctokeninfo.TokenProgramId),
+	}, nil
 }
 
 func (s *SolProcessor) buildExecutionInstruction(transfer *SOLRawTransaction) ([]soltypes.Instruction, error) {
