@@ -162,7 +162,9 @@ function grantPrivileges() {
 
 function buildService() {
     pushd $PROJECT_ABS_DIR
-    docker build . -f Dockerfile.witness -t witness:latest || exit 2
+    echo -e "$YELLOW Pull witness image from GitHub registry...$NC"
+    docker pull ghcr.io/iotubeproject/witness-service:latest || exit 2
+    docker tag ghcr.io/iotubeproject/witness-service:latest witness:latest
 }
 
 function startup() {
