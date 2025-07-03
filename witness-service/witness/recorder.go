@@ -26,6 +26,7 @@ import (
 
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/util/instruction"
 )
 
 type (
@@ -36,7 +37,7 @@ type (
 		transferTableName    string
 		tokenPairs           map[common.Address]util.Address
 		tokenWhitelists      map[common.Address]map[common.Address]struct{}
-		tokenMintPairs       map[string]util.Address
+		tokenMintPairs       map[string][2]util.Address
 		tokenRound           map[common.Address]int
 		addrDecoder          util.AddressDecoder
 	}
@@ -48,7 +49,7 @@ func NewRecorder(
 	transferTableName string,
 	tokenPairs map[common.Address]util.Address,
 	tokenWhitelists map[common.Address]map[common.Address]struct{},
-	tokenMintPairs map[string]util.Address,
+	tokenMintPairs map[string][2]util.Address,
 	tokenRound map[common.Address]int,
 	addrDecoder util.AddressDecoder,
 ) *Recorder {
@@ -448,8 +449,8 @@ func (recorder *Recorder) transfers(cashier string, status ...TransferStatus) ([
 		}
 		// replace recipient with solana ata address
 		if tokenMint, exist := recorder.tokenMintPairs[tx.coToken.String()]; exist {
-			ata, _, err := solcommon.FindAssociatedTokenAddress(tx.recipient.Address().(solcommon.PublicKey),
-				tokenMint.Address().(solcommon.PublicKey))
+			ata, _, err := instruction.FindAssociatedTokenAddress(tx.recipient.Address().(solcommon.PublicKey),
+				tokenMint[0].Address().(solcommon.PublicKey), tokenMint[1].Address().(solcommon.PublicKey))
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to find associated token address for %s", tx.recipient.String())
 			}
@@ -537,8 +538,8 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	}
 	// replace recipient with solana ata address
 	if tokenMint, exist := recorder.tokenMintPairs[tx.coToken.String()]; exist {
-		ata, _, err := solcommon.FindAssociatedTokenAddress(tx.recipient.Address().(solcommon.PublicKey),
-			tokenMint.Address().(solcommon.PublicKey))
+		ata, _, err := instruction.FindAssociatedTokenAddress(tx.recipient.Address().(solcommon.PublicKey),
+			tokenMint[0].Address().(solcommon.PublicKey), tokenMint[1].Address().(solcommon.PublicKey))
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to find associated token address for %s", tx.recipient.String())
 		}
