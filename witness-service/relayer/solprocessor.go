@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/json"
 	"log"
 	"math"
 	"sort"
@@ -13,12 +15,12 @@ import (
 	"github.com/blocto/solana-go-sdk/common"
 	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/blocto/solana-go-sdk/program/address_lookup_table"
-	"github.com/blocto/solana-go-sdk/program/associated_token_account"
 	"github.com/blocto/solana-go-sdk/program/compute_budget"
 	"github.com/blocto/solana-go-sdk/rpc"
 	soltypes "github.com/blocto/solana-go-sdk/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/mr-tron/base58"
 	"github.com/pkg/errors"
 	"go.uber.org/ratelimit"
@@ -31,11 +33,12 @@ import (
 const (
 	_limitSize                               = 64
 	_solanaRPCMaxQPS                         = 10
-	DEFAULT_COMPUTE_UNIT_PRICE_MICROLAMPORTS = 100_000
+	DEFAULT_COMPUTE_UNIT_PRICE_MICROLAMPORTS = 160_000
 )
 
 var (
-	rl = ratelimit.New(_solanaRPCMaxQPS)
+	rl          = ratelimit.New(_solanaRPCMaxQPS)
+	lruCache, _ = lru.New[[32]byte, soltypes.AddressLookupTableAccount](1024)
 )
 
 type (
@@ -156,16 +159,6 @@ func (s *SolProcessor) ConfirmTransfers() error {
 
 func (s *SolProcessor) confirmTransfer(sig string, lastValidHeight uint64) (bool, bool, error) {
 	rl.Take()
-	currentHeight, err := s.client.RpcClient.GetBlockHeight(context.Background())
-	if err != nil || currentHeight.Error != nil {
-		log.Printf("failed to get current block height, %+v\n", err)
-		return false, false, errors.New("failed to get current block height")
-	}
-	if currentHeight.Result > lastValidHeight {
-		return false, true, errors.New("transaction is expired")
-	}
-
-	rl.Take()
 	status, err := s.client.GetSignatureStatusWithConfig(
 		context.Background(),
 		sig,
@@ -178,6 +171,15 @@ func (s *SolProcessor) confirmTransfer(sig string, lastValidHeight uint64) (bool
 		return false, false, err
 	}
 	if status == nil {
+		rl.Take()
+		currentHeight, err := s.client.RpcClient.GetBlockHeight(context.Background())
+		if err != nil || currentHeight.Error != nil {
+			log.Printf("failed to get current block height, %+v\n", err)
+			return false, false, errors.New("failed to get current block height")
+		}
+		if currentHeight.Result > lastValidHeight+1000 {
+			return false, true, errors.New("transaction is expired")
+		}
 		return false, false, nil
 	}
 
@@ -327,12 +329,37 @@ func (s *SolProcessor) buildTransaction(transfer *SOLRawTransaction, witnesses [
 		return soltypes.Transaction{}, 0, err
 	}
 
-	lookupTable, err := s.buildAddressLookupTable(instr[1].Accounts)
+	cacheKey, err := hashAccounts(instr[1].Accounts)
 	if err != nil {
 		return soltypes.Transaction{}, 0, err
 	}
+	lookupTable, exist := lruCache.Get(cacheKey)
+	if !exist {
+		lt, err := s.buildAddressLookupTable(instr[1].Accounts)
+		if err != nil {
+			return soltypes.Transaction{}, 0, err
+		}
+		lruCache.Add(cacheKey, lt)
+		lookupTable = lt
+	}
 
 	return s.buildOptimalTransaction(instr, []soltypes.AddressLookupTableAccount{lookupTable})
+}
+
+func hashAccounts(accts []soltypes.AccountMeta) ([32]byte, error) {
+	data, err := json.Marshal(accts)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	hash := sha256.New()
+	if _, err := hash.Write(data); err != nil {
+		return [32]byte{}, err
+	}
+
+	var ret [32]byte
+	copy(ret[:], hash.Sum(nil))
+	return ret, nil
 }
 
 func (s *SolProcessor) buildInstructions(transfer *SOLRawTransaction, witnesses []*Witness) ([]soltypes.Instruction, error) {
@@ -560,12 +587,12 @@ func (s *SolProcessor) buildCreateAssociatedTokenAccountInstruction(transfer *SO
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get ctoken info")
 	}
-	ata, _, err := solcommon.FindAssociatedTokenAddress(ataOwnerAddr, ctokeninfo.TokenMint)
+	ata, _, err := instruction.FindAssociatedTokenAddress(ataOwnerAddr, ctokeninfo.TokenMint, ctokeninfo.TokenProgramId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find associated token address")
 	}
 	if !bytes.Equal(ata[:], recAddr[:]) {
-		return nil, errors.Errorf("ata %s is not equal to %s", ata, recAddr)
+		return nil, errors.Errorf("ata %s is not equal to %s", ata.String(), recAddr.String())
 	}
 
 	// check user account is wallet account
@@ -583,16 +610,12 @@ func (s *SolProcessor) buildCreateAssociatedTokenAccountInstruction(transfer *SO
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get ata account info")
 	}
-	if ataInfo.Lamports > 0 {
+	if ataInfo.Owner.String() == common.TokenProgramID.String() || ataInfo.Owner.String() == common.Token2022ProgramID.String() {
 		return []soltypes.Instruction{}, nil
 	}
 	return []soltypes.Instruction{
-		associated_token_account.Create(associated_token_account.CreateParam{
-			Funder:                 s.privateKey.PublicKey,
-			Owner:                  ataOwnerAddr,
-			Mint:                   ctokeninfo.TokenMint,
-			AssociatedTokenAccount: recAddr,
-		})}, nil
+		instruction.CreateAssociatedTokenAddress(s.privateKey.PublicKey, recAddr, ataOwnerAddr, ctokeninfo.TokenMint, ctokeninfo.TokenProgramId),
+	}, nil
 }
 
 func (s *SolProcessor) buildExecutionInstruction(transfer *SOLRawTransaction) ([]soltypes.Instruction, error) {

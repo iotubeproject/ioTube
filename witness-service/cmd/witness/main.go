@@ -37,7 +37,7 @@ import (
 type Configuration struct {
 	Chain                 string        `json:"chain" yaml:"chain"`
 	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
-	RelayerURL            string        `jsong:"relayerURL" yaml:"relayerURL"`
+	RelayerURL            string        `json:"relayerURL" yaml:"relayerURL"`
 	Database              db.Config     `json:"database" yaml:"database"`
 	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
@@ -76,10 +76,11 @@ type Configuration struct {
 
 // TokenPair defines a token pair
 type TokenPair struct {
-	Token1    string   `json:"token1" yaml:"token1"`
-	Token2    string   `json:"token2" yaml:"token2"`
-	TokenMint string   `json:"tokenMint" yaml:"tokenMint"`
-	Whitelist []string `json:"whitelist" yaml:"whitelist"`
+	Token1         string   `json:"token1" yaml:"token1"`
+	Token2         string   `json:"token2" yaml:"token2"`
+	TokenMint      string   `json:"tokenMint" yaml:"tokenMint"`
+	TokenProgramID string   `json:"tokenProgramID,omitempty" yaml:"tokenProgramID,omitempty"`
+	Whitelist      []string `json:"whitelist" yaml:"whitelist"`
 }
 
 var (
@@ -114,9 +115,9 @@ func init() {
 func parseTokenPairs(
 	tokenPairs []TokenPair,
 	destAddrDecoder util.AddressDecoder,
-) (map[common.Address]util.Address, map[string]util.Address, map[common.Address]map[common.Address]struct{}) {
+) (map[common.Address]util.Address, map[string][2]util.Address, map[common.Address]map[common.Address]struct{}) {
 	pairs := make(map[common.Address]util.Address)
-	tokenMintPairs := make(map[string]util.Address)
+	tokenMintPairs := make(map[string][2]util.Address)
 	whitelists := make(map[common.Address]map[common.Address]struct{})
 	for _, pair := range tokenPairs {
 		token1, err := util.ParseEthAddress(pair.Token1)
@@ -136,7 +137,15 @@ func parseTokenPairs(
 			if err != nil {
 				log.Fatalf("failed to decode mint address %s, %v\n", pair.TokenMint, err)
 			}
-			tokenMintPairs[token2.String()] = mint
+			tokenProgram := util.SOLAddressToAddress(solcommon.TokenProgramID)
+			if len(pair.TokenProgramID) > 0 && pair.TokenProgramID != tokenProgram.String() {
+				tokenProgram, err = destAddrDecoder.DecodeString(pair.TokenProgramID)
+				if err != nil {
+					log.Fatalf("failed to decode token program id %s, %v\n", pair.TokenProgramID, err)
+				}
+			}
+			// slot 0 is token mint, slot 1 is token program id
+			tokenMintPairs[token2.String()] = [2]util.Address{mint, tokenProgram}
 		}
 		if len(pair.Whitelist) > 0 {
 			whitelist := make(map[common.Address]struct{})
@@ -286,7 +295,7 @@ func main() {
 					cc.Reverse.TransferTableName,
 					pairs,
 					map[common.Address]map[common.Address]struct{}{},
-					map[string]util.Address{},
+					map[string][2]util.Address{},
 					map[common.Address]int{},
 					destAddrDecoder,
 				)
