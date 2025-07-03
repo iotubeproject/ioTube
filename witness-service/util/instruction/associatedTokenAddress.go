@@ -9,6 +9,7 @@ import (
 	"github.com/near/borsh-go"
 )
 
+// FindAssociatedTokenAddress finds the associated token account address for a given wallet address and token mint.
 func FindAssociatedTokenAddress(walletAddress, tokenMintAddress, tokenProgramID solcommon.PublicKey) (solcommon.PublicKey, uint8, error) {
 	if tokenProgramID.String() != solcommon.TokenProgramID.String() &&
 		tokenProgramID.String() != solcommon.Token2022ProgramID.String() {

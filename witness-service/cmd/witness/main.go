@@ -37,7 +37,7 @@ import (
 type Configuration struct {
 	Chain                 string        `json:"chain" yaml:"chain"`
 	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
-	RelayerURL            string        `jsong:"relayerURL" yaml:"relayerURL"`
+	RelayerURL            string        `json:"relayerURL" yaml:"relayerURL"`
 	Database              db.Config     `json:"database" yaml:"database"`
 	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
