@@ -1,4 +1,4 @@
-name: Build and Publish Witness Image
+name: Docker
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: iotubeproject/witness-service
+  IMAGE_NAME: ${{ github.repository }}
 
 
 jobs:
@@ -46,7 +46,6 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./witness-service
-          file: ./witness-service/Dockerfile.witness
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
