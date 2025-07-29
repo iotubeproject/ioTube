@@ -102,7 +102,7 @@ func NewTokenCashierOnSolana(
 					continue
 				}
 				for _, tx := range resp.Result.Transactions {
-					if tx.Meta.Err != nil {
+					if tx.Meta != nil && tx.Meta.Err != nil {
 						continue
 					}
 					txMap := tx.Transaction.(map[string]interface{})
