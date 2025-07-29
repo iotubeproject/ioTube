@@ -393,6 +393,10 @@ func (tc *tokenCashierBase) fetchTransfers(count uint16) error {
 		foundTransfers[t] = struct{}{}
 	}
 	for _, tx := range response.Txs {
+		if len(tx.TxHash) != 64 {
+			log.Printf("invalid tx hash %s, skipping\n", tx.TxHash)
+			continue
+		}
 		hash := hex.EncodeToString(tx.TxHash)
 		if _, exist := foundTransfers[hash]; exist {
 			continue
