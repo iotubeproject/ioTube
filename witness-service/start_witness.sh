@@ -161,8 +161,8 @@ function grantPrivileges() {
  }
 
 function buildService() {
-    docker pull ghcr.io/iotubeproject/iotube:latest || exit 2
-    docker tag ghcr.io/iotubeproject/iotube:latest witness:latest
+    docker pull ghcr.io/iotubeproject/iotube-witness:latest || exit 2
+    docker tag ghcr.io/iotubeproject/iotube-witness:latest witness:latest
 }
 
 function startup() {
