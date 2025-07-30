@@ -394,7 +394,7 @@ func (tc *tokenCashierBase) fetchTransfers(count uint16) error {
 	}
 	for _, tx := range response.Txs {
 		if len(tx.TxHash) != 64 {
-			log.Printf("invalid tx hash %s, skipping\n", tx.TxHash)
+			log.Printf("invalid tx hash %x, skipping\n", tx.TxHash)
 			continue
 		}
 		hash := hex.EncodeToString(tx.TxHash)
