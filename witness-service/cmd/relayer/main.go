@@ -298,7 +298,6 @@ func main() {
 			log.Fatalf("failed to create relay service: %v\n", err)
 		}
 		solanaService.SetProcessor(solProcessor)
-		log.Fatalf("iotex chain is not supported anymore, please switch to iotex-e\n")
 		if cfg.AlwaysReset {
 			solanaService.SetAlwaysRetry()
 		}
