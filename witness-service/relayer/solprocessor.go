@@ -31,14 +31,14 @@ import (
 )
 
 const (
-	_limitSize                               = 64
-	_solanaRPCMaxQPS                         = 10
-	DEFAULT_COMPUTE_UNIT_PRICE_MICROLAMPORTS = 160_000
+	_limitSize       = 64
+	_solanaRPCMaxQPS = 10
 )
 
 var (
-	rl          = ratelimit.New(_solanaRPCMaxQPS)
-	lruCache, _ = lru.New[[32]byte, soltypes.AddressLookupTableAccount](1024)
+	rl                  = ratelimit.New(_solanaRPCMaxQPS)
+	lruCache, _         = lru.New[[32]byte, soltypes.AddressLookupTableAccount](1024)
+	minComputeUnitPrice = uint64(0)
 )
 
 type (
@@ -63,6 +63,7 @@ type (
 
 func NewSolProcessor(client *client.Client, interval time.Duration,
 	privateKey *soltypes.Account, voteCfg VoteConfig, solRecorder *SolRecorder, qpslimit uint32,
+	minComputeUnitPriceParam uint64,
 ) *SolProcessor {
 	s := &SolProcessor{
 		client:      client,
@@ -78,6 +79,7 @@ func NewSolProcessor(client *client.Client, interval time.Duration,
 	if qpslimit > 0 {
 		rl = ratelimit.New(int(qpslimit))
 	}
+	minComputeUnitPrice = minComputeUnitPriceParam
 	return s
 }
 
@@ -769,8 +771,8 @@ func (s *SolProcessor) getPriorityFee(instructions []soltypes.Instruction) (uint
 	}
 
 	ret := medianFee(fees) + 1
-	if ret < DEFAULT_COMPUTE_UNIT_PRICE_MICROLAMPORTS {
-		return DEFAULT_COMPUTE_UNIT_PRICE_MICROLAMPORTS, nil
+	if ret < minComputeUnitPrice {
+		return minComputeUnitPrice, nil
 	}
 	return ret, nil
 }
