@@ -84,6 +84,7 @@ type (
 			ProposalTransactionAddr string  `json:"proposalTransactionAddr" yaml:"proposalTransactionAddr"`
 			Threshold               float64 `json:"threshold" yaml:"threshold"`
 			QPSLimit                uint32  `json:"qpsLimit" yaml:"qpsLimit"`
+			MinComputeUnitPrice     uint64  `json:"minComputeUnitPrice" yaml:"minComputeUnitPrice"`
 		} `json:"solanaConfig" yaml:"solanaConfig"`
 	}
 )
@@ -290,6 +291,7 @@ func main() {
 			},
 			solRecorder,
 			cfg.SolanaConfig.QPSLimit,
+			cfg.SolanaConfig.MinComputeUnitPrice,
 		)
 		solanaService, err := relayer.NewServiceOnSolana(solRecorder, transferValidatorAddr)
 		if err != nil {
