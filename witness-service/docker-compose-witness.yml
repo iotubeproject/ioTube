@@ -14,7 +14,7 @@ services:
 
   iotex-payload-witness:
     container_name: iotex-payload-witness
-    image: witness:latest
+    image: ghcr.io/iotubeproject/witness:latest
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-iotex-payload.yaml:/etc/iotube-witness/witness-config-iotex-payload.yaml:ro
@@ -27,7 +27,7 @@ services:
 
   ethereum-payload-witness:
     container_name: ethereum-payload-witness
-    image: witness:latest
+    image: ghcr.io/iotubeproject/witness:latest
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-ethereum-payload.yaml:/etc/iotube-witness/witness-config-ethereum-payload.yaml:ro
@@ -40,7 +40,7 @@ services:
 
 #  iotex-testnet-witness:
 #    container_name: iotex-testnet-witness
-#    image: witness:latest
+#    image: ghcr.io/iotubeproject/witness:latest
 #    restart: on-failure
 #    volumes:
 #      - $IOTEX_WITNESS/etc/witness-config-iotex-testnet.yaml:/etc/iotube-witness/witness-config-iotex-testnet.yaml:ro
@@ -53,7 +53,7 @@ services:
 
 #  sepolia-witness:
 #    container_name: sepolia-witness
-#    image: witness:latest
+#    image: ghcr.io/iotubeproject/witness:latest
 #    restart: on-failure
 #    volumes:
 #      - $IOTEX_WITNESS/etc/witness-config-sepolia.yaml:/etc/iotube-witness/witness-config-sepolia.yaml:ro
@@ -66,7 +66,7 @@ services:
 
   bsc-payload-witness:
     container_name: bsc-payload-witness
-    image: witness:latest
+    image: ghcr.io/iotubeproject/witness:latest
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-bsc-payload.yaml:/etc/iotube-witness/witness-config-bsc-payload.yaml:ro
@@ -79,7 +79,7 @@ services:
 
   matic-payload-witness:
     container_name: matic-payload-witness
-    image: witness:latest
+    image: ghcr.io/iotubeproject/witness:latest
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-matic-payload.yaml:/etc/iotube-witness/witness-config-matic-payload.yaml:ro
@@ -92,7 +92,7 @@ services:
 
   solana-witness:
     container_name: solana-witness
-    image: witness:latest
+    image: ghcr.io/iotubeproject/witness:latest
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-solana.yaml:/etc/iotube-witness/witness-config-solana.yaml:ro
@@ -105,7 +105,7 @@ services:
   
   iotex-solana-witness:
     container_name: iotex-solana-witness
-    image: witness:latest
+    image: ghcr.io/iotubeproject/witness:latest
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-iotex-solana.yaml:/etc/iotube-witness/witness-config-iotex-solana.yaml:ro
