@@ -151,7 +151,55 @@ func main() {
 	support1559 := true
 	var service services.RelayServiceServer
 	switch cfg.Chain {
-	case "iotex-e", "iotex", "iotex-testnet", "ethereum", "heco", "bsc", "matic", "polis", "sepolia":
+	case "solana":
+		transferValidatorAddr, err := util.NewSOLAddressDecoder().DecodeString(cfg.SolanaConfig.ProposalAddr)
+		if err != nil {
+			log.Fatalf("failed to decode validator address %v", err)
+		}
+
+		solRecorder := relayer.NewSolRecorder(
+			storeFactory.NewStore(cfg.Database),
+			cfg.TransferTableName,
+			cfg.WitnessTableName,
+			util.NewETHAddressDecoder(),
+			util.NewSOLAddressDecoder(),
+		)
+
+		privateKey, err := soltypes.AccountFromHex(cfg.PrivateKey)
+		if err != nil {
+			log.Fatalf("failed to decode private key %v", err)
+		}
+		solProcessor := relayer.NewSolProcessor(
+			client.NewClient(cfg.ClientURL),
+			cfg.Interval,
+			&privateKey,
+			relayer.VoteConfig{
+				ProgramID:               cfg.SolanaConfig.ValidatorAddress,
+				RealmAddr:               cfg.SolanaConfig.RealmAddr,
+				GoverningTokenMintAddr:  cfg.SolanaConfig.GoverningTokenMintAddr,
+				GovernanceAddr:          cfg.SolanaConfig.GovernanceAddr,
+				ProposalAddr:            cfg.SolanaConfig.ProposalAddr,
+				ProposalTransactionAddr: cfg.SolanaConfig.ProposalTransactionAddr,
+				Threshold:               cfg.SolanaConfig.Threshold,
+			},
+			solRecorder,
+			cfg.SolanaConfig.QPSLimit,
+			cfg.SolanaConfig.MinComputeUnitPrice,
+		)
+		solanaService, err := relayer.NewServiceOnSolana(solRecorder, transferValidatorAddr)
+		if err != nil {
+			log.Fatalf("failed to create relay service: %v\n", err)
+		}
+		solanaService.SetProcessor(solProcessor)
+		if cfg.AlwaysReset {
+			solanaService.SetAlwaysRetry()
+		}
+		if err := solanaService.Start(context.Background()); err != nil {
+			log.Fatalf("failed to start solana relay service: %v\n", err)
+		}
+		defer solanaService.Stop(context.Background())
+		service = solanaService
+	default: // "iotex-e", "iotex", "iotex-testnet", "ethereum", "heco", "bsc", "matic", "polis", "sepolia":
 		if cfg.ClientURL == "" {
 			break
 		}
@@ -258,56 +306,6 @@ func main() {
 		}
 		defer ethService.Stop(context.Background())
 		service = ethService
-	case "solana":
-		transferValidatorAddr, err := util.NewSOLAddressDecoder().DecodeString(cfg.SolanaConfig.ProposalAddr)
-		if err != nil {
-			log.Fatalf("failed to decode validator address %v", err)
-		}
-
-		solRecorder := relayer.NewSolRecorder(
-			storeFactory.NewStore(cfg.Database),
-			cfg.TransferTableName,
-			cfg.WitnessTableName,
-			util.NewETHAddressDecoder(),
-			util.NewSOLAddressDecoder(),
-		)
-
-		privateKey, err := soltypes.AccountFromHex(cfg.PrivateKey)
-		if err != nil {
-			log.Fatalf("failed to decode private key %v", err)
-		}
-		solProcessor := relayer.NewSolProcessor(
-			client.NewClient(cfg.ClientURL),
-			cfg.Interval,
-			&privateKey,
-			relayer.VoteConfig{
-				ProgramID:               cfg.SolanaConfig.ValidatorAddress,
-				RealmAddr:               cfg.SolanaConfig.RealmAddr,
-				GoverningTokenMintAddr:  cfg.SolanaConfig.GoverningTokenMintAddr,
-				GovernanceAddr:          cfg.SolanaConfig.GovernanceAddr,
-				ProposalAddr:            cfg.SolanaConfig.ProposalAddr,
-				ProposalTransactionAddr: cfg.SolanaConfig.ProposalTransactionAddr,
-				Threshold:               cfg.SolanaConfig.Threshold,
-			},
-			solRecorder,
-			cfg.SolanaConfig.QPSLimit,
-			cfg.SolanaConfig.MinComputeUnitPrice,
-		)
-		solanaService, err := relayer.NewServiceOnSolana(solRecorder, transferValidatorAddr)
-		if err != nil {
-			log.Fatalf("failed to create relay service: %v\n", err)
-		}
-		solanaService.SetProcessor(solProcessor)
-		if cfg.AlwaysReset {
-			solanaService.SetAlwaysRetry()
-		}
-		if err := solanaService.Start(context.Background()); err != nil {
-			log.Fatalf("failed to start solana relay service: %v\n", err)
-		}
-		defer solanaService.Stop(context.Background())
-		service = solanaService
-	default:
-		log.Fatalf("unknown chain name '%s'\n", cfg.Chain)
 	}
 
 	relayer.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort)
