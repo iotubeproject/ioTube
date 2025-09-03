@@ -1,0 +1,42 @@
+version: '2'
+
+services:
+  iotex-testnet-relayer:
+    container_name: iotex-testnet-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7101:7101
+      - 8101:8101
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-iotex-testnet.yaml:/etc/iotube-relayer/relayer-config-iotex-testnet.yaml:ro
+    command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-testnet.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${TESTNET_RELAYER_PRIVATE_KEY}
+
+  sepolia-relayer:
+    container_name: sepolia-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7100:7100
+      - 8100:8100
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-sepolia.yaml:/etc/iotube-relayer/relayer-config-sepolia.yaml:ro
+    command: relayer -config=/etc/iotube-relayer/relayer-config-sepolia.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${TESTNET_RELAYER_PRIVATE_KEY}
+
+  bsc-testnet-relayer:
+    container_name: bsc-testnet-relayer
+    image: relayer:latest
+    restart: on-failure
+    ports:
+      - 7102:7102
+      - 8102:8102
+    volumes:
+      - $IOTEX_RELAYER/etc/relayer-config-bsc-testnet.yaml:/etc/iotube-relayer/relayer-config-bsc-testnet.yaml:ro
+    command: relayer -config=/etc/iotube-relayer/relayer-config-bsc-testnet.yaml
+    environment:
+      RELAYER_PRIVATE_KEY: ${TESTNET_RELAYER_PRIVATE_KEY}
+

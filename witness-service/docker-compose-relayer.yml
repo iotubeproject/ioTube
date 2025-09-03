@@ -5,6 +5,8 @@ services:
     container_name: relayer-db
     image: mysql:8
     restart: always
+    ports:
+      - 13306:3306
     volumes:
       - $IOTEX_RELAYER/data/mysql:/var/lib/mysql:rw
     environment:
@@ -37,36 +39,6 @@ services:
     links:
       - database
     command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum-payload.yaml
-    environment:
-      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
-
-  iotex-testnet-relayer:
-    container_name: iotex-testnet-relayer
-    image: relayer:latest
-    restart: on-failure
-    ports:
-      - 7101:7101
-      - 8101:8101
-    volumes:
-      - $IOTEX_RELAYER/etc/relayer-config-iotex-testnet.yaml:/etc/iotube-relayer/relayer-config-iotex-testnet.yaml:ro
-    links:
-      - database
-    command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-testnet.yaml
-    environment:
-      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
-
-  sepolia-relayer:
-    container_name: sepolia-relayer
-    image: relayer:latest
-    restart: on-failure
-    ports:
-      - 7100:7100
-      - 8100:8100
-    volumes:
-      - $IOTEX_RELAYER/etc/relayer-config-sepolia.yaml:/etc/iotube-relayer/relayer-config-sepolia.yaml:ro
-    links:
-      - database
-    command: relayer -config=/etc/iotube-relayer/relayer-config-sepolia.yaml
     environment:
       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 

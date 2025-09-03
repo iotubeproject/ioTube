@@ -29,9 +29,9 @@ function checkDockerPermissions() {
 }
 
 function checkDockerCompose() {
-    docker-compose --version > /dev/null 2>&1
+    docker compose --version > /dev/null 2>&1
     if [ $? -eq 127 ];then
-        echo -e "$RED docker-compose command not found $NC"
+        echo -e "$RED docker compose command not found $NC"
         echo -e "Please install it first"
         exit 1
     fi
@@ -54,29 +54,35 @@ function confirmEnvironmentVariable() {
     echo -e "IOTEX_RELAYER directory: ${RED} ${IOTEX_RELAYER} ${NC}, Service relayer will copy config file into this dir."
 }
 
-function copyFile() {
-    srcFile=$1
-    tgtFile=$2
-    if [[ ! -f ${IOTEX_RELAYER}/etc/$tgtFile || $# -ge 3 && $3 == 1 ]]; then
-        echo -e "copy file ${srcFile} to ${tgtFile}"
-        cp -f $PROJECT_ABS_DIR/$srcFile ${IOTEX_RELAYER}/etc/$tgtFile
-         if [ $? -ne 0 ];then
-             echo "Get config error"
-             exit 2
-         fi
-    else
-       echo "skip copy file ${srcFile} to ${tgtFile}"
-    fi
-}
-
 function downloadConfigFile() {
-    copyFile "docker-compose-relayer.yml" "docker-compose.yml" 1
-    copyFile "configs/relayer-config-iotex-payload.yaml" "relayer-config-iotex-payload.yaml" 1
-    copyFile "configs/relayer-config-ethereum-payload.yaml" "relayer-config-ethereum-payload.yaml" 1
-    copyFile "configs/relayer-config-bsc-payload.yaml" "relayer-config-bsc-payload.yaml" 1
-    copyFile "configs/relayer-config-matic-payload.yaml" "relayer-config-matic-payload.yaml" 1
-    copyFile "configs/relayer-config-solana.yaml" "relayer-config-solana.yaml" 1
-    copyFile "configs/relayer-config-iotex-solana.yaml" "relayer-config-iotex-solana.yaml" 1
+    if [[ ! -f ${IOTEX_RELAYER}/etc/docker-compose.testnet.yml ]];then
+        cp -f $PROJECT_ABS_DIR/docker-compose-testnet-relayer.yml ${IOTEX_RELAYER}/etc/docker-compose.testnet.yml
+        if [ $? -ne 0 ];then
+            echo "Get docker-compose config error"
+            exit 2
+        fi
+    fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-iotex-testnet.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-iotex-testnet.yaml ${IOTEX_RELAYER}/etc/relayer-config-iotex-testnet.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-sepolia.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-sepolia.yaml ${IOTEX_RELAYER}/etc/relayer-config-sepolia.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
+    if [[ ! -f ${IOTEX_RELAYER}/etc/relayer-config-bsc-testnet.yaml ]];then
+        cp -f $PROJECT_ABS_DIR/configs/relayer-config-bsc-testnet.yaml ${IOTEX_RELAYER}/etc/relayer-config-bsc-testnet.yaml
+        if [ $? -ne 0 ];then
+            echo "Get config error"
+            exit 2
+        fi
+    fi
     [[ -f ${IOTEX_RELAYER}/etc/.env ]] || (echo "IOTEX_RELAYER=$IOTEX_RELAYER" > ${IOTEX_RELAYER}/etc/.env;echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${IOTEX_RELAYER}/etc/.env)
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_RELAYER}/etc/crontab
     cp -f $PROJECT_ABS_DIR/backup_relayer ${IOTEX_RELAYER}/etc/backup
@@ -101,7 +107,7 @@ function grantPrivileges() {
         retryTimes=0
         maxRetryTime=10
         pushd $IOTEX_RELAYER/etc
-        docker-compose up -d database
+        docker compose up -d database
     
         echo -e "$YELLOW Waiting for the mysqld daemon in the relayer-db container to successful... $NC"
         while true;do
@@ -133,7 +139,7 @@ function buildService() {
 function startup() {
     echo -e "$YELLOW Start relayer and it's database. $NC"
     pushd $IOTEX_RELAYER/etc
-    docker-compose up -d
+    docker compose up -d -f docker-compose.testnet.yml
     if [ $? -eq 0 ];then
         echo -e "${YELLOW} Server port on 7000 & 7001. ${NC}"
     fi
@@ -143,7 +149,7 @@ function startup() {
 function cleanAll() {
     echo -e "$YELLOW Starting clean all containers... $NC"
     pushd $IOTEX_RELAYER/etc
-    docker-compose rm -s -f -v
+    docker compose rm -s -f -v
     popd
     echo -e "${YELLOW} Done. ${NC}"
 

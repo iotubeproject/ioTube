@@ -38,32 +38,6 @@ services:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
       RELAYER_URL: ${RELAYER_URL}
 
-#  iotex-testnet-witness:
-#    container_name: iotex-testnet-witness
-#    image: witness:latest
-#    restart: on-failure
-#    volumes:
-#      - $IOTEX_WITNESS/etc/witness-config-iotex-testnet.yaml:/etc/iotube-witness/witness-config-iotex-testnet.yaml:ro
-#      - $IOTEX_WITNESS/etc/witness-config-iotex-testnet.secret.yaml:/etc/iotube-witness/witness-config-iotex-testnet.secret.yaml:ro
-#    network_mode: host
-#    command: witness -config=/etc/iotube-witness/witness-config-iotex-testnet.yaml -secret=/etc/iotube-witness/witness-config-iotex-testnet.secret.yaml
-#    environment:
-#      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-#      RELAYER_URL: ${RELAYER_URL}
-
-#  sepolia-witness:
-#    container_name: sepolia-witness
-#    image: witness:latest
-#    restart: on-failure
-#    volumes:
-#      - $IOTEX_WITNESS/etc/witness-config-sepolia.yaml:/etc/iotube-witness/witness-config-sepolia.yaml:ro
-#      - $IOTEX_WITNESS/etc/witness-config-sepolia.secret.yaml:/etc/iotube-witness/witness-config-sepolia.secret.yaml:ro
-#    network_mode: host
-#    command: witness -config=/etc/iotube-witness/witness-config-sepolia.yaml -secret=/etc/iotube-witness/witness-config-sepolia.secret.yaml
-#    environment:
-#      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-#      RELAYER_URL: ${RELAYER_URL}
-
   bsc-payload-witness:
     container_name: bsc-payload-witness
     image: witness:latest
