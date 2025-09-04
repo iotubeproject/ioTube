@@ -129,8 +129,7 @@ message WitnessSubmissionResponse {
 }
 
 message RetryRequest {
-    bytes cashier = 1;
-    uint64 height = 2;
+    uint64 height = 1;
 }
 
 message RetryResponse {
