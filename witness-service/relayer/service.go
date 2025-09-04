@@ -35,6 +35,7 @@ type (
 		validators      map[string]TransferValidator
 		unwrappers      map[string]map[string]common.Address
 		checkers        map[string]*FeeChecker
+		retryHeights    map[string]map[uint64]time.Time
 		bonusSender     BonusSender
 		processor       dispatcher.Runner
 		recorder        *Recorder
@@ -78,6 +79,7 @@ func NewServiceOnEthereum(
 		cache:           cache,
 		nonceTooLow:     map[common.Hash]uint64{},
 		destAddrDecoder: util.NewETHAddressDecoder(),
+		retryHeights:    map[string]map[uint64]time.Time{},
 	}
 	processor, err := dispatcher.NewRunner(interval, s.process)
 	if err != nil {
@@ -128,8 +130,7 @@ func (s *Service) submit(w *types.Witness) ([]byte, error) {
 	}
 	validator, ok := s.validators[cashier.String()]
 	if !ok {
-		log.Printf("no validator is found for %x\n", cashier)
-		return nil, errors.New("no validator is found")
+		return nil, errors.Errorf("no validator is found for %x", cashier)
 	}
 	transfer.GenID(validator.Address())
 	var witness *Witness
@@ -210,10 +211,27 @@ func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeigh
 	if err != nil {
 		return nil, err
 	}
-
+	toRetry, ok := s.retryHeights[cashier.String()]
+	if ok {
+		for height, ts := range toRetry {
+			heights = append(heights, height)
+			if ts.Add(10 * time.Minute).Before(time.Now()) {
+				delete(toRetry, height)
+			}
+		}
+	}
 	return &services.StaleHeightsResponse{
 		Heights: heights,
 	}, nil
+}
+
+func (s *Service) Retry(ctx context.Context, request *services.RetryRequest) (*services.RetryResponse, error) {
+	cashier, err := DecodeSourceAddrBytes(request.Cashier)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode cashier")
+	}
+	s.retryHeights[cashier.String()][request.Height] = time.Now()
+	return &services.RetryResponse{Success: true}, nil
 }
 
 func (s *Service) Lookup(ctx context.Context, request *services.LookupRequest) (*services.LookupResponse, error) {

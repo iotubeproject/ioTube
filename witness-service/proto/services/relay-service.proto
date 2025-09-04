@@ -26,6 +26,12 @@ service RelayService {
             body: "*"
         };
     };
+    rpc Retry(RetryRequest) returns (RetryResponse) {
+        option (google.api.http) = {
+            post: "/retry"
+            body: "*"
+        };
+    };
     rpc Lookup(LookupRequest) returns (LookupResponse) {
         option (google.api.http) = {
             post: "/lookup"
@@ -120,6 +126,15 @@ message ResetTransferResponse {
 message WitnessSubmissionResponse {
     bytes id = 1;
     bool success = 2;
+}
+
+message RetryRequest {
+    bytes cashier = 1;
+    uint64 height = 2;
+}
+
+message RetryResponse {
+    bool success = 1;
 }
 
 message SubmitNewTXRequest {
