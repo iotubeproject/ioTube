@@ -949,7 +949,7 @@ func (recorder *Recorder) ResetTransferInProcess(id common.Hash) error {
 
 // ResetFailedTransfer marks a record as new
 func (recorder *Recorder) ResetFailedTransfer(id common.Hash) error {
-	return recorder.reset(id, ValidationInProcess)
+	return recorder.reset(id, ValidationFailed)
 }
 
 func (recorder *Recorder) reset(id common.Hash, status ValidationStatusType) error {
