@@ -858,7 +858,19 @@ func (recorder *Recorder) MarkAsSettled(id common.Hash) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as settled")
 	}
-
+	if err := recorder.validateResult(result, 1); err == nil {
+		return nil
+	}
+	// Try again in case the transaction is in processing state
+	result, err = recorder.store.DB().Exec(
+		recorder.updateStatusQuery,
+		TransferSettled,
+		id.Hex(),
+		ValidationInProcess,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as settled")
+	}
 	return recorder.validateResult(result, 1)
 }
 

@@ -625,6 +625,7 @@ func (s *Service) submitTransfers() error {
 		}
 		for _, transfer := range newTransfers {
 			if err := s.submitTransfer(transfer, validator); err != nil {
+				log.Printf("failed to submit transfer %s, %+v\n", transfer.id.String(), err)
 				util.Alert("failed to submit transfer" + err.Error())
 			}
 			time.Sleep(5 * time.Second)
