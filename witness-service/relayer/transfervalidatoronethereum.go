@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
@@ -462,6 +463,9 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 	default:
 		if strings.Contains(err.Error(), "could not replace existing tx") {
 			return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+		}
+		if strings.Contains(err.Error(), "transfer has been settled") {
+			return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(vm.ErrExecutionReverted, err.Error())
 		}
 		return common.Hash{}, common.Address{}, 0, nil, err
 	}
