@@ -226,12 +226,14 @@ func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeigh
 }
 
 func (s *Service) Retry(ctx context.Context, request *services.RetryRequest) (*services.RetryResponse, error) {
-	cashier, err := DecodeSourceAddrBytes(request.Cashier)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode cashier")
-	}
-	s.retryHeights[cashier.String()][request.Height] = time.Now()
-	return &services.RetryResponse{Success: true}, nil
+	// TODO: enable retry when needed
+	// cashier, err := DecodeSourceAddrBytes(request.Cashier)
+	// if err != nil {
+	// 	return nil, errors.Wrap(err, "failed to decode cashier")
+	// }
+	// s.retryHeights[cashier.String()][request.Height] = time.Now()
+	// return &services.RetryResponse{Success: true}, nil
+	return nil, errors.New("cashier isn't provided in the request")
 }
 
 func (s *Service) Lookup(ctx context.Context, request *services.LookupRequest) (*services.LookupResponse, error) {
