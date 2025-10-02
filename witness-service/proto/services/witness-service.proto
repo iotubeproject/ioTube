@@ -1,3 +1,4 @@
+// the grpc server is temporarily disabled in witness
 syntax = "proto3";
 
 package services;

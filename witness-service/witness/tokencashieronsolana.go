@@ -146,6 +146,7 @@ func NewTokenCashierOnSolana(
 			}
 			return tsfs, nil
 		},
+		IDHasherForTransferInEVM,
 		signHandler,
 		func(util.Address, *big.Int) bool {
 			return true

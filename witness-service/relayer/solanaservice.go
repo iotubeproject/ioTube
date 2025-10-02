@@ -26,14 +26,14 @@ type (
 		alwaysReset           bool
 		nonceTooLow           map[common.Hash]uint64
 		// TODO: remove abstractRecorder once API is separated from service
-		abstractRecorder AbstractRecorder
-		destAddrDecoder  util.AddressDecoder
+		recorder        *SolRecorder
+		destAddrDecoder util.AddressDecoder
 	}
 )
 
 // NewServiceOnSolana creates a new relay service on Solana
 func NewServiceOnSolana(
-	abstractRecorder AbstractRecorder,
+	recorder *SolRecorder,
 	validatorContractAddr util.Address,
 ) (*SolanaService, error) {
 	cache, err := lru.New(100)
@@ -42,7 +42,7 @@ func NewServiceOnSolana(
 	}
 	s := &SolanaService{
 		transferValidatorAddr: validatorContractAddr,
-		abstractRecorder:      abstractRecorder,
+		recorder:              recorder,
 		cache:                 cache,
 		destAddrDecoder:       util.NewSOLAddressDecoder(),
 	}
@@ -62,7 +62,7 @@ func (s *SolanaService) SetProcessor(p dispatcher.Runner) {
 
 // Start starts the service
 func (s *SolanaService) Start(ctx context.Context) error {
-	if err := s.abstractRecorder.Start(ctx); err != nil {
+	if err := s.recorder.Start(ctx); err != nil {
 		return errors.Wrap(err, "failed to start recorder")
 	}
 	return s.processor.Start()
@@ -73,7 +73,7 @@ func (s *SolanaService) Stop(ctx context.Context) error {
 	if err := s.processor.Start(); err != nil {
 		return errors.Wrap(err, "failed to stop processor")
 	}
-	return s.abstractRecorder.Stop(ctx)
+	return s.recorder.Stop(ctx)
 }
 
 // Submit accepts a submission of witness
@@ -87,7 +87,7 @@ func (s *SolanaService) Submit(ctx context.Context, w *types.Witness) (*services
 	if err != nil {
 		return nil, err
 	}
-	transferID, err := s.abstractRecorder.AddWitness(s.transferValidatorAddr, transfer, witness)
+	transferID, err := s.recorder.AddWitness(s.transferValidatorAddr, transfer, witness)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (s *SolanaService) Submit(ctx context.Context, w *types.Witness) (*services
 
 // Reset resets a transfer status from failed to new
 func (s *SolanaService) Reset(ctx context.Context, request *services.ResetTransferRequest) (*services.ResetTransferResponse, error) {
-	if err := s.abstractRecorder.ResetFailedTransfer(common.BytesToHash(request.Id)); err != nil {
+	if err := s.recorder.ResetFailedTransfer(common.BytesToHash(request.Id)); err != nil {
 		return nil, err
 	}
 	return &services.ResetTransferResponse{Success: true}, nil
@@ -111,7 +111,7 @@ func (s *SolanaService) StaleHeights(ctx context.Context, request *services.Stal
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode cashier")
 	}
-	heights, err := s.abstractRecorder.HeightsOfStaleTransfers(cashier)
+	heights, err := s.recorder.HeightsOfStaleTransfers(cashier)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (s *SolanaService) StaleHeights(ctx context.Context, request *services.Stal
 }
 
 func (s *SolanaService) Lookup(ctx context.Context, request *services.LookupRequest) (*services.LookupResponse, error) {
-	transfers, err := s.abstractRecorder.TransfersBySourceTxHash(common.BytesToHash(request.SourceTxHash))
+	transfers, err := s.recorder.TransfersBySourceTxHash(common.BytesToHash(request.SourceTxHash))
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (s *SolanaService) List(ctx context.Context, request *services.ListRequest)
 	case services.Status_FAILED:
 		queryOpts = append(queryOpts, StatusQueryOption(ValidationFailed, ValidationRejected, InsufficientFeeRejected))
 	}
-	count, err := s.abstractRecorder.Count(queryOpts...)
+	count, err := s.recorder.Count(queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (s *SolanaService) List(ctx context.Context, request *services.ListRequest)
 	if skip+first > int32(count) {
 		first = int32(count) - skip
 	}
-	transfers, err := s.abstractRecorder.Transfers(uint32(skip), uint8(first), DESC, queryOpts...)
+	transfers, err := s.recorder.Transfers(uint32(skip), uint8(first), DESC, queryOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (s *SolanaService) List(ctx context.Context, request *services.ListRequest)
 	for _, transfer := range transfers {
 		ids = append(ids, transfer.id)
 	}
-	witnesses, err := s.abstractRecorder.Witnesses(ids...)
+	witnesses, err := s.recorder.Witnesses(ids...)
 	if err != nil {
 		return nil, err
 	}
@@ -292,11 +292,11 @@ func (s *SolanaService) assembleCheckResponse(transfer *Transfer, witnesses map[
 // Check checks the status of a transfer
 func (s *SolanaService) Check(ctx context.Context, request *services.CheckRequest) (*services.CheckResponse, error) {
 	id := common.BytesToHash(request.Id)
-	transfer, err := s.abstractRecorder.Transfer(id)
+	transfer, err := s.recorder.Transfer(id)
 	if err != nil {
 		return nil, err
 	}
-	witnesses, err := s.abstractRecorder.Witnesses(id)
+	witnesses, err := s.recorder.Witnesses(id)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func (s *SolanaService) Check(ctx context.Context, request *services.CheckReques
 
 // SubmitNewTX submits a new tx to be witnessed
 func (s *SolanaService) SubmitNewTX(ctx context.Context, request *services.SubmitNewTXRequest) (*services.SubmitNewTXResponse, error) {
-	err := s.abstractRecorder.AddNewTX(request.Height, request.TxHash)
+	err := s.recorder.AddNewTX(request.Height, request.TxHash)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func (s *SolanaService) SubmitNewTX(ctx context.Context, request *services.Submi
 
 // ListNewTX lists txs to be witnessed
 func (s *SolanaService) ListNewTX(ctx context.Context, request *services.ListNewTXRequest) (*services.ListNewTXResponse, error) {
-	heights, txHashes, err := s.abstractRecorder.NewTXs(request.Count)
+	heights, txHashes, err := s.recorder.NewTXs(request.Count)
 	if err != nil {
 		return nil, err
 	}

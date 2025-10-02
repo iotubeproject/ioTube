@@ -11,43 +11,37 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"log"
-	"regexp"
-	"strconv"
-	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
-	"github.com/iotexproject/ioTube/witness-service/grpc/services"
-	"github.com/iotexproject/ioTube/witness-service/util/instruction"
 )
 
 type service struct {
-	services.UnimplementedWitnessServiceServer
-	cashiers        []TokenCashier
-	processor       dispatcher.Runner
-	batchSize       uint16
-	processInterval time.Duration
-	disableSubmit   bool
+	cashiers          []TokenCashier
+	witnessCommittees []WitnessCommittee
+	processor         dispatcher.Runner
+	batchSize         uint16
+	processInterval   time.Duration
+	disableSubmit     bool
 }
 
 // NewService creates a new witness service
 func NewService(
 	cashiers []TokenCashier,
+	witnessCommittees []WitnessCommittee,
 	batchSize uint16,
 	processInterval time.Duration,
 	disableSubmit bool,
 ) (*service, error) {
 	s := &service{
-		cashiers:        cashiers,
-		processInterval: processInterval,
-		batchSize:       batchSize,
-		disableSubmit:   disableSubmit,
+		cashiers:          cashiers,
+		witnessCommittees: witnessCommittees,
+		processInterval:   processInterval,
+		batchSize:         batchSize,
+		disableSubmit:     disableSubmit,
 	}
 	var err error
 	if s.processor, err = dispatcher.NewRunner(processInterval, s.process); err != nil {
@@ -63,12 +57,22 @@ func (s *service) Start(ctx context.Context) error {
 			return errors.Wrap(err, "failed to start recorder")
 		}
 	}
+	for _, committee := range s.witnessCommittees {
+		if err := committee.Start(ctx); err != nil {
+			return errors.Wrap(err, "failed to start committee")
+		}
+	}
 	return s.processor.Start()
 }
 
 func (s *service) Stop(ctx context.Context) error {
 	if err := s.processor.Close(); err != nil {
 		return err
+	}
+	for _, committee := range s.witnessCommittees {
+		if err := committee.Stop(ctx); err != nil {
+			return errors.Wrap(err, "failed to stop committee")
+		}
 	}
 	for _, cashier := range s.cashiers {
 		if err := cashier.Stop(ctx); err != nil {
@@ -100,6 +104,24 @@ func (s *service) process() error {
 			continue
 		}
 	}
+
+	for _, committee := range s.witnessCommittees {
+		if err := committee.PullWitnessCandidates(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to pull witness candidates for %s", committee.ID()))
+			continue
+		}
+		if s.disableSubmit {
+			continue
+		}
+		if err := committee.SubmitWitnessCandidates(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to submit witness candidates for %s", committee.ID()))
+			continue
+		}
+		if err := committee.CheckWitnessCandidates(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to check witness candidates for %s", committee.ID()))
+			continue
+		}
+	}
 	return nil
 }
 
@@ -112,102 +134,33 @@ func (s *service) ProcessOneBlock(height uint64) error {
 	return nil
 }
 
-func (s *service) FetchByHeights(ctx context.Context, request *services.FetchRequest) (*emptypb.Empty, error) {
-	re := regexp.MustCompile(`^([0-9]*)-([0-9]*)$`)
-	var start, end uint64
-	var err error
-	for _, hstr := range strings.Split(request.Heights, ",") {
-		log.Printf("Processing %s\n", hstr)
-		if re.MatchString(hstr) {
-			matches := re.FindStringSubmatch(hstr)
-			start, err = strconv.ParseUint(matches[1], 10, 64)
-			if err != nil {
-				return nil, errors.Wrapf(err, "invalid start in %s", hstr)
-			}
-			end, err = strconv.ParseUint(matches[2], 10, 64)
-			if err != nil {
-				return nil, errors.Wrapf(err, "invalid end in %s", hstr)
-			}
-		} else {
-			start, err = strconv.ParseUint(hstr, 10, 64)
-			if err != nil {
-				return nil, errors.Wrapf(err, "invalid height %s", hstr)
-			}
-			end = start
-		}
-		for height := start; height <= end; height++ {
-			if err := s.ProcessOneBlock(height); err != nil {
-				return nil, errors.Wrapf(err, "failed to process block %d", height)
-			}
-		}
-	}
-	return nil, nil
-}
-
-func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*services.QueryResponse, error) {
-	id := common.BytesToHash(request.Id)
-
-	var tx AbstractTransfer
-	var e error
-	for _, c := range s.cashiers {
-		tx, e = c.GetRecorder().Transfer(id)
-		if e == nil {
-			break
-		}
-	}
-
-	if tx == nil {
-		return &services.QueryResponse{
-			Transfer: nil,
-		}, nil
-	}
-	return &services.QueryResponse{
-		Transfer: tx.ToTypesTransfer(),
-	}, nil
-}
-
 func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
-	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
-		id := crypto.Keccak256Hash(
-			validatorContractAddr,
-			transfer.Cashier().Bytes(),
-			transfer.CoToken().Bytes(),
-			math.U256Bytes(transfer.Index()),
-			transfer.Sender().Bytes(),
-			transfer.Recipient().Bytes(),
-			math.U256Bytes(transfer.Amount()),
-			transfer.Payload(),
-		)
+	return func(dataHash []byte) ([]byte, []byte, error) {
 		if privateKey == nil {
-			return id, nil, nil, nil
+			return nil, nil, nil
 		}
-		signature, err := crypto.Sign(id.Bytes(), privateKey)
+		signature, err := crypto.Sign(dataHash, privateKey)
 
-		return id, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), signature, err
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// adjust v value
+		if signature[64] < 27 {
+			signature[64] += 27
+		}
+
+		return crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), signature, nil
 	}
 }
 
 func NewEd25519SignHandler(privateKey *ed25519.PrivateKey) SignHandler {
-	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
-		data, err := instruction.SerializePayload(
-			validatorContractAddr,
-			transfer.Cashier().Bytes(),
-			transfer.CoToken().Bytes(),
-			transfer.Index().Uint64(),
-			transfer.Sender().String(),
-			transfer.Recipient().Bytes(),
-			transfer.Amount().Uint64(),
-			transfer.Payload(),
-		)
-		if err != nil {
-			return common.Hash{}, nil, nil, err
-		}
-		id := crypto.Keccak256Hash(data)
+	return func(dataHash []byte) ([]byte, []byte, error) {
 		if privateKey == nil {
-			return id, nil, nil, nil
+			return nil, nil, nil
 		}
-		signature := ed25519.Sign(*privateKey, id[:])
+		signature := ed25519.Sign(*privateKey, dataHash)
 
-		return id, privateKey.Public().(ed25519.PublicKey), signature, nil
+		return privateKey.Public().(ed25519.PublicKey), signature, nil
 	}
 }
