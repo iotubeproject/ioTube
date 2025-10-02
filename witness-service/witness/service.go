@@ -17,14 +17,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
-	"github.com/iotexproject/ioTube/witness-service/util/instruction"
 )
 
 type service struct {
@@ -187,47 +185,23 @@ func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*s
 }
 
 func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
-	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
-		id := crypto.Keccak256Hash(
-			validatorContractAddr,
-			transfer.Cashier().Bytes(),
-			transfer.CoToken().Bytes(),
-			math.U256Bytes(transfer.Index()),
-			transfer.Sender().Bytes(),
-			transfer.Recipient().Bytes(),
-			math.U256Bytes(transfer.Amount()),
-			transfer.Payload(),
-		)
+	return func(dataHash []byte) ([]byte, []byte, error) {
 		if privateKey == nil {
-			return id, nil, nil, nil
+			return nil, nil, nil
 		}
-		signature, err := crypto.Sign(id.Bytes(), privateKey)
+		signature, err := crypto.Sign(dataHash, privateKey)
 
-		return id, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), signature, err
+		return crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), signature, err
 	}
 }
 
 func NewEd25519SignHandler(privateKey *ed25519.PrivateKey) SignHandler {
-	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
-		data, err := instruction.SerializePayload(
-			validatorContractAddr,
-			transfer.Cashier().Bytes(),
-			transfer.CoToken().Bytes(),
-			transfer.Index().Uint64(),
-			transfer.Sender().String(),
-			transfer.Recipient().Bytes(),
-			transfer.Amount().Uint64(),
-			transfer.Payload(),
-		)
-		if err != nil {
-			return common.Hash{}, nil, nil, err
-		}
-		id := crypto.Keccak256Hash(data)
+	return func(dataHash []byte) ([]byte, []byte, error) {
 		if privateKey == nil {
-			return id, nil, nil, nil
+			return nil, nil, nil
 		}
-		signature := ed25519.Sign(*privateKey, id[:])
+		signature := ed25519.Sign(*privateKey, dataHash)
 
-		return id, privateKey.Public().(ed25519.PublicKey), signature, nil
+		return privateKey.Public().(ed25519.PublicKey), signature, nil
 	}
 }

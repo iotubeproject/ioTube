@@ -253,6 +253,14 @@ func NewTokenCashierOnEthereum(
 		}
 		pa = util.ETHAddressToAddress(previousCashierAddr)
 	}
+
+	var idHasher IDHasher
+	switch version {
+	case ToSolana:
+		idHasher = IDHasherForTransferInSVM
+	default:
+		idHasher = IDHasherForTransferInEVM
+	}
 	return newTokenCashierBase(
 		id,
 		util.ETHAddressToAddress(cashierContractAddr),
@@ -280,6 +288,7 @@ func NewTokenCashierOnEthereum(
 			return tipHeight - uint64(confirmBlockNumber), endHeight, nil
 		},
 		iter.Transfers,
+		idHasher,
 		signHandler,
 		func(_token util.Address, amountToTransfer *big.Int) bool {
 			if reverseRecorder == nil {

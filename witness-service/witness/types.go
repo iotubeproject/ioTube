@@ -99,17 +99,19 @@ type (
 
 	WitnessCandidates interface {
 		ID() []byte
+		SetID(common.Hash)
 		Committee() string
-		// SetID(common.Hash)
 		Epoch() uint64
 		PrevEpoch() uint64
 		Nominees() []util.Address
+		PrevNominees() []util.Address
 		Candidates() []util.Address
 		Status() CandidatesStatus
 		// ToTypesTransfer() *types.Transfer
 	}
 
-	SignHandler func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error)
+	IDHasher    func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, error)
+	SignHandler func(dataHash []byte) ([]byte, []byte, error)
 )
 
 const (

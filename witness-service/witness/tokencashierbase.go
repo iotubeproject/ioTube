@@ -62,6 +62,7 @@ type (
 		lastPullTimestamp      time.Time
 		calcConfirmHeight      calcConfirmHeightFunc
 		pullTransfers          pullTransfersFunc
+		idHasher               IDHasher
 		signHandler            SignHandler
 		hasEnoughBalance       hasEnoughBalanceFunc
 		start                  startStopFunc
@@ -84,6 +85,7 @@ func newTokenCashierBase(
 	startBlockHeight uint64,
 	calcConfirmHeight calcConfirmHeightFunc,
 	pullTransfers pullTransfersFunc,
+	idHasher IDHasher,
 	signHandler SignHandler,
 	hasEnoughBalance hasEnoughBalanceFunc,
 	start startStopFunc,
@@ -101,6 +103,7 @@ func newTokenCashierBase(
 		validatorContractAddr:  validatorContractAddr,
 		calcConfirmHeight:      calcConfirmHeight,
 		pullTransfers:          pullTransfers,
+		idHasher:               idHasher,
 		signHandler:            signHandler,
 		hasEnoughBalance:       hasEnoughBalance,
 		lastPullTimestamp:      time.Now(),
@@ -257,11 +260,15 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 		if !tc.hasEnoughBalance(transfer.Token(), transfer.Amount()) {
 			return errors.Errorf("not enough balance for token %s", transfer.Token())
 		}
-		id, pubkey, signature, err := tc.signHandler(transfer, tc.validatorContractAddr)
+		id, err := tc.idHasher(transfer, tc.validatorContractAddr)
 		if err != nil {
 			return err
 		}
 		transfer.SetID(id)
+		pubkey, signature, err := tc.signHandler(id.Bytes())
+		if err != nil {
+			return err
+		}
 		if signature == nil {
 			continue
 		}
