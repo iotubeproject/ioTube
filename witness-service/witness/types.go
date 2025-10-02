@@ -91,8 +91,8 @@ type (
 		Stop(ctx context.Context) error
 		AddCandidates(cand WitnessCandidates) error
 		Candidates(committee string, epoch uint64) (WitnessCandidates, error)
-		CandidatesToSubmit(string) ([]WitnessCandidates, error)
-		CandidatesToSettle(string) ([]WitnessCandidates, error)
+		CandidatesToSubmit(committee string) ([]WitnessCandidates, error)
+		CandidatesToSettle(committee string) ([]WitnessCandidates, error)
 		SettleCandidates(cand WitnessCandidates, status CandidatesStatus) error
 		ConfirmCandidates(cand WitnessCandidates) error
 	}

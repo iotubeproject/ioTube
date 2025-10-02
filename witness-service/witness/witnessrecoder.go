@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/pkg/errors"
@@ -52,10 +53,16 @@ func (recorder *witnessRecorder) Start(ctx context.Context) error {
 			"`prev_epoch` bigint(20),"+
 			"`nominees` json,"+
 			"`candidates` json,"+
+			"`prev_nominees` json,"+
 			"`status` varchar(10) NOT NULL DEFAULT '%s',"+
+			"`id` varchar(66),"+
 			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
 			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
 			"PRIMARY KEY (`committee`,`epoch`)"+
+			"KEY `committee_index` (`committee`),"+
+			"KEY `epoch_index` (`epoch`),"+
+			"KEY `status_index` (`status`),"+
+			"KEY `id_index` (`id`),"+
 			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
 		recorder.witnessTableName,
 		TransferNew,
@@ -76,17 +83,22 @@ func (recorder *witnessRecorder) AddCandidates(cand WitnessCandidates) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal nominees")
 	}
+	prevNominees, err := json.Marshal(toStringArray(cand.PrevNominees()))
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal prev nominees")
+	}
 	candidates, err := json.Marshal(toStringArray(cand.Candidates()))
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal candidates")
 	}
-	query := fmt.Sprintf("INSERT IGNORE INTO %s (`committee`, `epoch`, `prev_epoch`, `nominees`, `candidates`, `status`) VALUES (?, ?, ?, ?, ?, ?)", recorder.witnessTableName)
+	query := fmt.Sprintf("INSERT IGNORE INTO %s (`committee`, `epoch`, `prev_epoch`, `nominees`, `prev_nominees`, `candidates`, `status`) VALUES (?, ?, ?, ?, ?, ?, ?)", recorder.witnessTableName)
 	result, err := recorder.store.DB().Exec(
 		query,
 		cand.Committee(),
 		cand.Epoch(),
 		cand.PrevEpoch(),
 		nominees,
+		prevNominees,
 		candidates,
 		cand.Status(),
 	)
@@ -114,7 +126,7 @@ func toStringArray(addrs []util.Address) []string {
 func (recorder *witnessRecorder) Candidates(committee string, epoch uint64) (WitnessCandidates, error) {
 	row := recorder.store.DB().QueryRow(
 		fmt.Sprintf(
-			"SELECT `committee`, `epoch`, `prev_epoch`, `nominees`, `candidates`, `status` FROM %s WHERE `committee`=? AND `epoch`=?",
+			"SELECT `committee`, `epoch`, `prev_epoch`, `nominees`, `prev_nominees`, `candidates`, `status`, `id` FROM %s WHERE `committee`=? AND `epoch`=?",
 			recorder.witnessTableName,
 		),
 		committee,
@@ -122,16 +134,23 @@ func (recorder *witnessRecorder) Candidates(committee string, epoch uint64) (Wit
 	)
 
 	cand := &witnessCandidates{}
-	var nominees, candidates []byte
-	if err := row.Scan(&cand.committee, &cand.epoch, &cand.prevEpoch, &nominees, &candidates, &cand.status); err != nil {
+	var nominees, prevNominees, candidates []byte
+	var id sql.NullString
+	if err := row.Scan(&cand.committee, &cand.epoch, &cand.prevEpoch, &nominees, &prevNominees, &candidates, &cand.status, &id); err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
 			return nil, ErrWitnessCandidatesNotFound
 		}
 		return nil, err
 	}
-	var nomineeStrings, candidateStrings []string
+	if id.Valid {
+		cand.id = common.HexToHash(id.String)
+	}
+	var nomineeStrings, prevNomineeStrings, candidateStrings []string
 	if err := json.Unmarshal(nominees, &nomineeStrings); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal nominees")
+	}
+	if err := json.Unmarshal(prevNominees, &prevNomineeStrings); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal prev nominees")
 	}
 	if err := json.Unmarshal(candidates, &candidateStrings); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal candidates")
@@ -139,6 +158,10 @@ func (recorder *witnessRecorder) Candidates(committee string, epoch uint64) (Wit
 
 	var err error
 	cand.nominees, err = toAddressArray(recorder.addrDecoder, nomineeStrings)
+	if err != nil {
+		return nil, err
+	}
+	cand.prevNominees, err = toAddressArray(recorder.addrDecoder, prevNomineeStrings)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +183,7 @@ func (recorder *witnessRecorder) CandidatesToSettle(committee string) ([]Witness
 
 func (recorder *witnessRecorder) candidates(committee string, status CandidatesStatus) ([]WitnessCandidates, error) {
 	query := fmt.Sprintf(
-		"SELECT `committee`, `epoch`, `prev_epoch`, `nominees`, `candidates`, `status` "+
+		"SELECT `committee`, `epoch`, `prev_epoch`, `nominees`, `prev_nominees`, `candidates`, `status`, `id` "+
 			"FROM %s "+
 			"WHERE `status`=? AND `committee`=? "+
 			"ORDER BY `creationTime`",
@@ -176,19 +199,30 @@ func (recorder *witnessRecorder) candidates(committee string, status CandidatesS
 	var rec []WitnessCandidates
 	for rows.Next() {
 		cand := &witnessCandidates{}
-		var nominees, candidates []byte
-		if err := rows.Scan(&cand.committee, &cand.epoch, &cand.prevEpoch, &nominees, &candidates, &cand.status); err != nil {
+		var nominees, prevNominees, candidates []byte
+		var id sql.NullString
+		if err := rows.Scan(&cand.committee, &cand.epoch, &cand.prevEpoch, &nominees, &prevNominees, &candidates, &cand.status, &id); err != nil {
 			return nil, err
 		}
-		var nomineeStrings, candidateStrings []string
+		if id.Valid {
+			cand.id = common.HexToHash(id.String)
+		}
+		var nomineeStrings, prevNomineeStrings, candidateStrings []string
 		if err := json.Unmarshal(nominees, &nomineeStrings); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal nominees")
+		}
+		if err := json.Unmarshal(prevNominees, &prevNomineeStrings); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal prev nominees")
 		}
 		if err := json.Unmarshal(candidates, &candidateStrings); err != nil {
 			return nil, errors.Wrap(err, "failed to unmarshal candidates")
 		}
 
 		cand.nominees, err = toAddressArray(recorder.addrDecoder, nomineeStrings)
+		if err != nil {
+			return nil, err
+		}
+		cand.prevNominees, err = toAddressArray(recorder.addrDecoder, prevNomineeStrings)
 		if err != nil {
 			return nil, err
 		}
@@ -232,8 +266,9 @@ func (recorder *witnessRecorder) SettleCandidates(cand WitnessCandidates, status
 func (recorder *witnessRecorder) ConfirmCandidates(cand WitnessCandidates) error {
 	log.Printf("mark candidates for committee %s at epoch %d as confirmed", cand.Committee(), cand.Epoch())
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `committee`=? AND `epoch`=? AND `status`=?", recorder.witnessTableName),
+		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `committee`=? AND `epoch`=? AND `status`=?", recorder.witnessTableName),
 		SubmissionConfirmed,
+		common.BytesToHash(cand.ID()).Hex(),
 		cand.Committee(),
 		cand.Epoch(),
 		TransferNew,
