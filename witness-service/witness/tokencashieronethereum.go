@@ -37,14 +37,10 @@ func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr com
 		client:                client,
 		previous:              previous,
 	}
-	var err error
 	switch version {
 	case NoPayload, Payload, ToSolana:
 	default:
 		return nil, errors.Errorf("invalid version %s", version)
-	}
-	if err != nil {
-		return nil, err
 	}
 	return iter, nil
 }

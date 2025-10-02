@@ -423,8 +423,12 @@ func main() {
 		}
 	}
 
+	// TODO: init witness committees
+	witnessCommittees := []witness.WitnessCommittee{}
+
 	service, err := witness.NewService(
 		cashiers,
+		witnessCommittees,
 		uint16(cfg.BatchSize),
 		cfg.Interval,
 		cfg.DisableTransferSubmit,

@@ -20,7 +20,8 @@ type (
 	// Version
 	Version string
 	// TransferStatus is the status of a transfer
-	TransferStatus string
+	TransferStatus   string
+	CandidatesStatus TransferStatus
 
 	// Service manages to exchange iotex coin to ERC20 token on ethereum
 	Service interface {
@@ -41,6 +42,16 @@ type (
 		SubmitTransfers() error
 		CheckTransfers() error
 		ProcessStales() error
+	}
+
+	// TODO
+	WitnessCommittee interface {
+		Start(context.Context) error
+		Stop(context.Context) error
+		ID() string
+		PullWitnessCandidates() error
+		SubmitWitnessCandidates() error
+		CheckWitnessCandidates() error
 	}
 
 	AbstractRecorder interface {
@@ -73,6 +84,29 @@ type (
 		Status() TransferStatus
 		BlockHeight() uint64
 		ToTypesTransfer() *types.Transfer
+	}
+
+	WitnessRecorder interface {
+		Start(ctx context.Context) error
+		Stop(ctx context.Context) error
+		AddCandidates(cand WitnessCandidates) error
+		Candidates(committee string, epoch uint64) (WitnessCandidates, error)
+		CandidatesToSubmit(string) ([]WitnessCandidates, error)
+		CandidatesToSettle(string) ([]WitnessCandidates, error)
+		SettleCandidates(cand WitnessCandidates, status CandidatesStatus) error
+		ConfirmCandidates(cand WitnessCandidates) error
+	}
+
+	WitnessCandidates interface {
+		ID() []byte
+		Committee() string
+		// SetID(common.Hash)
+		Epoch() uint64
+		PrevEpoch() uint64
+		Nominees() []util.Address
+		Candidates() []util.Address
+		Status() CandidatesStatus
+		// ToTypesTransfer() *types.Transfer
 	}
 
 	SignHandler func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error)

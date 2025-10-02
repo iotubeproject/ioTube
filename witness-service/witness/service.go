@@ -29,16 +29,18 @@ import (
 
 type service struct {
 	services.UnimplementedWitnessServiceServer
-	cashiers        []TokenCashier
-	processor       dispatcher.Runner
-	batchSize       uint16
-	processInterval time.Duration
-	disableSubmit   bool
+	cashiers          []TokenCashier
+	witnessCommittees []WitnessCommittee
+	processor         dispatcher.Runner
+	batchSize         uint16
+	processInterval   time.Duration
+	disableSubmit     bool
 }
 
 // NewService creates a new witness service
 func NewService(
 	cashiers []TokenCashier,
+	witnessCommittees []WitnessCommittee,
 	batchSize uint16,
 	processInterval time.Duration,
 	disableSubmit bool,
@@ -97,6 +99,24 @@ func (s *service) process() error {
 		}
 		if err := cashier.ProcessStales(); err != nil {
 			log.Println(errors.Wrapf(err, "failed to process stales for %s", cashier.ID()))
+			continue
+		}
+	}
+
+	for _, committee := range s.witnessCommittees {
+		if err := committee.PullWitnessCandidates(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to pull witness candidates for %s", committee.ID()))
+			continue
+		}
+		if s.disableSubmit {
+			continue
+		}
+		if err := committee.SubmitWitnessCandidates(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to submit witness candidates for %s", committee.ID()))
+			continue
+		}
+		if err := committee.CheckWitnessCandidates(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to check witness candidates for %s", committee.ID()))
 			continue
 		}
 	}
