@@ -4,6 +4,7 @@ package services;
 
 import "google/api/annotations.proto";
 import "types/witness.proto";
+import "types/witnesseslist.proto";
 
 option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/services";
 
@@ -62,6 +63,18 @@ service RelayService {
             body: "*"
         };
     };
+    rpc SubmitWitnesses(types.WitnessesList) returns (WitnessListSubmissionResponse) {
+        option (google.api.http) = {
+            post: "/submit_witnesses"
+            body: "*"
+        };
+    }; 
+    rpc CheckWitnesses(CheckRequest) returns (CheckWitnessesResponse) {
+        option (google.api.http) = {
+            post: "/check_witnesses"
+            body: "*"
+        };
+    }; 
 }
 
 message CheckRequest {
@@ -90,6 +103,12 @@ message CheckResponse {
     repeated bytes witnesses = 2;
     bytes txHash = 3;
     Status status = 4;
+}
+
+message CheckWitnessesResponse {
+    bytes key = 1;
+    repeated bytes witnesses = 2;
+    Status status = 3;
 }
 
 message StaleHeightsRequest {
@@ -124,6 +143,11 @@ message ResetTransferResponse {
 }
 
 message WitnessSubmissionResponse {
+    bytes id = 1;
+    bool success = 2;
+}
+
+message WitnessListSubmissionResponse {
     bytes id = 1;
     bool success = 2;
 }

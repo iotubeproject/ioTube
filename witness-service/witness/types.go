@@ -107,7 +107,7 @@ type (
 		PrevNominees() []util.Address
 		Candidates() []util.Address
 		Status() CandidatesStatus
-		// ToTypesTransfer() *types.Transfer
+		ToTypesCandidates() *types.Candidates
 	}
 
 	IDHasher    func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, error)

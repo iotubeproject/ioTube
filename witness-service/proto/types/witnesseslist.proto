@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package types;
+
+option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/types";
+
+import "google/protobuf/timestamp.proto";
+
+message Candidates {
+    uint64 epoch = 1;
+    repeated string witnessesToAdd = 2;
+    repeated string witnessesToRemove = 3;
+    google.protobuf.Timestamp timestamp = 7;
+}
+
+message WitnessesList {
+    Candidates candidates = 1;
+    bytes address = 2;
+    bytes signature = 3;
+}

@@ -18,3 +18,4 @@ abigen --abi $DIR/ShadowToken.abi --bin $DIR/ShadowToken.bin --pkg contract --ty
 abigen --abi $DIR/addresslist.abi --bin $DIR/addresslist.bin --pkg contract --type AddressList --out $DIR/addresslist.go
 abigen --abi $DIR/TransferValidatorWithPayload.abi --pkg contract --type TransferValidatorWithPayload --out $DIR/transfervaldiatorwithpayload.go
 abigen --abi $DIR/TokenCashierWithPayload.abi --pkg contract --type TokenCashierWithPayload --out $DIR/tokencashierwithpayload.go
+abigen --abi $DIR/WitnessManager.abi --pkg contract --type WitnessManager --out $DIR/witnessmanager.go
