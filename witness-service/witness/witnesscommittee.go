@@ -7,30 +7,34 @@
 package witness
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"log"
-	"strings"
+	"sort"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
+
 	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
-	"github.com/pkg/errors"
-	"google.golang.org/grpc"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 type (
 	witnessCommittee struct {
-		id             string
-		ethereumClient *ethclient.Client
-		relayerURL     string
-		signHandler    SignHandler
-		recorder       WitnessRecorder
-
-		witnessManager *contract.WitnessManager
+		id                 string
+		ethereumClient     *ethclient.Client
+		witnessManagerAddr common.Address
+		relayerURL         string
+		signHandler        SignHandler
+		recorder           WitnessRecorder
+		witnessProvider    EpochWitnessProvider
+		witnessManager     *contract.WitnessManager
 	}
 )
 
@@ -38,29 +42,25 @@ const (
 	IOTX_MAINNET_NETWORK_ID = 4689
 )
 
-func init() {
-	witnessManagerABI, err := abi.JSON(strings.NewReader(contract.WitnessManagerABI))
-	if err != nil {
-		log.Panicf("failed to decode token cashier abi, %+v", err)
-	}
-}
-
 func newWitnessCommittee(
 	id string,
 	ethereumClient *ethclient.Client,
-
 	relayerURL string,
+	numNominees int,
+	witnessManagerAddr common.Address,
 ) (*witnessCommittee, error) {
-	witnessManagerAddr := common.Address{}
 	witnessManager, err := contract.NewWitnessManager(witnessManagerAddr, ethereumClient)
 	if err != nil {
 		return nil, err
 	}
+	witnessProvider := newEpochWitnessProvider(numNominees)
 	return &witnessCommittee{
-		id:             id,
-		ethereumClient: ethereumClient,
-		relayerURL:     relayerURL,
-		witnessManager: witnessManager,
+		id:                 id,
+		ethereumClient:     ethereumClient,
+		relayerURL:         relayerURL,
+		witnessManager:     witnessManager,
+		witnessProvider:    witnessProvider,
+		witnessManagerAddr: witnessManagerAddr,
 	}, nil
 }
 
@@ -88,7 +88,71 @@ func (w *witnessCommittee) ID() string {
 }
 
 func (w *witnessCommittee) PullWitnessCandidates() error {
+	epochOnContract, err := w.witnessManager.EpochNum(nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get epoch on contract")
+	}
+	epochInterval, err := w.witnessManager.EpochInterval(nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get epoch interval")
+	}
+	nextEpoch := epochOnContract + epochInterval
+
+	epochOnChain, err := w.epochOnChain()
+	if err != nil {
+		return errors.Wrap(err, "failed to get epoch on chain")
+	}
+	// if epoch on chain is less than next epoch, there is no need to pull witness candidates
+	if epochOnChain < nextEpoch {
+		return nil
+	}
+
+	_, err = w.recorder.Candidates(w.ID(), nextEpoch)
+	if err == nil {
+		return nil // candidates already exist
+	}
+	if err != ErrWitnessCandidatesNotFound {
+		return errors.Wrap(err, "failed to get candidates from recorder")
+	}
+
+	// fetch candidates from chain
+	candidates, err := w.fetchWitnessCandidates(epochOnContract, nextEpoch)
+	if err != nil {
+		return errors.Wrap(err, "failed to assemble witness candidates")
+	}
+
+	if err := w.recorder.AddCandidates(candidates); err != nil {
+		return errors.Wrap(err, "failed to add candidates to recorder")
+	}
+
 	return nil
+}
+
+// TODO: read value via contract abi call
+func (w *witnessCommittee) epochOnChain() (uint64, error) {
+	// TODO: hardcode value for now
+	return 0, nil
+}
+
+func (w *witnessCommittee) fetchWitnessCandidates(prevEpoch, epoch uint64) (WitnessCandidates, error) {
+	candidates, nominees, err := w.witnessProvider.Witnesses(epoch)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get witnesses from provider")
+	}
+
+	prevCandidates, err := w.recorder.Candidates(w.ID(), prevEpoch)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get candidates from recorder")
+	}
+
+	return &witnessCandidates{
+		committee:    w.ID(),
+		epoch:        epoch,
+		prevEpoch:    prevEpoch,
+		nominees:     nominees,
+		prevNominees: prevCandidates.Nominees(),
+		candidates:   candidates,
+	}, nil
 }
 
 func (w *witnessCommittee) SubmitWitnessCandidates() error {
@@ -106,7 +170,7 @@ func (w *witnessCommittee) SubmitWitnessCandidates() error {
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
 	for _, candidates := range candidatesToSubmit {
-		id, err := w.idHasher()
+		id, err := w.idHasher(candidates)
 		if err != nil {
 			return err
 		}
@@ -138,23 +202,23 @@ func (w *witnessCommittee) SubmitWitnessCandidates() error {
 	return nil
 }
 
-// TODO: it can check the completeness by reading the contract directly
 func (w *witnessCommittee) CheckWitnessCandidates() error {
+	epochOnContract, err := w.witnessManager.EpochNum(nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get epoch on contract")
+	}
+
 	candidatesToSettle, err := w.recorder.CandidatesToSettle(w.ID())
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch transfers to settle")
 	}
+
 	conn, err := grpc.Dial(w.relayerURL, grpc.WithInsecure())
 	if err != nil {
 		return errors.Wrap(err, "failed to create connection")
 	}
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
-
-	epochOnContract, err := w.witnessManager.EpochNum(nil)
-	if err != nil {
-		return errors.Wrap(err, "failed to get epoch on contract")
-	}
 
 	for _, candidates := range candidatesToSettle {
 		epoch := candidates.Epoch()
@@ -172,26 +236,65 @@ func (w *witnessCommittee) CheckWitnessCandidates() error {
 
 		if response.Status == services.Status_SETTLED {
 			if err := w.recorder.SettleCandidates(candidates, TransferSettled); err != nil {
-				return errors.Wrap(err, "failed to settle transfer")
+				return errors.Wrap(err, "failed to settle candidates")
 			}
-		} else {
-			opts := &bind.FilterOpts{
-				// TODO: optimize with the block height
-				Start: 0,
-				End:   nil,
+		} else if epoch < epochOnContract {
+			if err := w.recorder.SettleCandidates(candidates, TransferInvalid); err != nil {
+				return errors.Wrap(err, "failed to settle invalid candidates")
 			}
-			iter, err := w.witnessManager.FilterWitnessesProposed(opts, []uint64{epoch})
-			if err != nil {
-				return errors.Wrap(err, "failed to filter witnesses proposed")
-			}
-			// TODO: can't find the events
-
 		}
 	}
 	return nil
 }
 
-// TODO:
-func (w *witnessCommittee) idHasher() (common.Hash, error) {
-	return common.Hash{}, nil
+// TODO: sorting everywhere?
+func (w *witnessCommittee) idHasher(cand WitnessCandidates) (common.Hash, error) {
+	nominees := cand.Nominees()
+	prevNominees := cand.PrevNominees()
+
+	nomineesMap := make(map[string]bool)
+	for _, addr := range nominees {
+		nomineesMap[addr.String()] = true
+	}
+	prevNomineesMap := make(map[string]bool)
+	for _, addr := range prevNominees {
+		prevNomineesMap[addr.String()] = true
+	}
+
+	var witnessesToAdd []util.Address
+	for _, addr := range nominees {
+		if _, ok := prevNomineesMap[addr.String()]; !ok {
+			witnessesToAdd = append(witnessesToAdd, addr)
+		}
+	}
+	sort.Slice(witnessesToAdd, func(i, j int) bool {
+		return bytes.Compare(witnessesToAdd[i].Bytes(), witnessesToAdd[j].Bytes()) < 0
+	})
+
+	var witnessesToRemove []util.Address
+	for _, addr := range prevNominees {
+		if _, ok := nomineesMap[addr.String()]; !ok {
+			witnessesToRemove = append(witnessesToRemove, addr)
+		}
+	}
+	sort.Slice(witnessesToRemove, func(i, j int) bool {
+		return bytes.Compare(witnessesToRemove[i].Bytes(), witnessesToRemove[j].Bytes()) < 0
+	})
+
+	var data []byte
+	data = append(data, w.witnessManagerAddr.Bytes()...)
+
+	epochBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(epochBytes, cand.Epoch())
+	data = append(data, epochBytes...)
+
+	for _, addr := range witnessesToAdd {
+		data = append(data, addr.Bytes()...)
+	}
+
+	for _, addr := range witnessesToRemove {
+		data = append(data, addr.Bytes()...)
+	}
+
+	return crypto.Keccak256Hash(data), nil
 }

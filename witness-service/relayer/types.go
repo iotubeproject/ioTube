@@ -253,7 +253,7 @@ func NewWitness(witnessBytes []byte, signature []byte) (*Witness, error) {
 
 	return &Witness{
 		addr:      witnessBytes,
-		signature: signature,
+		signature: clone,
 	}, nil
 }
 

@@ -32,7 +32,10 @@ type (
 	// Service defines the relayer service
 	Service struct {
 		services.UnimplementedRelayServiceServer
-		validators      map[string]TransferValidator
+		validators map[string]TransferValidator
+
+		witnessManagers *string
+
 		unwrappers      map[string]map[string]common.Address
 		checkers        map[string]*FeeChecker
 		retryHeights    map[string]map[uint64]time.Time
@@ -448,6 +451,16 @@ func (s *Service) ListNewTX(ctx context.Context, request *services.ListNewTXRequ
 	return &services.ListNewTXResponse{Txs: txs}, nil
 }
 
+// TODO:
+func (s *Service) SubmitWitnesses(ctx context.Context, request *types.WitnessesList) (*services.WitnessListSubmissionResponse, error) {
+	return nil, nil
+}
+
+// TODO:
+func (s *Service) CheckWitnesses(ctx context.Context, request *services.CheckRequest) (*services.CheckWitnessesResponse, error) {
+	return nil, nil
+}
+
 func (s *Service) process() error {
 	if s.validators == nil {
 		return nil
@@ -456,7 +469,17 @@ func (s *Service) process() error {
 	if err := s.confirmTransfers(); err != nil {
 		return err
 	}
-	return s.submitTransfers()
+	if err := s.submitTransfers(); err != nil {
+		return err
+	}
+
+	if s.witnessManagers == nil {
+		return nil
+	}
+	if err := s.confirmWitnesses(); err != nil {
+		return err
+	}
+	return s.submitWitnesses()
 }
 
 func (s *Service) sendBonus() {
@@ -599,6 +622,11 @@ func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidato
 	return false, false, nil
 }
 
+// TODO:
+func (s *Service) confirmWitnesses() error {
+	return nil
+}
+
 func (s *Service) submitTransfers() error {
 	excludedAddr, _ := util.NewETHAddressDecoder().DecodeString("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")
 	for cashier, validator := range s.validators {
@@ -681,4 +709,9 @@ func (s *Service) submitTransfer(transfer *Transfer, validator TransferValidator
 		}
 		return err
 	}
+}
+
+// TODO:
+func (s *Service) submitWitnesses() error {
+	return nil
 }

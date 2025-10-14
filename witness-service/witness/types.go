@@ -44,7 +44,6 @@ type (
 		ProcessStales() error
 	}
 
-	// TODO
 	WitnessCommittee interface {
 		Start(context.Context) error
 		Stop(context.Context) error
@@ -108,6 +107,10 @@ type (
 		Candidates() []util.Address
 		Status() CandidatesStatus
 		ToTypesCandidates() *types.Candidates
+	}
+
+	EpochWitnessProvider interface {
+		Witnesses(epoch uint64) ([]util.Address, []util.Address, error)
 	}
 
 	IDHasher    func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, error)

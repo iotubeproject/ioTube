@@ -7,10 +7,11 @@ option go_package = "github.com/iotexproject/ioTube/witness-service/grpc/types";
 import "google/protobuf/timestamp.proto";
 
 message Candidates {
-    uint64 epoch = 1;
-    repeated string witnessesToAdd = 2;
-    repeated string witnessesToRemove = 3;
-    google.protobuf.Timestamp timestamp = 7;
+    bytes witnessManagerAddress = 1;
+    uint64 epoch = 2;
+    repeated string witnessesToAdd = 3;
+    repeated string witnessesToRemove = 4;
+    google.protobuf.Timestamp timestamp = 5;
 }
 
 message WitnessesList {
