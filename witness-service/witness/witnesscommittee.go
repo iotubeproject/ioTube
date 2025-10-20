@@ -7,14 +7,11 @@
 package witness
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"log"
-	"sort"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -27,14 +24,15 @@ import (
 
 type (
 	witnessCommittee struct {
-		id                 string
-		ethereumClient     *ethclient.Client
-		witnessManagerAddr common.Address
-		relayerURL         string
-		signHandler        SignHandler
-		recorder           WitnessRecorder
-		witnessProvider    EpochWitnessProvider
-		witnessManager     *contract.WitnessManager
+		id                  string
+		idHasher            IDHasher
+		signHandler         SignHandler
+		recorder            WitnessRecorder
+		witnessSelector     EpochWitnessSelector
+		witnessManager      *contract.WitnessManagerCaller
+		witnessListContract *contract.AddressListCaller
+		relayerConfigs      map[common.Address]string
+		relayerConns        map[string]*grpc.ClientConn
 	}
 )
 
@@ -42,44 +40,59 @@ const (
 	IOTX_MAINNET_NETWORK_ID = 4689
 )
 
-func newWitnessCommittee(
+func NewWitnessCommittee(
 	id string,
+	idHasher IDHasher,
+	signHandler SignHandler,
+	recorder WitnessRecorder,
 	ethereumClient *ethclient.Client,
-	relayerURL string,
 	numNominees int,
 	witnessManagerAddr common.Address,
-) (*witnessCommittee, error) {
-	witnessManager, err := contract.NewWitnessManager(witnessManagerAddr, ethereumClient)
+	relayerConfigs map[common.Address]string,
+) (WitnessCommittee, error) {
+	networkID, err := ethereumClient.NetworkID(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	witnessProvider := newEpochWitnessProvider(numNominees)
+	if networkID.Uint64() != IOTX_MAINNET_NETWORK_ID {
+		return nil, errors.New("not iotx mainnet")
+	}
+	witnessManager, err := contract.NewWitnessManagerCaller(witnessManagerAddr, ethereumClient)
+	if err != nil {
+		return nil, err
+	}
+	witnessContractAddr, err := witnessManager.WitnessList(nil)
+	if err != nil {
+		return nil, err
+	}
+	witnessListContract, err := contract.NewAddressListCaller(witnessContractAddr, ethereumClient)
+	if err != nil {
+		return nil, err
+	}
+	witnessSelector := newEpochWitnessSelector(numNominees, ethereumClient)
 	return &witnessCommittee{
-		id:                 id,
-		ethereumClient:     ethereumClient,
-		relayerURL:         relayerURL,
-		witnessManager:     witnessManager,
-		witnessProvider:    witnessProvider,
-		witnessManagerAddr: witnessManagerAddr,
+		id:                  id,
+		idHasher:            idHasher,
+		signHandler:         signHandler,
+		recorder:            recorder,
+		witnessSelector:     witnessSelector,
+		witnessManager:      witnessManager,
+		witnessListContract: witnessListContract,
+		relayerConfigs:      relayerConfigs,
+		relayerConns:        make(map[string]*grpc.ClientConn),
 	}, nil
 }
 
 func (w *witnessCommittee) Start(ctx context.Context) error {
-	networkID, err := w.ethereumClient.NetworkID(ctx)
-	if err != nil {
-		return err
-	}
-	if networkID.Uint64() != IOTX_MAINNET_NETWORK_ID {
-		return errors.New("not iotx mainnet")
-	}
-	if w.witnessManager == nil {
-		return errors.New("witness manager is not initialized")
-	}
-
 	return nil
 }
 
 func (w *witnessCommittee) Stop(ctx context.Context) error {
+	for _, conn := range w.relayerConns {
+		if err := conn.Close(); err != nil {
+			log.Printf("failed to close relayer connection, %v", err)
+		}
+	}
 	return nil
 }
 
@@ -109,7 +122,8 @@ func (w *witnessCommittee) PullWitnessCandidates() error {
 
 	_, err = w.recorder.Candidates(w.ID(), nextEpoch)
 	if err == nil {
-		return nil // candidates already exist
+		// candidates already exist
+		return nil
 	}
 	if err != ErrWitnessCandidatesNotFound {
 		return errors.Wrap(err, "failed to get candidates from recorder")
@@ -121,27 +135,62 @@ func (w *witnessCommittee) PullWitnessCandidates() error {
 		return errors.Wrap(err, "failed to assemble witness candidates")
 	}
 
-	if err := w.recorder.AddCandidates(candidates); err != nil {
+	witnessManagerAddrs := make([]common.Address, 0, len(w.relayerConfigs))
+	for addr := range w.relayerConfigs {
+		witnessManagerAddrs = append(witnessManagerAddrs, addr)
+	}
+	if err := w.recorder.AddCandidates(candidates, witnessManagerAddrs); err != nil {
 		return errors.Wrap(err, "failed to add candidates to recorder")
 	}
 
 	return nil
 }
 
-// TODO: read value via contract abi call
+// TODO: read value via contract abi call, hardcode value for now
 func (w *witnessCommittee) epochOnChain() (uint64, error) {
-	// TODO: hardcode value for now
 	return 0, nil
 }
 
 func (w *witnessCommittee) fetchWitnessCandidates(prevEpoch, epoch uint64) (WitnessCandidates, error) {
-	candidates, nominees, err := w.witnessProvider.Witnesses(epoch)
+	candidates, nominees, err := w.witnessSelector.Witnesses(epoch)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get witnesses from provider")
 	}
-
+	var prevNominees []util.Address
 	prevCandidates, err := w.recorder.Candidates(w.ID(), prevEpoch)
-	if err != nil {
+	switch err {
+	// if previous candidates exist, use them
+	case nil:
+		prevNominees = prevCandidates.Nominees()
+	// if previous candidates do not exist, fetch from contract
+	case ErrWitnessCandidatesNotFound:
+		numOfActive, err := w.witnessListContract.NumOfActive(nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get number of active witnesses")
+		}
+		witnesses := []common.Address{}
+		if numOfActive.Cmp(big.NewInt(0)) > 0 {
+			count, err := w.witnessListContract.Count(nil)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get total number of witnesses")
+			}
+			offset := big.NewInt(0)
+			limit := uint8(100)
+			activeWitnesses := make([]common.Address, 0, int(numOfActive.Int64()))
+			for offset.Cmp(count) < 0 && big.NewInt(int64(len(activeWitnesses))).Cmp(numOfActive) < 0 {
+				result, err := w.witnessListContract.GetActiveItems(nil, offset, limit)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to query list")
+				}
+				activeWitnesses = append(activeWitnesses, result.Items[0:result.Count.Int64()]...)
+				offset.Add(offset, big.NewInt(int64(limit)))
+			}
+			witnesses = activeWitnesses
+		}
+		for _, witness := range witnesses {
+			prevNominees = append(prevNominees, util.ETHAddressToAddress(witness))
+		}
+	default:
 		return nil, errors.Wrap(err, "failed to get candidates from recorder")
 	}
 
@@ -150,151 +199,198 @@ func (w *witnessCommittee) fetchWitnessCandidates(prevEpoch, epoch uint64) (Witn
 		epoch:        epoch,
 		prevEpoch:    prevEpoch,
 		nominees:     nominees,
-		prevNominees: prevCandidates.Nominees(),
+		prevNominees: prevNominees,
 		candidates:   candidates,
+		status:       CandidatesStatus(TransferNew),
 	}, nil
 }
 
+func (w *witnessCommittee) getRelayerConn(relayerURL string) (*grpc.ClientConn, error) {
+	if conn, ok := w.relayerConns[relayerURL]; ok {
+		return conn, nil
+	}
+	conn, err := grpc.Dial(relayerURL, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+	w.relayerConns[relayerURL] = conn
+
+	return conn, nil
+}
+
+func (w *witnessCommittee) submitToRelayer(
+	relayerURL string,
+	wit *types.WitnessesList,
+) bool {
+	conn, err := w.getRelayerConn(relayerURL)
+	if err != nil {
+		log.Printf("failed to connect to relayer %s: %+v\n", relayerURL, err)
+		return false
+	}
+	relayer := services.NewRelayServiceClient(conn)
+	response, err := relayer.SubmitWitnessesList(context.Background(), wit)
+	if err != nil {
+		log.Printf("failed to submit witness to relayer %s: %+v\n", relayerURL, err)
+		return false
+	}
+	if !response.Success {
+		log.Printf("something went wrong when submitting witness candidates for committee %s to relayer %s (epoch: %d, add: %d, remove: %d)\n", w.id, relayerURL, wit.Candidates.Epoch, len(wit.Candidates.WitnessesToAdd), len(wit.Candidates.WitnessesToRemove))
+		return false
+	}
+	return true
+}
+
+// SubmitWitnessCandidates submits candidates to relayers in two rounds.
+// The first round submits with an empty signature for validation,
+// and the second round submits with a valid signature to confirm.
 func (w *witnessCommittee) SubmitWitnessCandidates() error {
 	if w.signHandler == nil {
 		return nil
 	}
-	candidatesToSubmit, err := w.recorder.CandidatesToSubmit(w.ID())
+	groupedCandidatesToSubmit, err := w.recorder.CandidatesToSubmit(w.ID())
 	if err != nil {
 		return err
 	}
-	conn, err := grpc.Dial(w.relayerURL, grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	relayer := services.NewRelayServiceClient(conn)
-	for _, candidates := range candidatesToSubmit {
-		id, err := w.idHasher(candidates)
-		if err != nil {
-			return err
-		}
-		candidates.SetID(id)
-		pubkey, signature, err := w.signHandler(id.Bytes())
-		if err != nil {
-			return err
-		}
-		if signature == nil {
+	for _, candidatesGroup := range groupedCandidatesToSubmit {
+		if len(candidatesGroup) == 0 {
 			continue
 		}
-		witness := &types.WitnessesList{
-			Candidates: candidates.ToTypesCandidates(),
-			Address:    pubkey,
-			Signature:  signature,
+		// Round 1
+		round1Success := true
+		for _, candidates := range candidatesGroup {
+			witnessManagerAddr := candidates.WitnessManagerAddress()
+			id, err := w.idHasher(candidates, witnessManagerAddr.Bytes())
+			if err != nil {
+				log.Printf("failed to hash candidates for epoch %d: %v", candidates.Epoch(), err)
+				round1Success = false
+				break
+			}
+			candidates.SetID(id)
+
+			relayerURL, ok := w.relayerConfigs[witnessManagerAddr]
+			if !ok {
+				log.Printf("no relayer found for witness manager %s", witnessManagerAddr.Hex())
+				round1Success = false
+				break
+			}
+			pubkey, _, err := w.signHandler(id.Bytes())
+			if err != nil {
+				log.Printf("failed to get pubkey for epoch %d: %v", candidates.Epoch(), err)
+				round1Success = false
+				break
+			}
+
+			witNoSig := &types.WitnessesList{
+				Candidates: candidates.ToTypesCandidates(witnessManagerAddr.Bytes()),
+				Address:    pubkey,
+				Signature:  []byte{},
+			}
+			if !w.submitToRelayer(relayerURL, witNoSig) {
+				log.Printf("round 1 submission failed for epoch %d to relayer %s", candidates.Epoch(), relayerURL)
+				round1Success = false
+				break
+			}
 		}
-		response, err := relayer.SubmitWitnesses(context.Background(), witness)
-		if err != nil {
-			return err
-		}
-		if !response.Success {
-			log.Printf("something went wrong when submitting witness candidates for committee %s (epoch: %d, add: %d, remove: %d)\n", w.id, candidates.Epoch(), len(candidates.Nominees()), len(candidates.PrevNominees()))
+
+		if !round1Success {
+			log.Printf("Round 1 failed for epoch %d, skipping Round 2.", candidatesGroup[0].Epoch())
 			continue
 		}
-		if err := w.recorder.ConfirmCandidates(candidates); err != nil {
-			return err
+
+		// Round 2
+		round2Success := true
+		for _, candidates := range candidatesGroup {
+			id := candidates.ID()
+			pubkey, signature, err := w.signHandler(id)
+			if err != nil || signature == nil {
+				log.Printf("failed to sign for epoch %d: %v", candidates.Epoch(), err)
+				round2Success = false
+				break
+			}
+			witnessManagerAddr := candidates.WitnessManagerAddress()
+			relayerURL, ok := w.relayerConfigs[witnessManagerAddr]
+			if !ok {
+				log.Printf("no relayer found for witness manager %s", witnessManagerAddr.Hex())
+				round2Success = false
+				break
+			}
+
+			witWithSig := &types.WitnessesList{
+				Candidates: candidates.ToTypesCandidates(witnessManagerAddr.Bytes()),
+				Address:    pubkey,
+				Signature:  signature,
+			}
+			if !w.submitToRelayer(relayerURL, witWithSig) {
+				log.Printf("round 2 submission failed for epoch %d to relayer %s", candidates.Epoch(), relayerURL)
+				round2Success = false
+				break
+			}
+		}
+
+		if !round2Success {
+			log.Printf("Round 2 failed for epoch %d, not confirming.", candidatesGroup[0].Epoch())
+			continue
+		}
+
+		for _, candidates := range candidatesGroup {
+			if err := w.recorder.ConfirmCandidates(candidates); err != nil {
+				log.Printf("failed to confirm candidates for epoch %d: %v", candidates.Epoch(), err)
+			}
 		}
 	}
 	return nil
 }
 
+// CheckWitnessCandidates checks with relayers and settles candidates if they are settled on all relayers.
 func (w *witnessCommittee) CheckWitnessCandidates() error {
 	epochOnContract, err := w.witnessManager.EpochNum(nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to get epoch on contract")
 	}
 
-	candidatesToSettle, err := w.recorder.CandidatesToSettle(w.ID())
+	groupedCandidatesToSettle, err := w.recorder.CandidatesToSettle(w.ID())
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch transfers to settle")
 	}
 
-	conn, err := grpc.Dial(w.relayerURL, grpc.WithInsecure())
-	if err != nil {
-		return errors.Wrap(err, "failed to create connection")
-	}
-	defer conn.Close()
-	relayer := services.NewRelayServiceClient(conn)
-
-	for _, candidates := range candidatesToSettle {
-		epoch := candidates.Epoch()
-		if epoch > epochOnContract {
-			continue
-		}
-
-		response, err := relayer.CheckWitnesses(
-			context.Background(),
-			&services.CheckRequest{Id: candidates.ID()},
-		)
-		if err != nil {
-			return errors.Wrap(err, "failed to check with relayer")
-		}
-
-		if response.Status == services.Status_SETTLED {
-			if err := w.recorder.SettleCandidates(candidates, TransferSettled); err != nil {
-				return errors.Wrap(err, "failed to settle candidates")
+	for _, candidatesToSettle := range groupedCandidatesToSettle {
+		for _, candidates := range candidatesToSettle {
+			epoch := candidates.Epoch()
+			if epoch > epochOnContract {
+				continue
 			}
-		} else if epoch < epochOnContract {
-			if err := w.recorder.SettleCandidates(candidates, TransferInvalid); err != nil {
-				return errors.Wrap(err, "failed to settle invalid candidates")
+			witnessManagerAddr := candidates.WitnessManagerAddress()
+			relayerURL, ok := w.relayerConfigs[witnessManagerAddr]
+			if !ok {
+				log.Printf("no relayer found for witness manager %s", witnessManagerAddr.Hex())
+				if err := w.recorder.SettleCandidates(candidates, TransferInvalid); err != nil {
+					return errors.Wrap(err, "failed to settle invalid candidates")
+				}
+				continue
+			}
+			conn, err := w.getRelayerConn(relayerURL)
+			if err != nil {
+				log.Printf("failed to connect to relayer %s: %+v\n", relayerURL, err)
+				continue
+			}
+			response, err := services.NewRelayServiceClient(conn).CheckWitnessesList(
+				context.Background(),
+				&services.CheckRequest{Id: candidates.ID()},
+			)
+			if err != nil {
+				log.Printf("failed to check with relayer %s: %+v\n", relayerURL, err)
+				continue
+			}
+			if response.Status == services.Status_SETTLED {
+				if err := w.recorder.SettleCandidates(candidates, TransferSettled); err != nil {
+					return errors.Wrap(err, "failed to settle candidates")
+				}
+			} else if epoch < epochOnContract {
+				if err := w.recorder.SettleCandidates(candidates, TransferInvalid); err != nil {
+					return errors.Wrap(err, "failed to settle invalid candidates")
+				}
 			}
 		}
 	}
 	return nil
-}
-
-// TODO: sorting everywhere?
-func (w *witnessCommittee) idHasher(cand WitnessCandidates) (common.Hash, error) {
-	nominees := cand.Nominees()
-	prevNominees := cand.PrevNominees()
-
-	nomineesMap := make(map[string]bool)
-	for _, addr := range nominees {
-		nomineesMap[addr.String()] = true
-	}
-	prevNomineesMap := make(map[string]bool)
-	for _, addr := range prevNominees {
-		prevNomineesMap[addr.String()] = true
-	}
-
-	var witnessesToAdd []util.Address
-	for _, addr := range nominees {
-		if _, ok := prevNomineesMap[addr.String()]; !ok {
-			witnessesToAdd = append(witnessesToAdd, addr)
-		}
-	}
-	sort.Slice(witnessesToAdd, func(i, j int) bool {
-		return bytes.Compare(witnessesToAdd[i].Bytes(), witnessesToAdd[j].Bytes()) < 0
-	})
-
-	var witnessesToRemove []util.Address
-	for _, addr := range prevNominees {
-		if _, ok := nomineesMap[addr.String()]; !ok {
-			witnessesToRemove = append(witnessesToRemove, addr)
-		}
-	}
-	sort.Slice(witnessesToRemove, func(i, j int) bool {
-		return bytes.Compare(witnessesToRemove[i].Bytes(), witnessesToRemove[j].Bytes()) < 0
-	})
-
-	var data []byte
-	data = append(data, w.witnessManagerAddr.Bytes()...)
-
-	epochBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(epochBytes, cand.Epoch())
-	data = append(data, epochBytes...)
-
-	for _, addr := range witnessesToAdd {
-		data = append(data, addr.Bytes()...)
-	}
-
-	for _, addr := range witnessesToRemove {
-		data = append(data, addr.Bytes()...)
-	}
-
-	return crypto.Keccak256Hash(data), nil
 }

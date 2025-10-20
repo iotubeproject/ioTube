@@ -35,11 +35,12 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	Chain                 string        `json:"chain" yaml:"chain"`
-	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
-	RelayerURL            string        `json:"relayerURL" yaml:"relayerURL"`
-	Database              db.Config     `json:"database" yaml:"database"`
-	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
+	Chain      string    `json:"chain" yaml:"chain"`
+	ClientURL  string    `json:"clientURL" yaml:"clientURL"`
+	RelayerURL string    `json:"relayerURL" yaml:"relayerURL"`
+	Database   db.Config `json:"database" yaml:"database"`
+	PrivateKey string    `json:"privateKey" yaml:"privateKey"`
+	// TODO: remove this
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
 	LarkWebHook           string        `json:"larkWebHook" yaml:"larkWebHook"`
 	ConfirmBlockNumber    int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
@@ -72,6 +73,16 @@ type Configuration struct {
 		QPSLimit    uint32 `json:"qpsLimit" yaml:"qpsLimit"`
 		DisablePull bool   `json:"disablePull" yaml:"disablePull"`
 	} `json:"cashiers" yaml:"cashiers"`
+	WitnessCommittees []struct {
+		ID                            string `json:"id" yaml:"id"`
+		WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
+		RelayerConfigs                []struct {
+			RelayerURL                    string `json:"relayerURL" yaml:"relayerURL"`
+			WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
+		} `json:"relayerConfigs" yaml:"relayerConfigs"`
+		WitnessTableName string `json:"witnessTableName" yaml:"witnessTableName"`
+		NumNominees      int    `json:"numNominees" yaml:"numNominees"`
+	} `json:"witnessCommittees" yaml:"witnessCommittees"`
 }
 
 // TokenPair defines a token pair
@@ -229,6 +240,7 @@ func main() {
 
 	storeFactory := db.NewSQLStoreFactory()
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
+	var ethClient *ethclient.Client
 	switch cfg.Chain {
 	case "solana":
 		solClient := solclient.NewClient(cfg.ClientURL)
@@ -292,7 +304,7 @@ func main() {
 			cashiers = append(cashiers, cashier)
 		}
 	default: // "heco", "bsc", "matic", "polis", "iotex-e", "iotex", "sepolia", "iotex-testnet", "ethereum":
-		ethClient, err := ethclient.Dial(cfg.ClientURL)
+		ethClient, err = ethclient.Dial(cfg.ClientURL)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -423,8 +435,51 @@ func main() {
 		}
 	}
 
-	// TODO: init witness committees
 	witnessCommittees := []witness.WitnessCommittee{}
+	for _, wc := range cfg.WitnessCommittees {
+		if ethClient == nil {
+			log.Printf("Skipping witness committee for chain %s, no ethClient\n", cfg.Chain)
+			continue
+		}
+		relayerMap := make(map[common.Address]string)
+		for _, rc := range wc.RelayerConfigs {
+			addr, err := util.ParseEthAddress(rc.WitnessManagerContractAddress)
+			if err != nil {
+				log.Fatalf("invalid witness manager address %s: %v\n", rc.WitnessManagerContractAddress, err)
+			}
+			relayerMap[addr] = rc.RelayerURL
+		}
+		var committeeSignHandler witness.SignHandler
+		if cfg.PrivateKey != "" {
+			privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
+			if err != nil {
+				log.Fatalf("failed to decode private key %v\n", err)
+			}
+			committeeSignHandler = witness.NewSecp256k1SignHandler(privateKey)
+		} else {
+			log.Println("No Private Key")
+		}
+		recorder := witness.NewWitnessRecorder(
+			storeFactory.NewStore(cfg.Database),
+			wc.WitnessTableName,
+			util.NewETHAddressDecoder(),
+		)
+		witnessManagerAddr := common.HexToAddress(wc.WitnessManagerContractAddress)
+		witnessCommittee, err := witness.NewWitnessCommittee(
+			wc.ID,
+			witness.IDHasherForWitnessCandidatesInEVM,
+			committeeSignHandler,
+			recorder,
+			ethClient,
+			wc.NumNominees,
+			witnessManagerAddr,
+			relayerMap,
+		)
+		if err != nil {
+			log.Fatalf("failed to create witness committee %v\n", err)
+		}
+		witnessCommittees = append(witnessCommittees, witnessCommittee)
+	}
 
 	service, err := witness.NewService(
 		cashiers,

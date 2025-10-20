@@ -28,8 +28,8 @@ type RelayServiceClient interface {
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 	SubmitNewTX(ctx context.Context, in *SubmitNewTXRequest, opts ...grpc.CallOption) (*SubmitNewTXResponse, error)
 	ListNewTX(ctx context.Context, in *ListNewTXRequest, opts ...grpc.CallOption) (*ListNewTXResponse, error)
-	SubmitWitnesses(ctx context.Context, in *types.WitnessesList, opts ...grpc.CallOption) (*WitnessListSubmissionResponse, error)
-	CheckWitnesses(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckWitnessesResponse, error)
+	SubmitWitnessesList(ctx context.Context, in *types.WitnessesList, opts ...grpc.CallOption) (*WitnessListSubmissionResponse, error)
+	CheckWitnessesList(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckWitnessesListResponse, error)
 }
 
 type relayServiceClient struct {
@@ -121,18 +121,18 @@ func (c *relayServiceClient) ListNewTX(ctx context.Context, in *ListNewTXRequest
 	return out, nil
 }
 
-func (c *relayServiceClient) SubmitWitnesses(ctx context.Context, in *types.WitnessesList, opts ...grpc.CallOption) (*WitnessListSubmissionResponse, error) {
+func (c *relayServiceClient) SubmitWitnessesList(ctx context.Context, in *types.WitnessesList, opts ...grpc.CallOption) (*WitnessListSubmissionResponse, error) {
 	out := new(WitnessListSubmissionResponse)
-	err := c.cc.Invoke(ctx, "/services.RelayService/SubmitWitnesses", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/services.RelayService/SubmitWitnessesList", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *relayServiceClient) CheckWitnesses(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckWitnessesResponse, error) {
-	out := new(CheckWitnessesResponse)
-	err := c.cc.Invoke(ctx, "/services.RelayService/CheckWitnesses", in, out, opts...)
+func (c *relayServiceClient) CheckWitnessesList(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckWitnessesListResponse, error) {
+	out := new(CheckWitnessesListResponse)
+	err := c.cc.Invoke(ctx, "/services.RelayService/CheckWitnessesList", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -152,8 +152,8 @@ type RelayServiceServer interface {
 	List(context.Context, *ListRequest) (*ListResponse, error)
 	SubmitNewTX(context.Context, *SubmitNewTXRequest) (*SubmitNewTXResponse, error)
 	ListNewTX(context.Context, *ListNewTXRequest) (*ListNewTXResponse, error)
-	SubmitWitnesses(context.Context, *types.WitnessesList) (*WitnessListSubmissionResponse, error)
-	CheckWitnesses(context.Context, *CheckRequest) (*CheckWitnessesResponse, error)
+	SubmitWitnessesList(context.Context, *types.WitnessesList) (*WitnessListSubmissionResponse, error)
+	CheckWitnessesList(context.Context, *CheckRequest) (*CheckWitnessesListResponse, error)
 	mustEmbedUnimplementedRelayServiceServer()
 }
 
@@ -188,11 +188,11 @@ func (UnimplementedRelayServiceServer) SubmitNewTX(context.Context, *SubmitNewTX
 func (UnimplementedRelayServiceServer) ListNewTX(context.Context, *ListNewTXRequest) (*ListNewTXResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListNewTX not implemented")
 }
-func (UnimplementedRelayServiceServer) SubmitWitnesses(context.Context, *types.WitnessesList) (*WitnessListSubmissionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SubmitWitnesses not implemented")
+func (UnimplementedRelayServiceServer) SubmitWitnessesList(context.Context, *types.WitnessesList) (*WitnessListSubmissionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitWitnessesList not implemented")
 }
-func (UnimplementedRelayServiceServer) CheckWitnesses(context.Context, *CheckRequest) (*CheckWitnessesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CheckWitnesses not implemented")
+func (UnimplementedRelayServiceServer) CheckWitnessesList(context.Context, *CheckRequest) (*CheckWitnessesListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckWitnessesList not implemented")
 }
 func (UnimplementedRelayServiceServer) mustEmbedUnimplementedRelayServiceServer() {}
 
@@ -369,38 +369,38 @@ func _RelayService_ListNewTX_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RelayService_SubmitWitnesses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _RelayService_SubmitWitnessesList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(types.WitnessesList)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RelayServiceServer).SubmitWitnesses(ctx, in)
+		return srv.(RelayServiceServer).SubmitWitnessesList(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/services.RelayService/SubmitWitnesses",
+		FullMethod: "/services.RelayService/SubmitWitnessesList",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RelayServiceServer).SubmitWitnesses(ctx, req.(*types.WitnessesList))
+		return srv.(RelayServiceServer).SubmitWitnessesList(ctx, req.(*types.WitnessesList))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RelayService_CheckWitnesses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _RelayService_CheckWitnessesList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CheckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RelayServiceServer).CheckWitnesses(ctx, in)
+		return srv.(RelayServiceServer).CheckWitnessesList(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/services.RelayService/CheckWitnesses",
+		FullMethod: "/services.RelayService/CheckWitnessesList",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RelayServiceServer).CheckWitnesses(ctx, req.(*CheckRequest))
+		return srv.(RelayServiceServer).CheckWitnessesList(ctx, req.(*CheckRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -449,12 +449,12 @@ var RelayService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _RelayService_ListNewTX_Handler,
 		},
 		{
-			MethodName: "SubmitWitnesses",
-			Handler:    _RelayService_SubmitWitnesses_Handler,
+			MethodName: "SubmitWitnessesList",
+			Handler:    _RelayService_SubmitWitnessesList_Handler,
 		},
 		{
-			MethodName: "CheckWitnesses",
-			Handler:    _RelayService_CheckWitnesses_Handler,
+			MethodName: "CheckWitnessesList",
+			Handler:    _RelayService_CheckWitnessesList_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

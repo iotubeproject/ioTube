@@ -7,8 +7,10 @@
 package relayer
 
 import (
+	"bytes"
 	"context"
 	"math/big"
+	"sort"
 	"time"
 
 	soltypes "github.com/blocto/solana-go-sdk/types"
@@ -79,6 +81,20 @@ type (
 		SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 	}
 
+	// WitnessManager defines the interface for managing witness candidates
+	WitnessManager interface {
+		// Size returns the number of relayers
+		Size() int
+		// Address returns the witness manager contract address
+		Address() common.Address
+		// Check returns the status of witness candidates on chain
+		Check(candidates *WitnessCandidates) (StatusOnChainType, error)
+		// Submit submits witness candidate updates (additions and removals)
+		Submit(candidates *WitnessCandidates, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
+		// SpeedUp speeds up witness candidates
+		SpeedUp(candidates *WitnessCandidates, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
+	}
+
 	AbstractRecorder interface {
 		// Start starts the recorder
 		Start(ctx context.Context) error
@@ -125,7 +141,37 @@ type (
 		status               ValidationStatusType
 		timestamp            time.Time
 	}
+
+	// WitnessCandidates defines a record of witness list update
+	WitnessCandidates struct {
+		id              common.Hash
+		witnessManager  common.Address
+		epoch           uint64
+		witnessToAdd    []util.Address
+		witnessToRemove []util.Address
+		creationTime    time.Time
+		updateTime      time.Time
+		status          ValidationStatusType
+		txHash          common.Hash
+		blockHeight     uint64
+		gas             uint64
+		nonce           uint64
+		relayer         common.Address
+		gasPrice        *big.Int
+	}
 )
+
+func (cand *WitnessCandidates) Witnesses() ([]common.Address, []common.Address) {
+	witnessesToAdd := []common.Address{}
+	for _, witness := range cand.witnessToAdd {
+		witnessesToAdd = append(witnessesToAdd, witness.Address().(common.Address))
+	}
+	witnessesToRemove := []common.Address{}
+	for _, witness := range cand.witnessToRemove {
+		witnessesToRemove = append(witnessesToRemove, witness.Address().(common.Address))
+	}
+	return witnessesToAdd, witnessesToRemove
+}
 
 const (
 	// WaitingForWitnesses stands for a transfer which needs more valid witnesses
@@ -159,9 +205,12 @@ const (
 	StatusOnChainSettled
 )
 
-var errInsufficientWitnesses = errors.New("insufficient witnesses")
-var errGasPriceTooHigh = errors.New("gas price is too high")
-var errNoncritical = errors.New("error before submission")
+var (
+	errInsufficientWitnesses = errors.New("insufficient witnesses")
+	errGasPriceTooHigh       = errors.New("gas price is too high")
+	errNoncritical           = errors.New("error before submission")
+	errInvalidData           = errors.New("invalid data")
+)
 
 // UnmarshalTransferProto unmarshals a transfer proto
 func UnmarshalTransferProto(transfer *types.Transfer, destAddrDecoder util.AddressDecoder,
@@ -305,4 +354,95 @@ func (transfer *Transfer) ToTypesTransfer() *types.Transfer {
 
 func (w *Witness) Address() common.Address {
 	return common.BytesToAddress(w.addr)
+}
+
+func packWitnesses(witnesses []common.Address) ([]byte, error) {
+	sort.Slice(witnesses, func(i, j int) bool {
+		return bytes.Compare(witnesses[i][:], witnesses[j][:]) < 0
+	})
+	var packed []byte
+	for _, witness := range witnesses {
+		packed = append(packed, witness.Bytes()...)
+	}
+	return crypto.Keccak256Hash(packed).Bytes(), nil
+}
+
+// UnmarshalWitnessListProto unmarshals a witness list proto
+func UnmarshalWitnessListProto(
+	request *types.WitnessesList,
+	destAddrDecoder util.AddressDecoder,
+) (*WitnessCandidates, *Witness, error) {
+	if request.Candidates == nil {
+		return nil, nil, errors.New("candidates is nil")
+	}
+	witnessManager, err := destAddrDecoder.DecodeBytes(request.Candidates.WitnessManagerAddress)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to decode witness manager address")
+	}
+	witnessManagerAddr, ok := witnessManager.Address().(common.Address)
+	if !ok {
+		return nil, nil, errors.New("witness manager address is not common.Address")
+	}
+	witnessesToAdd := make([]util.Address, len(request.Candidates.WitnessesToAdd))
+	for i, witnessStr := range request.Candidates.WitnessesToAdd {
+		witness, err := destAddrDecoder.DecodeString(witnessStr)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to decode witness to add %s", witnessStr)
+		}
+		witnessesToAdd[i] = witness
+	}
+	witnessesToRemove := make([]util.Address, len(request.Candidates.WitnessesToRemove))
+	for i, witnessStr := range request.Candidates.WitnessesToRemove {
+		witness, err := destAddrDecoder.DecodeString(witnessStr)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to decode witness to remove %s", witnessStr)
+		}
+		witnessesToRemove[i] = witness
+	}
+	witness, err := NewWitness(request.Address, request.Signature)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to create witness")
+	}
+
+	return &WitnessCandidates{
+		witnessManager:  witnessManagerAddr,
+		epoch:           request.Candidates.Epoch,
+		witnessToAdd:    witnessesToAdd,
+		witnessToRemove: witnessesToRemove,
+		creationTime:    request.Candidates.Timestamp.AsTime(),
+	}, witness, nil
+}
+
+func (cand *WitnessCandidates) GenID() error {
+	witnessesToAdd := []common.Address{}
+	for _, witness := range cand.witnessToAdd {
+		commonAddr, ok := witness.Address().(common.Address)
+		if !ok {
+			return errors.Errorf("failed to cast witness to add %s to common.Address", witness.String())
+		}
+		witnessesToAdd = append(witnessesToAdd, commonAddr)
+	}
+	witnessesToRemove := []common.Address{}
+	for _, witness := range cand.witnessToRemove {
+		commonAddr, ok := witness.Address().(common.Address)
+		if !ok {
+			return errors.Errorf("failed to cast witness to remove %s to common.Address", witness.String())
+		}
+		witnessesToRemove = append(witnessesToRemove, commonAddr)
+	}
+
+	witnessesToAddBytes, err := packWitnesses(witnessesToAdd)
+	if err != nil {
+		return err
+	}
+	witnessesToRemoveBytes, err := packWitnesses(witnessesToRemove)
+	if err != nil {
+		return err
+	}
+	cand.id = crypto.Keccak256Hash(cand.witnessManager.Bytes(), math.U256Bytes(new(big.Int).SetUint64(cand.epoch)), witnessesToAddBytes, witnessesToRemoveBytes)
+	return nil
+}
+
+func (cand *WitnessCandidates) ID() common.Hash {
+	return cand.id
 }

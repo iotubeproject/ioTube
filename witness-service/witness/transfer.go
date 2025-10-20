@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
@@ -216,7 +217,11 @@ func (s *solTransfer) ToTypesTransfer() *types.Transfer {
 	}
 }
 
-func IDHasherForTransferInEVM(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, error) {
+func IDHasherForTransferInEVM(in any, validatorContractAddr []byte) (common.Hash, error) {
+	transfer, ok := in.(AbstractTransfer)
+	if !ok {
+		return common.Hash{}, errors.New("transfer is not an AbstractTransfer")
+	}
 	return crypto.Keccak256Hash(
 		validatorContractAddr,
 		transfer.Cashier().Bytes(),
@@ -229,7 +234,11 @@ func IDHasherForTransferInEVM(transfer AbstractTransfer, validatorContractAddr [
 	), nil
 }
 
-func IDHasherForTransferInSVM(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, error) {
+func IDHasherForTransferInSVM(in any, validatorContractAddr []byte) (common.Hash, error) {
+	transfer, ok := in.(AbstractTransfer)
+	if !ok {
+		return common.Hash{}, errors.New("transfer is not an AbstractTransfer")
+	}
 	data, err := instruction.SerializePayload(
 		validatorContractAddr,
 		transfer.Cashier().Bytes(),

@@ -63,13 +63,13 @@ service RelayService {
             body: "*"
         };
     };
-    rpc SubmitWitnesses(types.WitnessesList) returns (WitnessListSubmissionResponse) {
+    rpc SubmitWitnessesList(types.WitnessesList) returns (WitnessListSubmissionResponse) {
         option (google.api.http) = {
             post: "/submit_witnesses"
             body: "*"
         };
     }; 
-    rpc CheckWitnesses(CheckRequest) returns (CheckWitnessesResponse) {
+    rpc CheckWitnessesList(CheckRequest) returns (CheckWitnessesListResponse) {
         option (google.api.http) = {
             post: "/check_witnesses"
             body: "*"
@@ -105,7 +105,7 @@ message CheckResponse {
     Status status = 4;
 }
 
-message CheckWitnessesResponse {
+message CheckWitnessesListResponse {
     bytes key = 1;
     repeated bytes witnesses = 2;
     Status status = 3;

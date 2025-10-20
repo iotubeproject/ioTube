@@ -302,14 +302,22 @@ func (tv *transferValidatorOnEthereum) refresh() error {
 	if err != nil {
 		return err
 	}
+	numOfActive, err := tv.witnessListContract.NumOfActive(callOpts)
+	if err != nil {
+		return errors.Wrap(err, "failed to get number of active witnesses")
+	}
+	if numOfActive.Cmp(big.NewInt(0)) == 0 {
+		tv.witnesses = make(map[string]bool)
+		return nil
+	}
 	count, err := tv.witnessListContract.Count(callOpts)
 	if err != nil {
-		return errors.Wrap(err, "failed to call witness list contract")
+		return errors.Wrap(err, "failed to get total number of witnesses")
 	}
 	offset := big.NewInt(0)
-	limit := uint8(10)
-	witnesses := []common.Address{}
-	for offset.Cmp(count) < 0 {
+	limit := uint8(100)
+	witnesses := make([]common.Address, 0, int(numOfActive.Int64()))
+	for offset.Cmp(count) < 0 && big.NewInt(int64(len(witnesses))).Cmp(numOfActive) < 0 {
 		result, err := tv.witnessListContract.GetActiveItems(callOpts, offset, limit)
 		if err != nil {
 			return errors.Wrap(err, "failed to query list")
@@ -318,10 +326,8 @@ func (tv *transferValidatorOnEthereum) refresh() error {
 		offset.Add(offset, big.NewInt(int64(limit)))
 	}
 
-	// log.Println("refresh Witnesses")
 	activeWitnesses := make(map[string]bool)
 	for _, w := range witnesses {
-		// log.Println("\t" + w.Hex())
 		activeWitnesses[w.Hex()] = true
 	}
 
@@ -393,7 +399,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 		log.Printf("transfer %s with nonce %d needs speed up, %s %s %d\n", transfer.id, transfer.nonce, transfer.updateTime.String(), time.Now(), nonce)
 		return StatusOnChainNeedSpeedUp, nil
 	}
-	if transfer.updateTime.After(time.Now().Add(-20 * time.Minute)) {
+	if transfer.updateTime.After(time.Now().Add(-10 * time.Minute)) {
 		return StatusOnChainNotConfirmed, nil
 	}
 	// no matter what the receipt status is, mark the validation as failure
@@ -450,6 +456,7 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		if new(big.Int).Sub(gasPrice, transfer.gasPrice).Cmp(tv.gasPriceGap) < 0 {
 			return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "current gas price %s is not significantly larger than old gas price %s", gasPrice, transfer.gasPrice)
 		}
+		// TODO: update price in tOpts?
 		tOpts.Nonce = big.NewInt(0).SetUint64(transfer.nonce)
 	}
 	transaction, err := tv.validator.SubmitTransfer(tOpts, transfer, signatures)

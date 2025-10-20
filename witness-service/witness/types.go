@@ -20,7 +20,8 @@ type (
 	// Version
 	Version string
 	// TransferStatus is the status of a transfer
-	TransferStatus   string
+	TransferStatus string
+	// CandidatesStatus is the status of a candidates
 	CandidatesStatus TransferStatus
 
 	// Service manages to exchange iotex coin to ERC20 token on ethereum
@@ -42,15 +43,6 @@ type (
 		SubmitTransfers() error
 		CheckTransfers() error
 		ProcessStales() error
-	}
-
-	WitnessCommittee interface {
-		Start(context.Context) error
-		Stop(context.Context) error
-		ID() string
-		PullWitnessCandidates() error
-		SubmitWitnessCandidates() error
-		CheckWitnessCandidates() error
 	}
 
 	AbstractRecorder interface {
@@ -85,17 +77,32 @@ type (
 		ToTypesTransfer() *types.Transfer
 	}
 
+	IDHasher    func(any, []byte) (common.Hash, error)
+	SignHandler func(dataHash []byte) ([]byte, []byte, error)
+
+	// WitnessCommittee manages witness candidate lifecycle
+	WitnessCommittee interface {
+		Start(context.Context) error
+		Stop(context.Context) error
+		ID() string
+		PullWitnessCandidates() error
+		SubmitWitnessCandidates() error
+		CheckWitnessCandidates() error
+	}
+
+	// WitnessRecorder provides persistence for witness candidates
 	WitnessRecorder interface {
 		Start(ctx context.Context) error
 		Stop(ctx context.Context) error
-		AddCandidates(cand WitnessCandidates) error
+		AddCandidates(cand WitnessCandidates, witnessManagerAddrs []common.Address) error
 		Candidates(committee string, epoch uint64) (WitnessCandidates, error)
-		CandidatesToSubmit(committee string) ([]WitnessCandidates, error)
-		CandidatesToSettle(committee string) ([]WitnessCandidates, error)
+		CandidatesToSubmit(committee string) ([][]WitnessCandidates, error)
+		CandidatesToSettle(committee string) ([][]WitnessCandidates, error)
 		SettleCandidates(cand WitnessCandidates, status CandidatesStatus) error
 		ConfirmCandidates(cand WitnessCandidates) error
 	}
 
+	// WitnessCandidates represents witness candidates for an epoch
 	WitnessCandidates interface {
 		ID() []byte
 		SetID(common.Hash)
@@ -106,15 +113,14 @@ type (
 		PrevNominees() []util.Address
 		Candidates() []util.Address
 		Status() CandidatesStatus
-		ToTypesCandidates() *types.Candidates
+		WitnessManagerAddress() common.Address
+		ToTypesCandidates([]byte) *types.Candidates
 	}
 
-	EpochWitnessProvider interface {
+	// EpochWitnessSelector selects witnesses for an epoch
+	EpochWitnessSelector interface {
 		Witnesses(epoch uint64) ([]util.Address, []util.Address, error)
 	}
-
-	IDHasher    func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, error)
-	SignHandler func(dataHash []byte) ([]byte, []byte, error)
 )
 
 const (

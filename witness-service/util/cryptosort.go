@@ -14,15 +14,15 @@ var (
 	CryptoSeed = []byte{0xef, 0xcd, 0xab, 0x90, 0x78, 0x56, 0x34, 0x12}
 )
 
-// SortCandidates sorts a given slices of hashes cryptographically using hash function
-func SortCandidates(candidates []string, epochNum uint64, cryptoSeed []byte) {
+// SortCandidates sorts a given slices of addresses cryptographically using hash function
+func SortCandidates(candidates []common.Address, epochNum uint64, cryptoSeed []byte) {
 	nb := make([]byte, 8)
 	binary.LittleEndian.PutUint64(nb, epochNum)
 
-	hashMap := make(map[string]common.Hash)
+	hashMap := make(map[common.Address]common.Hash)
 	for _, cand := range candidates {
 		hash256 := crypto.Keccak256Hash(
-			[]byte(cand),
+			cand.Bytes(),
 			cryptoSeed,
 			nb)
 		hashMap[cand] = hash256

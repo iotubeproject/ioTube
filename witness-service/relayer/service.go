@@ -32,20 +32,19 @@ type (
 	// Service defines the relayer service
 	Service struct {
 		services.UnimplementedRelayServiceServer
-		validators map[string]TransferValidator
-
-		witnessManagers *string
-
-		unwrappers      map[string]map[string]common.Address
-		checkers        map[string]*FeeChecker
-		retryHeights    map[string]map[uint64]time.Time
-		bonusSender     BonusSender
-		processor       dispatcher.Runner
-		recorder        *Recorder
-		cache           *lru.Cache
-		alwaysReset     bool
-		nonceTooLow     map[common.Hash]uint64
-		destAddrDecoder util.AddressDecoder
+		validators               map[string]TransferValidator
+		witnessManagers          map[string]WitnessManager
+		unwrappers               map[string]map[string]common.Address
+		checkers                 map[string]*FeeChecker
+		retryHeights             map[string]map[uint64]time.Time
+		bonusSender              BonusSender
+		processor                dispatcher.Runner
+		recorder                 *Recorder
+		witnessCommitteeRecorder *WitnessCommitteeRecorder
+		cache                    *lru.Cache
+		alwaysReset              bool
+		nonceTooLow              map[common.Hash]uint64
+		destAddrDecoder          util.AddressDecoder
 	}
 )
 
@@ -451,14 +450,70 @@ func (s *Service) ListNewTX(ctx context.Context, request *services.ListNewTXRequ
 	return &services.ListNewTXResponse{Txs: txs}, nil
 }
 
-// TODO:
+// SubmitWitnesses accepts a submission of witness list
 func (s *Service) SubmitWitnesses(ctx context.Context, request *types.WitnessesList) (*services.WitnessListSubmissionResponse, error) {
-	return nil, nil
+	log.Printf("receive a witness list from %x\n", request.Address)
+	id, err := s.submitWitnesses(request)
+	if err != nil {
+		return nil, err
+	}
+
+	return &services.WitnessListSubmissionResponse{
+		Id:      id.Bytes(),
+		Success: true,
+	}, nil
 }
 
-// TODO:
-func (s *Service) CheckWitnesses(ctx context.Context, request *services.CheckRequest) (*services.CheckWitnessesResponse, error) {
-	return nil, nil
+func (s *Service) submitWitnesses(request *types.WitnessesList) (common.Hash, error) {
+	cand, witness, err := UnmarshalWitnessListProto(request, s.destAddrDecoder)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if s.witnessManagers != nil {
+		if _, ok := s.witnessManagers[cand.witnessManager.String()]; !ok {
+			return common.Hash{}, errors.Errorf("invalid witness manager %s", cand.witnessManager.String())
+		}
+	} else {
+		return common.Hash{}, errors.New("no witness manager configured")
+	}
+	if err := cand.GenID(); err != nil {
+		return common.Hash{}, err
+	}
+	if err := validateSignature(cand.ID().Bytes(), witness.Address(), witness.signature); err != nil {
+		return common.Hash{}, err
+	}
+
+	return cand.ID(), s.witnessCommitteeRecorder.AddWitnessCandidates(
+		cand.ID(),
+		cand.witnessManager,
+		cand.epoch,
+		cand.witnessToAdd,
+		cand.witnessToRemove,
+		witness.Address(),
+		witness.signature,
+	)
+}
+
+// CheckWitnesses checks the status of a witness submission
+func (s *Service) CheckWitnessesList(ctx context.Context, request *services.CheckRequest) (*services.CheckWitnessesListResponse, error) {
+	id := common.BytesToHash(request.Id)
+	candidate, err := s.witnessCommitteeRecorder.Candidate(id)
+	if err != nil {
+		return nil, err
+	}
+	witnesses, err := s.witnessCommitteeRecorder.WitnessSignatures(id)
+	if err != nil {
+		return nil, err
+	}
+	witnessAddrs := make([][]byte, 0, len(witnesses))
+	for _, witness := range witnesses {
+		witnessAddrs = append(witnessAddrs, witness.addr)
+	}
+	return &services.CheckWitnessesListResponse{
+		Key:       candidate.id.Bytes(),
+		Witnesses: witnessAddrs,
+		Status:    s.convertStatus(candidate.status),
+	}, nil
 }
 
 func (s *Service) process() error {
@@ -479,7 +534,7 @@ func (s *Service) process() error {
 	if err := s.confirmWitnesses(); err != nil {
 		return err
 	}
-	return s.submitWitnesses()
+	return s.submitAllWitnesses()
 }
 
 func (s *Service) sendBonus() {
@@ -527,6 +582,7 @@ func (s *Service) confirmTransfers() error {
 			switch {
 			case err != nil:
 				log.Printf("failed to confirm transfer %s, %+v\n", transfer.id.String(), err)
+				// TODO: change it to string contains
 				if errors.Cause(err).Error() == "rpc error: code = Internal desc = nonce too low" {
 					if _, ok := s.nonceTooLow[transfer.id]; !ok {
 						s.nonceTooLow[transfer.id] = 0
@@ -622,8 +678,46 @@ func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidato
 	return false, false, nil
 }
 
-// TODO:
 func (s *Service) confirmWitnesses() error {
+	for _, witnessManager := range s.witnessManagers {
+		validatedCandidates, err := s.witnessCommitteeRecorder.WitnessCandidates(
+			0,
+			uint8(witnessManager.Size()*2),
+			DESC,
+			witnessManager.Address(),
+			ValidationSubmitted,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to fetch candidates from recorder")
+		}
+		for _, candidate := range validatedCandidates {
+			statusOnChain, err := witnessManager.Check(candidate)
+			if err != nil {
+				log.Printf("failed to check status of candidate %s, %+v\n", candidate.id.String(), err)
+				continue
+			}
+			switch statusOnChain {
+			case StatusOnChainNotConfirmed:
+				continue
+			case StatusOnChainSettled:
+				if err := s.witnessCommitteeRecorder.MarkAsSettled(candidate.id); err != nil {
+					return errors.Wrapf(err, "failed to mark candidate as settled %s", candidate.id.String())
+				}
+			case StatusOnChainNonceOverwritten:
+				if err := s.witnessCommitteeRecorder.Reset(candidate.id, ValidationSubmitted); err != nil {
+					return errors.Wrapf(err, "failed to reset candidate with nonce overwritten %s", candidate.id.String())
+				}
+			case StatusOnChainNeedSpeedUp:
+				// TODO:
+				panic("speed up is not handled")
+				// if err := s.witnessCommitteeRecorder.Reset(candidate.id, ValidationSubmitted); err != nil {
+				// 	return errors.Wrapf(err, "failed to reset candidate with speed up %s", candidate.id.String())
+				// }
+			default:
+				return errors.New("unexpected error")
+			}
+		}
+	}
 	return nil
 }
 
@@ -711,7 +805,52 @@ func (s *Service) submitTransfer(transfer *Transfer, validator TransferValidator
 	}
 }
 
-// TODO:
-func (s *Service) submitWitnesses() error {
+func (s *Service) submitAllWitnesses() error {
+	for _, witnessManager := range s.witnessManagers {
+		candidates, err := s.witnessCommitteeRecorder.WitnessCandidates(
+			0,
+			uint8(witnessManager.Size()*2),
+			DESC,
+			witnessManager.Address(),
+			WaitingForWitnesses,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to fetch candidates from recorder")
+		}
+		for _, candidate := range candidates {
+			witnesses, err := s.witnessCommitteeRecorder.WitnessSignatures(candidate.id)
+			if err != nil {
+				return errors.Wrap(err, "failed to fetch witnesses from recorder")
+			}
+
+			if err := s.submitWitness(witnessManager, candidate, witnesses); err != nil {
+				return errors.Wrapf(err, "failed to submit witness %s", candidate.id.String())
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}
 	return nil
+}
+
+func (s *Service) submitWitness(witnessManager WitnessManager, candidate *WitnessCandidates, witnesses []*Witness) (err error) {
+	if err = s.witnessCommitteeRecorder.MarkAsProcessing(candidate.id); err != nil {
+		return errors.Wrap(err, "failed to mark candidate as processing")
+	}
+
+	txHash, relayer, nonce, gasPrice, err := witnessManager.Submit(candidate, witnesses)
+	if err != nil {
+		log.Printf("failed to propose witnesses: %+v\n", err)
+	}
+	switch errors.Cause(err) {
+	case nil:
+		return s.witnessCommitteeRecorder.MarkAsSubmitted(candidate.id, txHash, relayer, nonce, gasPrice)
+	case errGasPriceTooHigh, errInsufficientWitnesses, errNoncritical:
+		return s.witnessCommitteeRecorder.Reset(candidate.id, ValidationInProcess)
+	case errInvalidData:
+		return s.witnessCommitteeRecorder.MarkAsRejected(candidate.id)
+	default:
+		_ = s.witnessCommitteeRecorder.Reset(candidate.id, ValidationInProcess)
+		return errors.Wrap(err, "failed to submit witness")
+	}
 }
