@@ -47,33 +47,36 @@ type (
 	}
 	// Configuration defines the configuration of the witness service
 	Configuration struct {
-		Chain                 string                       `json:"chain" yaml:"chain"`
-		ClientURL             string                       `json:"clientURL" yaml:"clientURL"`
-		EthConfirmBlockNumber uint16                       `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
-		EthDefaultGasPrice    uint64                       `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
-		EthGasPriceLimit      uint64                       `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
-		EthGasPriceHardLimit  uint64                       `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
-		EthGasPriceDeviation  int64                        `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
-		EthGasPriceGap        uint64                       `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
-		PrivateKey            string                       `json:"privateKey" yaml:"privateKey"`
-		Interval              time.Duration                `json:"interval" yaml:"interval"`
-		Validators            []ValidatorConfig            `json:"validators" yaml:"validators"`
-		Unwrappers            map[string]map[string]string `json:"unwrappers" yaml:"unwrappers"`
+		Chain                   string                       `json:"chain" yaml:"chain"`
+		ClientURL               string                       `json:"clientURL" yaml:"clientURL"`
+		EthConfirmBlockNumber   uint16                       `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+		EthDefaultGasPrice      uint64                       `json:"ethDefaultGasPrice" yaml:"ethDefaultGasPrice"`
+		EthGasPriceLimit        uint64                       `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+		EthGasPriceHardLimit    uint64                       `json:"ethGasPriceHardLimit" yaml:"ethGasPriceHardLimit"`
+		EthGasPriceDeviation    int64                        `json:"ethGasPriceDeviation" yaml:"ethGasPriceDeviation"`
+		EthGasPriceGap          uint64                       `json:"ethGasPriceGap" yaml:"ethGasPriceGap"`
+		PrivateKey              string                       `json:"privateKey" yaml:"privateKey"`
+		Interval                time.Duration                `json:"interval" yaml:"interval"`
+		Validators              []ValidatorConfig            `json:"validators" yaml:"validators"`
+		WitnessManagerAddresses []string                     `json:"witnessManagerAddresses" yaml:"witnessManagerAddresses"`
+		Unwrappers              map[string]map[string]string `json:"unwrappers" yaml:"unwrappers"`
 
 		BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
 		Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
 
-		AlwaysReset             bool      `json:"alwaysReset" yaml:"alwaysReset"`
-		SlackWebHook            string    `json:"slackWebHook" yaml:"slackWebHook"`
-		LarkWebHook             string    `json:"larkWebHook" yaml:"larkWebHook"`
-		GrpcPort                int       `json:"grpcPort" yaml:"grpcPort"`
-		GrpcProxyPort           int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-		Database                db.Config `json:"database" yaml:"database"`
-		ExplorerDatabase        db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
-		TransferTableName       string    `json:"transferTableName" yaml:"transferTableName"`
-		NewTransactionTableName string    `json:"newTransactionTableName" yaml:"newTransactionTableName"`
-		WitnessTableName        string    `json:"witnessTableName" yaml:"witnessTableName"`
-		ExplorerTableName       string    `json:"explorerTableName" yaml:"explorerTableName"`
+		AlwaysReset                bool      `json:"alwaysReset" yaml:"alwaysReset"`
+		SlackWebHook               string    `json:"slackWebHook" yaml:"slackWebHook"`
+		LarkWebHook                string    `json:"larkWebHook" yaml:"larkWebHook"`
+		GrpcPort                   int       `json:"grpcPort" yaml:"grpcPort"`
+		GrpcProxyPort              int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+		Database                   db.Config `json:"database" yaml:"database"`
+		ExplorerDatabase           db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
+		TransferTableName          string    `json:"transferTableName" yaml:"transferTableName"`
+		NewTransactionTableName    string    `json:"newTransactionTableName" yaml:"newTransactionTableName"`
+		WitnessTableName           string    `json:"witnessTableName" yaml:"witnessTableName"`
+		WitnessCandidatesTableName string    `json:"witnessCandidatesTableName" yaml:"witnessCandidatesTableName"`
+		WitnessCommitteesTableName string    `json:"witnessCommitteesTableName" yaml:"witnessCommitteesTableName"`
+		ExplorerTableName          string    `json:"explorerTableName" yaml:"explorerTableName"`
 
 		SolanaConfig struct {
 			ValidatorAddress        string  `json:"validatorAddress" yaml:"validatorAddress"`
@@ -280,8 +283,45 @@ func main() {
 			log.Fatalf("failed to create bonus sender: %+v\n", err)
 		}
 
+		witnessManagers := make(map[string]relayer.WitnessManager)
+		for _, witnessManagerAddr := range cfg.WitnessManagerAddresses {
+			addr, err := util.ParseEthAddress(witnessManagerAddr)
+			if err != nil {
+				log.Fatalf("failed to parse witness manager address %s: %+v", witnessManagerAddr, err)
+			}
+			witnessManager, err := relayer.NewWitnessManagerOnEthereum(
+				ethClient,
+				privateKeys,
+				cfg.EthConfirmBlockNumber,
+				new(big.Int).SetUint64(cfg.EthDefaultGasPrice),
+				new(big.Int).SetUint64(cfg.EthGasPriceLimit),
+				new(big.Int).SetUint64(cfg.EthGasPriceHardLimit),
+				new(big.Int).SetInt64(cfg.EthGasPriceDeviation),
+				new(big.Int).SetUint64(cfg.EthGasPriceGap),
+				support1559,
+				addr,
+			)
+			if err != nil {
+				log.Fatalf("failed to create witness manager: %+v\n", err)
+			}
+			witnessManagers[addr.String()] = witnessManager
+		}
+		var witnessCommitteeRecorder *relayer.WitnessCommitteeRecorder
+		if len(witnessManagers) > 0 {
+			witnessCommitteeRecorder = relayer.NewWitnessCommitteeRecorder(
+				storeFactory.NewStore(cfg.Database),
+				cfg.WitnessCandidatesTableName,
+				cfg.WitnessCommitteesTableName,
+			)
+			if err := witnessCommitteeRecorder.Start(context.Background()); err != nil {
+				log.Fatalf("failed to start witness committee recorder: %v\n", err)
+			}
+			defer witnessCommitteeRecorder.Stop(context.Background())
+		}
+
 		ethService, err := relayer.NewServiceOnEthereum(
 			validators,
+			witnessManagers,
 			unwrappers,
 			checkers,
 			bonusSender,
@@ -293,6 +333,7 @@ func main() {
 				cfg.NewTransactionTableName,
 				cfg.ExplorerTableName,
 			),
+			witnessCommitteeRecorder,
 			cfg.Interval,
 		)
 		if err != nil {

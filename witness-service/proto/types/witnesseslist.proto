@@ -9,8 +9,8 @@ import "google/protobuf/timestamp.proto";
 message Candidates {
     bytes witnessManagerAddress = 1;
     uint64 epoch = 2;
-    repeated string witnessesToAdd = 3;
-    repeated string witnessesToRemove = 4;
+    repeated bytes witnessesToAdd = 3;
+    repeated bytes witnessesToRemove = 4;
     google.protobuf.Timestamp timestamp = 5;
 }
 

@@ -39,7 +39,7 @@ type witnessManagerOnEthereum struct {
 	witnesses           map[string]bool
 }
 
-func newWitnessManagerOnEthereum(
+func NewWitnessManagerOnEthereum(
 	client *ethclient.Client,
 	privateKeys []*ecdsa.PrivateKey,
 	confirmBlockNumber uint16,
@@ -63,31 +63,31 @@ func newWitnessManagerOnEthereum(
 		gasPriceHardLimit = gasPriceLimit
 	}
 	log.Printf("Create witness manager for chain %d\n", chainID)
-	w := &witnessManagerOnEthereum{
-		witnessManagerAddr: witnessManagerAddr,
-		witnessManager:     witnessManager,
-		confirmBlockNumber: confirmBlockNumber,
-		privateKeys:        privateKeys,
-		client:             client,
-		defaultGasPrice:    defaultGasPrice,
-		gasPriceLimit:      gasPriceLimit,
-		gasPriceHardLimit:  gasPriceHardLimit,
-		gasPriceDeviation:  gasPriceDeviation,
-		gasPriceGap:        gasPriceGap,
-		support1559:        support1559,
-		chainID:            chainID,
-	}
 
-	witnessContractAddr, err := w.witnessManager.WitnessList(nil)
+	witnessContractAddr, err := witnessManager.WitnessList(nil)
 	if err != nil {
 		return nil, err
 	}
-	w.witnessListContract, err = contract.NewAddressListCaller(witnessContractAddr, client)
+	witnessListContract, err := contract.NewAddressListCaller(witnessContractAddr, client)
 	if err != nil {
 		return nil, err
 	}
 
-	return w, nil
+	return &witnessManagerOnEthereum{
+		witnessManagerAddr:  witnessManagerAddr,
+		witnessManager:      witnessManager,
+		confirmBlockNumber:  confirmBlockNumber,
+		privateKeys:         privateKeys,
+		client:              client,
+		defaultGasPrice:     defaultGasPrice,
+		gasPriceLimit:       gasPriceLimit,
+		gasPriceHardLimit:   gasPriceHardLimit,
+		gasPriceDeviation:   gasPriceDeviation,
+		gasPriceGap:         gasPriceGap,
+		support1559:         support1559,
+		chainID:             chainID,
+		witnessListContract: witnessListContract,
+	}, nil
 }
 
 func (w *witnessManagerOnEthereum) Size() int {
@@ -105,6 +105,10 @@ func (w *witnessManagerOnEthereum) Check(candidates *WitnessCandidates) (StatusO
 	if candidates.relayer == zeroAddress {
 		return StatusOnChainUnknown, errors.New("relayer is null")
 	}
+	if candidates.witnessManager != w.witnessManagerAddr {
+		return StatusOnChainUnknown, errors.New("witness manager is not the same")
+	}
+
 	// Fetch confirmed nonce before all the other checks
 	nonce, err := w.client.NonceAt(context.Background(), candidates.relayer, nil)
 	if err != nil {

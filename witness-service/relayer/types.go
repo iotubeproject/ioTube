@@ -8,7 +8,7 @@ package relayer
 
 import (
 	"bytes"
-	"context"
+	"encoding/binary"
 	"math/big"
 	"sort"
 	"time"
@@ -95,34 +95,6 @@ type (
 		SpeedUp(candidates *WitnessCandidates, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 	}
 
-	AbstractRecorder interface {
-		// Start starts the recorder
-		Start(ctx context.Context) error
-		// Stop stops the recorder
-		Stop(ctx context.Context) error
-		// AddWitness adds a witness and a transfer
-		AddWitness(validator util.Address, transfer *Transfer, witness *Witness) (common.Hash, error)
-		// ResetFailedTransfer resets a failed transfer
-		ResetFailedTransfer(id common.Hash) error
-		// Transfers returns a list of transfers
-		Transfers(offset uint32, limit uint8, order Order,
-			queryOpts ...TransferQueryOption) ([]*Transfer, error)
-		// Transfer returns a transfer by id
-		Transfer(id common.Hash) (*Transfer, error)
-		// Witnesses returns a list of witnesses by transfer id
-		Witnesses(ids ...common.Hash) (map[common.Hash][]*Witness, error)
-		// Count returns the number of transfers
-		Count(opts ...TransferQueryOption) (int, error)
-		// AddNewTX adds a new tx to the new tx table
-		AddNewTX(height uint64, txHash []byte) error
-		// NewTXs returns the new txs to be witnessed
-		NewTXs(count uint32) ([]uint64, [][]byte, error)
-		// HeightsOfStaleTransfers returns the heights of stale transfers
-		HeightsOfStaleTransfers(cashier util.Address) ([]uint64, error)
-		// TransfersBySourceTxHash returns transfers by source tx hash
-		TransfersBySourceTxHash(hash common.Hash) ([]*Transfer, error)
-	}
-
 	SOLRawTransaction struct {
 		id                   common.Hash
 		cashier              util.Address
@@ -141,37 +113,7 @@ type (
 		status               ValidationStatusType
 		timestamp            time.Time
 	}
-
-	// WitnessCandidates defines a record of witness list update
-	WitnessCandidates struct {
-		id              common.Hash
-		witnessManager  common.Address
-		epoch           uint64
-		witnessToAdd    []util.Address
-		witnessToRemove []util.Address
-		creationTime    time.Time
-		updateTime      time.Time
-		status          ValidationStatusType
-		txHash          common.Hash
-		blockHeight     uint64
-		gas             uint64
-		nonce           uint64
-		relayer         common.Address
-		gasPrice        *big.Int
-	}
 )
-
-func (cand *WitnessCandidates) Witnesses() ([]common.Address, []common.Address) {
-	witnessesToAdd := []common.Address{}
-	for _, witness := range cand.witnessToAdd {
-		witnessesToAdd = append(witnessesToAdd, witness.Address().(common.Address))
-	}
-	witnessesToRemove := []common.Address{}
-	for _, witness := range cand.witnessToRemove {
-		witnessesToRemove = append(witnessesToRemove, witness.Address().(common.Address))
-	}
-	return witnessesToAdd, witnessesToRemove
-}
 
 const (
 	// WaitingForWitnesses stands for a transfer which needs more valid witnesses
@@ -194,6 +136,8 @@ const (
 	ValidationFailed = "failed"
 	// ValidationRejected stands for the validation of a transfer is rejected
 	ValidationRejected = "rejected"
+	// ValidationNeedSpeedUp stands for the validation of a transfer needs speed up
+	ValidationNeedSpeedUp = "speedup"
 )
 
 const (
@@ -356,17 +300,6 @@ func (w *Witness) Address() common.Address {
 	return common.BytesToAddress(w.addr)
 }
 
-func packWitnesses(witnesses []common.Address) ([]byte, error) {
-	sort.Slice(witnesses, func(i, j int) bool {
-		return bytes.Compare(witnesses[i][:], witnesses[j][:]) < 0
-	})
-	var packed []byte
-	for _, witness := range witnesses {
-		packed = append(packed, witness.Bytes()...)
-	}
-	return crypto.Keccak256Hash(packed).Bytes(), nil
-}
-
 // UnmarshalWitnessListProto unmarshals a witness list proto
 func UnmarshalWitnessListProto(
 	request *types.WitnessesList,
@@ -384,24 +317,27 @@ func UnmarshalWitnessListProto(
 		return nil, nil, errors.New("witness manager address is not common.Address")
 	}
 	witnessesToAdd := make([]util.Address, len(request.Candidates.WitnessesToAdd))
-	for i, witnessStr := range request.Candidates.WitnessesToAdd {
-		witness, err := destAddrDecoder.DecodeString(witnessStr)
+	for i, witnessBytes := range request.Candidates.WitnessesToAdd {
+		witness, err := destAddrDecoder.DecodeBytes(witnessBytes)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to decode witness to add %s", witnessStr)
+			return nil, nil, errors.Wrapf(err, "failed to decode witness to add %x", witnessBytes)
 		}
 		witnessesToAdd[i] = witness
 	}
 	witnessesToRemove := make([]util.Address, len(request.Candidates.WitnessesToRemove))
-	for i, witnessStr := range request.Candidates.WitnessesToRemove {
-		witness, err := destAddrDecoder.DecodeString(witnessStr)
+	for i, witnessBytes := range request.Candidates.WitnessesToRemove {
+		witness, err := destAddrDecoder.DecodeBytes(witnessBytes)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to decode witness to remove %s", witnessStr)
+			return nil, nil, errors.Wrapf(err, "failed to decode witness to remove %x", witnessBytes)
 		}
 		witnessesToRemove[i] = witness
 	}
-	witness, err := NewWitness(request.Address, request.Signature)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create witness")
+	var witness *Witness
+	if len(request.Address) > 0 && len(request.Signature) > 0 {
+		witness, err = NewWitness(request.Address, request.Signature)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to create witness")
+		}
 	}
 
 	return &WitnessCandidates{
@@ -409,28 +345,30 @@ func UnmarshalWitnessListProto(
 		epoch:           request.Candidates.Epoch,
 		witnessToAdd:    witnessesToAdd,
 		witnessToRemove: witnessesToRemove,
-		creationTime:    request.Candidates.Timestamp.AsTime(),
 	}, witness, nil
 }
 
-func (cand *WitnessCandidates) GenID() error {
-	witnessesToAdd := []common.Address{}
-	for _, witness := range cand.witnessToAdd {
-		commonAddr, ok := witness.Address().(common.Address)
-		if !ok {
-			return errors.Errorf("failed to cast witness to add %s to common.Address", witness.String())
-		}
-		witnessesToAdd = append(witnessesToAdd, commonAddr)
+type (
+	// WitnessCandidates defines a record of witness list update
+	WitnessCandidates struct {
+		id              common.Hash
+		witnessManager  common.Address
+		epoch           uint64
+		witnessToAdd    []util.Address
+		witnessToRemove []util.Address
+		updateTime      time.Time
+		status          ValidationStatusType
+		txHash          common.Hash
+		blockHeight     uint64
+		gas             uint64
+		nonce           uint64
+		relayer         common.Address
+		gasPrice        *big.Int
 	}
-	witnessesToRemove := []common.Address{}
-	for _, witness := range cand.witnessToRemove {
-		commonAddr, ok := witness.Address().(common.Address)
-		if !ok {
-			return errors.Errorf("failed to cast witness to remove %s to common.Address", witness.String())
-		}
-		witnessesToRemove = append(witnessesToRemove, commonAddr)
-	}
+)
 
+func (cand *WitnessCandidates) GenID() error {
+	witnessesToAdd, witnessesToRemove := cand.Witnesses()
 	witnessesToAddBytes, err := packWitnesses(witnessesToAdd)
 	if err != nil {
 		return err
@@ -439,8 +377,33 @@ func (cand *WitnessCandidates) GenID() error {
 	if err != nil {
 		return err
 	}
-	cand.id = crypto.Keccak256Hash(cand.witnessManager.Bytes(), math.U256Bytes(new(big.Int).SetUint64(cand.epoch)), witnessesToAddBytes, witnessesToRemoveBytes)
+	epochBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(epochBytes, cand.epoch)
+	cand.id = crypto.Keccak256Hash(cand.witnessManager.Bytes(), epochBytes, witnessesToAddBytes, witnessesToRemoveBytes)
 	return nil
+}
+
+func packWitnesses(witnesses []common.Address) ([]byte, error) {
+	sort.Slice(witnesses, func(i, j int) bool {
+		return bytes.Compare(witnesses[i][:], witnesses[j][:]) < 0
+	})
+	var packed []byte
+	for _, witness := range witnesses {
+		packed = append(packed, witness.Bytes()...)
+	}
+	return packed, nil
+}
+
+func (cand *WitnessCandidates) Witnesses() ([]common.Address, []common.Address) {
+	witnessesToAdd := []common.Address{}
+	for _, witness := range cand.witnessToAdd {
+		witnessesToAdd = append(witnessesToAdd, witness.Address().(common.Address))
+	}
+	witnessesToRemove := []common.Address{}
+	for _, witness := range cand.witnessToRemove {
+		witnessesToRemove = append(witnessesToRemove, witness.Address().(common.Address))
+	}
+	return witnessesToAdd, witnessesToRemove
 }
 
 func (cand *WitnessCandidates) ID() common.Hash {

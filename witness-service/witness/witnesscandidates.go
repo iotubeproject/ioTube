@@ -55,23 +55,22 @@ func (c *witnessCandidates) Candidates() []util.Address {
 }
 func (c *witnessCandidates) Status() CandidatesStatus { return c.status }
 func (c *witnessCandidates) ToTypesCandidates(witnessManagerAddr []byte) *types.Candidates {
-	witnessesToAdd := make([]string, len(c.nominees))
+	witnessesToAdd := make([][]byte, len(c.nominees))
 	for i, addr := range c.nominees {
-		witnessesToAdd[i] = addr.String()
+		witnessesToAdd[i] = addr.Bytes()
 	}
 
-	witnessesToRemove := make([]string, len(c.prevNominees))
+	witnessesToRemove := make([][]byte, len(c.prevNominees))
 	for i, addr := range c.prevNominees {
-		witnessesToRemove[i] = addr.String()
+		witnessesToRemove[i] = addr.Bytes()
 	}
 
 	return &types.Candidates{
 		WitnessManagerAddress: witnessManagerAddr,
 		Epoch:                 c.epoch,
-		// TODO: change string type to bytes type
-		WitnessesToAdd:    witnessesToAdd,
-		WitnessesToRemove: witnessesToRemove,
-		Timestamp:         timestamppb.Now(),
+		WitnessesToAdd:        witnessesToAdd,
+		WitnessesToRemove:     witnessesToRemove,
+		Timestamp:             timestamppb.Now(),
 	}
 }
 

@@ -17,7 +17,6 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
@@ -29,8 +28,8 @@ type (
 	WitnessCommitteeRecorder struct {
 		store                           *db.SQLStore
 		mutex                           sync.RWMutex
-		witnessCommitteeTableName       string
 		witnessCandidatesTableName      string
+		witnessCommitteeTableName       string
 		updateStatusQuery               string
 		updateStatusAndTransactionQuery string
 	}
@@ -39,13 +38,13 @@ type (
 // NewWitnessCommitteeRecorder returns a recorder for exchange
 func NewWitnessCommitteeRecorder(
 	store *db.SQLStore,
-	witnessCommitteeTableName string,
 	witnessCandidatesTableName string,
+	witnessCommitteeTableName string,
 ) *WitnessCommitteeRecorder {
 	return &WitnessCommitteeRecorder{
 		store:                           store,
-		witnessCommitteeTableName:       witnessCommitteeTableName,
 		witnessCandidatesTableName:      witnessCandidatesTableName,
+		witnessCommitteeTableName:       witnessCommitteeTableName,
 		updateStatusQuery:               fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=? AND `status`=?", witnessCandidatesTableName),
 		updateStatusAndTransactionQuery: fmt.Sprintf("UPDATE `%s` SET `status`=?, `txHash`=?, `relayer`=?, `nonce`=?, `gasPrice`=? WHERE `id`=? AND `status`=?", witnessCandidatesTableName),
 	}
@@ -120,27 +119,15 @@ func (r *WitnessCommitteeRecorder) Stop(ctx context.Context) error {
 }
 
 // AddWitnessCandidates records a new witness candidates list update and a witness signature
-func (r *WitnessCommitteeRecorder) AddWitnessCandidates(id common.Hash, witnessManager common.Address, epoch uint64, witnessToAdd []util.Address, witnessToRemove []util.Address, witness common.Address, signature []byte) error {
+func (r *WitnessCommitteeRecorder) AddWitnessCandidates(cand *WitnessCandidates, witness *Witness) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	rpk, err := crypto.Ecrecover(id.Bytes(), signature)
-	if err != nil {
-		return err
-	}
-	pk, err := crypto.UnmarshalPubkey(rpk)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal public key")
-	}
-	if crypto.PubkeyToAddress(*pk) != witness {
-		return errors.New("invalid signature")
-	}
-
-	add, err := json.Marshal(toStringArray(witnessToAdd))
+	add, err := json.Marshal(toStringArray(cand.witnessToAdd))
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal witness to add")
 	}
-	remove, err := json.Marshal(toStringArray(witnessToRemove))
+	remove, err := json.Marshal(toStringArray(cand.witnessToRemove))
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal witness to remove")
 	}
@@ -151,21 +138,23 @@ func (r *WitnessCommitteeRecorder) AddWitnessCandidates(id common.Hash, witnessM
 	defer tx.Rollback()
 	if _, err := tx.Exec(
 		fmt.Sprintf("INSERT IGNORE INTO %s (`id`, `witness_manager`, `epoch`, `witness_to_add`, `witness_to_remove`) VALUES (?, ?, ?, ?, ?)", r.witnessCandidatesTableName),
-		id.Hex(),
-		witnessManager.Hex(),
-		epoch,
+		cand.ID().Hex(),
+		cand.witnessManager.Hex(),
+		cand.epoch,
 		add,
 		remove,
 	); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (`candidatesId`, `witness`, `signature`) VALUES (?, ?, ?)", r.witnessCommitteeTableName),
-		id.Hex(),
-		witness.Hex(),
-		hex.EncodeToString(signature),
-	); err != nil {
-		return err
+	if witness != nil && len(witness.signature) > 0 {
+		if _, err := tx.Exec(
+			fmt.Sprintf("INSERT IGNORE INTO %s (`candidatesId`, `witness`, `signature`) VALUES (?, ?, ?)", r.witnessCommitteeTableName),
+			cand.ID().Hex(),
+			witness.Address().Hex(),
+			hex.EncodeToString(witness.signature),
+		); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -209,6 +198,9 @@ func (r *WitnessCommitteeRecorder) WitnessSignatures(id common.Hash) ([]*Witness
 		}
 		witnesses = append(witnesses, w)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to iterate rows")
+	}
 	return witnesses, nil
 }
 
@@ -220,7 +212,7 @@ func (r *WitnessCommitteeRecorder) assembleWitnessCandidates(scan func(dest ...i
 	var witnessManager string
 	var witnessToAdd, witnessToRemove []byte
 
-	if err := scan(&id, &witnessManager, &wl.epoch, &witnessToAdd, &witnessToRemove, &wl.creationTime, &wl.updateTime, &wl.status, &txHash, &gas, &nonce, &relayer, &gasPrice); err != nil {
+	if err := scan(&id, &witnessManager, &wl.epoch, &witnessToAdd, &witnessToRemove, &wl.updateTime, &wl.status, &txHash, &gas, &nonce, &relayer, &gasPrice); err != nil {
 		return nil, errors.Wrap(err, "failed to scan witness list")
 	}
 	wl.id = common.HexToHash(id)
@@ -290,8 +282,8 @@ func (r *WitnessCommitteeRecorder) WitnessCandidates(
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
-	query := fmt.Sprintf("SELECT `id`, `witness_manager`, `epoch`, `witness_to_add`, `witness_to_remove`, `creationTime`, `updateTime`, `status`, `txHash`, `gas`, `nonce`, `relayer`, `gasPrice` FROM %s WHERE `witness_manager`=? AND `status`=?", r.witnessCandidatesTableName)
-	orderBy := "creationTime"
+	query := fmt.Sprintf("SELECT `id`, `witness_manager`, `epoch`, `witness_to_add`, `witness_to_remove`, `updateTime`, `status`, `txHash`, `gas`, `nonce`, `relayer`, `gasPrice` FROM %s WHERE `witness_manager`=? AND `status`=?", r.witnessCandidatesTableName)
+	orderBy := "epoch"
 	params := []interface{}{witnessManager.Hex(), status}
 	if desc {
 		query += fmt.Sprintf(" ORDER BY `%s` DESC", orderBy)
@@ -324,7 +316,7 @@ func (r *WitnessCommitteeRecorder) Candidate(id common.Hash) (*WitnessCandidates
 	defer r.mutex.RUnlock()
 
 	row := r.store.DB().QueryRow(
-		fmt.Sprintf("SELECT `id`, `witness_manager`, `epoch`, `witness_to_add`, `witness_to_remove`, `creationTime`, `updateTime`, `status`, `txHash`, `gas`, `nonce`, `relayer`, `gasPrice` FROM %s WHERE `id`=?", r.witnessCandidatesTableName),
+		fmt.Sprintf("SELECT `id`, `witness_manager`, `epoch`, `witness_to_add`, `witness_to_remove`, `updateTime`, `status`, `txHash`, `gas`, `nonce`, `relayer`, `gasPrice` FROM %s WHERE `id`=?", r.witnessCandidatesTableName),
 		id.Hex(),
 	)
 	return r.assembleWitnessCandidates(row.Scan)
@@ -369,7 +361,7 @@ func (r *WitnessCommitteeRecorder) MarkAsSettled(id common.Hash) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	result, err := r.store.DB().Exec(
-		fmt.Sprintf("UPDATE `%s` SET `status`=? WHERE `id`=? AND `status`=?", r.witnessCandidatesTableName),
+		r.updateStatusQuery,
 		TransferSettled,
 		id.Hex(),
 		ValidationSubmitted,
@@ -378,6 +370,18 @@ func (r *WitnessCommitteeRecorder) MarkAsSettled(id common.Hash) error {
 		return errors.Wrap(err, "failed to mark as settled")
 	}
 
+	return r.validateResult(result, 1)
+}
+
+// MarkAsNeedSpeedUp marks a record as need speed up
+func (r *WitnessCommitteeRecorder) MarkAsNeedSpeedUp(id common.Hash) error {
+	log.Printf("mark witness candidates as need speed up, id: %s\n", id.Hex())
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	result, err := r.store.DB().Exec(r.updateStatusQuery, ValidationNeedSpeedUp, id.Hex(), ValidationInProcess)
+	if err != nil {
+		return errors.Wrap(err, "failed to mark as need speed up")
+	}
 	return r.validateResult(result, 1)
 }
 
@@ -406,11 +410,11 @@ func (r *WitnessCommitteeRecorder) MarkAsRejected(id common.Hash) error {
 }
 
 // Reset marks a record as new
-func (r *WitnessCommitteeRecorder) Reset(id common.Hash, oldStatus ValidationStatusType) error {
-	log.Printf("reset witness candidates %s from %s to %s\n", id.Hex(), oldStatus, WaitingForWitnesses)
+func (r *WitnessCommitteeRecorder) Reset(id common.Hash, oldStatus ValidationStatusType, newStatus ValidationStatusType) error {
+	log.Printf("reset witness candidates %s from %s to %s\n", id.Hex(), oldStatus, newStatus)
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	result, err := r.store.DB().Exec(r.updateStatusQuery, WaitingForWitnesses, id.Hex(), oldStatus)
+	result, err := r.store.DB().Exec(r.updateStatusQuery, newStatus, id.Hex(), oldStatus)
 	if err != nil {
 		return errors.Wrap(err, "failed to reset")
 	}

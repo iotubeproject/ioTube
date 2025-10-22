@@ -456,7 +456,7 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		if new(big.Int).Sub(gasPrice, transfer.gasPrice).Cmp(tv.gasPriceGap) < 0 {
 			return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "current gas price %s is not significantly larger than old gas price %s", gasPrice, transfer.gasPrice)
 		}
-		// TODO: update price in tOpts?
+		// TODO: increase price in tOpts when speeding up?
 		tOpts.Nonce = big.NewInt(0).SetUint64(transfer.nonce)
 	}
 	transaction, err := tv.validator.SubmitTransfer(tOpts, transfer, signatures)

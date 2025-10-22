@@ -26,8 +26,8 @@ type Candidates struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
 	WitnessManagerAddress []byte                 `protobuf:"bytes,1,opt,name=witnessManagerAddress,proto3" json:"witnessManagerAddress,omitempty"`
 	Epoch                 uint64                 `protobuf:"varint,2,opt,name=epoch,proto3" json:"epoch,omitempty"`
-	WitnessesToAdd        []string               `protobuf:"bytes,3,rep,name=witnessesToAdd,proto3" json:"witnessesToAdd,omitempty"`
-	WitnessesToRemove     []string               `protobuf:"bytes,4,rep,name=witnessesToRemove,proto3" json:"witnessesToRemove,omitempty"`
+	WitnessesToAdd        [][]byte               `protobuf:"bytes,3,rep,name=witnessesToAdd,proto3" json:"witnessesToAdd,omitempty"`
+	WitnessesToRemove     [][]byte               `protobuf:"bytes,4,rep,name=witnessesToRemove,proto3" json:"witnessesToRemove,omitempty"`
 	Timestamp             *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
@@ -77,14 +77,14 @@ func (x *Candidates) GetEpoch() uint64 {
 	return 0
 }
 
-func (x *Candidates) GetWitnessesToAdd() []string {
+func (x *Candidates) GetWitnessesToAdd() [][]byte {
 	if x != nil {
 		return x.WitnessesToAdd
 	}
 	return nil
 }
 
-func (x *Candidates) GetWitnessesToRemove() []string {
+func (x *Candidates) GetWitnessesToRemove() [][]byte {
 	if x != nil {
 		return x.WitnessesToRemove
 	}
@@ -167,8 +167,8 @@ const file_types_witnesseslist_proto_rawDesc = "" +
 	"Candidates\x124\n" +
 	"\x15witnessManagerAddress\x18\x01 \x01(\fR\x15witnessManagerAddress\x12\x14\n" +
 	"\x05epoch\x18\x02 \x01(\x04R\x05epoch\x12&\n" +
-	"\x0ewitnessesToAdd\x18\x03 \x03(\tR\x0ewitnessesToAdd\x12,\n" +
-	"\x11witnessesToRemove\x18\x04 \x03(\tR\x11witnessesToRemove\x128\n" +
+	"\x0ewitnessesToAdd\x18\x03 \x03(\fR\x0ewitnessesToAdd\x12,\n" +
+	"\x11witnessesToRemove\x18\x04 \x03(\fR\x11witnessesToRemove\x128\n" +
 	"\ttimestamp\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"z\n" +
 	"\rWitnessesList\x121\n" +
 	"\n" +
