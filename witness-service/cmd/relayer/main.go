@@ -40,10 +40,12 @@ type (
 	}
 	// ValidatorConfig defines the configuration of a validator
 	ValidatorConfig struct {
-		Address     string          `json:"address" yaml:"address"`
-		Cashiers    []CashierConfig `json:"cashiers" yaml:"cashiers"`
-		WithPayload bool            `json:"withPayload" yaml:"withPayload"`
-		FromSolana  bool            `json:"fromSolana" yaml:"fromSolana"`
+		Address  string          `json:"address" yaml:"address"`
+		Cashiers []CashierConfig `json:"cashiers" yaml:"cashiers"`
+		// TODO: refactor this to use a single field for all versions
+		WithPayload          bool `json:"withPayload" yaml:"withPayload"`
+		FromSolana           bool `json:"fromSolana" yaml:"fromSolana"`
+		WithWitnessCommittee bool `json:"withWitnessCommittee" yaml:"withWitnessCommittee"`
 	}
 	// Configuration defines the configuration of the witness service
 	Configuration struct {
@@ -236,13 +238,19 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to parse validator address %s: %+v", vc.Address, err)
 			}
-			version := relayer.NoPayload
-			if vc.WithPayload {
+
+			var version relayer.Version
+			switch {
+			case vc.WithPayload:
 				version = relayer.Payload
-			}
-			if vc.FromSolana {
+			case vc.FromSolana:
 				version = relayer.FromSolana
+			case vc.WithWitnessCommittee:
+				version = relayer.WitnessCommittee
+			default:
+				version = relayer.NoPayload
 			}
+
 			validator, err := relayer.NewTransferValidatorOnEthereum(
 				ethClient,
 				privateKeys,

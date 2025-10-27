@@ -58,6 +58,9 @@ const (
 
 	// FromSolana is the version for Solana
 	FromSolana Version = "from-solana"
+
+	// WitnessCommittee is the version for Witness Committee
+	WitnessCommittee Version = "witness-committee"
 )
 
 // NewServiceOnEthereum creates a new relay service on Ethereum
