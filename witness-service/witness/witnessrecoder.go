@@ -172,14 +172,8 @@ func (recorder *witnessRecorder) unmarshalWitnessCandidatesFromSet(row iWitnessS
 		}
 		return nil, err
 	}
-	if err := json.Unmarshal(nominees, &cand.nominees); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal nominees")
-	}
-	if err := json.Unmarshal(prevNominees, &cand.prevNominees); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal prev nominees")
-	}
-	if err := json.Unmarshal(candidates, &cand.candidates); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal candidates")
+	if err := recorder.unmarshalAddressArrays(cand, nominees, prevNominees, candidates); err != nil {
+		return nil, err
 	}
 
 	return cand, nil
@@ -200,32 +194,44 @@ func (recorder *witnessRecorder) unmarshalWitnessCandidatesFromSubmission(row iW
 		cand.id = common.HexToHash(id.String)
 	}
 	cand.witnessManagerAddr = common.HexToAddress(witnessManagerAddr)
+	if err := recorder.unmarshalAddressArrays(cand, nominees, prevNominees, candidates); err != nil {
+		return nil, err
+	}
+
+	return cand, nil
+}
+
+func (recorder *witnessRecorder) unmarshalAddressArrays(
+	cand *witnessCandidates,
+	nominees []byte,
+	prevNominees []byte,
+	candidates []byte,
+) error {
 	var nomineeStrings, prevNomineeStrings, candidateStrings []string
 	if err := json.Unmarshal(nominees, &nomineeStrings); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal nominees")
+		return errors.Wrap(err, "failed to unmarshal nominees")
 	}
 	if err := json.Unmarshal(prevNominees, &prevNomineeStrings); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal prev nominees")
+		return errors.Wrap(err, "failed to unmarshal prev nominees")
 	}
 	if err := json.Unmarshal(candidates, &candidateStrings); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal candidates")
+		return errors.Wrap(err, "failed to unmarshal candidates")
 	}
 
 	var err error
 	cand.nominees, err = toAddressArray(recorder.addrDecoder, nomineeStrings)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	cand.prevNominees, err = toAddressArray(recorder.addrDecoder, prevNomineeStrings)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	cand.candidates, err = toAddressArray(recorder.addrDecoder, candidateStrings)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	return cand, nil
+	return nil
 }
 
 func (recorder *witnessRecorder) Candidates(committee string, epoch uint64) (WitnessCandidates, error) {
@@ -307,7 +313,7 @@ func toAddressArray(decoder util.AddressDecoder, ss []string) ([]util.Address, e
 }
 
 func (recorder *witnessRecorder) SettleCandidates(cand WitnessCandidates, status CandidatesStatus) error {
-	log.Printf("mark candidates for committee %s at epoch %d as %s", cand.Committee(), cand.Epoch(), status)
+	log.Printf("mark witness candidates %s as %s", common.BytesToHash(cand.ID()).Hex(), status)
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `committee`=? AND `epoch`=? AND `status`=? AND `witnessManagerAddr`=?", recorder.witnessSubmissionsTableName),
 		status,
@@ -327,7 +333,7 @@ func (recorder *witnessRecorder) ConfirmCandidates(cand WitnessCandidates) error
 	if len(cand.ID()) == 0 {
 		return errors.New("candidate ID is empty")
 	}
-	log.Printf("mark candidates for committee %s at epoch %d as confirmed", cand.Committee(), cand.Epoch())
+	log.Printf("mark witness candidates %s as confirmed", common.BytesToHash(cand.ID()).Hex())
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `committee`=? AND `epoch`=? AND `status`=? AND `witnessManagerAddr`=?", recorder.witnessSubmissionsTableName),
 		SubmissionConfirmed,

@@ -119,11 +119,11 @@ func IDHasherForWitnessCandidatesInEVM(in any, witnessManagerAddr []byte) (commo
 	data = append(data, epochBytes...)
 
 	for _, addr := range witnessesToAdd {
-		data = append(data, addr.Bytes()...)
+		data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
 	}
 
 	for _, addr := range witnessesToRemove {
-		data = append(data, addr.Bytes()...)
+		data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
 	}
 
 	log.Printf("IDHasherForWitnessCandidatesInEVM data: %x\n", data)
@@ -179,7 +179,7 @@ func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Add
 }
 
 func (p *epochWitnessSelector) nomineesFromCandidates(cand []util.Address, epoch uint64) ([]util.Address, error) {
-	candidateList := make([]common.Address, 0, len(cand))
+	candidateList := make([]common.Address, len(cand))
 	candidateMap := make(map[common.Address]util.Address)
 	for i, addr := range cand {
 		commonAddr := addr.Address().(common.Address)

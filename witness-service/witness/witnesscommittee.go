@@ -84,6 +84,9 @@ func NewWitnessCommittee(
 }
 
 func (w *witnessCommittee) Start(ctx context.Context) error {
+	if err := w.recorder.Start(ctx); err != nil {
+		return errors.Wrap(err, "failed to start recorder")
+	}
 	return nil
 }
 
@@ -92,6 +95,9 @@ func (w *witnessCommittee) Stop(ctx context.Context) error {
 		if err := conn.Close(); err != nil {
 			log.Printf("failed to close relayer connection, %v", err)
 		}
+	}
+	if err := w.recorder.Stop(ctx); err != nil {
+		return errors.Wrap(err, "failed to stop recorder")
 	}
 	return nil
 }

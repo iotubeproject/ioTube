@@ -44,10 +44,11 @@ func NewService(
 	disableSubmit bool,
 ) (*service, error) {
 	s := &service{
-		cashiers:        cashiers,
-		processInterval: processInterval,
-		batchSize:       batchSize,
-		disableSubmit:   disableSubmit,
+		cashiers:          cashiers,
+		witnessCommittees: witnessCommittees,
+		processInterval:   processInterval,
+		batchSize:         batchSize,
+		disableSubmit:     disableSubmit,
 	}
 	var err error
 	if s.processor, err = dispatcher.NewRunner(processInterval, s.process); err != nil {
@@ -63,12 +64,22 @@ func (s *service) Start(ctx context.Context) error {
 			return errors.Wrap(err, "failed to start recorder")
 		}
 	}
+	for _, committee := range s.witnessCommittees {
+		if err := committee.Start(ctx); err != nil {
+			return errors.Wrap(err, "failed to start committee")
+		}
+	}
 	return s.processor.Start()
 }
 
 func (s *service) Stop(ctx context.Context) error {
 	if err := s.processor.Close(); err != nil {
 		return err
+	}
+	for _, committee := range s.witnessCommittees {
+		if err := committee.Stop(ctx); err != nil {
+			return errors.Wrap(err, "failed to stop committee")
+		}
 	}
 	for _, cashier := range s.cashiers {
 		if err := cashier.Stop(ctx); err != nil {
@@ -191,7 +202,16 @@ func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
 		}
 		signature, err := crypto.Sign(dataHash, privateKey)
 
-		return crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), signature, err
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// adjust v value
+		if signature[64] < 27 {
+			signature[64] += 27
+		}
+
+		return crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), signature, nil
 	}
 }
 

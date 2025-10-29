@@ -389,7 +389,7 @@ func packWitnesses(witnesses []common.Address) ([]byte, error) {
 	})
 	var packed []byte
 	for _, witness := range witnesses {
-		packed = append(packed, witness.Bytes()...)
+		packed = append(packed, common.LeftPadBytes(witness.Bytes(), 32)...)
 	}
 	return packed, nil
 }

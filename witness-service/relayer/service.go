@@ -189,7 +189,12 @@ func (s *Service) Submit(ctx context.Context, w *types.Witness) (*services.Witne
 }
 
 func validateSignature(id []byte, addr common.Address, signature []byte) error {
-	rpk, err := crypto.Ecrecover(id, signature)
+signatureToVerify := make([]byte, len(signature))
+	copy(signatureToVerify, signature)
+	if signatureToVerify[64] >= 27 {
+		signatureToVerify[64] -= 27
+	}
+	rpk, err := crypto.Ecrecover(id, signatureToVerify)
 	if err != nil {
 		return errors.Wrap(err, "failed to recover public key")
 	}
