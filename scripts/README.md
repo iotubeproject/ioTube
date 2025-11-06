@@ -19,6 +19,7 @@ export TOKEN_SYMBOL=CABC
 export TOKEN_DECIMALS=18
 export TOKEN_MAX=0.5
 export TOKEN_MIN=0.06
+export REF_CHAIN=bsc
 yarn hardhat run scripts/add-crosschain-token-source.js --network mainnet
 ```
 
