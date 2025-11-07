@@ -37,14 +37,10 @@ func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr com
 		client:                client,
 		previous:              previous,
 	}
-	var err error
 	switch version {
 	case NoPayload, Payload, ToSolana:
 	default:
 		return nil, errors.Errorf("invalid version %s", version)
-	}
-	if err != nil {
-		return nil, err
 	}
 	return iter, nil
 }
@@ -62,8 +58,8 @@ func (iter *iterator) extract(
 	}
 	var realAmount *big.Int
 	for _, l := range receipt.Logs {
-		if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && (l.Topics[1] == senderAddress.Hash() || l.Topics[1] == raw.Address.Hash()) {
-			if l.Topics[2] == iter.cashierContractAddr.Hash() || l.Topics[2] != _ZeroHash && l.Topics[2] == iter.tokenSafeContractAddr.Hash() {
+		if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && (l.Topics[1] == common.BytesToHash(senderAddress.Bytes()) || l.Topics[1] == common.BytesToHash(raw.Address.Bytes())) {
+			if l.Topics[2] == common.BytesToHash(iter.cashierContractAddr.Bytes()) || (l.Topics[2] != _ZeroHash && l.Topics[2] == common.BytesToHash(iter.tokenSafeContractAddr.Bytes())) {
 				if realAmount != nil {
 					return nil, errors.Errorf("two transfers in one transaction %x", raw.TxHash)
 				}
@@ -257,6 +253,14 @@ func NewTokenCashierOnEthereum(
 		}
 		pa = util.ETHAddressToAddress(previousCashierAddr)
 	}
+
+	var idHasher IDHasher
+	switch version {
+	case ToSolana:
+		idHasher = IDHasherForTransferInSVM
+	default:
+		idHasher = IDHasherForTransferInEVM
+	}
 	return newTokenCashierBase(
 		id,
 		util.ETHAddressToAddress(cashierContractAddr),
@@ -284,6 +288,7 @@ func NewTokenCashierOnEthereum(
 			return tipHeight - uint64(confirmBlockNumber), endHeight, nil
 		},
 		iter.Transfers,
+		idHasher,
 		signHandler,
 		func(_token util.Address, amountToTransfer *big.Int) bool {
 			if reverseRecorder == nil {

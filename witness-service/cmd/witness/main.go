@@ -45,8 +45,6 @@ type Configuration struct {
 	ConfirmBlockNumber    int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
 	BatchSize             int           `json:"batchSize" yaml:"batchSize"`
 	Interval              time.Duration `json:"interval" yaml:"interval"`
-	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
 	Cashiers              []struct {
 		ID                             string      `json:"id" yaml:"id"`
@@ -72,6 +70,16 @@ type Configuration struct {
 		QPSLimit    uint32 `json:"qpsLimit" yaml:"qpsLimit"`
 		DisablePull bool   `json:"disablePull" yaml:"disablePull"`
 	} `json:"cashiers" yaml:"cashiers"`
+	WitnessCommittees []struct {
+		ID                            string `json:"id" yaml:"id"`
+		WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
+		RelayerConfigs                []struct {
+			RelayerURL                    string `json:"relayerURL" yaml:"relayerURL"`
+			WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
+		} `json:"relayerConfigs" yaml:"relayerConfigs"`
+		WitnessTableName string `json:"witnessTableName" yaml:"witnessTableName"`
+		NumNominees      int    `json:"numNominees" yaml:"numNominees"`
+	} `json:"witnessCommittees" yaml:"witnessCommittees"`
 }
 
 // TokenPair defines a token pair
@@ -93,8 +101,6 @@ var (
 		SlackWebHook:       "",
 		LarkWebHook:        "",
 		ClientURL:          "",
-		GrpcPort:           9080,
-		GrpcProxyPort:      9081,
 	}
 
 	configFile       = flag.String("config", "", "path of config file")
@@ -183,28 +189,15 @@ func main() {
 		cfg.PrivateKey = pk
 	}
 
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok && cfg.GrpcPort == 0 {
-		cfg.GrpcPort, err = strconv.Atoi(port)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PROXY_PORT"); ok && cfg.GrpcProxyPort == 0 {
-		cfg.GrpcProxyPort, err = strconv.Atoi(port)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
 	if relayerURL, ok := os.LookupEnv("RELAYER_URL"); ok && cfg.RelayerURL == "" {
 		cfg.RelayerURL = relayerURL
 	}
 
 	// TODO: load more parameters from env
-	if cfg.SlackWebHook != "" {
+	if len(cfg.SlackWebHook) > 0 {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
-	if cfg.LarkWebHook != "" {
+	if len(cfg.LarkWebHook) > 0 {
 		util.SetLarkURL(cfg.LarkWebHook)
 	}
 
@@ -229,6 +222,7 @@ func main() {
 
 	storeFactory := db.NewSQLStoreFactory()
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
+	var ethClient *ethclient.Client
 	switch cfg.Chain {
 	case "solana":
 		solClient := solclient.NewClient(cfg.ClientURL)
@@ -292,7 +286,7 @@ func main() {
 			cashiers = append(cashiers, cashier)
 		}
 	default: // "heco", "bsc", "matic", "polis", "iotex-e", "iotex", "sepolia", "iotex-testnet", "ethereum":
-		ethClient, err := ethclient.Dial(cfg.ClientURL)
+		ethClient, err = ethclient.Dial(cfg.ClientURL)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -423,8 +417,55 @@ func main() {
 		}
 	}
 
+	witnessCommittees := []witness.WitnessCommittee{}
+	for _, wc := range cfg.WitnessCommittees {
+		if ethClient == nil {
+			log.Printf("Skipping witness committee for chain %s, no ethClient\n", cfg.Chain)
+			continue
+		}
+		relayerMap := make(map[common.Address]string)
+		for _, rc := range wc.RelayerConfigs {
+			addr, err := util.ParseEthAddress(rc.WitnessManagerContractAddress)
+			if err != nil {
+				log.Fatalf("invalid witness manager address %s: %v\n", rc.WitnessManagerContractAddress, err)
+			}
+			relayerMap[addr] = rc.RelayerURL
+		}
+		var committeeSignHandler witness.SignHandler
+		if cfg.PrivateKey != "" {
+			privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
+			if err != nil {
+				log.Fatalf("failed to decode private key %v\n", err)
+			}
+			committeeSignHandler = witness.NewSecp256k1SignHandler(privateKey)
+		} else {
+			log.Println("No Private Key")
+		}
+		recorder := witness.NewWitnessRecorder(
+			storeFactory.NewStore(cfg.Database),
+			wc.WitnessTableName,
+			util.NewETHAddressDecoder(),
+		)
+		witnessManagerAddr := common.HexToAddress(wc.WitnessManagerContractAddress)
+		witnessCommittee, err := witness.NewWitnessCommittee(
+			wc.ID,
+			witness.IDHasherForWitnessCandidatesInEVM,
+			committeeSignHandler,
+			recorder,
+			ethClient,
+			wc.NumNominees,
+			witnessManagerAddr,
+			relayerMap,
+		)
+		if err != nil {
+			log.Fatalf("failed to create witness committee %v\n", err)
+		}
+		witnessCommittees = append(witnessCommittees, witnessCommittee)
+	}
+
 	service, err := witness.NewService(
 		cashiers,
+		witnessCommittees,
 		uint16(cfg.BatchSize),
 		cfg.Interval,
 		cfg.DisableTransferSubmit,
@@ -468,7 +509,6 @@ func main() {
 		log.Println("Done")
 		return
 	}
-	witness.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort)
 
 	log.Println("Serving...")
 	select {}
