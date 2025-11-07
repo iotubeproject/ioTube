@@ -226,8 +226,7 @@ func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeigh
 	if err != nil {
 		return nil, err
 	}
-	toRetry, ok := s.retryHeights[cashier.String()]
-	if ok {
+	if toRetry, ok := s.retryHeights[cashier.String()]; ok {
 		for height, ts := range toRetry {
 			heights = append(heights, height)
 			if ts.Add(10 * time.Minute).Before(time.Now()) {
@@ -241,14 +240,12 @@ func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeigh
 }
 
 func (s *Service) Retry(ctx context.Context, request *services.RetryRequest) (*services.RetryResponse, error) {
-	// TODO: enable retry when needed
-	// cashier, err := DecodeSourceAddrBytes(request.Cashier)
-	// if err != nil {
-	// 	return nil, errors.Wrap(err, "failed to decode cashier")
-	// }
-	// s.retryHeights[cashier.String()][request.Height] = time.Now()
-	// return &services.RetryResponse{Success: true}, nil
-	return nil, errors.New("cashier isn't provided in the request")
+	cashier, err := DecodeSourceAddrBytes(request.Cashier)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode cashier")
+	}
+	s.retryHeights[cashier.String()][request.Height] = time.Now()
+	return &services.RetryResponse{Success: true}, nil
 }
 
 func (s *Service) Lookup(ctx context.Context, request *services.LookupRequest) (*services.LookupResponse, error) {
@@ -866,14 +863,8 @@ func (s *Service) submitWitness(witnessManager WitnessManager, candidate *Witnes
 
 	if currentStatus == ValidationNeedSpeedUp {
 		txHash, relayer, nonce, gasPrice, err = witnessManager.SpeedUp(candidate, witnesses)
-		if err != nil {
-			return errors.Wrap(err, "failed to speed up witness")
-		}
 	} else {
 		txHash, relayer, nonce, gasPrice, err = witnessManager.Submit(candidate, witnesses)
-		if err != nil {
-			return errors.Wrap(err, "failed to submit witness")
-		}
 	}
 	switch errors.Cause(err) {
 	case nil:

@@ -767,7 +767,8 @@ func (x *WitnessListSubmissionResponse) GetSuccess() bool {
 
 type RetryRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Height        uint64                 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
+	Cashier       []byte                 `protobuf:"bytes,1,opt,name=cashier,proto3" json:"cashier,omitempty"`
+	Height        uint64                 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -800,6 +801,13 @@ func (x *RetryRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RetryRequest.ProtoReflect.Descriptor instead.
 func (*RetryRequest) Descriptor() ([]byte, []int) {
 	return file_services_relay_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RetryRequest) GetCashier() []byte {
+	if x != nil {
+		return x.Cashier
+	}
+	return nil
 }
 
 func (x *RetryRequest) GetHeight() uint64 {
@@ -1081,9 +1089,10 @@ const file_services_relay_service_proto_rawDesc = "" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\"I\n" +
 	"\x1dWitnessListSubmissionResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\fR\x02id\x12\x18\n" +
-	"\asuccess\x18\x02 \x01(\bR\asuccess\"&\n" +
-	"\fRetryRequest\x12\x16\n" +
-	"\x06height\x18\x01 \x01(\x04R\x06height\")\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\"@\n" +
+	"\fRetryRequest\x12\x18\n" +
+	"\acashier\x18\x01 \x01(\fR\acashier\x12\x16\n" +
+	"\x06height\x18\x02 \x01(\x04R\x06height\")\n" +
 	"\rRetryResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"D\n" +
 	"\x12SubmitNewTXRequest\x12\x16\n" +

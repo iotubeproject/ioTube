@@ -35,19 +35,16 @@ import (
 
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	Chain      string    `json:"chain" yaml:"chain"`
-	ClientURL  string    `json:"clientURL" yaml:"clientURL"`
-	RelayerURL string    `json:"relayerURL" yaml:"relayerURL"`
-	Database   db.Config `json:"database" yaml:"database"`
-	PrivateKey string    `json:"privateKey" yaml:"privateKey"`
-	// TODO: remove this
+	Chain                 string        `json:"chain" yaml:"chain"`
+	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
+	RelayerURL            string        `json:"relayerURL" yaml:"relayerURL"`
+	Database              db.Config     `json:"database" yaml:"database"`
+	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
 	LarkWebHook           string        `json:"larkWebHook" yaml:"larkWebHook"`
 	ConfirmBlockNumber    int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
 	BatchSize             int           `json:"batchSize" yaml:"batchSize"`
 	Interval              time.Duration `json:"interval" yaml:"interval"`
-	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
 	Cashiers              []struct {
 		ID                             string      `json:"id" yaml:"id"`
@@ -104,8 +101,6 @@ var (
 		SlackWebHook:       "",
 		LarkWebHook:        "",
 		ClientURL:          "",
-		GrpcPort:           9080,
-		GrpcProxyPort:      9081,
 	}
 
 	configFile       = flag.String("config", "", "path of config file")
@@ -194,28 +189,15 @@ func main() {
 		cfg.PrivateKey = pk
 	}
 
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok && cfg.GrpcPort == 0 {
-		cfg.GrpcPort, err = strconv.Atoi(port)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PROXY_PORT"); ok && cfg.GrpcProxyPort == 0 {
-		cfg.GrpcProxyPort, err = strconv.Atoi(port)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
 	if relayerURL, ok := os.LookupEnv("RELAYER_URL"); ok && cfg.RelayerURL == "" {
 		cfg.RelayerURL = relayerURL
 	}
 
 	// TODO: load more parameters from env
-	if cfg.SlackWebHook != "" {
+	if len(cfg.SlackWebHook) > 0 {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
-	if cfg.LarkWebHook != "" {
+	if len(cfg.LarkWebHook) > 0 {
 		util.SetLarkURL(cfg.LarkWebHook)
 	}
 
@@ -527,7 +509,6 @@ func main() {
 		log.Println("Done")
 		return
 	}
-	witness.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort)
 
 	log.Println("Serving...")
 	select {}
