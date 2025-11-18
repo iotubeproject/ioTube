@@ -47,17 +47,18 @@ type Configuration struct {
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
 	Cashiers              []struct {
-		ID                             string      `json:"id" yaml:"id"`
-		RelayerURL                     string      `json:"relayerURL" yaml:"relayerURL"`
-		WithPayload                    bool        `json:"withPayload" yaml:"withPayload"`
-		CashierContractAddress         string      `json:"cashierContractAddress" yaml:"cashierContractAddress"`
-		PreviousCashierContractAddress string      `json:"previousCashierContractAddress" yaml:"previousCashierContractAddress"`
-		TokenSafeContractAddress       string      `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
-		ValidatorContractAddress       string      `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
-		TransferTableName              string      `json:"transferTableName" yaml:"transferTableName"`
-		TokenPairs                     []TokenPair `json:"tokenPairs" yaml:"tokenPairs"`
-		StartBlockHeight               int         `json:"startBlockHeight" yaml:"startBlockHeight"`
-		ToSolana                       bool        `json:"toSolana" yaml:"toSolana"`
+		ID                             string           `json:"id" yaml:"id"`
+		RelayerURL                     string           `json:"relayerURL" yaml:"relayerURL"`
+		WithPayload                    bool             `json:"withPayload" yaml:"withPayload"`
+		CashierContractAddress         string           `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+		PreviousCashierContractAddress string           `json:"previousCashierContractAddress" yaml:"previousCashierContractAddress"`
+		TokenSafeContractAddress       string           `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
+		ValidatorContractAddress       string           `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
+		TransferTableName              string           `json:"transferTableName" yaml:"transferTableName"`
+		TokenPairs                     []TokenPair      `json:"tokenPairs" yaml:"tokenPairs"`
+		RemoteTokenPairs               RemoteTokenPairs `json:"remoteTokenPairs" yaml:"remoteTokenPairs"`
+		StartBlockHeight               int              `json:"startBlockHeight" yaml:"startBlockHeight"`
+		ToSolana                       bool             `json:"toSolana" yaml:"toSolana"`
 		DecimalRound                   []struct {
 			Token1 string `json:"token1" yaml:"token1"`
 			Amount int    `json:"amount" yaml:"amount"`
@@ -91,6 +92,12 @@ type TokenPair struct {
 	Whitelist      []string `json:"whitelist" yaml:"whitelist"`
 }
 
+// RemoteTokenPairs defines the remote token pairs
+type RemoteTokenPairs struct {
+	URL             string `json:"url" yaml:"url"`
+	ContractAddress string `json:"contractAddress" yaml:"contractAddress"`
+}
+
 var (
 	defaultConfig = Configuration{
 		Chain:              "ethereum",
@@ -121,7 +128,7 @@ func init() {
 func parseTokenPairs(
 	tokenPairs []TokenPair,
 	destAddrDecoder util.AddressDecoder,
-) (map[common.Address]util.Address, map[string][2]util.Address, map[common.Address]map[common.Address]struct{}) {
+) (witness.TokenPairs, map[string][2]util.Address, map[common.Address]map[common.Address]struct{}) {
 	pairs := make(map[common.Address]util.Address)
 	tokenMintPairs := make(map[string][2]util.Address)
 	whitelists := make(map[common.Address]map[common.Address]struct{})
@@ -165,7 +172,8 @@ func parseTokenPairs(
 			whitelists[token1] = whitelist
 		}
 	}
-	return pairs, tokenMintPairs, whitelists
+	localPairs := witness.NewLocalTokenPairs(pairs)
+	return localPairs, tokenMintPairs, whitelists
 }
 
 func main() {
@@ -348,7 +356,7 @@ func main() {
 				reverseRecorder = witness.NewRecorder(
 					storeFactory.NewStore(cfg.Database),
 					cc.Reverse.TransferTableName,
-					pairs,
+					witness.NewLocalTokenPairs(pairs),
 					map[common.Address]map[common.Address]struct{}{},
 					map[string][2]util.Address{},
 					map[common.Address]int{},
@@ -367,7 +375,32 @@ func main() {
 			if err != nil {
 				log.Fatalf("invalid token safe address %s: %+v\n", cc.TokenSafeContractAddress, err)
 			}
-			pairs, tokenMintPairs, whitelists := parseTokenPairs(cc.TokenPairs, destAddrDecoder)
+			var (
+				pairs          witness.TokenPairs
+				tokenMintPairs map[string][2]util.Address
+				whitelists     map[common.Address]map[common.Address]struct{}
+			)
+
+			if len(cc.RemoteTokenPairs.ContractAddress) > 0 {
+				if len(cc.TokenPairs) > 0 {
+					log.Fatalf("both token pairs and remote token pairs are specified\n")
+				}
+				client, err := ethclient.Dial(cc.RemoteTokenPairs.URL)
+				if err != nil {
+					log.Fatal(err)
+				}
+				chainID, err := ethClient.ChainID(context.Background())
+				if err != nil {
+					log.Fatal(err)
+				}
+				pairs, err = witness.NewRemoteTokenPairs(chainID.Uint64(), common.HexToAddress(cc.RemoteTokenPairs.ContractAddress), client)
+				if err != nil {
+					log.Fatalf("failed to create remote token pairs %v\n", err)
+				}
+			} else {
+				pairs, tokenMintPairs, whitelists = parseTokenPairs(cc.TokenPairs, destAddrDecoder)
+			}
+
 			var version witness.Version
 			switch {
 			case cc.ToSolana:
@@ -404,6 +437,7 @@ func main() {
 					decimalRound,
 					destAddrDecoder,
 				),
+				pairs,
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
 				signHandler,

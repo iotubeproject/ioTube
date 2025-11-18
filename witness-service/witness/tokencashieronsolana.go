@@ -62,6 +62,7 @@ func NewTokenCashierOnSolana(
 		util.SOLAddressToAddress(cashier),
 		nil,
 		recorder,
+		nil,
 		relayerURL,
 		validatorAddr.Bytes(),
 		startBlockHeight,
