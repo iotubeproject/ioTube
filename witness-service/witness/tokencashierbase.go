@@ -54,6 +54,7 @@ type (
 		cashierContractAddr    util.Address
 		previousCashierAddr    util.Address
 		recorder               AbstractRecorder
+		tokenPairs             TokenPairs
 		relayerURL             string
 		validatorContractAddr  []byte
 		startBlockHeight       uint64
@@ -80,6 +81,7 @@ func newTokenCashierBase(
 	cashierContractAddr util.Address,
 	previousCashierAddr util.Address,
 	recorder AbstractRecorder,
+	tokenPairs TokenPairs,
 	relayerURL string,
 	validatorContractAddr []byte,
 	startBlockHeight uint64,
@@ -97,6 +99,7 @@ func newTokenCashierBase(
 		cashierContractAddr:    cashierContractAddr,
 		previousCashierAddr:    previousCashierAddr,
 		recorder:               recorder,
+		tokenPairs:             tokenPairs,
 		relayerURL:             relayerURL,
 		startBlockHeight:       startBlockHeight,
 		lastProcessBlockHeight: startBlockHeight,
@@ -429,4 +432,11 @@ func (tc *tokenCashierBase) fetchTransfers(count uint16) error {
 		}
 	}
 	return nil
+}
+
+func (tc *tokenCashierBase) RefreshTokenPairs() error {
+	if tc.tokenPairs == nil {
+		return nil
+	}
+	return tc.tokenPairs.Update()
 }

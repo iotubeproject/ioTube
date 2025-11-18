@@ -233,6 +233,7 @@ func NewTokenCashierOnEthereum(
 	tokenSafeContractAddr common.Address,
 	validatorContractAddr []byte,
 	recorder *Recorder,
+	tokenPairs TokenPairs,
 	startBlockHeight uint64,
 	confirmBlockNumber uint8,
 	signHandler SignHandler,
@@ -266,6 +267,7 @@ func NewTokenCashierOnEthereum(
 		util.ETHAddressToAddress(cashierContractAddr),
 		pa,
 		recorder,
+		tokenPairs,
 		relayerURL,
 		validatorContractAddr,
 		startBlockHeight,
@@ -295,12 +297,12 @@ func NewTokenCashierOnEthereum(
 				return true
 			}
 			token := _token.Address().(common.Address)
-			_coToken, ok := recorder.tokenPairs[token]
+			_coToken, ok := recorder.tokenPairs.CoToken(token)
 			if !ok {
 				return false
 			}
 			coToken := _coToken.Address().(common.Address)
-			if _, ok := reverseRecorder.tokenPairs[coToken]; !ok {
+			if _, ok := reverseRecorder.tokenPairs.CoToken(coToken); !ok {
 				return true
 			}
 			inAmount, err := reverseRecorder.AmountOfTransferred(reverseCashierContractAddr, coToken)

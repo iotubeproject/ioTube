@@ -84,6 +84,10 @@ func (s *service) Stop(ctx context.Context) error {
 
 func (s *service) process() error {
 	for _, cashier := range s.cashiers {
+		if err := cashier.RefreshTokenPairs(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to refresh token pairs for %s", cashier.ID()))
+			continue
+		}
 		if err := cashier.PullTransfers(s.batchSize); err != nil {
 			log.Println(errors.Wrapf(err, "failed to pull transfers for %s", cashier.ID()))
 			continue

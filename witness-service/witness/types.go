@@ -43,6 +43,7 @@ type (
 		SubmitTransfers() error
 		CheckTransfers() error
 		ProcessStales() error
+		RefreshTokenPairs() error
 	}
 
 	AbstractRecorder interface {
@@ -79,6 +80,11 @@ type (
 
 	IDHasher    func(any, []byte) (common.Hash, error)
 	SignHandler func(dataHash []byte) ([]byte, []byte, error)
+
+	TokenPairs interface {
+		CoToken(token common.Address) (util.Address, bool)
+		Update() error
+	}
 
 	// WitnessCommittee manages witness candidate lifecycle
 	WitnessCommittee interface {
