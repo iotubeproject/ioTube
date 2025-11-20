@@ -397,8 +397,10 @@ func main() {
 				if err != nil {
 					log.Fatalf("failed to create remote token pairs %v\n", err)
 				}
-			} else {
+			} else if len(cc.TokenPairs) > 0 {
 				pairs, tokenMintPairs, whitelists = parseTokenPairs(cc.TokenPairs, destAddrDecoder)
+			} else {
+				log.Fatalf("no token pairs or remote token pairs are specified\n")
 			}
 
 			var version witness.Version

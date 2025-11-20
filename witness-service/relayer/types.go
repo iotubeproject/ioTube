@@ -379,7 +379,13 @@ func (cand *WitnessCandidates) GenID() error {
 	}
 	epochBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(epochBytes, cand.epoch)
-	cand.id = crypto.Keccak256Hash(cand.witnessManager.Bytes(), epochBytes, witnessesToAddBytes, witnessesToRemoveBytes)
+	data := bytes.Join([][]byte{
+		cand.witnessManager.Bytes(),
+		epochBytes,
+		witnessesToAddBytes,
+		witnessesToRemoveBytes,
+	}, nil)
+	cand.id = crypto.Keccak256Hash(data)
 	return nil
 }
 
