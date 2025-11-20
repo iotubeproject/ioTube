@@ -55,21 +55,50 @@ func (c *witnessCandidates) Candidates() []util.Address {
 }
 func (c *witnessCandidates) Status() CandidatesStatus { return c.status }
 func (c *witnessCandidates) ToTypesCandidates(witnessManagerAddr []byte) *types.Candidates {
-	witnessesToAdd := make([][]byte, len(c.nominees))
-	for i, addr := range c.nominees {
-		witnessesToAdd[i] = addr.Bytes()
+	nomineesMap := make(map[string]bool)
+	for _, addr := range c.nominees {
+		nomineesMap[addr.String()] = true
+	}
+	prevNomineesMap := make(map[string]bool)
+	for _, addr := range c.prevNominees {
+		prevNomineesMap[addr.String()] = true
 	}
 
-	witnessesToRemove := make([][]byte, len(c.prevNominees))
-	for i, addr := range c.prevNominees {
-		witnessesToRemove[i] = addr.Bytes()
+	var witnessesToAdd []util.Address
+	for _, addr := range c.nominees {
+		if _, ok := prevNomineesMap[addr.String()]; !ok {
+			witnessesToAdd = append(witnessesToAdd, addr)
+		}
+	}
+	sort.Slice(witnessesToAdd, func(i, j int) bool {
+		return bytes.Compare(witnessesToAdd[i].Bytes(), witnessesToAdd[j].Bytes()) < 0
+	})
+
+	var witnessesToRemove []util.Address
+	for _, addr := range c.prevNominees {
+		if _, ok := nomineesMap[addr.String()]; !ok {
+			witnessesToRemove = append(witnessesToRemove, addr)
+		}
+	}
+	sort.Slice(witnessesToRemove, func(i, j int) bool {
+		return bytes.Compare(witnessesToRemove[i].Bytes(), witnessesToRemove[j].Bytes()) < 0
+	})
+
+	witnessesToAddBytes := make([][]byte, len(witnessesToAdd))
+	for i, addr := range witnessesToAdd {
+		witnessesToAddBytes[i] = addr.Bytes()
+	}
+
+	witnessesToRemoveBytes := make([][]byte, len(witnessesToRemove))
+	for i, addr := range witnessesToRemove {
+		witnessesToRemoveBytes[i] = addr.Bytes()
 	}
 
 	return &types.Candidates{
 		WitnessManagerAddress: witnessManagerAddr,
 		Epoch:                 c.epoch,
-		WitnessesToAdd:        witnessesToAdd,
-		WitnessesToRemove:     witnessesToRemove,
+		WitnessesToAdd:        witnessesToAddBytes,
+		WitnessesToRemove:     witnessesToRemoveBytes,
 		Timestamp:             timestamppb.Now(),
 	}
 }

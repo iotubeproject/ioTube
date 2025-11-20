@@ -283,36 +283,11 @@ func (w *witnessManagerOnEthereum) transactionOpts(privateKey *ecdsa.PrivateKey,
 
 // TODO: refactoring with transferValidatorOnEthereum.refresh()
 func (w *witnessManagerOnEthereum) refresh() error {
-	numOfActive, err := w.witnessListContract.NumOfActive(nil)
+	witnesses, err := fetchWitnessesFromContract(w.witnessListContract, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to get number of active witnesses")
+		return err
 	}
-	if numOfActive.Cmp(big.NewInt(0)) == 0 {
-		w.witnesses = make(map[string]bool)
-		return nil
-	}
-	count, err := w.witnessListContract.Count(nil)
-	if err != nil {
-		return errors.Wrap(err, "failed to get total number of witnesses")
-	}
-	offset := big.NewInt(0)
-	limit := uint8(100)
-	witnesses := make([]common.Address, 0, int(numOfActive.Int64()))
-	for offset.Cmp(count) < 0 && big.NewInt(int64(len(witnesses))).Cmp(numOfActive) < 0 {
-		result, err := w.witnessListContract.GetActiveItems(nil, offset, limit)
-		if err != nil {
-			return errors.Wrap(err, "failed to query list")
-		}
-		witnesses = append(witnesses, result.Items[0:result.Count.Int64()]...)
-		offset.Add(offset, big.NewInt(int64(limit)))
-	}
-
-	activeWitnesses := make(map[string]bool)
-	for _, witness := range witnesses {
-		activeWitnesses[witness.Hex()] = true
-	}
-
-	w.witnesses = activeWitnesses
+	w.witnesses = witnesses
 	return nil
 }
 
