@@ -323,11 +323,11 @@ func (r *WitnessCommitteeRecorder) Candidate(id common.Hash) (*WitnessCandidates
 }
 
 // MarkAsProcessing marks a record as processing
-func (r *WitnessCommitteeRecorder) MarkAsProcessing(id common.Hash) error {
+func (r *WitnessCommitteeRecorder) MarkAsProcessing(id common.Hash, status ValidationStatusType) error {
 	log.Printf("processing witness list %s\n", id.Hex())
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	result, err := r.store.DB().Exec(r.updateStatusQuery, ValidationInProcess, id.Hex(), WaitingForWitnesses)
+	result, err := r.store.DB().Exec(r.updateStatusQuery, ValidationInProcess, id.Hex(), status)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as processing")
 	}
@@ -378,7 +378,7 @@ func (r *WitnessCommitteeRecorder) MarkAsNeedSpeedUp(id common.Hash) error {
 	log.Printf("mark witness candidates as need speed up, id: %s\n", id.Hex())
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	result, err := r.store.DB().Exec(r.updateStatusQuery, ValidationNeedSpeedUp, id.Hex(), ValidationInProcess)
+	result, err := r.store.DB().Exec(r.updateStatusQuery, ValidationNeedSpeedUp, id.Hex(), ValidationSubmitted)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as need speed up")
 	}
@@ -402,7 +402,7 @@ func (r *WitnessCommitteeRecorder) MarkAsRejected(id common.Hash) error {
 	log.Printf("mark witness candidates as rejected, id: %s\n", id.Hex())
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	result, err := r.store.DB().Exec(r.updateStatusQuery, ValidationRejected, id.Hex(), ValidationSubmitted)
+	result, err := r.store.DB().Exec(r.updateStatusQuery, ValidationRejected, id.Hex(), ValidationInProcess)
 	if err != nil {
 		return errors.Wrap(err, "failed to mark as rejected")
 	}

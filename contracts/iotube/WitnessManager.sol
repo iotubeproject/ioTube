@@ -12,6 +12,8 @@ interface IWitnessList {
     function removeWitnesses(address[] memory _witnesses) external;
     function owner() external view returns (address);
     function transferOwnership(address newOwner) external;
+    function threshold() external view returns (uint8);
+    function setThreshold(uint8 _threshold) external;
 }
 
 contract WitnessManager is Ownable {
@@ -23,8 +25,13 @@ contract WitnessManager is Ownable {
     // protocol-related
     uint64 public epochNum;
     uint64 public epochInterval;
+   
+    // witness setting related
+    uint64 public numNominees;
+    uint64 private _nextNumNominees;
     EnumerableSet.AddressSet private _excludedList;
-    // TODO: define x out of 36 number in the contract  
+    address[] private _nextAddExcludedList;
+    address[] private _nextRemoveExcludedList;
 
     constructor(address initialOwner, IWitnessList _witnessList) Ownable(initialOwner) {
         witnessList = _witnessList;
@@ -40,22 +47,45 @@ contract WitnessManager is Ownable {
 
     function setEpochNum(uint64 _epochNum) public onlyOwner {
         epochNum = _epochNum;
-    }
+    } 
     
     function setEpochInterval(uint64 _epochInterval) public onlyOwner {
         epochInterval = _epochInterval;
     }
 
-    function addExcludedWitnesses(address[] calldata _witnesses) public onlyOwner {
+    function setNumNominees(uint64 _numNominees) public onlyOwner {
+        numNominees = _numNominees;
+    }
+
+    /**
+     * @notice Set the number of nominees for the next epoch.
+     * @param nextNumNominees The number of nominees for the next epoch.
+     */
+    function setNextNumNominees(uint64 nextNumNominees) public onlyOwner {
+        _nextNumNominees = nextNumNominees;
+    }
+
+    function setExcludedWitnesses(address[] calldata _witnesses) public onlyOwner {
+        _excludedList.clear();
         for (uint256 i = 0; i < _witnesses.length; i++) {
             _excludedList.add(_witnesses[i]);
         }
     }
 
-    function removeExcludedWitnesses(address[] calldata _witnesses) public onlyOwner {
-        for (uint256 i = 0; i < _witnesses.length; i++) {
-            require(_excludedList.remove(_witnesses[i]), "witness not found");
-        }
+    /**
+     * @notice Set the list of witnesses to be added to the excluded list in the next epoch.
+     * @param _witnesses The list of witnesses to be added to the excluded list.
+     */
+    function setNextAddExcludedWitnesses(address[] calldata _witnesses) public onlyOwner {
+        _nextAddExcludedList = _witnesses;
+    }
+
+    /**
+     * @notice Set the list of witnesses to be removed from the excluded list in the next epoch.
+     * @param _witnesses The list of witnesses to be removed from the excluded list.
+     */
+    function setNextRemoveExcludedWitnesses(address[] calldata _witnesses) public onlyOwner {
+        _nextRemoveExcludedList = _witnesses;
     }
 
     function getExcludedWitnesses() public view returns (address[] memory) {
@@ -76,14 +106,14 @@ contract WitnessManager is Ownable {
 
         // extract hash from nextEpochNum and witnesses
         bytes32 hash;
-        bytes memory packed = abi.encodePacked(address(this), nextEpochNum, witnessesToAdd, witnessesToRemove);
+        bytes memory packed = abi.encode(address(this), nextEpochNum, witnessesToAdd, witnessesToRemove);
         assembly {
             hash := keccak256(add(packed, 32), mload(packed))
         }
 
         // validate current witness signature
         uint256 signatureCount = signatures.length;
-        require(signatureCount * 3 > witnessList.numOfActive() * 2, "insufficient witnesses");
+        require(signatureCount * 100 > witnessList.numOfActive() * witnessList.threshold(), "insufficient witnesses");
 
         address[] memory signers = new address[](signatureCount);
         for (uint256 i = 0; i < signatureCount; i++) {
@@ -98,6 +128,7 @@ contract WitnessManager is Ownable {
         // update witness list
         updateWitnessList(witnessesToAdd, witnessesToRemove);
         epochNum = nextEpochNum;
+        flushNextWitnessSettings();
 
         emit WitnessesProposed(nextEpochNum, hash);
     }
@@ -113,6 +144,33 @@ contract WitnessManager is Ownable {
         witnessList.addWitnesses(witnessesToAdd);
 
         require(witnessList.numOfActive()  == currentWitnessCount + witnessesToAdd.length - witnessesToRemove.length, "witness count mismatch");
+        require(witnessList.numOfActive() == numNominees, "nominee count mismatch");
+    }
+
+    /**
+    * @notice Flush the pending witness settings to the current settings.
+    */
+    function flushNextWitnessSettings() internal {
+        if (_nextNumNominees != 0) {
+           numNominees = _nextNumNominees;
+           _nextNumNominees = 0;
+        }
+        if (_nextAddExcludedList.length > 0) {
+            for (uint256 i = 0; i < _nextAddExcludedList.length; i++) {
+                _excludedList.add(_nextAddExcludedList[i]);
+            }
+            delete _nextAddExcludedList;
+        }
+        if (_nextRemoveExcludedList.length > 0) {
+            for (uint256 i = 0; i < _nextRemoveExcludedList.length; i++) {
+                _excludedList.remove(_nextRemoveExcludedList[i]);
+            }
+            delete _nextRemoveExcludedList;
+        }
+    }
+    
+    function setWitnessListThreshold(uint8 _threshold) public onlyOwner {
+        witnessList.setThreshold(_threshold);
     }
 
     function transferWitnessListOwnership(address newOwner) public onlyOwner {

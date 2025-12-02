@@ -1045,6 +1045,102 @@ func (x *ListNewTXResponse) GetTxs() []*SubmitNewTXRequest {
 	return nil
 }
 
+type ReportCashierRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Address       []byte                 `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	Height        uint64                 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportCashierRequest) Reset() {
+	*x = ReportCashierRequest{}
+	mi := &file_services_relay_service_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportCashierRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportCashierRequest) ProtoMessage() {}
+
+func (x *ReportCashierRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_services_relay_service_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportCashierRequest.ProtoReflect.Descriptor instead.
+func (*ReportCashierRequest) Descriptor() ([]byte, []int) {
+	return file_services_relay_service_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ReportCashierRequest) GetAddress() []byte {
+	if x != nil {
+		return x.Address
+	}
+	return nil
+}
+
+func (x *ReportCashierRequest) GetHeight() uint64 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+type ReportCashierResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportCashierResponse) Reset() {
+	*x = ReportCashierResponse{}
+	mi := &file_services_relay_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportCashierResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportCashierResponse) ProtoMessage() {}
+
+func (x *ReportCashierResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_services_relay_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportCashierResponse.ProtoReflect.Descriptor instead.
+func (*ReportCashierResponse) Descriptor() ([]byte, []int) {
+	return file_services_relay_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ReportCashierResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
 var File_services_relay_service_proto protoreflect.FileDescriptor
 
 const file_services_relay_service_proto_rawDesc = "" +
@@ -1103,7 +1199,12 @@ const file_services_relay_service_proto_rawDesc = "" +
 	"\x10ListNewTXRequest\x12\x14\n" +
 	"\x05count\x18\x01 \x01(\rR\x05count\"C\n" +
 	"\x11ListNewTXResponse\x12.\n" +
-	"\x03txs\x18\x01 \x03(\v2\x1c.services.SubmitNewTXRequestR\x03txs*Z\n" +
+	"\x03txs\x18\x01 \x03(\v2\x1c.services.SubmitNewTXRequestR\x03txs\"H\n" +
+	"\x14ReportCashierRequest\x12\x18\n" +
+	"\aaddress\x18\x01 \x01(\fR\aaddress\x12\x16\n" +
+	"\x06height\x18\x02 \x01(\x04R\x06height\"1\n" +
+	"\x15ReportCashierResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess*Z\n" +
 	"\x06Status\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\v\n" +
 	"\aCREATED\x10\x01\x12\r\n" +
@@ -1112,7 +1213,7 @@ const file_services_relay_service_proto_rawDesc = "" +
 	"\n" +
 	"\x06FAILED\x10\x04\x12\x0e\n" +
 	"\n" +
-	"CONFIRMING\x10\x052\x83\b\n" +
+	"CONFIRMING\x10\x052\xf1\b\n" +
 	"\fRelayService\x12Q\n" +
 	"\x06Submit\x12\x0e.types.Witness\x1a#.services.WitnessSubmissionResponse\"\x12\x82\xd3\xe4\x93\x02\f:\x01*\"\a/submit\x12[\n" +
 	"\x05Reset\x12\x1e.services.ResetTransferRequest\x1a\x1f.services.ResetTransferResponse\"\x11\x82\xd3\xe4\x93\x02\v:\x01*\"\x06/reset\x12K\n" +
@@ -1126,7 +1227,8 @@ const file_services_relay_service_proto_rawDesc = "" +
 	"\tListNewTX\x12\x1a.services.ListNewTXRequest\x1a\x1b.services.ListNewTXResponse\"\x15\x82\xd3\xe4\x93\x02\x0f:\x01*\"\n" +
 	"/listnewtx\x12r\n" +
 	"\x13SubmitWitnessesList\x12\x14.types.WitnessesList\x1a'.services.WitnessListSubmissionResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/submit_witnesses\x12o\n" +
-	"\x12CheckWitnessesList\x12\x16.services.CheckRequest\x1a$.services.CheckWitnessesListResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/check_witnessesB>Z<github.com/iotexproject/ioTube/witness-service/grpc/servicesb\x06proto3"
+	"\x12CheckWitnessesList\x12\x16.services.CheckRequest\x1a$.services.CheckWitnessesListResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/check_witnesses\x12l\n" +
+	"\rReportCashier\x12\x1e.services.ReportCashierRequest\x1a\x1f.services.ReportCashierResponse\"\x1a\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/report_cashierB>Z<github.com/iotexproject/ioTube/witness-service/grpc/servicesb\x06proto3"
 
 var (
 	file_services_relay_service_proto_rawDescOnce sync.Once
@@ -1141,7 +1243,7 @@ func file_services_relay_service_proto_rawDescGZIP() []byte {
 }
 
 var file_services_relay_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_services_relay_service_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_services_relay_service_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_services_relay_service_proto_goTypes = []any{
 	(Status)(0),                           // 0: services.Status
 	(*CheckRequest)(nil),                  // 1: services.CheckRequest
@@ -1163,19 +1265,21 @@ var file_services_relay_service_proto_goTypes = []any{
 	(*SubmitNewTXResponse)(nil),           // 17: services.SubmitNewTXResponse
 	(*ListNewTXRequest)(nil),              // 18: services.ListNewTXRequest
 	(*ListNewTXResponse)(nil),             // 19: services.ListNewTXResponse
-	(*types.Transfer)(nil),                // 20: types.Transfer
-	(*types.Witness)(nil),                 // 21: types.Witness
-	(*types.WitnessesList)(nil),           // 22: types.WitnessesList
+	(*ReportCashierRequest)(nil),          // 20: services.ReportCashierRequest
+	(*ReportCashierResponse)(nil),         // 21: services.ReportCashierResponse
+	(*types.Transfer)(nil),                // 22: types.Transfer
+	(*types.Witness)(nil),                 // 23: types.Witness
+	(*types.WitnessesList)(nil),           // 24: types.WitnessesList
 }
 var file_services_relay_service_proto_depIdxs = []int32{
 	4,  // 0: services.LookupResponse.statuses:type_name -> services.CheckResponse
 	0,  // 1: services.CheckResponse.status:type_name -> services.Status
 	0,  // 2: services.CheckWitnessesListResponse.status:type_name -> services.Status
 	0,  // 3: services.ListRequest.status:type_name -> services.Status
-	20, // 4: services.ListResponse.transfers:type_name -> types.Transfer
+	22, // 4: services.ListResponse.transfers:type_name -> types.Transfer
 	4,  // 5: services.ListResponse.statuses:type_name -> services.CheckResponse
 	16, // 6: services.ListNewTXResponse.txs:type_name -> services.SubmitNewTXRequest
-	21, // 7: services.RelayService.Submit:input_type -> types.Witness
+	23, // 7: services.RelayService.Submit:input_type -> types.Witness
 	10, // 8: services.RelayService.Reset:input_type -> services.ResetTransferRequest
 	1,  // 9: services.RelayService.Check:input_type -> services.CheckRequest
 	14, // 10: services.RelayService.Retry:input_type -> services.RetryRequest
@@ -1184,21 +1288,23 @@ var file_services_relay_service_proto_depIdxs = []int32{
 	8,  // 13: services.RelayService.List:input_type -> services.ListRequest
 	16, // 14: services.RelayService.SubmitNewTX:input_type -> services.SubmitNewTXRequest
 	18, // 15: services.RelayService.ListNewTX:input_type -> services.ListNewTXRequest
-	22, // 16: services.RelayService.SubmitWitnessesList:input_type -> types.WitnessesList
+	24, // 16: services.RelayService.SubmitWitnessesList:input_type -> types.WitnessesList
 	1,  // 17: services.RelayService.CheckWitnessesList:input_type -> services.CheckRequest
-	12, // 18: services.RelayService.Submit:output_type -> services.WitnessSubmissionResponse
-	11, // 19: services.RelayService.Reset:output_type -> services.ResetTransferResponse
-	4,  // 20: services.RelayService.Check:output_type -> services.CheckResponse
-	15, // 21: services.RelayService.Retry:output_type -> services.RetryResponse
-	3,  // 22: services.RelayService.Lookup:output_type -> services.LookupResponse
-	7,  // 23: services.RelayService.StaleHeights:output_type -> services.StaleHeightsResponse
-	9,  // 24: services.RelayService.List:output_type -> services.ListResponse
-	17, // 25: services.RelayService.SubmitNewTX:output_type -> services.SubmitNewTXResponse
-	19, // 26: services.RelayService.ListNewTX:output_type -> services.ListNewTXResponse
-	13, // 27: services.RelayService.SubmitWitnessesList:output_type -> services.WitnessListSubmissionResponse
-	5,  // 28: services.RelayService.CheckWitnessesList:output_type -> services.CheckWitnessesListResponse
-	18, // [18:29] is the sub-list for method output_type
-	7,  // [7:18] is the sub-list for method input_type
+	20, // 18: services.RelayService.ReportCashier:input_type -> services.ReportCashierRequest
+	12, // 19: services.RelayService.Submit:output_type -> services.WitnessSubmissionResponse
+	11, // 20: services.RelayService.Reset:output_type -> services.ResetTransferResponse
+	4,  // 21: services.RelayService.Check:output_type -> services.CheckResponse
+	15, // 22: services.RelayService.Retry:output_type -> services.RetryResponse
+	3,  // 23: services.RelayService.Lookup:output_type -> services.LookupResponse
+	7,  // 24: services.RelayService.StaleHeights:output_type -> services.StaleHeightsResponse
+	9,  // 25: services.RelayService.List:output_type -> services.ListResponse
+	17, // 26: services.RelayService.SubmitNewTX:output_type -> services.SubmitNewTXResponse
+	19, // 27: services.RelayService.ListNewTX:output_type -> services.ListNewTXResponse
+	13, // 28: services.RelayService.SubmitWitnessesList:output_type -> services.WitnessListSubmissionResponse
+	5,  // 29: services.RelayService.CheckWitnessesList:output_type -> services.CheckWitnessesListResponse
+	21, // 30: services.RelayService.ReportCashier:output_type -> services.ReportCashierResponse
+	19, // [19:31] is the sub-list for method output_type
+	7,  // [7:19] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -1215,7 +1321,7 @@ func file_services_relay_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_relay_service_proto_rawDesc), len(file_services_relay_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   19,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

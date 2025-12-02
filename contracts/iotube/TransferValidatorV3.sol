@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 interface IAllowlist {
     function isAllowed(address) external view returns (bool);
     function numOfActive() external view returns (uint256);
+    function threshold() external view returns (uint8);
 }
 
 interface IMinter {
@@ -49,7 +50,7 @@ contract TransferValidatorV3 is Ownable, Pausable {
             }
         }
         if (count == 0) {
-            revert("Witness list not found");
+            revert("witness list not found");
         }
 
         IAllowlist[] memory lists = new IAllowlist[](count);
@@ -78,7 +79,7 @@ contract TransferValidatorV3 is Ownable, Pausable {
         bytes32 key = generateKey(cashier, tokenAddr, index, from, to, amount, payload);
         require(settles[key] == 0, "transfer has been settled");
         IAllowlist[] memory witnessListArray = getWitnessLists(tokenAddr);
-        require(witnessListArray.length == signaturesArray.length, "invalid signature length");
+        require(witnessListArray.length == signaturesArray.length, "invalid signatures array length");
         uint256 totalSignatures = 0;
         for (uint256 i = 0; i < signaturesArray.length; i++) {
             require(signaturesArray[i].length % 65 == 0, "invalid signature length");
@@ -92,7 +93,6 @@ contract TransferValidatorV3 is Ownable, Pausable {
             uint256 numOfSignatures = signatures.length / 65;
             address[] memory witnesses = new address[](numOfSignatures);
             for (uint256 j = 0; j < numOfSignatures; j++) {
-                // TODO: check sig copy gas
                 address witness = recover(key, signatures, j * 65);
                 require(witnessList.isAllowed(witness), "invalid signature");
                 for (uint256 k = 0; k < j; k++) {
@@ -102,7 +102,7 @@ contract TransferValidatorV3 is Ownable, Pausable {
                 allWitnesses[witnessIndex] = witness;
                 witnessIndex++;
             }
-            require(numOfSignatures * 3 > witnessList.numOfActive() * 2, "insufficient witnesses");
+            require(numOfSignatures * 100 > witnessList.numOfActive() * witnessList.threshold(), "insufficient witnesses");
         }
         IMinter minter = getMinter(tokenAddr);
         settles[key] = block.number;
