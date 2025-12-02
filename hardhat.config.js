@@ -1,6 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
 require('dotenv').config();
-require('@nomiclabs/hardhat-truffle5');
 
 const accounts = [
   process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000",
