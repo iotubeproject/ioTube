@@ -2,10 +2,10 @@ package witness
 
 import (
 	"bytes"
-	"encoding/binary"
 	"log"
 	"sort"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -140,19 +140,38 @@ func IDHasherForWitnessCandidatesInEVM(in any, witnessManagerAddr []byte) (commo
 		return bytes.Compare(witnessesToRemove[i].Bytes(), witnessesToRemove[j].Bytes()) < 0
 	})
 
-	var data []byte
-	data = append(data, witnessManagerAddr...)
+	// DEBUG print witnessesToAdd and witnessesToRemove and nominees and prevNominees
+	log.Printf("witnessesToAdd: %v\n", witnessesToAdd)
+	log.Printf("witnessesToRemove: %v\n", witnessesToRemove)
+	log.Printf("nominees: %v\n", nominees)
+	log.Printf("prevNominees: %v\n", prevNominees)
 
-	epochBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(epochBytes, cand.Epoch())
-	data = append(data, epochBytes...)
+	addressType, _ := abi.NewType("address", "", nil)
+	uint64Type, _ := abi.NewType("uint64", "", nil)
+	addressArrayType, _ := abi.NewType("address[]", "", nil)
 
-	for _, addr := range witnessesToAdd {
-		data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
+	arguments := abi.Arguments{
+		{Type: addressType},
+		{Type: uint64Type},
+		{Type: addressArrayType},
+		{Type: addressArrayType},
 	}
 
-	for _, addr := range witnessesToRemove {
-		data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
+	wmAddr := common.BytesToAddress(witnessManagerAddr)
+
+	wToAdd := make([]common.Address, len(witnessesToAdd))
+	for i, w := range witnessesToAdd {
+		wToAdd[i] = common.BytesToAddress(w.Bytes())
+	}
+
+	wToRemove := make([]common.Address, len(witnessesToRemove))
+	for i, w := range witnessesToRemove {
+		wToRemove[i] = common.BytesToAddress(w.Bytes())
+	}
+
+	data, err := arguments.Pack(wmAddr, cand.Epoch(), wToAdd, wToRemove)
+	if err != nil {
+		return common.Hash{}, err
 	}
 
 	log.Printf("IDHasherForWitnessCandidatesInEVM data: %x\n", data)

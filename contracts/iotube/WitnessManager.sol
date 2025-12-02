@@ -76,7 +76,7 @@ contract WitnessManager is Ownable {
 
         // extract hash from nextEpochNum and witnesses
         bytes32 hash;
-        bytes memory packed = abi.encodePacked(address(this), nextEpochNum, witnessesToAdd, witnessesToRemove);
+        bytes memory packed = abi.encode(address(this), nextEpochNum, witnessesToAdd, witnessesToRemove);
         assembly {
             hash := keccak256(add(packed, 32), mload(packed))
         }

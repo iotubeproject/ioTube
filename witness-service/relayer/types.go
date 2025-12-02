@@ -8,12 +8,12 @@ package relayer
 
 import (
 	"bytes"
-	"encoding/binary"
 	"math/big"
 	"sort"
 	"time"
 
 	soltypes "github.com/blocto/solana-go-sdk/types"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -369,35 +369,35 @@ type (
 
 func (cand *WitnessCandidates) GenID() error {
 	witnessesToAdd, witnessesToRemove := cand.Witnesses()
-	witnessesToAddBytes, err := packWitnesses(witnessesToAdd)
+	sort.Slice(witnessesToAdd, func(i, j int) bool {
+		return bytes.Compare(witnessesToAdd[i][:], witnessesToAdd[j][:]) < 0
+	})
+	sort.Slice(witnessesToRemove, func(i, j int) bool {
+		return bytes.Compare(witnessesToRemove[i][:], witnessesToRemove[j][:]) < 0
+	})
+
+	addressType, _ := abi.NewType("address", "", nil)
+	uint64Type, _ := abi.NewType("uint64", "", nil)
+	addressArrayType, _ := abi.NewType("address[]", "", nil)
+
+	arguments := abi.Arguments{
+		{Type: addressType},
+		{Type: uint64Type},
+		{Type: addressArrayType},
+		{Type: addressArrayType},
+	}
+
+	data, err := arguments.Pack(
+		cand.witnessManager,
+		cand.epoch,
+		witnessesToAdd,
+		witnessesToRemove,
+	)
 	if err != nil {
 		return err
 	}
-	witnessesToRemoveBytes, err := packWitnesses(witnessesToRemove)
-	if err != nil {
-		return err
-	}
-	epochBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(epochBytes, cand.epoch)
-	data := bytes.Join([][]byte{
-		cand.witnessManager.Bytes(),
-		epochBytes,
-		witnessesToAddBytes,
-		witnessesToRemoveBytes,
-	}, nil)
 	cand.id = crypto.Keccak256Hash(data)
 	return nil
-}
-
-func packWitnesses(witnesses []common.Address) ([]byte, error) {
-	sort.Slice(witnesses, func(i, j int) bool {
-		return bytes.Compare(witnesses[i][:], witnesses[j][:]) < 0
-	})
-	var packed []byte
-	for _, witness := range witnesses {
-		packed = append(packed, common.LeftPadBytes(witness.Bytes(), 32)...)
-	}
-	return packed, nil
 }
 
 func (cand *WitnessCandidates) Witnesses() ([]common.Address, []common.Address) {
