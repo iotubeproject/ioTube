@@ -255,6 +255,9 @@ func (recorder *witnessRecorder) CandidatesToSettle(committee string) ([][]Witne
 	return recorder.candidates(committee, CandidatesStatus(SubmissionConfirmed))
 }
 
+// candidates returns witness candidates grouped by epoch.
+// Each epoch group contains multiple WitnessCandidates for distributed processing -
+// one per witness manager, each submitting independently with its own key/relayer.
 func (recorder *witnessRecorder) candidates(committee string, status CandidatesStatus) ([][]WitnessCandidates, error) {
 	query := fmt.Sprintf(
 		"SELECT s.`committee`, s.`epoch`, s.`prev_epoch`, s.`nominees`, s.`prev_nominees`, s.`candidates`, su.`status`, su.`id`, su.`witnessManagerAddr` "+

@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/pkg/errors"
@@ -38,7 +37,7 @@ func (t *localTokenPairs) Update() error {
 	return nil
 }
 
-func NewRemoteTokenPairs(chainID uint64, contractAddress common.Address, client *ethclient.Client) (TokenPairs, error) {
+func NewRemoteTokenPairs(chainID uint64, contractAddress common.Address, client Client) (TokenPairs, error) {
 	tokenPairsContract, err := contract.NewTokenPairsCaller(contractAddress, client)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create token pairs contract")
@@ -52,8 +51,8 @@ func NewRemoteTokenPairs(chainID uint64, contractAddress common.Address, client 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get chain ID 2")
 	}
-	if chainID != chainID1.Uint64() || chainID != chainID2.Uint64() {
-		return nil, errors.New("chain ID mismatch")
+	if chainID != chainID1.Uint64() && chainID != chainID2.Uint64() {
+		return nil, errors.Wrapf(errors.New("chain ID mismatch"), "chain ID mismatch: %d vs %d vs %d", chainID, chainID1.Uint64(), chainID2.Uint64())
 	}
 
 	return &remoteTokenPairs{

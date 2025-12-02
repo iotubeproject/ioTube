@@ -31,7 +31,7 @@ var (
 
 // WitnessManagerMetaData contains all meta data concerning the WitnessManager contract.
 var WitnessManagerMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"initialOwner\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_witnessList\",\"type\":\"address\",\"internalType\":\"contractIWitnessList\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addExcludedWitnesses\",\"inputs\":[{\"name\":\"_witnesses\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"addWitnesses\",\"inputs\":[{\"name\":\"_witnesses\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"epochInterval\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"epochNum\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getExcludedWitnesses\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"proposeWitnesses\",\"inputs\":[{\"name\":\"nextEpochNum\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"witnessesToAdd\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"witnessesToRemove\",\"type\":\"address[]\",\"internalType\":\"address[]\"},{\"name\":\"signatures\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"removeExcludedWitnesses\",\"inputs\":[{\"name\":\"_witnesses\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"removeWitnesses\",\"inputs\":[{\"name\":\"_witnesses\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setEpochInterval\",\"inputs\":[{\"name\":\"_epochInterval\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setEpochNum\",\"inputs\":[{\"name\":\"_epochNum\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferWitnessListOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"witnessList\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIWitnessList\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WitnessesProposed\",\"inputs\":[{\"name\":\"epochNum\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"witnessesHash\",\"type\":\"bytes32\",\"indexed\":false,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"ECDSAInvalidSignature\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ECDSAInvalidSignatureLength\",\"inputs\":[{\"name\":\"length\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"ECDSAInvalidSignatureS\",\"inputs\":[{\"name\":\"s\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"OwnableInvalidOwner\",\"inputs\":[{\"name\":\"owner\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"OwnableUnauthorizedAccount\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}]}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"initialOwner\",\"type\":\"address\"},{\"internalType\":\"contractIWitnessList\",\"name\":\"_witnessList\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"ECDSAInvalidSignature\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"length\",\"type\":\"uint256\"}],\"name\":\"ECDSAInvalidSignatureLength\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"s\",\"type\":\"bytes32\"}],\"name\":\"ECDSAInvalidSignatureS\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"epochNum\",\"type\":\"uint64\"},{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"witnessesHash\",\"type\":\"bytes32\"}],\"name\":\"WitnessesProposed\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_witnesses\",\"type\":\"address[]\"}],\"name\":\"addWitnesses\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"epochInterval\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"epochNum\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getExcludedWitnesses\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"numNominees\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"nextEpochNum\",\"type\":\"uint64\"},{\"internalType\":\"address[]\",\"name\":\"witnessesToAdd\",\"type\":\"address[]\"},{\"internalType\":\"address[]\",\"name\":\"witnessesToRemove\",\"type\":\"address[]\"},{\"internalType\":\"bytes[]\",\"name\":\"signatures\",\"type\":\"bytes[]\"}],\"name\":\"proposeWitnesses\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_witnesses\",\"type\":\"address[]\"}],\"name\":\"removeWitnesses\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"_epochInterval\",\"type\":\"uint64\"}],\"name\":\"setEpochInterval\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"_epochNum\",\"type\":\"uint64\"}],\"name\":\"setEpochNum\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_witnesses\",\"type\":\"address[]\"}],\"name\":\"setExcludedWitnesses\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_witnesses\",\"type\":\"address[]\"}],\"name\":\"setNextAddExcludedWitnesses\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"nextNumNominees\",\"type\":\"uint64\"}],\"name\":\"setNextNumNominees\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_witnesses\",\"type\":\"address[]\"}],\"name\":\"setNextRemoveExcludedWitnesses\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"_numNominees\",\"type\":\"uint64\"}],\"name\":\"setNumNominees\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"_threshold\",\"type\":\"uint8\"}],\"name\":\"setWitnessListThreshold\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferWitnessListOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"witnessList\",\"outputs\":[{\"internalType\":\"contractIWitnessList\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // WitnessManagerABI is the input ABI used to generate the binding from.
@@ -273,6 +273,37 @@ func (_WitnessManager *WitnessManagerCallerSession) GetExcludedWitnesses() ([]co
 	return _WitnessManager.Contract.GetExcludedWitnesses(&_WitnessManager.CallOpts)
 }
 
+// NumNominees is a free data retrieval call binding the contract method 0x2601d299.
+//
+// Solidity: function numNominees() view returns(uint64)
+func (_WitnessManager *WitnessManagerCaller) NumNominees(opts *bind.CallOpts) (uint64, error) {
+	var out []interface{}
+	err := _WitnessManager.contract.Call(opts, &out, "numNominees")
+
+	if err != nil {
+		return *new(uint64), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
+
+	return out0, err
+
+}
+
+// NumNominees is a free data retrieval call binding the contract method 0x2601d299.
+//
+// Solidity: function numNominees() view returns(uint64)
+func (_WitnessManager *WitnessManagerSession) NumNominees() (uint64, error) {
+	return _WitnessManager.Contract.NumNominees(&_WitnessManager.CallOpts)
+}
+
+// NumNominees is a free data retrieval call binding the contract method 0x2601d299.
+//
+// Solidity: function numNominees() view returns(uint64)
+func (_WitnessManager *WitnessManagerCallerSession) NumNominees() (uint64, error) {
+	return _WitnessManager.Contract.NumNominees(&_WitnessManager.CallOpts)
+}
+
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
 //
 // Solidity: function owner() view returns(address)
@@ -335,27 +366,6 @@ func (_WitnessManager *WitnessManagerCallerSession) WitnessList() (common.Addres
 	return _WitnessManager.Contract.WitnessList(&_WitnessManager.CallOpts)
 }
 
-// AddExcludedWitnesses is a paid mutator transaction binding the contract method 0xd583da9b.
-//
-// Solidity: function addExcludedWitnesses(address[] _witnesses) returns()
-func (_WitnessManager *WitnessManagerTransactor) AddExcludedWitnesses(opts *bind.TransactOpts, _witnesses []common.Address) (*types.Transaction, error) {
-	return _WitnessManager.contract.Transact(opts, "addExcludedWitnesses", _witnesses)
-}
-
-// AddExcludedWitnesses is a paid mutator transaction binding the contract method 0xd583da9b.
-//
-// Solidity: function addExcludedWitnesses(address[] _witnesses) returns()
-func (_WitnessManager *WitnessManagerSession) AddExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
-	return _WitnessManager.Contract.AddExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
-}
-
-// AddExcludedWitnesses is a paid mutator transaction binding the contract method 0xd583da9b.
-//
-// Solidity: function addExcludedWitnesses(address[] _witnesses) returns()
-func (_WitnessManager *WitnessManagerTransactorSession) AddExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
-	return _WitnessManager.Contract.AddExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
-}
-
 // AddWitnesses is a paid mutator transaction binding the contract method 0x14e61a54.
 //
 // Solidity: function addWitnesses(address[] _witnesses) returns()
@@ -396,27 +406,6 @@ func (_WitnessManager *WitnessManagerSession) ProposeWitnesses(nextEpochNum uint
 // Solidity: function proposeWitnesses(uint64 nextEpochNum, address[] witnessesToAdd, address[] witnessesToRemove, bytes[] signatures) returns()
 func (_WitnessManager *WitnessManagerTransactorSession) ProposeWitnesses(nextEpochNum uint64, witnessesToAdd []common.Address, witnessesToRemove []common.Address, signatures [][]byte) (*types.Transaction, error) {
 	return _WitnessManager.Contract.ProposeWitnesses(&_WitnessManager.TransactOpts, nextEpochNum, witnessesToAdd, witnessesToRemove, signatures)
-}
-
-// RemoveExcludedWitnesses is a paid mutator transaction binding the contract method 0xb2dea92d.
-//
-// Solidity: function removeExcludedWitnesses(address[] _witnesses) returns()
-func (_WitnessManager *WitnessManagerTransactor) RemoveExcludedWitnesses(opts *bind.TransactOpts, _witnesses []common.Address) (*types.Transaction, error) {
-	return _WitnessManager.contract.Transact(opts, "removeExcludedWitnesses", _witnesses)
-}
-
-// RemoveExcludedWitnesses is a paid mutator transaction binding the contract method 0xb2dea92d.
-//
-// Solidity: function removeExcludedWitnesses(address[] _witnesses) returns()
-func (_WitnessManager *WitnessManagerSession) RemoveExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
-	return _WitnessManager.Contract.RemoveExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
-}
-
-// RemoveExcludedWitnesses is a paid mutator transaction binding the contract method 0xb2dea92d.
-//
-// Solidity: function removeExcludedWitnesses(address[] _witnesses) returns()
-func (_WitnessManager *WitnessManagerTransactorSession) RemoveExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
-	return _WitnessManager.Contract.RemoveExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
 }
 
 // RemoveWitnesses is a paid mutator transaction binding the contract method 0xfca2ec37.
@@ -501,6 +490,132 @@ func (_WitnessManager *WitnessManagerSession) SetEpochNum(_epochNum uint64) (*ty
 // Solidity: function setEpochNum(uint64 _epochNum) returns()
 func (_WitnessManager *WitnessManagerTransactorSession) SetEpochNum(_epochNum uint64) (*types.Transaction, error) {
 	return _WitnessManager.Contract.SetEpochNum(&_WitnessManager.TransactOpts, _epochNum)
+}
+
+// SetExcludedWitnesses is a paid mutator transaction binding the contract method 0x08f350b7.
+//
+// Solidity: function setExcludedWitnesses(address[] _witnesses) returns()
+func (_WitnessManager *WitnessManagerTransactor) SetExcludedWitnesses(opts *bind.TransactOpts, _witnesses []common.Address) (*types.Transaction, error) {
+	return _WitnessManager.contract.Transact(opts, "setExcludedWitnesses", _witnesses)
+}
+
+// SetExcludedWitnesses is a paid mutator transaction binding the contract method 0x08f350b7.
+//
+// Solidity: function setExcludedWitnesses(address[] _witnesses) returns()
+func (_WitnessManager *WitnessManagerSession) SetExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
+}
+
+// SetExcludedWitnesses is a paid mutator transaction binding the contract method 0x08f350b7.
+//
+// Solidity: function setExcludedWitnesses(address[] _witnesses) returns()
+func (_WitnessManager *WitnessManagerTransactorSession) SetExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
+}
+
+// SetNextAddExcludedWitnesses is a paid mutator transaction binding the contract method 0xfed01392.
+//
+// Solidity: function setNextAddExcludedWitnesses(address[] _witnesses) returns()
+func (_WitnessManager *WitnessManagerTransactor) SetNextAddExcludedWitnesses(opts *bind.TransactOpts, _witnesses []common.Address) (*types.Transaction, error) {
+	return _WitnessManager.contract.Transact(opts, "setNextAddExcludedWitnesses", _witnesses)
+}
+
+// SetNextAddExcludedWitnesses is a paid mutator transaction binding the contract method 0xfed01392.
+//
+// Solidity: function setNextAddExcludedWitnesses(address[] _witnesses) returns()
+func (_WitnessManager *WitnessManagerSession) SetNextAddExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetNextAddExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
+}
+
+// SetNextAddExcludedWitnesses is a paid mutator transaction binding the contract method 0xfed01392.
+//
+// Solidity: function setNextAddExcludedWitnesses(address[] _witnesses) returns()
+func (_WitnessManager *WitnessManagerTransactorSession) SetNextAddExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetNextAddExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
+}
+
+// SetNextNumNominees is a paid mutator transaction binding the contract method 0x1e7297f4.
+//
+// Solidity: function setNextNumNominees(uint64 nextNumNominees) returns()
+func (_WitnessManager *WitnessManagerTransactor) SetNextNumNominees(opts *bind.TransactOpts, nextNumNominees uint64) (*types.Transaction, error) {
+	return _WitnessManager.contract.Transact(opts, "setNextNumNominees", nextNumNominees)
+}
+
+// SetNextNumNominees is a paid mutator transaction binding the contract method 0x1e7297f4.
+//
+// Solidity: function setNextNumNominees(uint64 nextNumNominees) returns()
+func (_WitnessManager *WitnessManagerSession) SetNextNumNominees(nextNumNominees uint64) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetNextNumNominees(&_WitnessManager.TransactOpts, nextNumNominees)
+}
+
+// SetNextNumNominees is a paid mutator transaction binding the contract method 0x1e7297f4.
+//
+// Solidity: function setNextNumNominees(uint64 nextNumNominees) returns()
+func (_WitnessManager *WitnessManagerTransactorSession) SetNextNumNominees(nextNumNominees uint64) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetNextNumNominees(&_WitnessManager.TransactOpts, nextNumNominees)
+}
+
+// SetNextRemoveExcludedWitnesses is a paid mutator transaction binding the contract method 0xf31f811b.
+//
+// Solidity: function setNextRemoveExcludedWitnesses(address[] _witnesses) returns()
+func (_WitnessManager *WitnessManagerTransactor) SetNextRemoveExcludedWitnesses(opts *bind.TransactOpts, _witnesses []common.Address) (*types.Transaction, error) {
+	return _WitnessManager.contract.Transact(opts, "setNextRemoveExcludedWitnesses", _witnesses)
+}
+
+// SetNextRemoveExcludedWitnesses is a paid mutator transaction binding the contract method 0xf31f811b.
+//
+// Solidity: function setNextRemoveExcludedWitnesses(address[] _witnesses) returns()
+func (_WitnessManager *WitnessManagerSession) SetNextRemoveExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetNextRemoveExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
+}
+
+// SetNextRemoveExcludedWitnesses is a paid mutator transaction binding the contract method 0xf31f811b.
+//
+// Solidity: function setNextRemoveExcludedWitnesses(address[] _witnesses) returns()
+func (_WitnessManager *WitnessManagerTransactorSession) SetNextRemoveExcludedWitnesses(_witnesses []common.Address) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetNextRemoveExcludedWitnesses(&_WitnessManager.TransactOpts, _witnesses)
+}
+
+// SetNumNominees is a paid mutator transaction binding the contract method 0x9d831270.
+//
+// Solidity: function setNumNominees(uint64 _numNominees) returns()
+func (_WitnessManager *WitnessManagerTransactor) SetNumNominees(opts *bind.TransactOpts, _numNominees uint64) (*types.Transaction, error) {
+	return _WitnessManager.contract.Transact(opts, "setNumNominees", _numNominees)
+}
+
+// SetNumNominees is a paid mutator transaction binding the contract method 0x9d831270.
+//
+// Solidity: function setNumNominees(uint64 _numNominees) returns()
+func (_WitnessManager *WitnessManagerSession) SetNumNominees(_numNominees uint64) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetNumNominees(&_WitnessManager.TransactOpts, _numNominees)
+}
+
+// SetNumNominees is a paid mutator transaction binding the contract method 0x9d831270.
+//
+// Solidity: function setNumNominees(uint64 _numNominees) returns()
+func (_WitnessManager *WitnessManagerTransactorSession) SetNumNominees(_numNominees uint64) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetNumNominees(&_WitnessManager.TransactOpts, _numNominees)
+}
+
+// SetWitnessListThreshold is a paid mutator transaction binding the contract method 0xe9de83a0.
+//
+// Solidity: function setWitnessListThreshold(uint8 _threshold) returns()
+func (_WitnessManager *WitnessManagerTransactor) SetWitnessListThreshold(opts *bind.TransactOpts, _threshold uint8) (*types.Transaction, error) {
+	return _WitnessManager.contract.Transact(opts, "setWitnessListThreshold", _threshold)
+}
+
+// SetWitnessListThreshold is a paid mutator transaction binding the contract method 0xe9de83a0.
+//
+// Solidity: function setWitnessListThreshold(uint8 _threshold) returns()
+func (_WitnessManager *WitnessManagerSession) SetWitnessListThreshold(_threshold uint8) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetWitnessListThreshold(&_WitnessManager.TransactOpts, _threshold)
+}
+
+// SetWitnessListThreshold is a paid mutator transaction binding the contract method 0xe9de83a0.
+//
+// Solidity: function setWitnessListThreshold(uint8 _threshold) returns()
+func (_WitnessManager *WitnessManagerTransactorSession) SetWitnessListThreshold(_threshold uint8) (*types.Transaction, error) {
+	return _WitnessManager.Contract.SetWitnessListThreshold(&_WitnessManager.TransactOpts, _threshold)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.

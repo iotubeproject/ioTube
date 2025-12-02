@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -73,13 +74,13 @@ type Configuration struct {
 	} `json:"cashiers" yaml:"cashiers"`
 	WitnessCommittees []struct {
 		ID                            string `json:"id" yaml:"id"`
+		NetworkID                     uint64 `json:"networkID" yaml:"networkID"`
 		WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
 		RelayerConfigs                []struct {
 			RelayerURL                    string `json:"relayerURL" yaml:"relayerURL"`
 			WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
 		} `json:"relayerConfigs" yaml:"relayerConfigs"`
 		WitnessTableName string `json:"witnessTableName" yaml:"witnessTableName"`
-		NumNominees      int    `json:"numNominees" yaml:"numNominees"`
 	} `json:"witnessCommittees" yaml:"witnessCommittees"`
 }
 
@@ -226,11 +227,29 @@ func main() {
 				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL
 			}
 		}
+		for i, wc := range cfg.WitnessCommittees {
+			for j, rc := range wc.RelayerConfigs {
+				switch {
+				case strings.HasPrefix(rc.RelayerURL, ":") && !hasPort:
+					cfg.WitnessCommittees[i].RelayerConfigs[j].RelayerURL = cfg.RelayerURL + rc.RelayerURL
+				case rc.RelayerURL == "":
+					cfg.WitnessCommittees[i].RelayerConfigs[j].RelayerURL = cfg.RelayerURL
+				}
+			}
+		}
+	}
+
+	// print configuration for Debug
+	cfgJSON, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal config for debugging: %v\n", err)
+	} else {
+		log.Printf("Configuration after environment processing:\n%s\n", string(cfgJSON))
 	}
 
 	storeFactory := db.NewSQLStoreFactory()
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
-	var ethClient *ethclient.Client
+	var ethClient witness.Client
 	switch cfg.Chain {
 	case "solana":
 		solClient := solclient.NewClient(cfg.ClientURL)
@@ -257,15 +276,21 @@ func main() {
 				token := solcommon.PublicKeyFromString(pair.Token1)
 				decimalRound[token] = pair.Amount
 			}
-			var signHandler witness.SignHandler
+			var signHandlers []witness.SignHandler
+			var witnessAddresses [][]byte
 			if cfg.PrivateKey != "" {
-				privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
-				if err != nil {
-					log.Fatalf("failed to decode private key %v\n", err)
+				for _, pk := range strings.Split(cfg.PrivateKey, ",") {
+					privateKey, err := crypto.HexToECDSA(pk)
+					if err != nil {
+						log.Fatalf("failed to decode private key %v\n", err)
+					}
+					if len(witnessAddresses) == 0 {
+						util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
+					}
+					log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
+					signHandlers = append(signHandlers, witness.NewSecp256k1SignHandler(privateKey))
+					witnessAddresses = append(witnessAddresses, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes())
 				}
-				util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
-				log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
-				signHandler = witness.NewSecp256k1SignHandler(privateKey)
 			} else {
 				log.Println("No Private Key")
 			}
@@ -285,7 +310,8 @@ func main() {
 				),
 				uint64(cc.StartBlockHeight),
 				cc.QPSLimit,
-				signHandler,
+				signHandlers,
+				witnessAddresses,
 				cc.DisablePull,
 			)
 			if err != nil {
@@ -294,26 +320,32 @@ func main() {
 			cashiers = append(cashiers, cashier)
 		}
 	default: // "heco", "bsc", "matic", "polis", "iotex-e", "iotex", "sepolia", "iotex-testnet", "ethereum":
-		ethClient, err = ethclient.Dial(cfg.ClientURL)
+		ethClient, err = witness.NewMultiClient(strings.Split(cfg.ClientURL, ","))
 		if err != nil {
 			log.Fatal(err)
 		}
 		for _, cc := range cfg.Cashiers {
 			var (
-				signHandler     witness.SignHandler
-				destAddrDecoder util.AddressDecoder
+				signHandlers     []witness.SignHandler
+				witnessAddresses [][]byte
+				destAddrDecoder  util.AddressDecoder
 			)
 			if !cc.ToSolana {
 				destAddrDecoder = util.NewETHAddressDecoder()
 
 				if cfg.PrivateKey != "" {
-					privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
-					if err != nil {
-						log.Fatalf("failed to decode private key %v\n", err)
+					for _, pk := range strings.Split(cfg.PrivateKey, ",") {
+						privateKey, err := crypto.HexToECDSA(pk)
+						if err != nil {
+							log.Fatalf("failed to decode private key %v\n", err)
+						}
+						if len(witnessAddresses) == 0 {
+							util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
+						}
+						log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
+						signHandlers = append(signHandlers, witness.NewSecp256k1SignHandler(privateKey))
+						witnessAddresses = append(witnessAddresses, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes())
 					}
-					util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
-					log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
-					signHandler = witness.NewSecp256k1SignHandler(privateKey)
 				} else {
 					log.Println("No Private Key")
 				}
@@ -321,22 +353,25 @@ func main() {
 				destAddrDecoder = util.NewSOLAddressDecoder()
 
 				if cfg.PrivateKey != "" {
-					privateKeyBytes, err := hex.DecodeString(cfg.PrivateKey)
-					if err != nil {
-						log.Fatalf("failed to decode private key %v\n", err)
+					for _, pk := range strings.Split(cfg.PrivateKey, ",") {
+						privateKeyBytes, err := hex.DecodeString(pk)
+						if err != nil {
+							log.Fatalf("failed to decode private key %v\n", err)
+						}
+						var edPrivateKey ed25519.PrivateKey
+						switch len(privateKeyBytes) {
+						case ed25519.PrivateKeySize:
+							edPrivateKey = ed25519.PrivateKey(privateKeyBytes)
+						case 32: // Seed from 32 bytes
+							edPrivateKey = ed25519.NewKeyFromSeed(privateKeyBytes)
+						default:
+							log.Fatalf("invalid private key length %d\n", len(privateKeyBytes))
+						}
+						pbk := solcommon.PublicKeyFromBytes(edPrivateKey.Public().(ed25519.PublicKey)).String()
+						log.Println("Witness Service for " + pbk + " on chain " + cfg.Chain)
+						signHandlers = append(signHandlers, witness.NewEd25519SignHandler(&edPrivateKey))
+						witnessAddresses = append(witnessAddresses, edPrivateKey.Public().(ed25519.PublicKey))
 					}
-					var edPrivateKey ed25519.PrivateKey
-					switch len(privateKeyBytes) {
-					case ed25519.PrivateKeySize:
-						edPrivateKey = ed25519.PrivateKey(privateKeyBytes)
-					case 32: // Seed from 32 bytes
-						edPrivateKey = ed25519.NewKeyFromSeed(privateKeyBytes)
-					default:
-						log.Fatalf("invalid private key length %d\n", len(privateKeyBytes))
-					}
-					pbk := solcommon.PublicKeyFromBytes(edPrivateKey.Public().(ed25519.PublicKey)).String()
-					log.Println("Witness Service for " + pbk + " on chain " + cfg.Chain)
-					signHandler = witness.NewEd25519SignHandler(&edPrivateKey)
 				} else {
 					log.Println("No Private Key")
 				}
@@ -442,7 +477,8 @@ func main() {
 				pairs,
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
-				signHandler,
+				signHandlers,
+				witnessAddresses,
 				reverseRecorder,
 				common.HexToAddress(cc.Reverse.CashierContractAddress),
 			)
@@ -467,13 +503,17 @@ func main() {
 			}
 			relayerMap[addr] = rc.RelayerURL
 		}
-		var committeeSignHandler witness.SignHandler
+		var committeeSignHandlers []witness.SignHandler
+		var witnessAddresses [][]byte
 		if cfg.PrivateKey != "" {
-			privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
-			if err != nil {
-				log.Fatalf("failed to decode private key %v\n", err)
+			for _, pk := range strings.Split(cfg.PrivateKey, ",") {
+				privateKey, err := crypto.HexToECDSA(pk)
+				if err != nil {
+					log.Fatalf("failed to decode private key %v\n", err)
+				}
+				committeeSignHandlers = append(committeeSignHandlers, witness.NewSecp256k1SignHandler(privateKey))
+				witnessAddresses = append(witnessAddresses, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes())
 			}
-			committeeSignHandler = witness.NewSecp256k1SignHandler(privateKey)
 		} else {
 			log.Println("No Private Key")
 		}
@@ -486,12 +526,13 @@ func main() {
 		witnessCommittee, err := witness.NewWitnessCommittee(
 			wc.ID,
 			witness.IDHasherForWitnessCandidatesInEVM,
-			committeeSignHandler,
+			committeeSignHandlers,
+			witnessAddresses,
 			recorder,
 			ethClient,
-			wc.NumNominees,
 			witnessManagerAddr,
 			relayerMap,
+			wc.NetworkID,
 		)
 		if err != nil {
 			log.Fatalf("failed to create witness committee %v\n", err)

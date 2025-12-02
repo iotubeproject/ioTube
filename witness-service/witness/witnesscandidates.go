@@ -2,16 +2,17 @@ package witness
 
 import (
 	"bytes"
-	"encoding/binary"
 	"log"
+	"math/big"
 	"sort"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/iotexproject/ioTube/witness-service/util"
 )
@@ -140,19 +141,38 @@ func IDHasherForWitnessCandidatesInEVM(in any, witnessManagerAddr []byte) (commo
 		return bytes.Compare(witnessesToRemove[i].Bytes(), witnessesToRemove[j].Bytes()) < 0
 	})
 
-	var data []byte
-	data = append(data, witnessManagerAddr...)
+	// DEBUG print witnessesToAdd and witnessesToRemove and nominees and prevNominees
+	log.Printf("witnessesToAdd: %v\n", witnessesToAdd)
+	log.Printf("witnessesToRemove: %v\n", witnessesToRemove)
+	log.Printf("nominees: %v\n", nominees)
+	log.Printf("prevNominees: %v\n", prevNominees)
 
-	epochBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(epochBytes, cand.Epoch())
-	data = append(data, epochBytes...)
+	addressType, _ := abi.NewType("address", "", nil)
+	uint64Type, _ := abi.NewType("uint64", "", nil)
+	addressArrayType, _ := abi.NewType("address[]", "", nil)
 
-	for _, addr := range witnessesToAdd {
-		data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
+	arguments := abi.Arguments{
+		{Type: addressType},
+		{Type: uint64Type},
+		{Type: addressArrayType},
+		{Type: addressArrayType},
 	}
 
-	for _, addr := range witnessesToRemove {
-		data = append(data, common.LeftPadBytes(addr.Bytes(), 32)...)
+	wmAddr := common.BytesToAddress(witnessManagerAddr)
+
+	wToAdd := make([]common.Address, len(witnessesToAdd))
+	for i, w := range witnessesToAdd {
+		wToAdd[i] = common.BytesToAddress(w.Bytes())
+	}
+
+	wToRemove := make([]common.Address, len(witnessesToRemove))
+	for i, w := range witnessesToRemove {
+		wToRemove[i] = common.BytesToAddress(w.Bytes())
+	}
+
+	data, err := arguments.Pack(wmAddr, cand.Epoch(), wToAdd, wToRemove)
+	if err != nil {
+		return common.Hash{}, err
 	}
 
 	log.Printf("IDHasherForWitnessCandidatesInEVM data: %x\n", data)
@@ -161,15 +181,19 @@ func IDHasherForWitnessCandidatesInEVM(in any, witnessManagerAddr []byte) (commo
 }
 
 type epochWitnessSelector struct {
-	numNominees    int
-	ethereumClient *ethclient.Client
+	witnessManager       *contract.WitnessManagerCaller
+	pollProtocolContract *contract.PollProtocolContractCaller
 }
 
-func newEpochWitnessSelector(numNominees int, ethereumClient *ethclient.Client) EpochWitnessSelector {
-	return &epochWitnessSelector{
-		numNominees:    numNominees,
-		ethereumClient: ethereumClient,
+func newEpochWitnessSelector(witnessManager *contract.WitnessManagerCaller, ethereumClient Client) (EpochWitnessSelector, error) {
+	pollProtocolContract, err := contract.NewPollProtocolContractCaller(POLL_PROTOCOL_ADDRESS, ethereumClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to new poll protocol contract")
 	}
+	return &epochWitnessSelector{
+		witnessManager:       witnessManager,
+		pollProtocolContract: pollProtocolContract,
+	}, nil
 }
 
 func (p *epochWitnessSelector) Witnesses(epoch uint64) ([]util.Address, []util.Address, error) {
@@ -198,13 +222,46 @@ func (p *epochWitnessSelector) Witnesses(epoch uint64) ([]util.Address, []util.A
 	return candidates, nominees, nil
 }
 
-// TODO: read value via contract abi call, hardcode value for now
+// func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Address, error) {
+// 	return []util.Address{
+// 		util.ETHAddressToAddress(common.HexToAddress("0xa62c5719dc2b020791d9f0b0d09862dc36c083a9")),
+// 		// util.ETHAddressToAddress(common.HexToAddress("0x806755EADC11E49605A237E945Bd67DC22c60aA1")),
+// 	}, nil
+// }
+
+// TODO: uncomment in testnet
 func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Address, error) {
-	return []util.Address{
-		util.ETHAddressToAddress(common.HexToAddress("0x0000000000000000000000000000000000000000")),
-		util.ETHAddressToAddress(common.HexToAddress("0x0000000000000000000000000000000000000000")),
-		util.ETHAddressToAddress(common.HexToAddress("0x0000000000000000000000000000000000000000")),
-	}, nil
+	candidates, err := p.pollProtocolContract.ActiveBlockProducersByEpoch(nil, big.NewInt(int64(epoch)))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get active block producers by epoch")
+	}
+
+	probationList, err := p.pollProtocolContract.ProbationListByEpoch(nil, big.NewInt(int64(epoch)))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get probation list by epoch")
+	}
+
+	excludedWitnesses, err := p.witnessManager.GetExcludedWitnesses(nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get excluded witnesses")
+	}
+
+	excludedMap := make(map[common.Address]struct{})
+	for _, excluded := range excludedWitnesses {
+		excludedMap[excluded] = struct{}{} // Add excluded addresses to map for quick lookup
+	}
+	for _, probation := range probationList.Probation.ProbationInfo {
+		excludedMap[probation.OperatorAddress] = struct{}{}
+	}
+
+	result := make([]util.Address, 0, len(candidates.Candidates))
+	for _, cand := range candidates.Candidates {
+		if _, ok := excludedMap[cand.OperatorAddress]; ok {
+			continue
+		}
+		result = append(result, util.ETHAddressToAddress(cand.OperatorAddress))
+	}
+	return result, nil
 }
 
 func (p *epochWitnessSelector) nomineesFromCandidates(cand []util.Address, epoch uint64) ([]util.Address, error) {
@@ -217,13 +274,17 @@ func (p *epochWitnessSelector) nomineesFromCandidates(cand []util.Address, epoch
 	}
 	util.SortCandidates(candidateList, epoch, util.CryptoSeed)
 
-	length := p.numNominees
+	numNominees, err := p.witnessManager.NumNominees(nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get num nominees")
+	}
+	length := int(numNominees)
 	if len(candidateList) < length {
 		length = len(candidateList)
 		log.Printf(
 			"the number of candidates %d is less than expected %d",
 			len(candidateList),
-			p.numNominees,
+			numNominees,
 		)
 	}
 	nominees := make([]util.Address, length)

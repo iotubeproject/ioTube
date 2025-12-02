@@ -521,6 +521,11 @@ func (s *Service) CheckWitnessesList(ctx context.Context, request *services.Chec
 	}, nil
 }
 
+func (s *Service) ReportCashier(ctx context.Context, request *services.ReportCashierRequest) (*services.ReportCashierResponse, error) {
+	// log.Printf("receive a report from %x at height %d\n", request.Address, request.Height)
+	return &services.ReportCashierResponse{Success: true}, nil
+}
+
 func (s *Service) process() error {
 	if s.validators == nil {
 		return nil
@@ -812,7 +817,7 @@ func (s *Service) submitWitnesses() error {
 		candidates, err := s.witnessCommitteeRecorder.WitnessCandidates(
 			0,
 			uint8(witnessManager.Size()*2),
-			DESC,
+			AESC,
 			witnessManager.Address(),
 			WaitingForWitnesses,
 		)

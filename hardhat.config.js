@@ -42,6 +42,9 @@ module.exports = {
       }
     ],
   },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY,
+  },
   networks: {
     hardhat: {
       forking: {
@@ -54,6 +57,11 @@ module.exports = {
       url: process.env.MAINNET_RPC_URL || "https://www.ankr.com/rpc/eth/",
       chainId: 1,
     },
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL || "https://1rpc.io/sepolia",
+      chainId: 11155111,
+      accounts: accounts,
+    },
     iotex: {
         url: 'https://babel-api.mainnet.iotex.io',
         chainId: 4689,
@@ -61,6 +69,7 @@ module.exports = {
     iotex_test: {
         url: 'https://babel-api.testnet.iotex.io',
         chainId: 4690,
+        accounts: accounts,
     },
     bsc: {
       url: 'https://bsc-dataseed.binance.org',

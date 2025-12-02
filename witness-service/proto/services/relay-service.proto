@@ -75,6 +75,12 @@ service RelayService {
             body: "*"
         };
     }; 
+    rpc ReportCashier(ReportCashierRequest) returns (ReportCashierResponse) {
+        option (google.api.http) = {
+            post: "/report_cashier"
+            body: "*"
+        };
+    }
 }
 
 message CheckRequest {
@@ -176,4 +182,13 @@ message ListNewTXRequest {
 
 message ListNewTXResponse {
     repeated SubmitNewTXRequest txs = 1;
+}
+
+message ReportCashierRequest {
+    bytes address = 1;
+    uint64 height = 2;
+}
+
+message ReportCashierResponse {
+    bool success = 1;
 }

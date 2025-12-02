@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
@@ -23,13 +22,13 @@ import (
 
 type iterator struct {
 	version               Version
-	client                *ethclient.Client
+	client                Client
 	cashierContractAddr   common.Address
 	tokenSafeContractAddr common.Address
 	previous              *iterator
 }
 
-func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr common.Address, client *ethclient.Client, previous *iterator) (*iterator, error) {
+func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr common.Address, client Client, previous *iterator) (*iterator, error) {
 	iter := &iterator{
 		version:               version,
 		cashierContractAddr:   cashierContractAddr,
@@ -227,7 +226,7 @@ func NewTokenCashierOnEthereum(
 	id string,
 	version Version,
 	relayerURL string,
-	ethereumClient *ethclient.Client,
+	ethereumClient Client,
 	cashierContractAddr common.Address,
 	previousCashierAddr common.Address,
 	tokenSafeContractAddr common.Address,
@@ -236,7 +235,8 @@ func NewTokenCashierOnEthereum(
 	tokenPairs TokenPairs,
 	startBlockHeight uint64,
 	confirmBlockNumber uint8,
-	signHandler SignHandler,
+	signHandlers []SignHandler,
+	witnessAddresses [][]byte,
 	reverseRecorder *Recorder,
 	reverseCashierContractAddr common.Address,
 ) (TokenCashier, error) {
@@ -291,7 +291,8 @@ func NewTokenCashierOnEthereum(
 		},
 		iter.Transfers,
 		idHasher,
-		signHandler,
+		signHandlers,
+		witnessAddresses,
 		func(_token util.Address, amountToTransfer *big.Int) bool {
 			if reverseRecorder == nil {
 				return true

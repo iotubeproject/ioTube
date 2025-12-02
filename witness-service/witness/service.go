@@ -95,6 +95,9 @@ func (s *service) process() error {
 		if s.disableSubmit {
 			continue
 		}
+		if err := cashier.ReportProgress(); err != nil {
+			log.Println(errors.Wrapf(err, "failed to report progress for %s", cashier.ID()))
+		}
 		if err := cashier.SubmitTransfers(); err != nil {
 			log.Println(errors.Wrapf(err, "failed to submit transfers for %s", cashier.ID()))
 			continue
@@ -139,14 +142,14 @@ func (s *service) ProcessOneBlock(height uint64) error {
 }
 
 func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
-	return func(dataHash []byte) ([]byte, []byte, error) {
+	return func(dataHash []byte) ([]byte, error) {
 		if privateKey == nil {
-			return nil, nil, nil
+			return nil, nil
 		}
 		signature, err := crypto.Sign(dataHash, privateKey)
 
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		// adjust v value
@@ -154,17 +157,17 @@ func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
 			signature[64] += 27
 		}
 
-		return crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), signature, nil
+		return signature, nil
 	}
 }
 
 func NewEd25519SignHandler(privateKey *ed25519.PrivateKey) SignHandler {
-	return func(dataHash []byte) ([]byte, []byte, error) {
+	return func(dataHash []byte) ([]byte, error) {
 		if privateKey == nil {
-			return nil, nil, nil
+			return nil, nil
 		}
 		signature := ed25519.Sign(*privateKey, dataHash)
 
-		return privateKey.Public().(ed25519.PublicKey), signature, nil
+		return signature, nil
 	}
 }

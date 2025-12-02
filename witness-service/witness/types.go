@@ -44,6 +44,7 @@ type (
 		CheckTransfers() error
 		ProcessStales() error
 		RefreshTokenPairs() error
+		ReportProgress() error
 	}
 
 	AbstractRecorder interface {
@@ -79,7 +80,7 @@ type (
 	}
 
 	IDHasher    func(any, []byte) (common.Hash, error)
-	SignHandler func(dataHash []byte) ([]byte, []byte, error)
+	SignHandler func(dataHash []byte) ([]byte, error)
 
 	TokenPairs interface {
 		CoToken(token common.Address) (util.Address, bool)
