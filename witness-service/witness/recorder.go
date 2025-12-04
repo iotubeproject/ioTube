@@ -35,7 +35,7 @@ type (
 		store                *db.SQLStore
 		cashierMetaTableName string
 		transferTableName    string
-		tokenPairs           map[common.Address]util.Address
+		tokenPairs           TokenPairs
 		tokenWhitelists      map[common.Address]map[common.Address]struct{}
 		tokenMintPairs       map[string][2]util.Address
 		tokenRound           map[common.Address]int
@@ -47,7 +47,7 @@ type (
 func NewRecorder(
 	store *db.SQLStore,
 	transferTableName string,
-	tokenPairs map[common.Address]util.Address,
+	tokenPairs TokenPairs,
 	tokenWhitelists map[common.Address]map[common.Address]struct{},
 	tokenMintPairs map[string][2]util.Address,
 	tokenRound map[common.Address]int,
@@ -441,7 +441,7 @@ func (recorder *Recorder) transfers(cashier string, status ...TransferStatus) ([
 				return nil, errors.Wrap(err, "failed to decode shadow payload")
 			}
 		}
-		if toToken, ok := recorder.tokenPairs[tx.token]; ok {
+		if toToken, ok := recorder.tokenPairs.CoToken(tx.token); ok {
 			tx.coToken = toToken
 		} else {
 			// skip if token is not in whitelist
@@ -531,7 +531,7 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 			return nil, errors.Wrap(err, "failed to decode shadow payload")
 		}
 	}
-	if toToken, ok := recorder.tokenPairs[tx.token]; ok {
+	if toToken, ok := recorder.tokenPairs.CoToken(tx.token); ok {
 		tx.coToken = toToken
 	} else {
 		return nil, errors.New("invalid token")

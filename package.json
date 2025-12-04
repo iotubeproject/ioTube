@@ -2,7 +2,7 @@
   "name": "iotube-contracts",
   "version": "1.0.0",
   "description": "The IoTeX Emerald token contract is an ERC20-compatible token that is designed to be “pausable”, which means that we can pause transfers in case of a major security vulnerability or attack.",
-  "main": "hardhat-config.js",
+  "main": "hardhat.config.js",
   "directories": {
     "test": "test"
   },

@@ -7,11 +7,13 @@
 package relayer
 
 import (
-	"context"
+	"bytes"
 	"math/big"
+	"sort"
 	"time"
 
 	soltypes "github.com/blocto/solana-go-sdk/types"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -79,32 +81,18 @@ type (
 		SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 	}
 
-	AbstractRecorder interface {
-		// Start starts the recorder
-		Start(ctx context.Context) error
-		// Stop stops the recorder
-		Stop(ctx context.Context) error
-		// AddWitness adds a witness and a transfer
-		AddWitness(validator util.Address, transfer *Transfer, witness *Witness) (common.Hash, error)
-		// ResetFailedTransfer resets a failed transfer
-		ResetFailedTransfer(id common.Hash) error
-		// Transfers returns a list of transfers
-		Transfers(offset uint32, limit uint8, order Order,
-			queryOpts ...TransferQueryOption) ([]*Transfer, error)
-		// Transfer returns a transfer by id
-		Transfer(id common.Hash) (*Transfer, error)
-		// Witnesses returns a list of witnesses by transfer id
-		Witnesses(ids ...common.Hash) (map[common.Hash][]*Witness, error)
-		// Count returns the number of transfers
-		Count(opts ...TransferQueryOption) (int, error)
-		// AddNewTX adds a new tx to the new tx table
-		AddNewTX(height uint64, txHash []byte) error
-		// NewTXs returns the new txs to be witnessed
-		NewTXs(count uint32) ([]uint64, [][]byte, error)
-		// HeightsOfStaleTransfers returns the heights of stale transfers
-		HeightsOfStaleTransfers(cashier util.Address) ([]uint64, error)
-		// TransfersBySourceTxHash returns transfers by source tx hash
-		TransfersBySourceTxHash(hash common.Hash) ([]*Transfer, error)
+	// WitnessManager defines the interface for managing witness candidates
+	WitnessManager interface {
+		// Size returns the number of relayers
+		Size() int
+		// Address returns the witness manager contract address
+		Address() common.Address
+		// Check returns the status of witness candidates on chain
+		Check(candidates *WitnessCandidates) (StatusOnChainType, error)
+		// Submit submits witness candidate updates (additions and removals)
+		Submit(candidates *WitnessCandidates, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
+		// SpeedUp speeds up witness candidates
+		SpeedUp(candidates *WitnessCandidates, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 	}
 
 	SOLRawTransaction struct {
@@ -148,6 +136,8 @@ const (
 	ValidationFailed = "failed"
 	// ValidationRejected stands for the validation of a transfer is rejected
 	ValidationRejected = "rejected"
+	// ValidationNeedSpeedUp stands for the validation of a transfer needs speed up
+	ValidationNeedSpeedUp = "speedup"
 )
 
 const (
@@ -159,9 +149,12 @@ const (
 	StatusOnChainSettled
 )
 
-var errInsufficientWitnesses = errors.New("insufficient witnesses")
-var errGasPriceTooHigh = errors.New("gas price is too high")
-var errNoncritical = errors.New("error before submission")
+var (
+	errInsufficientWitnesses = errors.New("insufficient witnesses")
+	errGasPriceTooHigh       = errors.New("gas price is too high")
+	errNoncritical           = errors.New("error before submission")
+	errInvalidData           = errors.New("invalid data")
+)
 
 // UnmarshalTransferProto unmarshals a transfer proto
 func UnmarshalTransferProto(transfer *types.Transfer, destAddrDecoder util.AddressDecoder,
@@ -253,7 +246,7 @@ func NewWitness(witnessBytes []byte, signature []byte) (*Witness, error) {
 
 	return &Witness{
 		addr:      witnessBytes,
-		signature: signature,
+		signature: clone,
 	}, nil
 }
 
@@ -305,4 +298,120 @@ func (transfer *Transfer) ToTypesTransfer() *types.Transfer {
 
 func (w *Witness) Address() common.Address {
 	return common.BytesToAddress(w.addr)
+}
+
+// UnmarshalWitnessListProto unmarshals a witness list proto
+func UnmarshalWitnessListProto(
+	request *types.WitnessesList,
+	destAddrDecoder util.AddressDecoder,
+) (*WitnessCandidates, *Witness, error) {
+	if request.Candidates == nil {
+		return nil, nil, errors.New("candidates is nil")
+	}
+	witnessManager, err := destAddrDecoder.DecodeBytes(request.Candidates.WitnessManagerAddress)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to decode witness manager address")
+	}
+	witnessManagerAddr, ok := witnessManager.Address().(common.Address)
+	if !ok {
+		return nil, nil, errors.New("witness manager address is not common.Address")
+	}
+	witnessesToAdd := make([]util.Address, len(request.Candidates.WitnessesToAdd))
+	for i, witnessBytes := range request.Candidates.WitnessesToAdd {
+		witness, err := destAddrDecoder.DecodeBytes(witnessBytes)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to decode witness to add %x", witnessBytes)
+		}
+		witnessesToAdd[i] = witness
+	}
+	witnessesToRemove := make([]util.Address, len(request.Candidates.WitnessesToRemove))
+	for i, witnessBytes := range request.Candidates.WitnessesToRemove {
+		witness, err := destAddrDecoder.DecodeBytes(witnessBytes)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to decode witness to remove %x", witnessBytes)
+		}
+		witnessesToRemove[i] = witness
+	}
+	var witness *Witness
+	if len(request.Address) > 0 && len(request.Signature) > 0 {
+		witness, err = NewWitness(request.Address, request.Signature)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to create witness")
+		}
+	}
+
+	return &WitnessCandidates{
+		witnessManager:  witnessManagerAddr,
+		epoch:           request.Candidates.Epoch,
+		witnessToAdd:    witnessesToAdd,
+		witnessToRemove: witnessesToRemove,
+	}, witness, nil
+}
+
+type (
+	// WitnessCandidates defines a record of witness list update
+	WitnessCandidates struct {
+		id              common.Hash
+		witnessManager  common.Address
+		epoch           uint64
+		witnessToAdd    []util.Address
+		witnessToRemove []util.Address
+		updateTime      time.Time
+		status          ValidationStatusType
+		txHash          common.Hash
+		blockHeight     uint64
+		gas             uint64
+		nonce           uint64
+		relayer         common.Address
+		gasPrice        *big.Int
+	}
+)
+
+func (cand *WitnessCandidates) GenID() error {
+	witnessesToAdd, witnessesToRemove := cand.Witnesses()
+	sort.Slice(witnessesToAdd, func(i, j int) bool {
+		return bytes.Compare(witnessesToAdd[i][:], witnessesToAdd[j][:]) < 0
+	})
+	sort.Slice(witnessesToRemove, func(i, j int) bool {
+		return bytes.Compare(witnessesToRemove[i][:], witnessesToRemove[j][:]) < 0
+	})
+
+	addressType, _ := abi.NewType("address", "", nil)
+	uint64Type, _ := abi.NewType("uint64", "", nil)
+	addressArrayType, _ := abi.NewType("address[]", "", nil)
+
+	arguments := abi.Arguments{
+		{Type: addressType},
+		{Type: uint64Type},
+		{Type: addressArrayType},
+		{Type: addressArrayType},
+	}
+
+	data, err := arguments.Pack(
+		cand.witnessManager,
+		cand.epoch,
+		witnessesToAdd,
+		witnessesToRemove,
+	)
+	if err != nil {
+		return err
+	}
+	cand.id = crypto.Keccak256Hash(data)
+	return nil
+}
+
+func (cand *WitnessCandidates) Witnesses() ([]common.Address, []common.Address) {
+	witnessesToAdd := []common.Address{}
+	for _, witness := range cand.witnessToAdd {
+		witnessesToAdd = append(witnessesToAdd, witness.Address().(common.Address))
+	}
+	witnessesToRemove := []common.Address{}
+	for _, witness := range cand.witnessToRemove {
+		witnessesToRemove = append(witnessesToRemove, witness.Address().(common.Address))
+	}
+	return witnessesToAdd, witnessesToRemove
+}
+
+func (cand *WitnessCandidates) ID() common.Hash {
+	return cand.id
 }

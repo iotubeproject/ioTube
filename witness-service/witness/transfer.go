@@ -7,10 +7,14 @@ import (
 	solcommon "github.com/blocto/solana-go-sdk/common"
 	soltypes "github.com/blocto/solana-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/util/instruction"
 )
 
 // Transfer defines a record
@@ -211,4 +215,42 @@ func (s *solTransfer) ToTypesTransfer() *types.Transfer {
 		Payload:      s.payload,
 		SourceTxHash: s.txSignature,
 	}
+}
+
+func IDHasherForTransferInEVM(in any, validatorContractAddr []byte) (common.Hash, error) {
+	transfer, ok := in.(AbstractTransfer)
+	if !ok {
+		return common.Hash{}, errors.New("transfer is not an AbstractTransfer")
+	}
+	return crypto.Keccak256Hash(
+		validatorContractAddr,
+		transfer.Cashier().Bytes(),
+		transfer.CoToken().Bytes(),
+		math.U256Bytes(transfer.Index()),
+		transfer.Sender().Bytes(),
+		transfer.Recipient().Bytes(),
+		math.U256Bytes(transfer.Amount()),
+		transfer.Payload(),
+	), nil
+}
+
+func IDHasherForTransferInSVM(in any, validatorContractAddr []byte) (common.Hash, error) {
+	transfer, ok := in.(AbstractTransfer)
+	if !ok {
+		return common.Hash{}, errors.New("transfer is not an AbstractTransfer")
+	}
+	data, err := instruction.SerializePayload(
+		validatorContractAddr,
+		transfer.Cashier().Bytes(),
+		transfer.CoToken().Bytes(),
+		transfer.Index().Uint64(),
+		transfer.Sender().String(),
+		transfer.Recipient().Bytes(),
+		transfer.Amount().Uint64(),
+		transfer.Payload(),
+	)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	return crypto.Keccak256Hash(data), nil
 }

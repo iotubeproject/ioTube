@@ -18,7 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -47,22 +47,27 @@ type (
 		privateKeys           []*ecdsa.PrivateKey
 		validatorContractAddr common.Address
 
-		client              *ethclient.Client
-		validator           validatorContract
+		client                     *ethclient.Client
+		validator                  validatorContract
+		witnessListContractMapping map[common.Address]witnessListInfo
+	}
+
+	witnessListInfo struct {
 		witnessListContract *contract.AddressListCaller
 		witnesses           map[string]bool
 	}
 
 	validatorContract interface {
-		WitnessListAddr(*bind.CallOpts) (common.Address, error)
+		WitnessListsAddr(*bind.CallOpts, common.Address) ([]common.Address, error)
 		SettledHeight(common.Hash) (*big.Int, error)
 		SettledTransaction(uint64, common.Hash) (common.Hash, error)
-		SubmitTransfer(*bind.TransactOpts, *Transfer, []byte) (*types.Transaction, error)
+		SubmitTransfer(*bind.TransactOpts, *Transfer, ...[]byte) (*types.Transaction, error)
 	}
 
-	validatorWithPayload    contract.TransferValidatorWithPayload
-	validatorWithoutPayload contract.TransferValidator
-	validatorForSolana      contract.TransferValidatorForSolana
+	validatorWithPayload      contract.TransferValidatorWithPayload
+	validatorWithoutPayload   contract.TransferValidator
+	validatorForSolana        contract.TransferValidatorForSolana
+	validatorWitnessCommittee contract.TransferValidatorV3
 )
 
 func newValidatorContract(
@@ -89,24 +94,62 @@ func newValidatorContract(
 			return nil, err
 		}
 		return (*validatorWithoutPayload)(validator), nil
+	case WitnessCommittee:
+		validator, err := contract.NewTransferValidatorV3(addr, client)
+		if err != nil {
+			return nil, err
+		}
+		return (*validatorWitnessCommittee)(validator), nil
 	default:
 		return nil, errors.New("")
 	}
 }
 
-func (v *validatorWithoutPayload) WitnessListAddr(callOpts *bind.CallOpts) (common.Address, error) {
-	return v.WitnessList(callOpts)
+func (v *validatorWithoutPayload) WitnessListsAddr(callOpts *bind.CallOpts, _ common.Address) ([]common.Address, error) {
+	addr, err := v.WitnessList(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	return []common.Address{addr}, nil
 }
 
-func (v *validatorWithPayload) WitnessListAddr(callOpts *bind.CallOpts) (common.Address, error) {
-	return v.WitnessList(callOpts)
+func (v *validatorWithPayload) WitnessListsAddr(callOpts *bind.CallOpts, _ common.Address) ([]common.Address, error) {
+	addr, err := v.WitnessList(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	return []common.Address{addr}, nil
 }
 
-func (v *validatorForSolana) WitnessListAddr(callOpts *bind.CallOpts) (common.Address, error) {
-	return v.WitnessList(callOpts)
+func (v *validatorForSolana) WitnessListsAddr(callOpts *bind.CallOpts, _ common.Address) ([]common.Address, error) {
+	addr, err := v.WitnessList(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	return []common.Address{addr}, nil
+}
+
+func (v *validatorWitnessCommittee) WitnessListsAddr(callOpts *bind.CallOpts, tokenAddr common.Address) ([]common.Address, error) {
+	addrs, err := v.GetWitnessLists(callOpts, tokenAddr)
+	if err != nil {
+		return nil, err
+	}
+	if len(addrs) == 0 {
+		return nil, errors.New("no witness list found")
+	}
+	for _, addr := range addrs {
+		if addr == zeroAddress {
+			return nil, errors.New("witness list address is zero address")
+		}
+	}
+	return addrs, nil
 }
 
 func (v *validatorWithPayload) SettledHeight(id common.Hash) (*big.Int, error) {
+	return v.Settles(&bind.CallOpts{}, id)
+}
+
+func (v *validatorWitnessCommittee) SettledHeight(id common.Hash) (*big.Int, error) {
 	return v.Settles(&bind.CallOpts{}, id)
 }
 
@@ -162,7 +205,32 @@ func (v *validatorForSolana) SettledTransaction(height uint64, id common.Hash) (
 	return iter.Event.Raw.TxHash, nil
 }
 
-func (v *validatorWithPayload) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signatures []byte) (*types.Transaction, error) {
+func (v *validatorWitnessCommittee) SettledTransaction(height uint64, id common.Hash) (common.Hash, error) {
+	iter, err := v.FilterSettled(
+		&bind.FilterOpts{Start: height},
+		[][32]byte{id},
+	)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if !iter.Next() {
+		if err := iter.Close(); err != nil {
+			// ignore close error
+		}
+		return common.Hash{}, ethereum.NotFound
+	}
+	txHash := iter.Event.Raw.TxHash
+	if err := iter.Close(); err != nil {
+		// ignore close error
+	}
+	return txHash, nil
+}
+
+func (v *validatorWithPayload) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signaturesArr ...[]byte) (*types.Transaction, error) {
+	if len(signaturesArr) != 1 {
+		return nil, errors.New("invalid signature length")
+	}
+	signatures := signaturesArr[0]
 	cashier, err := util.ParseEthAddress(transfer.cashier.String())
 	if err != nil {
 		return nil, err
@@ -195,7 +263,11 @@ func (v *validatorWithPayload) SubmitTransfer(opts *bind.TransactOpts, transfer 
 	return v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signatures, transfer.payload)
 }
 
-func (v *validatorWithoutPayload) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signatures []byte) (*types.Transaction, error) {
+func (v *validatorWithoutPayload) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signaturesArr ...[]byte) (*types.Transaction, error) {
+	if len(signaturesArr) != 1 {
+		return nil, errors.New("invalid signature length")
+	}
+	signatures := signaturesArr[0]
 	cashier, err := util.ParseEthAddress(transfer.cashier.String())
 	if err != nil {
 		return nil, err
@@ -215,7 +287,11 @@ func (v *validatorWithoutPayload) SubmitTransfer(opts *bind.TransactOpts, transf
 	return v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signatures)
 }
 
-func (v *validatorForSolana) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signatures []byte) (*types.Transaction, error) {
+func (v *validatorForSolana) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signaturesArr ...[]byte) (*types.Transaction, error) {
+	if len(signaturesArr) != 1 {
+		return nil, errors.New("invalid signature length")
+	}
+	signatures := signaturesArr[0]
 	token, err := util.ParseEthAddress(transfer.token.String())
 	if err != nil {
 		return nil, err
@@ -225,6 +301,39 @@ func (v *validatorForSolana) SubmitTransfer(opts *bind.TransactOpts, transfer *T
 		return nil, err
 	}
 	return v.Submit(opts, transfer.cashier.Bytes(), token, new(big.Int).SetUint64(transfer.index), transfer.sender.Bytes(), recipient, transfer.amount, signatures, transfer.payload)
+}
+
+func (v *validatorWitnessCommittee) SubmitTransfer(opts *bind.TransactOpts, transfer *Transfer, signaturesArr ...[]byte) (*types.Transaction, error) {
+	cashier, err := util.ParseEthAddress(transfer.cashier.String())
+	if err != nil {
+		return nil, err
+	}
+	token, err := util.ParseEthAddress(transfer.token.String())
+	if err != nil {
+		return nil, err
+	}
+	sender, err := util.ParseEthAddress(transfer.sender.String())
+	if err != nil {
+		return nil, err
+	}
+	recipient, err := util.ParseEthAddress(transfer.recipient.String())
+	if err != nil {
+		return nil, err
+	}
+	// Estimate gas first
+	opts.NoSend = true
+	nonceSet := opts.Nonce != nil
+	tx, err := v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signaturesArr, transfer.payload)
+	if err != nil {
+		return nil, err
+	}
+	if !nonceSet {
+		opts.Nonce = nil
+	}
+	opts.NoSend = false
+	opts.GasLimit = tx.Gas() * 11 / 10
+
+	return v.Submit(opts, cashier, token, new(big.Int).SetUint64(transfer.index), sender, recipient, transfer.amount, signaturesArr, transfer.payload)
 }
 
 // NewTransferValidatorOnEthereum creates a new TransferValidator
@@ -266,21 +375,9 @@ func NewTransferValidatorOnEthereum(
 		privateKeys:           privateKeys,
 		validatorContractAddr: validatorContractAddr,
 
-		client:    client,
-		validator: validator,
-	}
-
-	callOpts, err := tv.callOpts()
-	if err != nil {
-		return nil, err
-	}
-	witnessContractAddr, err := tv.validator.WitnessListAddr(callOpts)
-	if err != nil {
-		return nil, err
-	}
-	tv.witnessListContract, err = contract.NewAddressListCaller(witnessContractAddr, client)
-	if err != nil {
-		return nil, err
+		client:                     client,
+		validator:                  validator,
+		witnessListContractMapping: make(map[common.Address]witnessListInfo),
 	}
 
 	return tv, nil
@@ -297,42 +394,101 @@ func (tv *transferValidatorOnEthereum) Address() common.Address {
 	return tv.validatorContractAddr
 }
 
-func (tv *transferValidatorOnEthereum) refresh() error {
-	callOpts, err := tv.callOpts()
-	if err != nil {
-		return err
+func (tv *transferValidatorOnEthereum) refresh(witnessLists []common.Address, callOpts *bind.CallOpts) error {
+	for _, witnessList := range witnessLists {
+		info, ok := tv.witnessListContractMapping[witnessList]
+		if !ok {
+			caller, err := contract.NewAddressListCaller(witnessList, tv.client)
+			if err != nil {
+				return err
+			}
+			info = witnessListInfo{
+				witnessListContract: caller,
+				witnesses:           make(map[string]bool),
+			}
+		}
+		witnesses, err := fetchWitnessesFromContract(info.witnessListContract, callOpts)
+		if err != nil {
+			return err
+		}
+		info.witnesses = witnesses
+		tv.witnessListContractMapping[witnessList] = info
 	}
-	count, err := tv.witnessListContract.Count(callOpts)
+	return nil
+}
+
+type witnessListContract interface {
+	NumOfActive(opts *bind.CallOpts) (*big.Int, error)
+	Count(opts *bind.CallOpts) (*big.Int, error)
+	GetActiveItems(*bind.CallOpts, *big.Int, uint8) (struct {
+		Count *big.Int
+		Items []common.Address
+	}, error)
+}
+
+func fetchWitnessesFromContract(contract witnessListContract, callOpts *bind.CallOpts) (map[string]bool, error) {
+	numOfActive, err := contract.NumOfActive(callOpts)
 	if err != nil {
-		return errors.Wrap(err, "failed to call witness list contract")
+		return nil, errors.Wrap(err, "failed to get number of active witnesses")
+	}
+	if numOfActive.Cmp(big.NewInt(0)) == 0 {
+		return make(map[string]bool), nil
+	}
+	count, err := contract.Count(callOpts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get total number of witnesses")
 	}
 	offset := big.NewInt(0)
-	limit := uint8(10)
-	witnesses := []common.Address{}
-	for offset.Cmp(count) < 0 {
-		result, err := tv.witnessListContract.GetActiveItems(callOpts, offset, limit)
+	limit := uint8(100)
+	witnesses := make([]common.Address, 0, int(numOfActive.Int64()))
+	for offset.Cmp(count) < 0 && big.NewInt(int64(len(witnesses))).Cmp(numOfActive) < 0 {
+		result, err := contract.GetActiveItems(callOpts, offset, limit)
 		if err != nil {
-			return errors.Wrap(err, "failed to query list")
+			return nil, errors.Wrap(err, "failed to query list")
 		}
 		witnesses = append(witnesses, result.Items[0:result.Count.Int64()]...)
 		offset.Add(offset, big.NewInt(int64(limit)))
 	}
 
-	// log.Println("refresh Witnesses")
 	activeWitnesses := make(map[string]bool)
 	for _, w := range witnesses {
-		// log.Println("\t" + w.Hex())
 		activeWitnesses[w.Hex()] = true
 	}
 
-	tv.witnesses = activeWitnesses
-	return nil
+	return activeWitnesses, nil
 }
 
-func (tv *transferValidatorOnEthereum) isActiveWitness(witness common.Address) bool {
-	val, ok := tv.witnesses[witness.Hex()]
+func (tv *transferValidatorOnEthereum) filterValidWitnesses(witnesses []*Witness, witnessLists []common.Address) ([][]*Witness, [][]byte, error) {
+	validWitnesses := [][]*Witness{}
+	validSignatures := [][]byte{}
 
-	return ok && val
+	for _, witnessListAddr := range witnessLists {
+		witnessListInfo, exist := tv.witnessListContractMapping[witnessListAddr]
+		if !exist {
+			return nil, nil, errors.Errorf("witness list contract not found for witness list %s", witnessListAddr.Hex())
+		}
+
+		currentListWitnesses := []*Witness{}
+		signatures := []byte{}
+		numOfValidSignatures := 0
+
+		for _, witness := range witnesses {
+			witnessAddr := witness.Address()
+			if !witnessListInfo.witnesses[witnessAddr.Hex()] {
+				continue
+			}
+			signatures = append(signatures, witness.signature...)
+			currentListWitnesses = append(currentListWitnesses, witness)
+			numOfValidSignatures++
+		}
+		if numOfValidSignatures*3 <= len(witnessListInfo.witnesses)*2 {
+			return nil, nil, errInsufficientWitnesses
+		}
+		validWitnesses = append(validWitnesses, currentListWitnesses)
+		validSignatures = append(validSignatures, signatures)
+	}
+
+	return validWitnesses, validSignatures, nil
 }
 
 // Check returns true if a transfer has been settled
@@ -393,7 +549,7 @@ func (tv *transferValidatorOnEthereum) Check(transfer *Transfer) (StatusOnChainT
 		log.Printf("transfer %s with nonce %d needs speed up, %s %s %d\n", transfer.id, transfer.nonce, transfer.updateTime.String(), time.Now(), nonce)
 		return StatusOnChainNeedSpeedUp, nil
 	}
-	if transfer.updateTime.After(time.Now().Add(-20 * time.Minute)) {
+	if transfer.updateTime.After(time.Now().Add(-10 * time.Minute)) {
 		return StatusOnChainNotConfirmed, nil
 	}
 	// no matter what the receipt status is, mark the validation as failure
@@ -410,24 +566,25 @@ func (tv *transferValidatorOnEthereum) privateKeyOfRelayer(relayer common.Addres
 }
 
 func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*Witness, isSpeedUp bool) (common.Hash, common.Address, uint64, *big.Int, error) {
-	if err := tv.refresh(); err != nil {
+	callOpts, err := tv.callOpts()
+	if err != nil {
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
-	signatures := []byte{}
-	numOfValidSignatures := 0
-	for _, witness := range witnesses {
-		if !tv.isActiveWitness(witness.Address()) {
-			log.Printf("witness %s is inactive\n", witness.Address().Hex())
-			continue
-		}
-		signatures = append(signatures, witness.signature...)
-		numOfValidSignatures++
+	witnessLists, err := tv.validator.WitnessListsAddr(callOpts, transfer.token.Address().(common.Address))
+	if err != nil {
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
-	if numOfValidSignatures*3 <= len(tv.witnesses)*2 {
-		return common.Hash{}, common.Address{}, 0, nil, errInsufficientWitnesses
+	if err := tv.refresh(witnessLists, callOpts); err != nil {
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+	}
+	_, signatures, err := tv.filterValidWitnesses(witnesses, witnessLists)
+	if err != nil {
+		if errors.Cause(err) == errInsufficientWitnesses {
+			return common.Hash{}, common.Address{}, 0, nil, errInsufficientWitnesses
+		}
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	}
 	var privateKey *ecdsa.PrivateKey
-	var err error
 	if isSpeedUp {
 		privateKey, err = tv.privateKeyOfRelayer(transfer.relayer)
 		if err != nil {
@@ -450,13 +607,14 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 		if new(big.Int).Sub(gasPrice, transfer.gasPrice).Cmp(tv.gasPriceGap) < 0 {
 			return common.Hash{}, common.Address{}, 0, nil, errors.Wrapf(errNoncritical, "current gas price %s is not significantly larger than old gas price %s", gasPrice, transfer.gasPrice)
 		}
+		// TODO: increase price in tOpts when speeding up?
 		tOpts.Nonce = big.NewInt(0).SetUint64(transfer.nonce)
 	}
-	transaction, err := tv.validator.SubmitTransfer(tOpts, transfer, signatures)
+	transaction, err := tv.validator.SubmitTransfer(tOpts, transfer, signatures...)
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil
-	case core.ErrUnderpriced:
+	case txpool.ErrUnderpriced:
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	case ethereum.NotFound:
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
