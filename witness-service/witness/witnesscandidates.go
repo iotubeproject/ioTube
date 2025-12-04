@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/iotexproject/ioTube/witness-service/util"
 )
@@ -180,15 +181,19 @@ func IDHasherForWitnessCandidatesInEVM(in any, witnessManagerAddr []byte) (commo
 }
 
 type epochWitnessSelector struct {
-	numNominees    int
-	ethereumClient *ethclient.Client
+	numNominees          int
+	pollProtocolContract *contract.PollProtocolContractCaller
 }
 
-func newEpochWitnessSelector(numNominees int, ethereumClient *ethclient.Client) EpochWitnessSelector {
-	return &epochWitnessSelector{
-		numNominees:    numNominees,
-		ethereumClient: ethereumClient,
+func newEpochWitnessSelector(numNominees int, ethereumClient *ethclient.Client) (EpochWitnessSelector, error) {
+	pollProtocolContract, err := contract.NewPollProtocolContractCaller(POLL_PROTOCOL_ADDRESS, ethereumClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to new poll protocol contract")
 	}
+	return &epochWitnessSelector{
+		numNominees:          numNominees,
+		pollProtocolContract: pollProtocolContract,
+	}, nil
 }
 
 func (p *epochWitnessSelector) Witnesses(epoch uint64) ([]util.Address, []util.Address, error) {
@@ -217,14 +222,25 @@ func (p *epochWitnessSelector) Witnesses(epoch uint64) ([]util.Address, []util.A
 	return candidates, nominees, nil
 }
 
-// TODO: read value via contract abi call, hardcode value for now
 func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Address, error) {
 	return []util.Address{
-		util.ETHAddressToAddress(common.HexToAddress("0x0000000000000000000000000000000000000000")),
-		util.ETHAddressToAddress(common.HexToAddress("0x0000000000000000000000000000000000000000")),
-		util.ETHAddressToAddress(common.HexToAddress("0x0000000000000000000000000000000000000000")),
+		util.ETHAddressToAddress(common.HexToAddress("0xa62c5719dc2b020791d9f0b0d09862dc36c083a9")),
+		// util.ETHAddressToAddress(common.HexToAddress("0x806755EADC11E49605A237E945Bd67DC22c60aA1")),
 	}, nil
 }
+
+// TODO: uncomment in testnet
+// func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Address, error) {
+// 	candidates, err := p.pollProtocolContract.ActiveBlockProducersByEpoch(nil, big.NewInt(int64(epoch)))
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "failed to get active block producers by epoch")
+// 	}
+// 	result := make([]util.Address, 0, len(candidates.Candidates))
+// 	for _, cand := range candidates.Candidates {
+// 		result = append(result, util.ETHAddressToAddress(cand.OperatorAddress))
+// 	}
+// 	return result, nil
+// }
 
 func (p *epochWitnessSelector) nomineesFromCandidates(cand []util.Address, epoch uint64) ([]util.Address, error) {
 	candidateList := make([]common.Address, len(cand))

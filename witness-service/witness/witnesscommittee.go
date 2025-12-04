@@ -31,13 +31,18 @@ type (
 		witnessSelector     EpochWitnessSelector
 		witnessManager      *contract.WitnessManagerCaller
 		witnessListContract *contract.AddressListCaller
+		epochReader         *contract.RollDPoSProtocolContractCaller
+		ethclient           *ethclient.Client
 		relayerConfigs      map[common.Address]string
 		relayerConns        map[string]*grpc.ClientConn
 	}
 )
 
 const (
-	IOTX_MAINNET_NETWORK_ID = 4689
+
+var (
+	POLL_PROTOCOL_ADDRESS     = common.HexToAddress("0x166B743C2C1a57C93c2E2Bc3e169D28BBb9f6dA3")
+	ROLLDPOS_PROTOCOL_ADDRESS = common.HexToAddress("0x041370E00a711CD81da1918f0E494459Aadae50E")
 )
 
 func NewWitnessCommittee(
@@ -69,7 +74,14 @@ func NewWitnessCommittee(
 	if err != nil {
 		return nil, err
 	}
-	witnessSelector := newEpochWitnessSelector(numNominees, ethereumClient)
+	witnessSelector, err := newEpochWitnessSelector(numNominees, ethereumClient)
+	if err != nil {
+		return nil, err
+	}
+	epochReader, err := contract.NewRollDPoSProtocolContractCaller(ROLLDPOS_PROTOCOL_ADDRESS, ethereumClient)
+	if err != nil {
+		return nil, err
+	}
 	return &witnessCommittee{
 		id:                  id,
 		idHasher:            idHasher,
@@ -78,6 +90,8 @@ func NewWitnessCommittee(
 		witnessSelector:     witnessSelector,
 		witnessManager:      witnessManager,
 		witnessListContract: witnessListContract,
+		epochReader:         epochReader,
+		ethclient:           ethereumClient,
 		relayerConfigs:      relayerConfigs,
 		relayerConns:        make(map[string]*grpc.ClientConn),
 	}, nil
@@ -155,7 +169,20 @@ func (w *witnessCommittee) PullWitnessCandidates() error {
 // TODO: read value via contract abi call, hardcode value for now
 func (w *witnessCommittee) epochOnChain() (uint64, error) {
 	return 0, nil
+return 2, nil
 }
+
+// func (w *witnessCommittee) epochOnChain() (uint64, error) {
+// 	tipHeight, err := w.ethclient.HeaderByNumber(context.Background(), nil)
+// 	if err != nil {
+// 		return 0, errors.Wrap(err, "failed to get tip height")
+// 	}
+// 	epoch, err := w.epochReader.EpochNumber(nil, tipHeight.Number)
+// 	if err != nil {
+// 		return 0, errors.Wrap(err, "failed to get epoch number")
+// 	}
+// 	return epoch.EpochNumber.Uint64(), nil
+// }
 
 func (w *witnessCommittee) fetchWitnessCandidates(prevEpoch, epoch uint64) (WitnessCandidates, error) {
 	candidates, nominees, err := w.witnessSelector.Witnesses(epoch)
