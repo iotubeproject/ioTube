@@ -79,7 +79,6 @@ type Configuration struct {
 			WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
 		} `json:"relayerConfigs" yaml:"relayerConfigs"`
 		WitnessTableName string `json:"witnessTableName" yaml:"witnessTableName"`
-		NumNominees      int    `json:"numNominees" yaml:"numNominees"`
 	} `json:"witnessCommittees" yaml:"witnessCommittees"`
 }
 
@@ -230,7 +229,7 @@ func main() {
 
 	storeFactory := db.NewSQLStoreFactory()
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
-	var ethClient *ethclient.Client
+	var ethClient witness.Client
 	switch cfg.Chain {
 	case "solana":
 		solClient := solclient.NewClient(cfg.ClientURL)
@@ -258,6 +257,7 @@ func main() {
 				decimalRound[token] = pair.Amount
 			}
 			var signHandler witness.SignHandler
+			var witnessAddress []byte
 			if cfg.PrivateKey != "" {
 				privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
 				if err != nil {
@@ -266,6 +266,7 @@ func main() {
 				util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
 				log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
 				signHandler = witness.NewSecp256k1SignHandler(privateKey)
+				witnessAddress = crypto.PubkeyToAddress(privateKey.PublicKey).Bytes()
 			} else {
 				log.Println("No Private Key")
 			}
@@ -286,6 +287,7 @@ func main() {
 				uint64(cc.StartBlockHeight),
 				cc.QPSLimit,
 				signHandler,
+				witnessAddress,
 				cc.DisablePull,
 			)
 			if err != nil {
@@ -294,13 +296,14 @@ func main() {
 			cashiers = append(cashiers, cashier)
 		}
 	default: // "heco", "bsc", "matic", "polis", "iotex-e", "iotex", "sepolia", "iotex-testnet", "ethereum":
-		ethClient, err = ethclient.Dial(cfg.ClientURL)
+		ethClient, err = witness.NewMultiClient(strings.Split(cfg.ClientURL, ","))
 		if err != nil {
 			log.Fatal(err)
 		}
 		for _, cc := range cfg.Cashiers {
 			var (
 				signHandler     witness.SignHandler
+				witnessAddress  []byte
 				destAddrDecoder util.AddressDecoder
 			)
 			if !cc.ToSolana {
@@ -314,6 +317,7 @@ func main() {
 					util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
 					log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
 					signHandler = witness.NewSecp256k1SignHandler(privateKey)
+					witnessAddress = crypto.PubkeyToAddress(privateKey.PublicKey).Bytes()
 				} else {
 					log.Println("No Private Key")
 				}
@@ -337,6 +341,7 @@ func main() {
 					pbk := solcommon.PublicKeyFromBytes(edPrivateKey.Public().(ed25519.PublicKey)).String()
 					log.Println("Witness Service for " + pbk + " on chain " + cfg.Chain)
 					signHandler = witness.NewEd25519SignHandler(&edPrivateKey)
+					witnessAddress = edPrivateKey.Public().(ed25519.PublicKey)
 				} else {
 					log.Println("No Private Key")
 				}
@@ -443,6 +448,7 @@ func main() {
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
 				signHandler,
+				witnessAddress,
 				reverseRecorder,
 				common.HexToAddress(cc.Reverse.CashierContractAddress),
 			)
@@ -468,12 +474,14 @@ func main() {
 			relayerMap[addr] = rc.RelayerURL
 		}
 		var committeeSignHandler witness.SignHandler
+		var witnessAddress []byte
 		if cfg.PrivateKey != "" {
 			privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
 			if err != nil {
 				log.Fatalf("failed to decode private key %v\n", err)
 			}
 			committeeSignHandler = witness.NewSecp256k1SignHandler(privateKey)
+			witnessAddress = crypto.PubkeyToAddress(privateKey.PublicKey).Bytes()
 		} else {
 			log.Println("No Private Key")
 		}
@@ -487,9 +495,9 @@ func main() {
 			wc.ID,
 			witness.IDHasherForWitnessCandidatesInEVM,
 			committeeSignHandler,
+			witnessAddress,
 			recorder,
 			ethClient,
-			wc.NumNominees,
 			witnessManagerAddr,
 			relayerMap,
 		)

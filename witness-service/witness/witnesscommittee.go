@@ -12,7 +12,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 
@@ -27,12 +26,13 @@ type (
 		id                  string
 		idHasher            IDHasher
 		signHandler         SignHandler
+		witnessAddress      []byte
 		recorder            WitnessRecorder
 		witnessSelector     EpochWitnessSelector
 		witnessManager      *contract.WitnessManagerCaller
 		witnessListContract *contract.AddressListCaller
 		epochReader         *contract.RollDPoSProtocolContractCaller
-		ethclient           *ethclient.Client
+		ethclient           Client
 		relayerConfigs      map[common.Address]string
 		relayerConns        map[string]*grpc.ClientConn
 	}
@@ -49,9 +49,9 @@ func NewWitnessCommittee(
 	id string,
 	idHasher IDHasher,
 	signHandler SignHandler,
+	witnessAddress []byte,
 	recorder WitnessRecorder,
-	ethereumClient *ethclient.Client,
-	numNominees int,
+	ethereumClient Client,
 	witnessManagerAddr common.Address,
 	relayerConfigs map[common.Address]string,
 ) (WitnessCommittee, error) {
@@ -74,7 +74,7 @@ func NewWitnessCommittee(
 	if err != nil {
 		return nil, err
 	}
-	witnessSelector, err := newEpochWitnessSelector(numNominees, ethereumClient)
+	witnessSelector, err := newEpochWitnessSelector(witnessManager, ethereumClient)
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +86,7 @@ func NewWitnessCommittee(
 		id:                  id,
 		idHasher:            idHasher,
 		signHandler:         signHandler,
+		witnessAddress:      witnessAddress,
 		recorder:            recorder,
 		witnessSelector:     witnessSelector,
 		witnessManager:      witnessManager,
@@ -306,7 +307,7 @@ func (w *witnessCommittee) SubmitWitnessCandidates() error {
 				round1Success = false
 				break
 			}
-			pubkey, _, err := w.signHandler(id.Bytes())
+			_, err = w.signHandler(id.Bytes())
 			if err != nil {
 				log.Printf("failed to get pubkey for epoch %d: %v", candidates.Epoch(), err)
 				round1Success = false
@@ -315,7 +316,7 @@ func (w *witnessCommittee) SubmitWitnessCandidates() error {
 
 			witNoSig := &types.WitnessesList{
 				Candidates: candidates.ToTypesCandidates(witnessManagerAddr.Bytes()),
-				Address:    pubkey,
+				Address:    w.witnessAddress,
 				Signature:  []byte{},
 			}
 			if !w.submitToRelayer(relayerURL, witNoSig) {
@@ -334,7 +335,7 @@ func (w *witnessCommittee) SubmitWitnessCandidates() error {
 		round2Success := true
 		for _, candidates := range candidatesGroup {
 			id := candidates.ID()
-			pubkey, signature, err := w.signHandler(id)
+			signature, err := w.signHandler(id)
 			if err != nil || signature == nil {
 				log.Printf("failed to sign for epoch %d: %v", candidates.Epoch(), err)
 				round2Success = false
@@ -350,7 +351,7 @@ func (w *witnessCommittee) SubmitWitnessCandidates() error {
 
 			witWithSig := &types.WitnessesList{
 				Candidates: candidates.ToTypesCandidates(witnessManagerAddr.Bytes()),
-				Address:    pubkey,
+				Address:    w.witnessAddress,
 				Signature:  signature,
 			}
 			if !w.submitToRelayer(relayerURL, witWithSig) {

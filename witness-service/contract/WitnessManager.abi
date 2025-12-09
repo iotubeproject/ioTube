@@ -17,19 +17,6 @@
   },
   {
     "type": "function",
-    "name": "addExcludedWitnesses",
-    "inputs": [
-      {
-        "name": "_witnesses",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "addWitnesses",
     "inputs": [
       {
@@ -82,6 +69,19 @@
   },
   {
     "type": "function",
+    "name": "numNominees",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
@@ -116,19 +116,6 @@
         "name": "signatures",
         "type": "bytes[]",
         "internalType": "bytes[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "removeExcludedWitnesses",
-    "inputs": [
-      {
-        "name": "_witnesses",
-        "type": "address[]",
-        "internalType": "address[]"
       }
     ],
     "outputs": [],
@@ -173,6 +160,71 @@
     "inputs": [
       {
         "name": "_epochNum",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setExcludedWitnesses",
+    "inputs": [
+      {
+        "name": "_witnesses",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setNextAddExcludedWitnesses",
+    "inputs": [
+      {
+        "name": "_witnesses",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setNextNumNominees",
+    "inputs": [
+      {
+        "name": "nextNumNominees",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setNextRemoveExcludedWitnesses",
+    "inputs": [
+      {
+        "name": "_witnesses",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setNumNominees",
+    "inputs": [
+      {
+        "name": "_numNominees",
         "type": "uint64",
         "internalType": "uint64"
       }

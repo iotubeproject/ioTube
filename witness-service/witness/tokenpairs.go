@@ -1,10 +1,10 @@
 package witness
 
 import (
+	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/ioTube/witness-service/contract"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/pkg/errors"
@@ -38,7 +38,7 @@ func (t *localTokenPairs) Update() error {
 	return nil
 }
 
-func NewRemoteTokenPairs(chainID uint64, contractAddress common.Address, client *ethclient.Client) (TokenPairs, error) {
+func NewRemoteTokenPairs(chainID uint64, contractAddress common.Address, client Client) (TokenPairs, error) {
 	tokenPairsContract, err := contract.NewTokenPairsCaller(contractAddress, client)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create token pairs contract")

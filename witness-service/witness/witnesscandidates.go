@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -181,17 +180,17 @@ func IDHasherForWitnessCandidatesInEVM(in any, witnessManagerAddr []byte) (commo
 }
 
 type epochWitnessSelector struct {
-	numNominees          int
+	witnessManager       *contract.WitnessManagerCaller
 	pollProtocolContract *contract.PollProtocolContractCaller
 }
 
-func newEpochWitnessSelector(numNominees int, ethereumClient *ethclient.Client) (EpochWitnessSelector, error) {
+func newEpochWitnessSelector(witnessManager *contract.WitnessManagerCaller, ethereumClient Client) (EpochWitnessSelector, error) {
 	pollProtocolContract, err := contract.NewPollProtocolContractCaller(POLL_PROTOCOL_ADDRESS, ethereumClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to new poll protocol contract")
 	}
 	return &epochWitnessSelector{
-		numNominees:          numNominees,
+		witnessManager:       witnessManager,
 		pollProtocolContract: pollProtocolContract,
 	}, nil
 }
@@ -235,8 +234,22 @@ func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Add
 // 	if err != nil {
 // 		return nil, errors.Wrap(err, "failed to get active block producers by epoch")
 // 	}
+
+// 	excludedWitnesses, err := p.witnessManager.GetExcludedWitnesses(nil)
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "failed to get excluded witnesses")
+// 	}
+
+// 	excludedMap := make(map[common.Address]struct{})
+// 	for _, excluded := range excludedWitnesses {
+// 		excludedMap[excluded] = struct{}{} // Add excluded addresses to map for quick lookup
+// 	}
+
 // 	result := make([]util.Address, 0, len(candidates.Candidates))
 // 	for _, cand := range candidates.Candidates {
+// 		if _, ok := excludedMap[cand.OperatorAddress]; ok {
+// 			continue
+// 		}
 // 		result = append(result, util.ETHAddressToAddress(cand.OperatorAddress))
 // 	}
 // 	return result, nil
@@ -252,13 +265,17 @@ func (p *epochWitnessSelector) nomineesFromCandidates(cand []util.Address, epoch
 	}
 	util.SortCandidates(candidateList, epoch, util.CryptoSeed)
 
-	length := p.numNominees
+	numNominees, err := p.witnessManager.NumNominees(nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get num nominees")
+	}
+	length := int(numNominees)
 	if len(candidateList) < length {
 		length = len(candidateList)
 		log.Printf(
 			"the number of candidates %d is less than expected %d",
 			len(candidateList),
-			p.numNominees,
+			numNominees,
 		)
 	}
 	nominees := make([]util.Address, length)

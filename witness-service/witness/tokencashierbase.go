@@ -65,6 +65,7 @@ type (
 		pullTransfers          pullTransfersFunc
 		idHasher               IDHasher
 		signHandler            SignHandler
+		witnessAddress         []byte
 		hasEnoughBalance       hasEnoughBalanceFunc
 		start                  startStopFunc
 		stop                   startStopFunc
@@ -89,6 +90,7 @@ func newTokenCashierBase(
 	pullTransfers pullTransfersFunc,
 	idHasher IDHasher,
 	signHandler SignHandler,
+	witnessAddress []byte,
 	hasEnoughBalance hasEnoughBalanceFunc,
 	start startStopFunc,
 	stop startStopFunc,
@@ -108,6 +110,7 @@ func newTokenCashierBase(
 		pullTransfers:          pullTransfers,
 		idHasher:               idHasher,
 		signHandler:            signHandler,
+		witnessAddress:         witnessAddress,
 		hasEnoughBalance:       hasEnoughBalance,
 		lastPullTimestamp:      time.Now(),
 		start:                  start,
@@ -273,7 +276,7 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 			return err
 		}
 		transfer.SetID(id)
-		pubkey, signature, err := tc.signHandler(id.Bytes())
+		signature, err := tc.signHandler(id.Bytes())
 		if err != nil {
 			return err
 		}
@@ -284,13 +287,13 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 		if transfer.Status() == TransferReady {
 			witness = &types.Witness{
 				Transfer:  transfer.ToTypesTransfer(),
-				Address:   pubkey,
+				Address:   tc.witnessAddress,
 				Signature: signature,
 			}
 		} else {
 			witness = &types.Witness{
 				Transfer:  transfer.ToTypesTransfer(),
-				Address:   pubkey,
+				Address:   tc.witnessAddress,
 				Signature: []byte{},
 			}
 		}
@@ -439,4 +442,28 @@ func (tc *tokenCashierBase) RefreshTokenPairs() error {
 		return nil
 	}
 	return tc.tokenPairs.Update()
+}
+
+func (tc *tokenCashierBase) ReportProgress() error {
+	height, err := tc.recorder.TipHeight(tc.id)
+	if err != nil {
+		return errors.Wrap(err, "failed to get tip height")
+	}
+	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	if err != nil {
+		return errors.Wrap(err, "failed to create connection")
+	}
+	defer conn.Close()
+	relayer := services.NewRelayServiceClient(conn)
+	response, err := relayer.ReportCashier(context.Background(), &services.ReportCashierRequest{
+		Address: tc.witnessAddress,
+		Height:  height,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to report progress")
+	}
+	if !response.Success {
+		return errors.New("failed to report progress")
+	}
+	return nil
 }
