@@ -39,6 +39,10 @@ type (
 )
 
 const (
+	// TODO: set in the config?
+	IOTX_MAINNET_NETWORK_ID = 4690
+	// IOTX_MAINNET_NETWORK_ID = 31337
+)
 
 var (
 	POLL_PROTOCOL_ADDRESS     = common.HexToAddress("0x166B743C2C1a57C93c2E2Bc3e169D28BBb9f6dA3")
@@ -167,23 +171,23 @@ func (w *witnessCommittee) PullWitnessCandidates() error {
 	return nil
 }
 
-// TODO: read value via contract abi call, hardcode value for now
-func (w *witnessCommittee) epochOnChain() (uint64, error) {
-	return 0, nil
-return 2, nil
-}
-
 // func (w *witnessCommittee) epochOnChain() (uint64, error) {
-// 	tipHeight, err := w.ethclient.HeaderByNumber(context.Background(), nil)
-// 	if err != nil {
-// 		return 0, errors.Wrap(err, "failed to get tip height")
-// 	}
-// 	epoch, err := w.epochReader.EpochNumber(nil, tipHeight.Number)
-// 	if err != nil {
-// 		return 0, errors.Wrap(err, "failed to get epoch number")
-// 	}
-// 	return epoch.EpochNumber.Uint64(), nil
+// 	// return 0, nil
+// 	return 2, nil
 // }
+
+// TODO: uncomment in testnet
+func (w *witnessCommittee) epochOnChain() (uint64, error) {
+	tipHeight, err := w.ethclient.HeaderByNumber(context.Background(), nil)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get tip height")
+	}
+	epoch, err := w.epochReader.EpochNumber(nil, tipHeight.Number)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get epoch number")
+	}
+	return epoch.EpochNumber.Uint64(), nil
+}
 
 func (w *witnessCommittee) fetchWitnessCandidates(prevEpoch, epoch uint64) (WitnessCandidates, error) {
 	candidates, nominees, err := w.witnessSelector.Witnesses(epoch)

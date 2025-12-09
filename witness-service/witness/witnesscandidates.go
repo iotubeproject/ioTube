@@ -3,6 +3,7 @@ package witness
 import (
 	"bytes"
 	"log"
+	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -221,39 +222,39 @@ func (p *epochWitnessSelector) Witnesses(epoch uint64) ([]util.Address, []util.A
 	return candidates, nominees, nil
 }
 
-func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Address, error) {
-	return []util.Address{
-		util.ETHAddressToAddress(common.HexToAddress("0xa62c5719dc2b020791d9f0b0d09862dc36c083a9")),
-		// util.ETHAddressToAddress(common.HexToAddress("0x806755EADC11E49605A237E945Bd67DC22c60aA1")),
-	}, nil
-}
+// func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Address, error) {
+// 	return []util.Address{
+// 		util.ETHAddressToAddress(common.HexToAddress("0xa62c5719dc2b020791d9f0b0d09862dc36c083a9")),
+// 		// util.ETHAddressToAddress(common.HexToAddress("0x806755EADC11E49605A237E945Bd67DC22c60aA1")),
+// 	}, nil
+// }
 
 // TODO: uncomment in testnet
-// func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Address, error) {
-// 	candidates, err := p.pollProtocolContract.ActiveBlockProducersByEpoch(nil, big.NewInt(int64(epoch)))
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "failed to get active block producers by epoch")
-// 	}
+func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Address, error) {
+	candidates, err := p.pollProtocolContract.ActiveBlockProducersByEpoch(nil, big.NewInt(int64(epoch)))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get active block producers by epoch")
+	}
 
-// 	excludedWitnesses, err := p.witnessManager.GetExcludedWitnesses(nil)
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "failed to get excluded witnesses")
-// 	}
+	excludedWitnesses, err := p.witnessManager.GetExcludedWitnesses(nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get excluded witnesses")
+	}
 
-// 	excludedMap := make(map[common.Address]struct{})
-// 	for _, excluded := range excludedWitnesses {
-// 		excludedMap[excluded] = struct{}{} // Add excluded addresses to map for quick lookup
-// 	}
+	excludedMap := make(map[common.Address]struct{})
+	for _, excluded := range excludedWitnesses {
+		excludedMap[excluded] = struct{}{} // Add excluded addresses to map for quick lookup
+	}
 
-// 	result := make([]util.Address, 0, len(candidates.Candidates))
-// 	for _, cand := range candidates.Candidates {
-// 		if _, ok := excludedMap[cand.OperatorAddress]; ok {
-// 			continue
-// 		}
-// 		result = append(result, util.ETHAddressToAddress(cand.OperatorAddress))
-// 	}
-// 	return result, nil
-// }
+	result := make([]util.Address, 0, len(candidates.Candidates))
+	for _, cand := range candidates.Candidates {
+		if _, ok := excludedMap[cand.OperatorAddress]; ok {
+			continue
+		}
+		result = append(result, util.ETHAddressToAddress(cand.OperatorAddress))
+	}
+	return result, nil
+}
 
 func (p *epochWitnessSelector) nomineesFromCandidates(cand []util.Address, epoch uint64) ([]util.Address, error) {
 	candidateList := make([]common.Address, len(cand))
