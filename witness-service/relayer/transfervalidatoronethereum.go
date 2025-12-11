@@ -412,6 +412,11 @@ func (tv *transferValidatorOnEthereum) refresh(witnessLists []common.Address, ca
 			return err
 		}
 		info.witnesses = witnesses
+		// TODO: remove debug witness list
+		log.Printf("Witness list %s has %d witnesses\n", witnessList.Hex(), len(witnesses))
+		for witness := range witnesses {
+			log.Printf("Witness %s\n", witness)
+		}
 		tv.witnessListContractMapping[witnessList] = info
 	}
 	return nil
@@ -480,6 +485,8 @@ func (tv *transferValidatorOnEthereum) filterValidWitnesses(witnesses []*Witness
 			signatures = append(signatures, witness.signature...)
 			currentListWitnesses = append(currentListWitnesses, witness)
 			numOfValidSignatures++
+			// TODO: remove debug valid witnesses
+			log.Printf("Valid witness %s in witness list %s\n", witnessAddr.Hex(), witnessListAddr.Hex())
 		}
 		if numOfValidSignatures*3 <= len(witnessListInfo.witnesses)*2 {
 			return nil, nil, errInsufficientWitnesses
