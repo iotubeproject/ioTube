@@ -51,8 +51,8 @@ func NewRemoteTokenPairs(chainID uint64, contractAddress common.Address, client 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get chain ID 2")
 	}
-	if chainID != chainID1.Uint64() || chainID != chainID2.Uint64() {
-		return nil, errors.Wrapf(err, "chain ID mismatch: %d vs %d vs %d", chainID, chainID1.Uint64(), chainID2.Uint64())
+	if chainID != chainID1.Uint64() && chainID != chainID2.Uint64() {
+		return nil, errors.Wrapf(errors.New("chain ID mismatch"), "chain ID mismatch: %d vs %d vs %d", chainID, chainID1.Uint64(), chainID2.Uint64())
 	}
 
 	return &remoteTokenPairs{
