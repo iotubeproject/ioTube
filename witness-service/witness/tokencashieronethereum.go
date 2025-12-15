@@ -235,8 +235,8 @@ func NewTokenCashierOnEthereum(
 	tokenPairs TokenPairs,
 	startBlockHeight uint64,
 	confirmBlockNumber uint8,
-	signHandler SignHandler,
-	witnessAddress []byte,
+	signHandlers []SignHandler,
+	witnessAddresses [][]byte,
 	reverseRecorder *Recorder,
 	reverseCashierContractAddr common.Address,
 ) (TokenCashier, error) {
@@ -291,8 +291,8 @@ func NewTokenCashierOnEthereum(
 		},
 		iter.Transfers,
 		idHasher,
-		signHandler,
-		witnessAddress,
+		signHandlers,
+		witnessAddresses,
 		func(_token util.Address, amountToTransfer *big.Int) bool {
 			if reverseRecorder == nil {
 				return true

@@ -522,7 +522,7 @@ func (s *Service) CheckWitnessesList(ctx context.Context, request *services.Chec
 }
 
 func (s *Service) ReportCashier(ctx context.Context, request *services.ReportCashierRequest) (*services.ReportCashierResponse, error) {
-	log.Printf("receive a report from %x at height %d\n", request.Address, request.Height)
+	// log.Printf("receive a report from %x at height %d\n", request.Address, request.Height)
 	return &services.ReportCashierResponse{Success: true}, nil
 }
 

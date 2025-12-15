@@ -64,8 +64,8 @@ type (
 		calcConfirmHeight      calcConfirmHeightFunc
 		pullTransfers          pullTransfersFunc
 		idHasher               IDHasher
-		signHandler            SignHandler
-		witnessAddress         []byte
+		signHandlers           []SignHandler
+		witnessAddresses       [][]byte
 		hasEnoughBalance       hasEnoughBalanceFunc
 		start                  startStopFunc
 		stop                   startStopFunc
@@ -89,8 +89,8 @@ func newTokenCashierBase(
 	calcConfirmHeight calcConfirmHeightFunc,
 	pullTransfers pullTransfersFunc,
 	idHasher IDHasher,
-	signHandler SignHandler,
-	witnessAddress []byte,
+	signHandlers []SignHandler,
+	witnessAddresses [][]byte,
 	hasEnoughBalance hasEnoughBalanceFunc,
 	start startStopFunc,
 	stop startStopFunc,
@@ -109,8 +109,8 @@ func newTokenCashierBase(
 		calcConfirmHeight:      calcConfirmHeight,
 		pullTransfers:          pullTransfers,
 		idHasher:               idHasher,
-		signHandler:            signHandler,
-		witnessAddress:         witnessAddress,
+		signHandlers:           signHandlers,
+		witnessAddresses:       witnessAddresses,
 		hasEnoughBalance:       hasEnoughBalance,
 		lastPullTimestamp:      time.Now(),
 		start:                  start,
@@ -247,7 +247,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 }
 
 func (tc *tokenCashierBase) SubmitTransfers() error {
-	if tc.signHandler == nil {
+	if len(tc.signHandlers) == 0 {
 		return nil
 	}
 	transfersToSubmit, err := tc.recorder.TransfersToSubmit(tc.cashierContractAddr.String())
@@ -276,42 +276,46 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 			return err
 		}
 		transfer.SetID(id)
-		signature, err := tc.signHandler(id.Bytes())
-		if err != nil {
-			return err
-		}
-		if signature == nil {
-			continue
-		}
-		var witness *types.Witness
-		if transfer.Status() == TransferReady {
-			witness = &types.Witness{
+		submittedCount := 0
+		for i, signHandler := range tc.signHandlers {
+			var signature []byte
+			if transfer.Status() == TransferReady {
+				signature, err = signHandler(id.Bytes())
+				if err != nil {
+					return err
+				}
+				if signature == nil {
+					continue
+				}
+			} else {
+				signature = []byte{}
+			}
+
+			witness := &types.Witness{
 				Transfer:  transfer.ToTypesTransfer(),
-				Address:   tc.witnessAddress,
+				Address:   tc.witnessAddresses[i],
 				Signature: signature,
 			}
-		} else {
-			witness = &types.Witness{
-				Transfer:  transfer.ToTypesTransfer(),
-				Address:   tc.witnessAddress,
-				Signature: []byte{},
-			}
-		}
-		response, err := relayer.Submit(context.Background(), witness)
-		if err != nil {
-			return err
-		}
-		if !response.Success {
-			log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
-			continue
-		}
-		if transfer.Status() == TransferReady {
-			if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
+
+			response, err := relayer.Submit(context.Background(), witness)
+			if err != nil {
 				return err
 			}
-		} else {
-			if err := tc.recorder.MarkTransferAsPending(transfer); err != nil {
-				return err
+			if !response.Success {
+				log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s with address %x\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id, tc.witnessAddresses[i])
+				continue
+			}
+			submittedCount++
+		}
+		if submittedCount == len(tc.signHandlers) {
+			if transfer.Status() == TransferReady {
+				if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
+					return err
+				}
+			} else {
+				if err := tc.recorder.MarkTransferAsPending(transfer); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -455,15 +459,17 @@ func (tc *tokenCashierBase) ReportProgress() error {
 	}
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
-	response, err := relayer.ReportCashier(context.Background(), &services.ReportCashierRequest{
-		Address: tc.witnessAddress,
-		Height:  height,
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to report progress")
-	}
-	if !response.Success {
-		return errors.New("failed to report progress")
+	for _, witnessAddress := range tc.witnessAddresses {
+		response, err := relayer.ReportCashier(context.Background(), &services.ReportCashierRequest{
+			Address: witnessAddress,
+			Height:  height,
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to report progress")
+		}
+		if !response.Success {
+			return errors.New("failed to report progress")
+		}
 	}
 	return nil
 }

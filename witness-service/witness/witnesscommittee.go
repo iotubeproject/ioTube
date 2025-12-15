@@ -25,8 +25,8 @@ type (
 	witnessCommittee struct {
 		id                  string
 		idHasher            IDHasher
-		signHandler         SignHandler
-		witnessAddress      []byte
+		signHandlers        []SignHandler
+		witnessAddresses    [][]byte
 		recorder            WitnessRecorder
 		witnessSelector     EpochWitnessSelector
 		witnessManager      *contract.WitnessManagerCaller
@@ -52,8 +52,8 @@ var (
 func NewWitnessCommittee(
 	id string,
 	idHasher IDHasher,
-	signHandler SignHandler,
-	witnessAddress []byte,
+	signHandlers []SignHandler,
+	witnessAddresses [][]byte,
 	recorder WitnessRecorder,
 	ethereumClient Client,
 	witnessManagerAddr common.Address,
@@ -89,8 +89,8 @@ func NewWitnessCommittee(
 	return &witnessCommittee{
 		id:                  id,
 		idHasher:            idHasher,
-		signHandler:         signHandler,
-		witnessAddress:      witnessAddress,
+		signHandlers:        signHandlers,
+		witnessAddresses:    witnessAddresses,
 		recorder:            recorder,
 		witnessSelector:     witnessSelector,
 		witnessManager:      witnessManager,
@@ -282,7 +282,7 @@ func (w *witnessCommittee) submitToRelayer(
 // The first round submits with an empty signature for validation,
 // and the second round submits with a valid signature to confirm.
 func (w *witnessCommittee) SubmitWitnessCandidates() error {
-	if w.signHandler == nil {
+	if len(w.signHandlers) == 0 {
 		return nil
 	}
 	groupedCandidatesToSubmit, err := w.recorder.CandidatesToSubmit(w.ID())
@@ -293,90 +293,89 @@ func (w *witnessCommittee) SubmitWitnessCandidates() error {
 		if len(candidatesGroup) == 0 {
 			continue
 		}
-		// Round 1
-		round1Success := true
-		for _, candidates := range candidatesGroup {
-			witnessManagerAddr := candidates.WitnessManagerAddress()
-			id, err := w.idHasher(candidates, witnessManagerAddr.Bytes())
-			if err != nil {
-				log.Printf("failed to hash candidates for epoch %d: %v", candidates.Epoch(), err)
-				round1Success = false
-				break
-			}
-			candidates.SetID(id)
 
-			relayerURL, ok := w.relayerConfigs[witnessManagerAddr]
-			if !ok {
-				log.Printf("no relayer found for witness manager %s", witnessManagerAddr.Hex())
-				round1Success = false
-				break
-			}
-			_, err = w.signHandler(id.Bytes())
-			if err != nil {
-				log.Printf("failed to get pubkey for epoch %d: %v", candidates.Epoch(), err)
-				round1Success = false
-				break
-			}
-
-			witNoSig := &types.WitnessesList{
-				Candidates: candidates.ToTypesCandidates(witnessManagerAddr.Bytes()),
-				Address:    w.witnessAddress,
-				Signature:  []byte{},
-			}
-			if !w.submitToRelayer(relayerURL, witNoSig) {
-				log.Printf("round 1 submission failed for epoch %d to relayer %s", candidates.Epoch(), relayerURL)
-				round1Success = false
-				break
+		successCount := 0
+		for i, signHandler := range w.signHandlers {
+			witnessAddress := w.witnessAddresses[i]
+			if w.submitCandidatesGroupForKey(candidatesGroup, signHandler, witnessAddress) {
+				successCount++
+			} else {
+				log.Printf("failed to submit candidates group for committee %s with witness address %x\n", w.id, witnessAddress)
 			}
 		}
 
-		if !round1Success {
-			log.Printf("Round 1 failed for epoch %d, skipping Round 2.", candidatesGroup[0].Epoch())
-			continue
-		}
-
-		// Round 2
-		round2Success := true
-		for _, candidates := range candidatesGroup {
-			id := candidates.ID()
-			signature, err := w.signHandler(id)
-			if err != nil || signature == nil {
-				log.Printf("failed to sign for epoch %d: %v", candidates.Epoch(), err)
-				round2Success = false
-				break
-			}
-			witnessManagerAddr := candidates.WitnessManagerAddress()
-			relayerURL, ok := w.relayerConfigs[witnessManagerAddr]
-			if !ok {
-				log.Printf("no relayer found for witness manager %s", witnessManagerAddr.Hex())
-				round2Success = false
-				break
-			}
-
-			witWithSig := &types.WitnessesList{
-				Candidates: candidates.ToTypesCandidates(witnessManagerAddr.Bytes()),
-				Address:    w.witnessAddress,
-				Signature:  signature,
-			}
-			if !w.submitToRelayer(relayerURL, witWithSig) {
-				log.Printf("round 2 submission failed for epoch %d to relayer %s", candidates.Epoch(), relayerURL)
-				round2Success = false
-				break
-			}
-		}
-
-		if !round2Success {
-			log.Printf("Round 2 failed for epoch %d, not confirming.", candidatesGroup[0].Epoch())
-			continue
-		}
-
-		for _, candidates := range candidatesGroup {
-			if err := w.recorder.ConfirmCandidates(candidates); err != nil {
-				log.Printf("failed to confirm candidates for epoch %d: %v", candidates.Epoch(), err)
+		if successCount == len(w.signHandlers) {
+			for _, candidates := range candidatesGroup {
+				if err := w.recorder.ConfirmCandidates(candidates); err != nil {
+					log.Printf("failed to confirm candidates for epoch %d: %v", candidates.Epoch(), err)
+				}
 			}
 		}
 	}
 	return nil
+}
+
+func (w *witnessCommittee) submitCandidatesGroupForKey(
+	candidatesGroup []WitnessCandidates,
+	signHandler SignHandler,
+	witnessAddress []byte,
+) bool {
+	// Round 1
+	for _, candidates := range candidatesGroup {
+		witnessManagerAddr := candidates.WitnessManagerAddress()
+		id, err := w.idHasher(candidates, witnessManagerAddr.Bytes())
+		if err != nil {
+			log.Printf("failed to hash candidates for epoch %d: %v", candidates.Epoch(), err)
+			return false
+		}
+		candidates.SetID(id)
+
+		relayerURL, ok := w.relayerConfigs[witnessManagerAddr]
+		if !ok {
+			log.Printf("no relayer found for witness manager %s", witnessManagerAddr.Hex())
+			return false
+		}
+
+		_, err = signHandler(id.Bytes())
+		if err != nil {
+			log.Printf("failed to get pubkey for epoch %d: %v", candidates.Epoch(), err)
+			return false
+		}
+
+		witNoSig := &types.WitnessesList{
+			Candidates: candidates.ToTypesCandidates(witnessManagerAddr.Bytes()),
+			Address:    witnessAddress,
+			Signature:  []byte{},
+		}
+		if !w.submitToRelayer(relayerURL, witNoSig) {
+			log.Printf("round 1 submission failed for epoch %d to relayer %s", candidates.Epoch(), relayerURL)
+			return false
+		}
+	}
+
+	// Round 2
+	for _, candidates := range candidatesGroup {
+		id := candidates.ID()
+		signature, err := signHandler(id)
+		if err != nil || signature == nil {
+			log.Printf("failed to sign for epoch %d: %v", candidates.Epoch(), err)
+			return false
+		}
+		witnessManagerAddr := candidates.WitnessManagerAddress()
+		relayerURL := w.relayerConfigs[witnessManagerAddr]
+
+		witWithSig := &types.WitnessesList{
+			Candidates: candidates.ToTypesCandidates(witnessManagerAddr.Bytes()),
+			Address:    witnessAddress,
+			Signature:  signature,
+		}
+		if !w.submitToRelayer(relayerURL, witWithSig) {
+			log.Printf("round 2 submission failed for epoch %d to relayer %s", candidates.Epoch(), relayerURL)
+			return false
+		}
+	}
+
+	return true
 }
 
 // CheckWitnessCandidates checks with relayers and settles candidates if they are settled on all relayers.

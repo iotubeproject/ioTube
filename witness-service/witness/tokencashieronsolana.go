@@ -41,8 +41,8 @@ func NewTokenCashierOnSolana(
 	recorder *SOLRecorder,
 	startBlockHeight uint64,
 	qpsLimit uint32,
-	signHandler SignHandler,
-	witnessAddress []byte,
+	signHandlers []SignHandler,
+	witnessAddresses [][]byte,
 	disablePull bool,
 ) (TokenCashier, error) {
 	if qpsLimit > 0 {
@@ -149,8 +149,8 @@ func NewTokenCashierOnSolana(
 			return tsfs, nil
 		},
 		IDHasherForTransferInEVM,
-		signHandler,
-		witnessAddress,
+		signHandlers,
+		witnessAddresses,
 		func(util.Address, *big.Int) bool {
 			return true
 		},
