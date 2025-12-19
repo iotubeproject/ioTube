@@ -9,7 +9,9 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -108,12 +110,13 @@ func (s *SQLStore) createDatabaseIfNotExists() error {
 	if s.cfg.Driver != "mysql" {
 		return nil
 	}
+	log.Printf("Database uri: %s", s.cfg.URI)
 	cfg, err := mysql.ParseDSN(s.cfg.URI)
 	if err != nil {
 		return err
 	}
 	if cfg.DBName == "" {
-		return nil
+		return errors.New("database name is empty")
 	}
 	dbName := cfg.DBName
 	cfg.DBName = ""
