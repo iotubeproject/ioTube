@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -225,6 +226,24 @@ func main() {
 				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL
 			}
 		}
+		for i, wc := range cfg.WitnessCommittees {
+			for j, rc := range wc.RelayerConfigs {
+				switch {
+				case strings.HasPrefix(rc.RelayerURL, ":") && !hasPort:
+					cfg.WitnessCommittees[i].RelayerConfigs[j].RelayerURL = cfg.RelayerURL + rc.RelayerURL
+				case rc.RelayerURL == "":
+					cfg.WitnessCommittees[i].RelayerConfigs[j].RelayerURL = cfg.RelayerURL
+				}
+			}
+		}
+	}
+
+	// print configuration for Debug
+	cfgJSON, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal config for debugging: %v\n", err)
+	} else {
+		log.Printf("Configuration after environment processing:\n%s\n", string(cfgJSON))
 	}
 
 	storeFactory := db.NewSQLStoreFactory()
@@ -412,7 +431,6 @@ func main() {
 				if err != nil {
 					log.Fatalf("failed to create remote token pairs %v\n", err)
 				}
-				log.Printf("remote token pairs: %v", pairs)
 			} else if len(cc.TokenPairs) > 0 {
 				pairs, tokenMintPairs, whitelists = parseTokenPairs(cc.TokenPairs, destAddrDecoder)
 			} else {
