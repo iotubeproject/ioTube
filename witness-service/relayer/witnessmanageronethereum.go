@@ -157,7 +157,7 @@ func (w *witnessManagerOnEthereum) SpeedUp(candidates *WitnessCandidates, witnes
 
 func (w *witnessManagerOnEthereum) submit(candidates *WitnessCandidates, witnesses []*Witness, isSpeedUp bool) (common.Hash, common.Address, uint64, *big.Int, error) {
 	if err := w.validateEpoch(candidates.epoch); err != nil {
-		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errInvalidData, err.Error())
+		return common.Hash{}, common.Address{}, 0, nil, err
 	}
 
 	if err := w.refresh(); err != nil {
@@ -223,17 +223,24 @@ func (w *witnessManagerOnEthereum) submit(candidates *WitnessCandidates, witness
 func (w *witnessManagerOnEthereum) validateEpoch(epoch uint64) error {
 	epochOnContract, err := w.witnessManager.EpochNum(nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to get epoch on contract")
+		return errors.Wrapf(errNoncritical, "failed to get epoch on contract")
 	}
 	epochInterval, err := w.witnessManager.EpochInterval(nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to get epoch interval")
+		return errors.Wrapf(errNoncritical, "failed to get epoch interval")
+	}
+	if epoch < epochOnContract {
+		log.Printf("epoch number is too small, candidates.epoch: %d, epochOnContract: %d\n", epoch, epochOnContract)
+		return errors.Wrapf(errInvalidData, "epoch number is too small")
+	}
+	if (epoch-epochOnContract)%epochInterval != 0 {
+		log.Printf("epoch number is not aligned with epoch interval, candidates.epoch: %d, epochOnContract: %d, epochInterval: %d\n", epoch, epochOnContract, epochInterval)
+		return errors.Wrapf(errInvalidData, "epoch number is not aligned with epoch interval")
 	}
 	if epoch != epochOnContract+epochInterval {
 		log.Printf("epoch number is invalid, candidates.epoch: %d, epochOnContract: %d, epochInterval: %d\n", epoch, epochOnContract, epochInterval)
-		return errors.New("epoch number is invalid")
+		return errors.Wrapf(errNoncritical, "epoch number is invalid")
 	}
-
 	return nil
 }
 
