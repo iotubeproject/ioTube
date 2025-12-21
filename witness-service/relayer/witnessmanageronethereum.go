@@ -173,7 +173,7 @@ func (w *witnessManagerOnEthereum) submit(candidates *WitnessCandidates, witness
 		signatures = append(signatures, witness.signature)
 		numOfValidSignatures++
 	}
-	if numOfValidSignatures*3 <= len(w.witnesses)*2 {
+	if len(w.witnesses) > 0 && numOfValidSignatures*3 <= len(w.witnesses)*2 {
 		return common.Hash{}, common.Address{}, 0, nil, errInsufficientWitnesses
 	}
 
