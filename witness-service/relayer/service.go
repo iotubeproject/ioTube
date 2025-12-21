@@ -817,7 +817,7 @@ func (s *Service) submitWitnesses() error {
 		candidates, err := s.witnessCommitteeRecorder.WitnessCandidates(
 			0,
 			uint8(witnessManager.Size()*2),
-			DESC,
+			AESC,
 			witnessManager.Address(),
 			WaitingForWitnesses,
 		)
