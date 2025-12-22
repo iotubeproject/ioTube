@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 interface IAllowlist {
     function isAllowed(address) external view returns (bool);
     function numOfActive() external view returns (uint256);
+    function threshold() external view returns (uint8);
 }
 
 interface IMinter {
@@ -102,7 +103,7 @@ contract TransferValidatorV3 is Ownable, Pausable {
                 allWitnesses[witnessIndex] = witness;
                 witnessIndex++;
             }
-            require(numOfSignatures * 3 > witnessList.numOfActive() * 2, "insufficient witnesses");
+            require(numOfSignatures * 100 > witnessList.numOfActive() * witnessList.threshold(), "insufficient witnesses");
         }
         IMinter minter = getMinter(tokenAddr);
         settles[key] = block.number;

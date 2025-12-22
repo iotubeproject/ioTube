@@ -53,8 +53,9 @@ type (
 	}
 
 	witnessListInfo struct {
-		witnessListContract *contract.AddressListCaller
+		witnessListContract *contract.WitnessListV3Caller
 		witnesses           map[string]bool
+		threshold           uint8
 	}
 
 	validatorContract interface {
@@ -398,7 +399,7 @@ func (tv *transferValidatorOnEthereum) refresh(witnessLists []common.Address, ca
 	for _, witnessList := range witnessLists {
 		info, ok := tv.witnessListContractMapping[witnessList]
 		if !ok {
-			caller, err := contract.NewAddressListCaller(witnessList, tv.client)
+			caller, err := contract.NewWitnessListV3Caller(witnessList, tv.client)
 			if err != nil {
 				return err
 			}
@@ -412,6 +413,12 @@ func (tv *transferValidatorOnEthereum) refresh(witnessLists []common.Address, ca
 			return err
 		}
 		info.witnesses = witnesses
+		// Fetch threshold from contract, default to 67 if error
+		threshold, err := info.witnessListContract.Threshold(callOpts)
+		if err != nil {
+			threshold = 67 // default value if can't read from contract
+		}
+		info.threshold = threshold
 		// TODO: remove debug witness list
 		log.Printf("Witness list %s has %d witnesses\n", witnessList.Hex(), len(witnesses))
 		for witness := range witnesses {
@@ -429,6 +436,7 @@ type witnessListContract interface {
 		Count *big.Int
 		Items []common.Address
 	}, error)
+	Threshold(opts *bind.CallOpts) (uint8, error)
 }
 
 func fetchWitnessesFromContract(contract witnessListContract, callOpts *bind.CallOpts) (map[string]bool, error) {
@@ -488,7 +496,7 @@ func (tv *transferValidatorOnEthereum) filterValidWitnesses(witnesses []*Witness
 			// TODO: remove debug valid witnesses
 			log.Printf("Valid witness %s in witness list %s\n", witnessAddr.Hex(), witnessListAddr.Hex())
 		}
-		if numOfValidSignatures*3 <= len(witnessListInfo.witnesses)*2 {
+		if numOfValidSignatures*100 <= len(witnessListInfo.witnesses)*int(witnessListInfo.threshold) {
 			return nil, nil, errInsufficientWitnesses
 		}
 		validWitnesses = append(validWitnesses, currentListWitnesses)

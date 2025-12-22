@@ -74,6 +74,7 @@ type Configuration struct {
 	} `json:"cashiers" yaml:"cashiers"`
 	WitnessCommittees []struct {
 		ID                            string `json:"id" yaml:"id"`
+		NetworkID                     uint64 `json:"networkID" yaml:"networkID"`
 		WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
 		RelayerConfigs                []struct {
 			RelayerURL                    string `json:"relayerURL" yaml:"relayerURL"`
@@ -531,6 +532,7 @@ func main() {
 			ethClient,
 			witnessManagerAddr,
 			relayerMap,
+			wc.NetworkID,
 		)
 		if err != nil {
 			log.Fatalf("failed to create witness committee %v\n", err)

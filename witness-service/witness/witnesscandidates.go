@@ -236,6 +236,11 @@ func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Add
 		return nil, errors.Wrap(err, "failed to get active block producers by epoch")
 	}
 
+	probationList, err := p.pollProtocolContract.ProbationListByEpoch(nil, big.NewInt(int64(epoch)))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get probation list by epoch")
+	}
+
 	excludedWitnesses, err := p.witnessManager.GetExcludedWitnesses(nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get excluded witnesses")
@@ -244,6 +249,9 @@ func (p *epochWitnessSelector) activeCandidatesOnChain(epoch uint64) ([]util.Add
 	excludedMap := make(map[common.Address]struct{})
 	for _, excluded := range excludedWitnesses {
 		excludedMap[excluded] = struct{}{} // Add excluded addresses to map for quick lookup
+	}
+	for _, probation := range probationList.Probation.ProbationInfo {
+		excludedMap[probation.OperatorAddress] = struct{}{}
 	}
 
 	result := make([]util.Address, 0, len(candidates.Candidates))

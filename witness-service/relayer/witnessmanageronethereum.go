@@ -35,8 +35,9 @@ type witnessManagerOnEthereum struct {
 	support1559       bool
 
 	chainID             *big.Int
-	witnessListContract *contract.AddressListCaller
+	witnessListContract *contract.WitnessListV3Caller
 	witnesses           map[string]bool
+	threshold           uint8
 }
 
 func NewWitnessManagerOnEthereum(
@@ -68,7 +69,7 @@ func NewWitnessManagerOnEthereum(
 	if err != nil {
 		return nil, err
 	}
-	witnessListContract, err := contract.NewAddressListCaller(witnessContractAddr, client)
+	witnessListContract, err := contract.NewWitnessListV3Caller(witnessContractAddr, client)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +88,7 @@ func NewWitnessManagerOnEthereum(
 		support1559:         support1559,
 		chainID:             chainID,
 		witnessListContract: witnessListContract,
+		threshold:           67, // default value, will be updated in refresh()
 	}, nil
 }
 
@@ -173,7 +175,7 @@ func (w *witnessManagerOnEthereum) submit(candidates *WitnessCandidates, witness
 		signatures = append(signatures, witness.signature)
 		numOfValidSignatures++
 	}
-	if numOfValidSignatures*3 <= len(w.witnesses)*2 {
+	if numOfValidSignatures*100 <= len(w.witnesses)*int(w.threshold) {
 		return common.Hash{}, common.Address{}, 0, nil, errInsufficientWitnesses
 	}
 
@@ -295,6 +297,12 @@ func (w *witnessManagerOnEthereum) refresh() error {
 		return err
 	}
 	w.witnesses = witnesses
+	// Fetch threshold from contract, default to 67 if error
+	threshold, err := w.witnessListContract.Threshold(nil)
+	if err != nil {
+		threshold = 67 // default value if can't read from contract
+	}
+	w.threshold = threshold
 	return nil
 }
 

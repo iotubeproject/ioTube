@@ -38,12 +38,6 @@ type (
 	}
 )
 
-const (
-	// TODO: set in the config?
-	IOTX_MAINNET_NETWORK_ID = 4690
-	// IOTX_MAINNET_NETWORK_ID = 31337
-)
-
 var (
 	POLL_PROTOCOL_ADDRESS     = common.HexToAddress("0x166B743C2C1a57C93c2E2Bc3e169D28BBb9f6dA3")
 	ROLLDPOS_PROTOCOL_ADDRESS = common.HexToAddress("0x041370E00a711CD81da1918f0E494459Aadae50E")
@@ -58,13 +52,17 @@ func NewWitnessCommittee(
 	ethereumClient Client,
 	witnessManagerAddr common.Address,
 	relayerConfigs map[common.Address]string,
+	expectedNetworkID uint64,
 ) (WitnessCommittee, error) {
+	if expectedNetworkID == 0 {
+		return nil, errors.New("expected network id is 0")
+	}
 	networkID, err := ethereumClient.NetworkID(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	if networkID.Uint64() != IOTX_MAINNET_NETWORK_ID {
-		return nil, errors.New("not iotx mainnet")
+	if networkID.Uint64() != expectedNetworkID {
+		return nil, errors.New("network id mismatch")
 	}
 	witnessManager, err := contract.NewWitnessManagerCaller(witnessManagerAddr, ethereumClient)
 	if err != nil {
