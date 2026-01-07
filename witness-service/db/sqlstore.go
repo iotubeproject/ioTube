@@ -9,8 +9,12 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 type (
@@ -64,6 +68,9 @@ func (s *SQLStore) Start(_ context.Context) error {
 	if s.db != nil {
 		return nil
 	}
+	if err := s.createDatabaseIfNotExists(); err != nil {
+		return err
+	}
 	db, err := sql.Open(s.cfg.Driver, s.cfg.URI)
 	if err != nil {
 		return err
@@ -96,4 +103,28 @@ func (s *SQLStore) DB() *sql.DB {
 // DriverName returns the name of the driver
 func (s *SQLStore) DriverName() string {
 	return s.cfg.Driver
+}
+
+func (s *SQLStore) createDatabaseIfNotExists() error {
+	if s.cfg.Driver != "mysql" {
+		return nil
+	}
+	cfg, err := mysql.ParseDSN(s.cfg.URI)
+	if err != nil {
+		return err
+	}
+	if cfg.DBName == "" {
+		return errors.New("database name is empty")
+	}
+	dbName := cfg.DBName
+	cfg.DBName = ""
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if _, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", dbName)); err != nil {
+		return err
+	}
+	return nil
 }

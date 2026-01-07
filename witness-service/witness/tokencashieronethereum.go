@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
@@ -23,13 +22,13 @@ import (
 
 type iterator struct {
 	version               Version
-	client                *ethclient.Client
+	client                Client
 	cashierContractAddr   common.Address
 	tokenSafeContractAddr common.Address
 	previous              *iterator
 }
 
-func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr common.Address, client *ethclient.Client, previous *iterator) (*iterator, error) {
+func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr common.Address, client Client, previous *iterator) (*iterator, error) {
 	iter := &iterator{
 		version:               version,
 		cashierContractAddr:   cashierContractAddr,
@@ -37,14 +36,10 @@ func newIterator(version Version, cashierContractAddr, tokenSafeContractAddr com
 		client:                client,
 		previous:              previous,
 	}
-	var err error
 	switch version {
 	case NoPayload, Payload, ToSolana:
 	default:
 		return nil, errors.Errorf("invalid version %s", version)
-	}
-	if err != nil {
-		return nil, err
 	}
 	return iter, nil
 }
@@ -62,8 +57,8 @@ func (iter *iterator) extract(
 	}
 	var realAmount *big.Int
 	for _, l := range receipt.Logs {
-		if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && (l.Topics[1] == senderAddress.Hash() || l.Topics[1] == raw.Address.Hash()) {
-			if l.Topics[2] == iter.cashierContractAddr.Hash() || l.Topics[2] != _ZeroHash && l.Topics[2] == iter.tokenSafeContractAddr.Hash() {
+		if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && (l.Topics[1] == common.BytesToHash(senderAddress.Bytes()) || l.Topics[1] == common.BytesToHash(raw.Address.Bytes())) {
+			if l.Topics[2] == common.BytesToHash(iter.cashierContractAddr.Bytes()) || (l.Topics[2] != _ZeroHash && l.Topics[2] == common.BytesToHash(iter.tokenSafeContractAddr.Bytes())) {
 				if realAmount != nil {
 					return nil, errors.Errorf("two transfers in one transaction %x", raw.TxHash)
 				}
@@ -231,15 +226,17 @@ func NewTokenCashierOnEthereum(
 	id string,
 	version Version,
 	relayerURL string,
-	ethereumClient *ethclient.Client,
+	ethereumClient Client,
 	cashierContractAddr common.Address,
 	previousCashierAddr common.Address,
 	tokenSafeContractAddr common.Address,
 	validatorContractAddr []byte,
 	recorder *Recorder,
+	tokenPairs TokenPairs,
 	startBlockHeight uint64,
 	confirmBlockNumber uint8,
-	signHandler SignHandler,
+	signHandlers []SignHandler,
+	witnessAddresses [][]byte,
 	reverseRecorder *Recorder,
 	reverseCashierContractAddr common.Address,
 ) (TokenCashier, error) {
@@ -257,11 +254,20 @@ func NewTokenCashierOnEthereum(
 		}
 		pa = util.ETHAddressToAddress(previousCashierAddr)
 	}
+
+	var idHasher IDHasher
+	switch version {
+	case ToSolana:
+		idHasher = IDHasherForTransferInSVM
+	default:
+		idHasher = IDHasherForTransferInEVM
+	}
 	return newTokenCashierBase(
 		id,
 		util.ETHAddressToAddress(cashierContractAddr),
 		pa,
 		recorder,
+		tokenPairs,
 		relayerURL,
 		validatorContractAddr,
 		startBlockHeight,
@@ -284,18 +290,20 @@ func NewTokenCashierOnEthereum(
 			return tipHeight - uint64(confirmBlockNumber), endHeight, nil
 		},
 		iter.Transfers,
-		signHandler,
+		idHasher,
+		signHandlers,
+		witnessAddresses,
 		func(_token util.Address, amountToTransfer *big.Int) bool {
 			if reverseRecorder == nil {
 				return true
 			}
 			token := _token.Address().(common.Address)
-			_coToken, ok := recorder.tokenPairs[token]
+			_coToken, ok := recorder.tokenPairs.CoToken(token)
 			if !ok {
 				return false
 			}
 			coToken := _coToken.Address().(common.Address)
-			if _, ok := reverseRecorder.tokenPairs[coToken]; !ok {
+			if _, ok := reverseRecorder.tokenPairs.CoToken(coToken); !ok {
 				return true
 			}
 			inAmount, err := reverseRecorder.AmountOfTransferred(reverseCashierContractAddr, coToken)

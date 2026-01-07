@@ -54,6 +54,7 @@ type (
 		cashierContractAddr    util.Address
 		previousCashierAddr    util.Address
 		recorder               AbstractRecorder
+		tokenPairs             TokenPairs
 		relayerURL             string
 		validatorContractAddr  []byte
 		startBlockHeight       uint64
@@ -62,7 +63,9 @@ type (
 		lastPullTimestamp      time.Time
 		calcConfirmHeight      calcConfirmHeightFunc
 		pullTransfers          pullTransfersFunc
-		signHandler            SignHandler
+		idHasher               IDHasher
+		signHandlers           []SignHandler
+		witnessAddresses       [][]byte
 		hasEnoughBalance       hasEnoughBalanceFunc
 		start                  startStopFunc
 		stop                   startStopFunc
@@ -79,12 +82,15 @@ func newTokenCashierBase(
 	cashierContractAddr util.Address,
 	previousCashierAddr util.Address,
 	recorder AbstractRecorder,
+	tokenPairs TokenPairs,
 	relayerURL string,
 	validatorContractAddr []byte,
 	startBlockHeight uint64,
 	calcConfirmHeight calcConfirmHeightFunc,
 	pullTransfers pullTransfersFunc,
-	signHandler SignHandler,
+	idHasher IDHasher,
+	signHandlers []SignHandler,
+	witnessAddresses [][]byte,
 	hasEnoughBalance hasEnoughBalanceFunc,
 	start startStopFunc,
 	stop startStopFunc,
@@ -95,13 +101,16 @@ func newTokenCashierBase(
 		cashierContractAddr:    cashierContractAddr,
 		previousCashierAddr:    previousCashierAddr,
 		recorder:               recorder,
+		tokenPairs:             tokenPairs,
 		relayerURL:             relayerURL,
 		startBlockHeight:       startBlockHeight,
 		lastProcessBlockHeight: startBlockHeight,
 		validatorContractAddr:  validatorContractAddr,
 		calcConfirmHeight:      calcConfirmHeight,
 		pullTransfers:          pullTransfers,
-		signHandler:            signHandler,
+		idHasher:               idHasher,
+		signHandlers:           signHandlers,
+		witnessAddresses:       witnessAddresses,
 		hasEnoughBalance:       hasEnoughBalance,
 		lastPullTimestamp:      time.Now(),
 		start:                  start,
@@ -156,13 +165,6 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	if tc.disablePull {
 		return tc.fetchTransfers(count)
 	}
-	startHeight, err := tc.recorder.TipHeight(tc.id)
-	if err != nil {
-		return err
-	}
-	if startHeight < tc.lastProcessBlockHeight {
-		startHeight = tc.lastProcessBlockHeight
-	}
 	if count == 0 {
 		count = 1
 	}
@@ -170,13 +172,14 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	if patrolSize > 1000 {
 		patrolSize = 1000
 	}
-	if tc.lastPatrolBlockHeight == 0 && startHeight > patrolSize {
-		tc.lastPatrolBlockHeight = startHeight - patrolSize
-		if tc.lastPatrolBlockHeight < tc.startBlockHeight {
-			tc.lastPatrolBlockHeight = tc.startBlockHeight
-		}
+	startHeight, err := tc.recorder.TipHeight(tc.id)
+	if err != nil {
+		return err
 	}
-	startHeight = startHeight + 1
+	startHeight = max(startHeight+1, tc.startBlockHeight)
+	if tc.lastPatrolBlockHeight == 0 && startHeight > patrolSize {
+		tc.lastPatrolBlockHeight = max(startHeight-patrolSize, tc.startBlockHeight)
+	}
 	confirmHeight, endHeight, err := tc.calcConfirmHeight(startHeight, count)
 	if err != nil {
 		if tc.lastPullTimestamp.Add(3 * time.Minute).After(time.Now()) {
@@ -185,19 +188,30 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		}
 		return errors.Wrapf(err, "failed to get end height and tip height with start height %d, count %d", startHeight, count)
 	}
-	if confirmHeight < startHeight {
-		return errors.Errorf("failed to get end height with start height %d, count %d, confirm height %d", startHeight, count, confirmHeight)
+	var shouldPatrol bool
+	switch {
+	case endHeight < startHeight-1:
+		return errors.Errorf("end height %d is less than start height %d - 1", endHeight, startHeight)
+	case endHeight == startHeight-1:
+		if endHeight > tc.lastPatrolBlockHeight+patrolSize {
+			shouldPatrol = true
+		} else {
+			return nil
+		}
+	case endHeight > startHeight-1:
+		if startHeight > tc.lastPatrolBlockHeight+patrolSize {
+			shouldPatrol = true
+			endHeight = startHeight
+		}
 	}
 	var transfers []AbstractTransfer
-	tc.lastPullTimestamp = time.Now()
-	if startHeight > tc.lastPatrolBlockHeight+patrolSize {
-		log.Printf("fetching events from block %d to %d for %s with patrol\n", tc.lastPatrolBlockHeight, startHeight, tc.id)
-		transfers, err = tc.pullTransfers(tc.lastPatrolBlockHeight, startHeight)
+	if shouldPatrol {
+		log.Printf("fetching events from block %d to %d for %s with patrol\n", tc.lastPatrolBlockHeight, endHeight, tc.id)
+		transfers, err = tc.pullTransfers(tc.lastPatrolBlockHeight, endHeight)
 		if err != nil {
-			return errors.Wrapf(err, "failed to pull transfers from %d to %d with patrol", tc.lastPatrolBlockHeight, startHeight)
+			return errors.Wrapf(err, "failed to pull transfers from %d to %d with patrol", tc.lastPatrolBlockHeight, endHeight)
 		}
-		tc.lastPatrolBlockHeight = startHeight
-		endHeight = startHeight
+		tc.lastPatrolBlockHeight = endHeight
 	} else {
 		// log.Printf("fetching events from block %d to %d for %s\n", startHeight, endHeight, tc.id)
 		transfers, err = tc.pullTransfers(startHeight, endHeight)
@@ -205,6 +219,7 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 			return errors.Wrapf(err, "failed to pull transfers from %d to %d", startHeight, endHeight)
 		}
 	}
+	tc.lastPullTimestamp = time.Now()
 	for _, transfer := range transfers {
 		if transfer.BlockHeight() <= confirmHeight {
 			if err := tc.recorder.UpsertTransfer(transfer); err != nil {
@@ -221,19 +236,18 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 			}
 		}
 	}
-	if confirmHeight < endHeight {
-		endHeight = confirmHeight
-	}
-	tc.lastProcessBlockHeight = endHeight
 
+	endHeight = min(confirmHeight, endHeight)
+	tc.lastProcessBlockHeight = endHeight
 	if err := tc.recorder.UpdateSyncHeight(tc.id, endHeight); err != nil {
 		return errors.Wrap(err, "failed to update sync height")
 	}
+
 	return nil
 }
 
 func (tc *tokenCashierBase) SubmitTransfers() error {
-	if tc.signHandler == nil {
+	if len(tc.signHandlers) == 0 {
 		return nil
 	}
 	transfersToSubmit, err := tc.recorder.TransfersToSubmit(tc.cashierContractAddr.String())
@@ -257,43 +271,51 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 		if !tc.hasEnoughBalance(transfer.Token(), transfer.Amount()) {
 			return errors.Errorf("not enough balance for token %s", transfer.Token())
 		}
-		id, pubkey, signature, err := tc.signHandler(transfer, tc.validatorContractAddr)
+		id, err := tc.idHasher(transfer, tc.validatorContractAddr)
 		if err != nil {
 			return err
 		}
 		transfer.SetID(id)
-		if signature == nil {
-			continue
-		}
-		var witness *types.Witness
-		if transfer.Status() == TransferReady {
-			witness = &types.Witness{
+		submittedCount := 0
+		for i, signHandler := range tc.signHandlers {
+			var signature []byte
+			if transfer.Status() == TransferReady {
+				signature, err = signHandler(id.Bytes())
+				if err != nil {
+					return err
+				}
+				if signature == nil {
+					continue
+				}
+			} else {
+				signature = []byte{}
+			}
+
+			witness := &types.Witness{
 				Transfer:  transfer.ToTypesTransfer(),
-				Address:   pubkey,
+				Address:   tc.witnessAddresses[i],
 				Signature: signature,
 			}
-		} else {
-			witness = &types.Witness{
-				Transfer:  transfer.ToTypesTransfer(),
-				Address:   pubkey,
-				Signature: []byte{},
-			}
-		}
-		response, err := relayer.Submit(context.Background(), witness)
-		if err != nil {
-			return err
-		}
-		if !response.Success {
-			log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
-			continue
-		}
-		if transfer.Status() == TransferReady {
-			if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
+
+			response, err := relayer.Submit(context.Background(), witness)
+			if err != nil {
 				return err
 			}
-		} else {
-			if err := tc.recorder.MarkTransferAsPending(transfer); err != nil {
-				return err
+			if !response.Success {
+				log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s with address %x\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id, tc.witnessAddresses[i])
+				continue
+			}
+			submittedCount++
+		}
+		if submittedCount == len(tc.signHandlers) {
+			if transfer.Status() == TransferReady {
+				if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
+					return err
+				}
+			} else {
+				if err := tc.recorder.MarkTransferAsPending(transfer); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -414,6 +436,39 @@ func (tc *tokenCashierBase) fetchTransfers(count uint16) error {
 			if err := tc.recorder.AddTransfer(transfer, TransferReady); err != nil {
 				return errors.Wrap(err, "failed to add transfer")
 			}
+		}
+	}
+	return nil
+}
+
+func (tc *tokenCashierBase) RefreshTokenPairs() error {
+	if tc.tokenPairs == nil {
+		return nil
+	}
+	return tc.tokenPairs.Update()
+}
+
+func (tc *tokenCashierBase) ReportProgress() error {
+	height, err := tc.recorder.TipHeight(tc.id)
+	if err != nil {
+		return errors.Wrap(err, "failed to get tip height")
+	}
+	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	if err != nil {
+		return errors.Wrap(err, "failed to create connection")
+	}
+	defer conn.Close()
+	relayer := services.NewRelayServiceClient(conn)
+	for _, witnessAddress := range tc.witnessAddresses {
+		response, err := relayer.ReportCashier(context.Background(), &services.ReportCashierRequest{
+			Address: witnessAddress,
+			Height:  height,
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to report progress")
+		}
+		if !response.Success {
+			return errors.New("failed to report progress")
 		}
 	}
 	return nil

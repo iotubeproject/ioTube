@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -45,21 +46,20 @@ type Configuration struct {
 	ConfirmBlockNumber    int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
 	BatchSize             int           `json:"batchSize" yaml:"batchSize"`
 	Interval              time.Duration `json:"interval" yaml:"interval"`
-	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
 	Cashiers              []struct {
-		ID                             string      `json:"id" yaml:"id"`
-		RelayerURL                     string      `json:"relayerURL" yaml:"relayerURL"`
-		WithPayload                    bool        `json:"withPayload" yaml:"withPayload"`
-		CashierContractAddress         string      `json:"cashierContractAddress" yaml:"cashierContractAddress"`
-		PreviousCashierContractAddress string      `json:"previousCashierContractAddress" yaml:"previousCashierContractAddress"`
-		TokenSafeContractAddress       string      `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
-		ValidatorContractAddress       string      `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
-		TransferTableName              string      `json:"transferTableName" yaml:"transferTableName"`
-		TokenPairs                     []TokenPair `json:"tokenPairs" yaml:"tokenPairs"`
-		StartBlockHeight               int         `json:"startBlockHeight" yaml:"startBlockHeight"`
-		ToSolana                       bool        `json:"toSolana" yaml:"toSolana"`
+		ID                             string           `json:"id" yaml:"id"`
+		RelayerURL                     string           `json:"relayerURL" yaml:"relayerURL"`
+		WithPayload                    bool             `json:"withPayload" yaml:"withPayload"`
+		CashierContractAddress         string           `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+		PreviousCashierContractAddress string           `json:"previousCashierContractAddress" yaml:"previousCashierContractAddress"`
+		TokenSafeContractAddress       string           `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
+		ValidatorContractAddress       string           `json:"vialidatorContractAddress" yaml:"validatorContractAddress"`
+		TransferTableName              string           `json:"transferTableName" yaml:"transferTableName"`
+		TokenPairs                     []TokenPair      `json:"tokenPairs" yaml:"tokenPairs"`
+		RemoteTokenPairs               RemoteTokenPairs `json:"remoteTokenPairs" yaml:"remoteTokenPairs"`
+		StartBlockHeight               int              `json:"startBlockHeight" yaml:"startBlockHeight"`
+		ToSolana                       bool             `json:"toSolana" yaml:"toSolana"`
 		DecimalRound                   []struct {
 			Token1 string `json:"token1" yaml:"token1"`
 			Amount int    `json:"amount" yaml:"amount"`
@@ -72,6 +72,16 @@ type Configuration struct {
 		QPSLimit    uint32 `json:"qpsLimit" yaml:"qpsLimit"`
 		DisablePull bool   `json:"disablePull" yaml:"disablePull"`
 	} `json:"cashiers" yaml:"cashiers"`
+	WitnessCommittees []struct {
+		ID                            string `json:"id" yaml:"id"`
+		NetworkID                     uint64 `json:"networkID" yaml:"networkID"`
+		WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
+		RelayerConfigs                []struct {
+			RelayerURL                    string `json:"relayerURL" yaml:"relayerURL"`
+			WitnessManagerContractAddress string `json:"witnessManagerContractAddress" yaml:"witnessManagerContractAddress"`
+		} `json:"relayerConfigs" yaml:"relayerConfigs"`
+		WitnessTableName string `json:"witnessTableName" yaml:"witnessTableName"`
+	} `json:"witnessCommittees" yaml:"witnessCommittees"`
 }
 
 // TokenPair defines a token pair
@@ -81,6 +91,12 @@ type TokenPair struct {
 	TokenMint      string   `json:"tokenMint" yaml:"tokenMint"`
 	TokenProgramID string   `json:"tokenProgramID,omitempty" yaml:"tokenProgramID,omitempty"`
 	Whitelist      []string `json:"whitelist" yaml:"whitelist"`
+}
+
+// RemoteTokenPairs defines the remote token pairs
+type RemoteTokenPairs struct {
+	URL             string `json:"url" yaml:"url"`
+	ContractAddress string `json:"contractAddress" yaml:"contractAddress"`
 }
 
 var (
@@ -93,8 +109,6 @@ var (
 		SlackWebHook:       "",
 		LarkWebHook:        "",
 		ClientURL:          "",
-		GrpcPort:           9080,
-		GrpcProxyPort:      9081,
 	}
 
 	configFile       = flag.String("config", "", "path of config file")
@@ -115,7 +129,7 @@ func init() {
 func parseTokenPairs(
 	tokenPairs []TokenPair,
 	destAddrDecoder util.AddressDecoder,
-) (map[common.Address]util.Address, map[string][2]util.Address, map[common.Address]map[common.Address]struct{}) {
+) (witness.TokenPairs, map[string][2]util.Address, map[common.Address]map[common.Address]struct{}) {
 	pairs := make(map[common.Address]util.Address)
 	tokenMintPairs := make(map[string][2]util.Address)
 	whitelists := make(map[common.Address]map[common.Address]struct{})
@@ -159,7 +173,8 @@ func parseTokenPairs(
 			whitelists[token1] = whitelist
 		}
 	}
-	return pairs, tokenMintPairs, whitelists
+	localPairs := witness.NewLocalTokenPairs(pairs)
+	return localPairs, tokenMintPairs, whitelists
 }
 
 func main() {
@@ -183,28 +198,15 @@ func main() {
 		cfg.PrivateKey = pk
 	}
 
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok && cfg.GrpcPort == 0 {
-		cfg.GrpcPort, err = strconv.Atoi(port)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-
-	if port, ok := os.LookupEnv("WITNESS_GRPC_PROXY_PORT"); ok && cfg.GrpcProxyPort == 0 {
-		cfg.GrpcProxyPort, err = strconv.Atoi(port)
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
 	if relayerURL, ok := os.LookupEnv("RELAYER_URL"); ok && cfg.RelayerURL == "" {
 		cfg.RelayerURL = relayerURL
 	}
 
 	// TODO: load more parameters from env
-	if cfg.SlackWebHook != "" {
+	if len(cfg.SlackWebHook) > 0 {
 		util.SetSlackURL(cfg.SlackWebHook)
 	}
-	if cfg.LarkWebHook != "" {
+	if len(cfg.LarkWebHook) > 0 {
 		util.SetLarkURL(cfg.LarkWebHook)
 	}
 
@@ -225,10 +227,29 @@ func main() {
 				cfg.Cashiers[i].RelayerURL = cfg.RelayerURL
 			}
 		}
+		for i, wc := range cfg.WitnessCommittees {
+			for j, rc := range wc.RelayerConfigs {
+				switch {
+				case strings.HasPrefix(rc.RelayerURL, ":") && !hasPort:
+					cfg.WitnessCommittees[i].RelayerConfigs[j].RelayerURL = cfg.RelayerURL + rc.RelayerURL
+				case rc.RelayerURL == "":
+					cfg.WitnessCommittees[i].RelayerConfigs[j].RelayerURL = cfg.RelayerURL
+				}
+			}
+		}
+	}
+
+	// print configuration for Debug
+	cfgJSON, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal config for debugging: %v\n", err)
+	} else {
+		log.Printf("Configuration after environment processing:\n%s\n", string(cfgJSON))
 	}
 
 	storeFactory := db.NewSQLStoreFactory()
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
+	var ethClient witness.Client
 	switch cfg.Chain {
 	case "solana":
 		solClient := solclient.NewClient(cfg.ClientURL)
@@ -255,15 +276,21 @@ func main() {
 				token := solcommon.PublicKeyFromString(pair.Token1)
 				decimalRound[token] = pair.Amount
 			}
-			var signHandler witness.SignHandler
+			var signHandlers []witness.SignHandler
+			var witnessAddresses [][]byte
 			if cfg.PrivateKey != "" {
-				privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
-				if err != nil {
-					log.Fatalf("failed to decode private key %v\n", err)
+				for _, pk := range strings.Split(cfg.PrivateKey, ",") {
+					privateKey, err := crypto.HexToECDSA(pk)
+					if err != nil {
+						log.Fatalf("failed to decode private key %v\n", err)
+					}
+					if len(witnessAddresses) == 0 {
+						util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
+					}
+					log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
+					signHandlers = append(signHandlers, witness.NewSecp256k1SignHandler(privateKey))
+					witnessAddresses = append(witnessAddresses, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes())
 				}
-				util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
-				log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
-				signHandler = witness.NewSecp256k1SignHandler(privateKey)
 			} else {
 				log.Println("No Private Key")
 			}
@@ -283,7 +310,8 @@ func main() {
 				),
 				uint64(cc.StartBlockHeight),
 				cc.QPSLimit,
-				signHandler,
+				signHandlers,
+				witnessAddresses,
 				cc.DisablePull,
 			)
 			if err != nil {
@@ -292,26 +320,32 @@ func main() {
 			cashiers = append(cashiers, cashier)
 		}
 	default: // "heco", "bsc", "matic", "polis", "iotex-e", "iotex", "sepolia", "iotex-testnet", "ethereum":
-		ethClient, err := ethclient.Dial(cfg.ClientURL)
+		ethClient, err = witness.NewMultiClient(strings.Split(cfg.ClientURL, ","))
 		if err != nil {
 			log.Fatal(err)
 		}
 		for _, cc := range cfg.Cashiers {
 			var (
-				signHandler     witness.SignHandler
-				destAddrDecoder util.AddressDecoder
+				signHandlers     []witness.SignHandler
+				witnessAddresses [][]byte
+				destAddrDecoder  util.AddressDecoder
 			)
 			if !cc.ToSolana {
 				destAddrDecoder = util.NewETHAddressDecoder()
 
 				if cfg.PrivateKey != "" {
-					privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
-					if err != nil {
-						log.Fatalf("failed to decode private key %v\n", err)
+					for _, pk := range strings.Split(cfg.PrivateKey, ",") {
+						privateKey, err := crypto.HexToECDSA(pk)
+						if err != nil {
+							log.Fatalf("failed to decode private key %v\n", err)
+						}
+						if len(witnessAddresses) == 0 {
+							util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
+						}
+						log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
+						signHandlers = append(signHandlers, witness.NewSecp256k1SignHandler(privateKey))
+						witnessAddresses = append(witnessAddresses, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes())
 					}
-					util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
-					log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
-					signHandler = witness.NewSecp256k1SignHandler(privateKey)
 				} else {
 					log.Println("No Private Key")
 				}
@@ -319,22 +353,25 @@ func main() {
 				destAddrDecoder = util.NewSOLAddressDecoder()
 
 				if cfg.PrivateKey != "" {
-					privateKeyBytes, err := hex.DecodeString(cfg.PrivateKey)
-					if err != nil {
-						log.Fatalf("failed to decode private key %v\n", err)
+					for _, pk := range strings.Split(cfg.PrivateKey, ",") {
+						privateKeyBytes, err := hex.DecodeString(pk)
+						if err != nil {
+							log.Fatalf("failed to decode private key %v\n", err)
+						}
+						var edPrivateKey ed25519.PrivateKey
+						switch len(privateKeyBytes) {
+						case ed25519.PrivateKeySize:
+							edPrivateKey = ed25519.PrivateKey(privateKeyBytes)
+						case 32: // Seed from 32 bytes
+							edPrivateKey = ed25519.NewKeyFromSeed(privateKeyBytes)
+						default:
+							log.Fatalf("invalid private key length %d\n", len(privateKeyBytes))
+						}
+						pbk := solcommon.PublicKeyFromBytes(edPrivateKey.Public().(ed25519.PublicKey)).String()
+						log.Println("Witness Service for " + pbk + " on chain " + cfg.Chain)
+						signHandlers = append(signHandlers, witness.NewEd25519SignHandler(&edPrivateKey))
+						witnessAddresses = append(witnessAddresses, edPrivateKey.Public().(ed25519.PublicKey))
 					}
-					var edPrivateKey ed25519.PrivateKey
-					switch len(privateKeyBytes) {
-					case ed25519.PrivateKeySize:
-						edPrivateKey = ed25519.PrivateKey(privateKeyBytes)
-					case 32: // Seed from 32 bytes
-						edPrivateKey = ed25519.NewKeyFromSeed(privateKeyBytes)
-					default:
-						log.Fatalf("invalid private key length %d\n", len(privateKeyBytes))
-					}
-					pbk := solcommon.PublicKeyFromBytes(edPrivateKey.Public().(ed25519.PublicKey)).String()
-					log.Println("Witness Service for " + pbk + " on chain " + cfg.Chain)
-					signHandler = witness.NewEd25519SignHandler(&edPrivateKey)
 				} else {
 					log.Println("No Private Key")
 				}
@@ -354,7 +391,7 @@ func main() {
 				reverseRecorder = witness.NewRecorder(
 					storeFactory.NewStore(cfg.Database),
 					cc.Reverse.TransferTableName,
-					pairs,
+					witness.NewLocalTokenPairs(pairs),
 					map[common.Address]map[common.Address]struct{}{},
 					map[string][2]util.Address{},
 					map[common.Address]int{},
@@ -373,7 +410,34 @@ func main() {
 			if err != nil {
 				log.Fatalf("invalid token safe address %s: %+v\n", cc.TokenSafeContractAddress, err)
 			}
-			pairs, tokenMintPairs, whitelists := parseTokenPairs(cc.TokenPairs, destAddrDecoder)
+			var (
+				pairs          witness.TokenPairs
+				tokenMintPairs map[string][2]util.Address
+				whitelists     map[common.Address]map[common.Address]struct{}
+			)
+
+			if len(cc.RemoteTokenPairs.ContractAddress) > 0 {
+				if len(cc.TokenPairs) > 0 {
+					log.Fatalf("both token pairs and remote token pairs are specified\n")
+				}
+				client, err := ethclient.Dial(cc.RemoteTokenPairs.URL)
+				if err != nil {
+					log.Fatal(err)
+				}
+				chainID, err := ethClient.ChainID(context.Background())
+				if err != nil {
+					log.Fatal(err)
+				}
+				pairs, err = witness.NewRemoteTokenPairs(chainID.Uint64(), common.HexToAddress(cc.RemoteTokenPairs.ContractAddress), client)
+				if err != nil {
+					log.Fatalf("failed to create remote token pairs %v\n", err)
+				}
+			} else if len(cc.TokenPairs) > 0 {
+				pairs, tokenMintPairs, whitelists = parseTokenPairs(cc.TokenPairs, destAddrDecoder)
+			} else {
+				log.Fatalf("no token pairs or remote token pairs are specified\n")
+			}
+
 			var version witness.Version
 			switch {
 			case cc.ToSolana:
@@ -410,9 +474,11 @@ func main() {
 					decimalRound,
 					destAddrDecoder,
 				),
+				pairs,
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
-				signHandler,
+				signHandlers,
+				witnessAddresses,
 				reverseRecorder,
 				common.HexToAddress(cc.Reverse.CashierContractAddress),
 			)
@@ -423,8 +489,60 @@ func main() {
 		}
 	}
 
+	witnessCommittees := []witness.WitnessCommittee{}
+	for _, wc := range cfg.WitnessCommittees {
+		if ethClient == nil {
+			log.Printf("Skipping witness committee for chain %s, no ethClient\n", cfg.Chain)
+			continue
+		}
+		relayerMap := make(map[common.Address]string)
+		for _, rc := range wc.RelayerConfigs {
+			addr, err := util.ParseEthAddress(rc.WitnessManagerContractAddress)
+			if err != nil {
+				log.Fatalf("invalid witness manager address %s: %v\n", rc.WitnessManagerContractAddress, err)
+			}
+			relayerMap[addr] = rc.RelayerURL
+		}
+		var committeeSignHandlers []witness.SignHandler
+		var witnessAddresses [][]byte
+		if cfg.PrivateKey != "" {
+			for _, pk := range strings.Split(cfg.PrivateKey, ",") {
+				privateKey, err := crypto.HexToECDSA(pk)
+				if err != nil {
+					log.Fatalf("failed to decode private key %v\n", err)
+				}
+				committeeSignHandlers = append(committeeSignHandlers, witness.NewSecp256k1SignHandler(privateKey))
+				witnessAddresses = append(witnessAddresses, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes())
+			}
+		} else {
+			log.Println("No Private Key")
+		}
+		recorder := witness.NewWitnessRecorder(
+			storeFactory.NewStore(cfg.Database),
+			wc.WitnessTableName,
+			util.NewETHAddressDecoder(),
+		)
+		witnessManagerAddr := common.HexToAddress(wc.WitnessManagerContractAddress)
+		witnessCommittee, err := witness.NewWitnessCommittee(
+			wc.ID,
+			witness.IDHasherForWitnessCandidatesInEVM,
+			committeeSignHandlers,
+			witnessAddresses,
+			recorder,
+			ethClient,
+			witnessManagerAddr,
+			relayerMap,
+			wc.NetworkID,
+		)
+		if err != nil {
+			log.Fatalf("failed to create witness committee %v\n", err)
+		}
+		witnessCommittees = append(witnessCommittees, witnessCommittee)
+	}
+
 	service, err := witness.NewService(
 		cashiers,
+		witnessCommittees,
 		uint16(cfg.BatchSize),
 		cfg.Interval,
 		cfg.DisableTransferSubmit,
@@ -468,7 +586,6 @@ func main() {
 		log.Println("Done")
 		return
 	}
-	witness.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort)
 
 	log.Println("Serving...")
 	select {}
