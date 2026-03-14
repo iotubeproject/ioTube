@@ -35,7 +35,18 @@ build-relayer:
 build-explorer:
 	$(GOBUILD) -o ./bin/explorer cmd/explorer/main.go
 
-build-all: build-addtokenpair build-witness build-relayer build-explorer
+build-sign-witness:
+	$(GOBUILD) -o ./bin/sign-witness cmd/sign-witness/main.go
+
+build-sign-tx:
+	$(GOBUILD) -o ./bin/sign-tx cmd/sign-tx/main.go
+
+build-submit-witness:
+	$(GOBUILD) -o ./bin/submit-witness cmd/submit-witness/main.go
+
+build-signing-tools: build-sign-witness build-sign-tx build-submit-witness
+
+build-all: build-addtokenpair build-witness build-relayer build-explorer build-signing-tools
 
 all: clean build-all test
 
