@@ -31,3 +31,5 @@ typechain-types
 cache
 artifacts
 bun.lockb
+# Witness signing tools binaries
+witness-service/bin/
