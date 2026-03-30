@@ -40,15 +40,20 @@ type ReceiptEventData struct {
 
 // Configuration defines the configuration
 type Configuration struct {
-	Chain           string          `json:"chain" yaml:"chain"`
-	ClientURL       string          `json:"clientURL" yaml:"clientURL"`
-	PrivateKey      string          `json:"privateKey" yaml:"privateKey"`
-	GrpcPort        int             `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort   int             `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	Interval        string          `json:"interval" yaml:"interval"`
-	BatchSize       int             `json:"batchSize" yaml:"batchSize"`
-	Database        DatabaseConfig  `json:"database" yaml:"database"`
-	Cashiers        []CashierConfig `json:"cashiers" yaml:"cashiers"`
+	Chain                 string          `json:"chain" yaml:"chain"`
+	ClientURL             string          `json:"clientURL" yaml:"clientURL"`
+	RelayerURL            string          `json:"relayerURL" yaml:"relayerURL"`
+	PrivateKey            string          `json:"privateKey" yaml:"privateKey"`
+	SlackWebHook          string          `json:"slackWebHook" yaml:"slackWebHook"`
+	LarkWebHook           string          `json:"larkWebHook" yaml:"larkWebHook"`
+	ConfirmBlockNumber    int             `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
+	BatchSize             int             `json:"batchSize" yaml:"batchSize"`
+	Interval              string          `json:"interval" yaml:"interval"`
+	GrpcPort              int             `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort         int             `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	DisableTransferSubmit bool            `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
+	Database              DatabaseConfig  `json:"database" yaml:"database"`
+	Cashiers              []CashierConfig `json:"cashiers" yaml:"cashiers"`
 }
 
 // DatabaseConfig defines database configuration
@@ -137,6 +142,14 @@ func main() {
 	var cfg Configuration
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalf("Failed to parse config: %v\n", err)
+	}
+
+	// Override with environment variables if set
+	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok && cfg.PrivateKey == "" {
+		cfg.PrivateKey = pk
+	}
+	if url, ok := os.LookupEnv("WITNESS_CLIENT_URL"); ok && cfg.ClientURL == "" {
+		cfg.ClientURL = url
 	}
 
 	// Connect to client
