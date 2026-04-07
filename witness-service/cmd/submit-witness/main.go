@@ -14,10 +14,11 @@ import (
 	"log"
 	"math/big"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
+	goethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -30,19 +31,23 @@ import (
 
 // Configuration defines the relayer configuration
 type Configuration struct {
-	Chain              string            `json:"chain" yaml:"chain"`
-	ClientURL          string            `json:"clientURL" yaml:"clientURL"`
-	PrivateKey         string            `json:"privateKey" yaml:"privateKey"`
-	ConfirmBlockNumber int               `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
-	GrpcPort           int               `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort      int               `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	Interval           string            `json:"interval" yaml:"interval"`
-	Database           DatabaseConfig    `json:"database" yaml:"database"`
-	TransferTableName  string            `json:"transferTableName" yaml:"transferTableName"`
-	WitnessTableName   string            `json:"witnessTableName" yaml:"witnessTableName"`
-	Bonus              string            `json:"bonus" yaml:"bonus"`
-	SlackWebHook       string            `json:"slackWebHook" yaml:"slackWebHook"`
-	Validators         []ValidatorConfig `json:"validators" yaml:"validators"`
+	Chain                    string            `json:"chain" yaml:"chain"`
+	ClientURL                string            `json:"clientURL" yaml:"clientURL"`
+	PrivateKey               string            `json:"privateKey" yaml:"privateKey"`
+	EthConfirmBlockNumber    int               `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+	EthGasPriceLimit         int64             `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+	GrpcPort                 int               `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort            int               `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	Interval                 string            `json:"interval" yaml:"interval"`
+	Database                 DatabaseConfig    `json:"database" yaml:"database"`
+	TransferTableName        string            `json:"transferTableName" yaml:"transferTableName"`
+	NewTransactionTableName  string            `json:"newTransactionTableName" yaml:"newTransactionTableName"`
+	WitnessTableName         string            `json:"witnessTableName" yaml:"witnessTableName"`
+	Bonus                    string            `json:"bonus" yaml:"bonus"`
+	SlackWebHook             string            `json:"slackWebHook" yaml:"slackWebHook"`
+	SolanaConfig             interface{}       `json:"solanaConfig" yaml:"solanaConfig"`
+	Unwrappers               interface{}       `json:"unwrappers" yaml:"unwrappers"`
+	Validators               []ValidatorConfig `json:"validators" yaml:"validators"`
 }
 
 // DatabaseConfig defines database configuration
@@ -53,9 +58,10 @@ type DatabaseConfig struct {
 
 // ValidatorConfig defines the configuration for a validator
 type ValidatorConfig struct {
-	Address   string   `json:"address" yaml:"address"`
-	WithPayload bool   `json:"withPayload" yaml:"withPayload"`
-	Cashiers  []CashierRef `json:"cashiers" yaml:"cashiers"`
+	Address     string       `json:"address" yaml:"address"`
+	WithPayload bool         `json:"withPayload" yaml:"withPayload"`
+	FromSolana  bool         `json:"fromSolana" yaml:"fromSolana"`
+	Cashiers    []CashierRef `json:"cashiers" yaml:"cashiers"`
 }
 
 // CashierRef references a cashier
@@ -68,7 +74,7 @@ var (
 	secretFile    = flag.String("secret", "", "path to secret config file")
 	validatorAddr = flag.String("validator", "", "validator contract address (overrides config)")
 	cashierAddr   = flag.String("cashier", "", "cashier contract address")
-	tokenAddr     = flag.String("token", "", "source token address")
+	tokenAddr     = flag.String("token", "", "co-token address on the destination chain")
 	index         = flag.Uint("index", 0, "transfer index")
 	senderAddr    = flag.String("sender", "", "sender address")
 	recipientAddr = flag.String("recipient", "", "recipient address")
@@ -96,9 +102,6 @@ func main() {
 
 	if *configFile == "" {
 		log.Fatal("-config is required")
-	}
-	if *cashierAddr == "" {
-		log.Fatal("-cashier is required")
 	}
 	if *tokenAddr == "" {
 		log.Fatal("-token is required")
@@ -148,6 +151,13 @@ func main() {
 		log.Fatal("-validator or validator in config is required")
 	}
 
+	// Get cashier address from flag or config
+	resolvedCashier, err := resolveCashier(*cashierAddr, cfg.Validators, valAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	*cashierAddr = resolvedCashier
+
 	// Connect to client
 	if cfg.ClientURL == "" {
 		log.Fatal("clientURL is required in config")
@@ -194,19 +204,9 @@ func main() {
 
 	// Parse and concatenate signatures
 	sigList := strings.Split(*signatures, ",")
-	concatSigs := []byte{}
-	for i, sig := range sigList {
-		sig = strings.TrimSpace(sig)
-		sig = strings.TrimPrefix(sig, "0x")
-		sigBytes, err := hex.DecodeString(sig)
-		if err != nil {
-			log.Fatalf("Invalid signature %d: %v\n", i, err)
-		}
-		// Ethereum signatures are 65 bytes (r, s, v)
-		if len(sigBytes) != 65 {
-			log.Fatalf("Signature %d has invalid length %d (expected 65)\n", i, len(sigBytes))
-		}
-		concatSigs = append(concatSigs, sigBytes...)
+	concatSigs, err := parseSignatures(*signatures)
+	if err != nil {
+		log.Fatalf("Invalid signatures: %v\n", err)
 	}
 
 	fmt.Println("=== Submitting to Validator ===")
@@ -223,8 +223,32 @@ func main() {
 	fmt.Printf("Signatures: %d (%d bytes total)\n", len(sigList), len(concatSigs))
 	fmt.Printf("Relayer: %s\n", crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
 
+	// Determine if with payload based on config
+	withPayload := resolveWithPayload(cfg.Validators, valAddr)
+
 	if *dryRun {
-		fmt.Println("\n[DRY RUN] Transaction not sent.")
+		callData, err := buildSubmitCallData(withPayload, cashier, token, big.NewInt(int64(*index)), sender, recipient, amountVal, concatSigs, payload)
+		if err != nil {
+			log.Fatalf("Failed to pack calldata: %v\n", err)
+		}
+		relayer := crypto.PubkeyToAddress(privateKey.PublicKey)
+		estimatedGas, err := client.EstimateGas(context.Background(), goethereum.CallMsg{
+			From: relayer,
+			To:   &validator,
+			Data: callData,
+		})
+		if err != nil {
+			log.Fatalf("Gas estimation failed (params may be invalid): %v\n", err)
+		}
+		gp, err := client.SuggestGasPrice(context.Background())
+		if err != nil {
+			log.Fatalf("Failed to get gas price: %v\n", err)
+		}
+		gasCost := new(big.Int).Mul(big.NewInt(int64(estimatedGas)), gp)
+		fmt.Printf("\n[DRY RUN] Estimated gas: %d\n", estimatedGas)
+		fmt.Printf("[DRY RUN] Gas price:     %s wei\n", gp.String())
+		fmt.Printf("[DRY RUN] Estimated cost: %s wei\n", gasCost.String())
+		fmt.Println("[DRY RUN] Transaction not sent.")
 		return
 	}
 
@@ -267,15 +291,6 @@ func main() {
 	// Submit transaction
 	fmt.Println("\nSubmitting transaction...")
 	var tx *types.Transaction
-
-	// Determine if with payload based on config or flag
-	withPayload := len(payload) > 0
-	for _, v := range cfg.Validators {
-		if v.Address == valAddr {
-			withPayload = v.WithPayload
-			break
-		}
-	}
 
 	if withPayload {
 		// Use TransferValidatorWithPayload
@@ -327,10 +342,66 @@ func main() {
 	}
 }
 
-func mustParseUint64(s string) uint64 {
-	val, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		log.Fatalf("Invalid uint64: %s\n", s)
+// buildSubmitCallData packs the ABI calldata for the submit function.
+func buildSubmitCallData(withPayload bool, cashier, token common.Address, index *big.Int, sender, recipient common.Address, amount *big.Int, signatures []byte, payload []byte) ([]byte, error) {
+	var (
+		parsedABI abi.ABI
+		err       error
+	)
+	if withPayload {
+		parsedABI, err = abi.JSON(strings.NewReader(contract.TransferValidatorWithPayloadMetaData.ABI))
+		if err != nil {
+			return nil, err
+		}
+		return parsedABI.Pack("submit", cashier, token, index, sender, recipient, amount, signatures, payload)
 	}
-	return val
+	parsedABI, err = abi.JSON(strings.NewReader(contract.TransferValidatorABI))
+	if err != nil {
+		return nil, err
+	}
+	return parsedABI.Pack("submit", cashier, token, index, sender, recipient, amount, signatures)
+}
+
+// parseSignatures parses a comma-separated list of hex-encoded 65-byte signatures
+// and returns the concatenated bytes.
+func parseSignatures(sigStr string) ([]byte, error) {
+	sigList := strings.Split(sigStr, ",")
+	concatSigs := make([]byte, 0, len(sigList)*65)
+	for i, sig := range sigList {
+		sig = strings.TrimSpace(sig)
+		sig = strings.TrimPrefix(sig, "0x")
+		sigBytes, err := hex.DecodeString(sig)
+		if err != nil {
+			return nil, fmt.Errorf("invalid signature %d: %v", i, err)
+		}
+		if len(sigBytes) != 65 {
+			return nil, fmt.Errorf("signature %d has invalid length %d (expected 65)", i, len(sigBytes))
+		}
+		concatSigs = append(concatSigs, sigBytes...)
+	}
+	return concatSigs, nil
+}
+
+// resolveCashier returns the cashier address from the flag value if set, or falls back
+// to the first cashier listed under the matching validator in config.
+func resolveCashier(flagValue string, validators []ValidatorConfig, valAddr string) (string, error) {
+	if flagValue != "" {
+		return flagValue, nil
+	}
+	for _, v := range validators {
+		if strings.EqualFold(v.Address, valAddr) && len(v.Cashiers) > 0 {
+			return v.Cashiers[0].Address, nil
+		}
+	}
+	return "", fmt.Errorf("-cashier is required (or set cashiers in config validators)")
+}
+
+// resolveWithPayload returns true if the validator matching valAddr has withPayload set.
+func resolveWithPayload(validators []ValidatorConfig, valAddr string) bool {
+	for _, v := range validators {
+		if strings.EqualFold(v.Address, valAddr) {
+			return v.WithPayload
+		}
+	}
+	return false
 }

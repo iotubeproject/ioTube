@@ -7,6 +7,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SIGN_WITNESS="$SCRIPT_DIR/../bin/sign-witness"
 
+# Load .env if IOTEX_WITNESS is set
+if [[ -n "$IOTEX_WITNESS" && -f "$IOTEX_WITNESS/etc/.env" ]]; then
+    set -a
+    source "$IOTEX_WITNESS/etc/.env"
+    set +a
+fi
+
 if [[ $# -eq 0 ]]; then
     echo "Usage: $0 -config <config.yaml> -secret <secret.yaml> -cashier <id> -cotoken <address> -index <num> -sender <address> -recipient <pubkey> -amount <amount>"
     echo ""
@@ -29,6 +36,7 @@ while [[ $# -gt 0 ]]; do
         -config)    CONFIG="$2"; shift 2 ;;
         -secret)    SECRET="$2"; shift 2 ;;
         -cashier)   CASHIER="$2"; shift 2 ;;
+        -token)     TOKEN="$2"; shift 2 ;;
         -cotoken)   COTOKEN="$2"; shift 2 ;;
         -index)     INDEX="$2"; shift 2 ;;
         -sender)    SENDER="$2"; shift 2 ;;
@@ -80,7 +88,7 @@ if [[ -n "$CASHIER_ID_FROM_CONFIG" ]]; then
 fi
 
 # Build and execute command
-CMD="$SIGN_WITNESS -to-solana -config $CONFIG -secret $SECRET -cashier $CASHIER -cashier-address $CASHIER_ADDR -validator-address $VALIDATOR_ADDR -cotoken $COTOKEN -index $INDEX -sender $SENDER -recipient $RECIPIENT -amount $AMOUNT"
+CMD="$SIGN_WITNESS -to-solana -config $CONFIG -secret $SECRET -cashier $CASHIER -cashier-address $CASHIER_ADDR -validator-address $VALIDATOR_ADDR -token $TOKEN -cotoken $COTOKEN -index $INDEX -sender $SENDER -recipient $RECIPIENT -amount $AMOUNT"
 [[ -n "$PAYLOAD" ]] && CMD="$CMD -payload $PAYLOAD"
 
 exec $CMD

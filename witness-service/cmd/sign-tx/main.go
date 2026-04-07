@@ -205,7 +205,7 @@ func main() {
 		// Parse token1 address to normalized hex format
 		token1Hex := parseAddressToHex(pair.Token1)
 		if token1Hex == tokenHex {
-			coToken = pair.Token2
+			coToken = parseAddressToHex(pair.Token2)
 			break
 		}
 	}
@@ -220,6 +220,7 @@ func main() {
 		"-config", *configFile,
 		"-secret", *secretFile,
 		"-cashier", cashierCfg.ID,
+		"-token", eventData.Token.Hex(),
 		"-cotoken", coToken,
 		"-index", eventData.ID.String(),
 		"-sender", eventData.Sender.Hex(),
