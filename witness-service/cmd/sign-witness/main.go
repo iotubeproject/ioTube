@@ -107,6 +107,7 @@ var (
 	cashierID        = flag.String("cashier", "", "cashier ID (from config)")
 	cashierAddr      = flag.String("cashier-address", "", "cashier contract address")
 	validatorAddr    = flag.String("validator-address", "", "validator contract address")
+	tokenAddr        = flag.String("token", "", "source token address (for reference in output)")
 	coTokenAddr      = flag.String("cotoken", "", "co-token address")
 	index            = flag.String("index", "", "transfer index")
 	senderAddr       = flag.String("sender", "", "sender address")
@@ -315,12 +316,17 @@ func main() {
 	fmt.Printf("Signature: 0x%x\n", signature)
 	fmt.Println()
 	fmt.Println("=== Details ===")
-	fmt.Printf("Validator: 0x%x\n", validator.Bytes())
-	fmt.Printf("Cashier: 0x%x\n", cashier.Bytes())
-	fmt.Printf("CoToken: 0x%x\n", coToken)
+	fmt.Printf("Validator: %s\n", validator.Hex())
+	fmt.Printf("Cashier: %s\n", cashier.Hex())
+	if isToSolana {
+		fmt.Printf("CoToken: 0x%x\n", coToken)
+		fmt.Printf("Recipient: 0x%x\n", recipient)
+	} else {
+		fmt.Printf("CoToken: %s\n", common.BytesToAddress(coToken).Hex())
+		fmt.Printf("Recipient: %s\n", common.BytesToAddress(recipient).Hex())
+	}
 	fmt.Printf("Index: %s\n", indexVal.String())
 	fmt.Printf("Sender: %s\n", sender.Hex())
-	fmt.Printf("Recipient: 0x%x\n", recipient)
 	fmt.Printf("Amount: %s\n", amount.String())
 	if len(payload) > 0 {
 		fmt.Printf("Payload: 0x%x\n", payload)
@@ -330,7 +336,11 @@ func main() {
 
 func resolveAddress(flagValue string, cashierCfg *CashierConfig, getFromConfig func(CashierConfig) string, name string) common.Address {
 	if flagValue != "" {
-		return common.HexToAddress(flagValue)
+		parsed, err := util.ParseEthAddress(flagValue)
+		if err != nil {
+			log.Fatalf("Failed to parse -%s-address: %v\n", name, err)
+		}
+		return parsed
 	}
 	if cashierCfg != nil {
 		addrStr := getFromConfig(*cashierCfg)
