@@ -88,7 +88,8 @@ if [[ -n "$CASHIER_ID_FROM_CONFIG" ]]; then
 fi
 
 # Build and execute command
-CMD="$SIGN_WITNESS -config $CONFIG -secret $SECRET -cashier $CASHIER -cashier-address $CASHIER_ADDR -validator-address $VALIDATOR_ADDR -token $TOKEN -cotoken $COTOKEN -index $INDEX -sender $SENDER -recipient $RECIPIENT -amount $AMOUNT"
+CMD="$SIGN_WITNESS -config $CONFIG -secret $SECRET -cashier $CASHIER -cashier-address $CASHIER_ADDR -validator-address $VALIDATOR_ADDR -cotoken $COTOKEN -index $INDEX -sender $SENDER -recipient $RECIPIENT -amount $AMOUNT"
+[[ -n "$TOKEN" ]] && CMD="$CMD -token $TOKEN"
 [[ -n "$PAYLOAD" ]] && CMD="$CMD -payload $PAYLOAD"
 
 exec $CMD

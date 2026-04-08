@@ -312,7 +312,11 @@ func main() {
 	// Output results
 	fmt.Println("=== Witness Signature ===")
 	fmt.Printf("Transfer ID: 0x%x\n", id.Bytes())
-	fmt.Printf("Witness Public Key: 0x%x\n", witnessPubKey)
+	if isToSolana {
+		fmt.Printf("Witness Public Key: 0x%x\n", witnessPubKey)
+	} else {
+		fmt.Printf("Witness Address: %s\n", common.BytesToAddress(witnessPubKey).Hex())
+	}
 	fmt.Printf("Signature: 0x%x\n", signature)
 	fmt.Println()
 	fmt.Println("=== Details ===")
