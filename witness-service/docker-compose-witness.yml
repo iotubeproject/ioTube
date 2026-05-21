@@ -25,18 +25,18 @@ services:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
       RELAYER_URL: ${RELAYER_URL}
 
-  ethereum-payload-witness:
-    container_name: ethereum-payload-witness
-    image: witness:latest
-    restart: on-failure
-    volumes:
-      - $IOTEX_WITNESS/etc/witness-config-ethereum-payload.yaml:/etc/iotube-witness/witness-config-ethereum-payload.yaml:ro
-      - $IOTEX_WITNESS/etc/witness-config-ethereum.secret.yaml:/etc/iotube-witness/witness-config-ethereum.secret.yaml:ro
-    network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-ethereum-payload.yaml -secret=/etc/iotube-witness/witness-config-ethereum.secret.yaml
-    environment:
-      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-      RELAYER_URL: ${RELAYER_URL}
+#   ethereum-payload-witness:
+#     container_name: ethereum-payload-witness
+#     image: witness:latest
+#     restart: on-failure
+#     volumes:
+#       - $IOTEX_WITNESS/etc/witness-config-ethereum-payload.yaml:/etc/iotube-witness/witness-config-ethereum-payload.yaml:ro
+#       - $IOTEX_WITNESS/etc/witness-config-ethereum.secret.yaml:/etc/iotube-witness/witness-config-ethereum.secret.yaml:ro
+#     network_mode: host
+#     command: witness -config=/etc/iotube-witness/witness-config-ethereum-payload.yaml -secret=/etc/iotube-witness/witness-config-ethereum.secret.yaml
+#     environment:
+#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+#       RELAYER_URL: ${RELAYER_URL}
 
   bsc-payload-witness:
     container_name: bsc-payload-witness
@@ -51,61 +51,61 @@ services:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
       RELAYER_URL: ${RELAYER_URL}
 
-  matic-payload-witness:
-    container_name: matic-payload-witness
-    image: witness:latest
-    restart: on-failure
-    volumes:
-      - $IOTEX_WITNESS/etc/witness-config-matic-payload.yaml:/etc/iotube-witness/witness-config-matic-payload.yaml:ro
-      - $IOTEX_WITNESS/etc/witness-config-matic.secret.yaml:/etc/iotube-witness/witness-config-matic.secret.yaml:ro
-    network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-matic-payload.yaml -secret=/etc/iotube-witness/witness-config-matic.secret.yaml
-    environment:
-      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-      RELAYER_URL: ${RELAYER_URL}
+#   matic-payload-witness:
+#     container_name: matic-payload-witness
+#     image: witness:latest
+#     restart: on-failure
+#     volumes:
+#       - $IOTEX_WITNESS/etc/witness-config-matic-payload.yaml:/etc/iotube-witness/witness-config-matic-payload.yaml:ro
+#       - $IOTEX_WITNESS/etc/witness-config-matic.secret.yaml:/etc/iotube-witness/witness-config-matic.secret.yaml:ro
+#     network_mode: host
+#     command: witness -config=/etc/iotube-witness/witness-config-matic-payload.yaml -secret=/etc/iotube-witness/witness-config-matic.secret.yaml
+#     environment:
+#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+#       RELAYER_URL: ${RELAYER_URL}
 
-  solana-witness:
-    container_name: solana-witness
-    image: witness:latest
-    restart: on-failure
-    volumes:
-      - $IOTEX_WITNESS/etc/witness-config-solana.yaml:/etc/iotube-witness/witness-config-solana.yaml:ro
-      - $IOTEX_WITNESS/etc/witness-config-solana.secret.yaml:/etc/iotube-witness/witness-config-solana.secret.yaml:ro
-    network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-solana.yaml -secret=/etc/iotube-witness/witness-config-solana.secret.yaml
-    environment:
-      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-      RELAYER_URL: ${RELAYER_URL}
+#   solana-witness:
+#     container_name: solana-witness
+#     image: witness:latest
+#     restart: on-failure
+#     volumes:
+#       - $IOTEX_WITNESS/etc/witness-config-solana.yaml:/etc/iotube-witness/witness-config-solana.yaml:ro
+#       - $IOTEX_WITNESS/etc/witness-config-solana.secret.yaml:/etc/iotube-witness/witness-config-solana.secret.yaml:ro
+#     network_mode: host
+#     command: witness -config=/etc/iotube-witness/witness-config-solana.yaml -secret=/etc/iotube-witness/witness-config-solana.secret.yaml
+#     environment:
+#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+#       RELAYER_URL: ${RELAYER_URL}
   
-  iotex-solana-witness:
-    container_name: iotex-solana-witness
-    image: witness:latest
-    restart: on-failure
-    volumes:
-      - $IOTEX_WITNESS/etc/witness-config-iotex-solana.yaml:/etc/iotube-witness/witness-config-iotex-solana.yaml:ro
-      - $IOTEX_WITNESS/etc/witness-config-iotex-solana.secret.yaml:/etc/iotube-witness/witness-config-iotex-solana.secret.yaml:ro
-    network_mode: host
-    command: witness -config=/etc/iotube-witness/witness-config-iotex-solana.yaml -secret=/etc/iotube-witness/witness-config-iotex-solana.secret.yaml
-    environment:
-      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-      RELAYER_URL: ${RELAYER_URL}
+#   iotex-solana-witness:
+#     container_name: iotex-solana-witness
+#     image: witness:latest
+#     restart: on-failure
+#     volumes:
+#       - $IOTEX_WITNESS/etc/witness-config-iotex-solana.yaml:/etc/iotube-witness/witness-config-iotex-solana.yaml:ro
+#       - $IOTEX_WITNESS/etc/witness-config-iotex-solana.secret.yaml:/etc/iotube-witness/witness-config-iotex-solana.secret.yaml:ro
+#     network_mode: host
+#     command: witness -config=/etc/iotube-witness/witness-config-iotex-solana.yaml -secret=/etc/iotube-witness/witness-config-iotex-solana.secret.yaml
+#     environment:
+#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
+#       RELAYER_URL: ${RELAYER_URL}
 
-  cron:
-    image: schnitzler/mysqldump
-    restart: always
-    volumes:
-      - $IOTEX_WITNESS/etc/crontab:/var/spool/cron/crontabs/root
-      - $IOTEX_WITNESS/etc/backup:/usr/local/bin/backup
-    volumes_from:
-      - backup
-    command: ["-l", "8", "-d", "8"]
-    environment:
-      MYSQL_HOST: database
-      MYSQL_USER: root
-      MYSQL_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: witness
+#   cron:
+#     image: schnitzler/mysqldump
+#     restart: always
+#     volumes:
+#       - $IOTEX_WITNESS/etc/crontab:/var/spool/cron/crontabs/root
+#       - $IOTEX_WITNESS/etc/backup:/usr/local/bin/backup
+#     volumes_from:
+#       - backup
+#     command: ["-l", "8", "-d", "8"]
+#     environment:
+#       MYSQL_HOST: database
+#       MYSQL_USER: root
+#       MYSQL_PASSWORD: ${DB_ROOT_PASSWORD}
+#       MYSQL_DATABASE: witness
 
-  backup:
-    image: busybox
-    volumes:
-      - $IOTEX_WITNESS/data/backup:/backup
+#   backup:
+#     image: busybox
+#     volumes:
+#       - $IOTEX_WITNESS/data/backup:/backup

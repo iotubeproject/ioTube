@@ -27,20 +27,20 @@ services:
     environment:
       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
-  ethereum-payload-relayer:
-    container_name: ethereum-payload-relayer
-    image: relayer:latest
-    restart: on-failure
-    ports:
-      - 7200:7200
-      - 8200:8200
-    volumes:
-      - $IOTEX_RELAYER/etc/relayer-config-ethereum-payload.yaml:/etc/iotube-relayer/relayer-config-ethereum-payload.yaml:ro
-    links:
-      - database
-    command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum-payload.yaml
-    environment:
-      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+#   ethereum-payload-relayer:
+#     container_name: ethereum-payload-relayer
+#     image: relayer:latest
+#     restart: on-failure
+#     ports:
+#       - 7200:7200
+#       - 8200:8200
+#     volumes:
+#       - $IOTEX_RELAYER/etc/relayer-config-ethereum-payload.yaml:/etc/iotube-relayer/relayer-config-ethereum-payload.yaml:ro
+#     links:
+#       - database
+#     command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum-payload.yaml
+#     environment:
+#       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
   bsc-payload-relayer:
     container_name: bsc-payload-relayer
@@ -57,62 +57,62 @@ services:
     environment:
       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
-  matic-payload-relayer:
-    container_name: matic-payload-relayer
-    image: relayer:latest
-    restart: on-failure
-    ports:
-      - 7204:7204
-      - 8204:8204
-    volumes:
-      - $IOTEX_RELAYER/etc/relayer-config-matic-payload.yaml:/etc/iotube-relayer/relayer-config-matic-payload.yaml:ro
-    links:
-      - database
-    command: relayer -config=/etc/iotube-relayer/relayer-config-matic-payload.yaml
-    environment:
-      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+#   matic-payload-relayer:
+#     container_name: matic-payload-relayer
+#     image: relayer:latest
+#     restart: on-failure
+#     ports:
+#       - 7204:7204
+#       - 8204:8204
+#     volumes:
+#       - $IOTEX_RELAYER/etc/relayer-config-matic-payload.yaml:/etc/iotube-relayer/relayer-config-matic-payload.yaml:ro
+#     links:
+#       - database
+#     command: relayer -config=/etc/iotube-relayer/relayer-config-matic-payload.yaml
+#     environment:
+#       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
-  iotex-solana-relayer:
-    container_name: iotex-solana-relayer
-    image: relayer:latest
-    restart: on-failure
-    ports:
-      - 7008:7008
-      - 8008:8008
-    volumes:
-      - $IOTEX_RELAYER/etc/relayer-config-iotex-solana.yaml:/etc/iotube-relayer/relayer-config-iotex-solana.yaml:ro
-    links:
-      - database
-    command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-solana.yaml
-    environment:
-      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+#   iotex-solana-relayer:
+#     container_name: iotex-solana-relayer
+#     image: relayer:latest
+#     restart: on-failure
+#     ports:
+#       - 7008:7008
+#       - 8008:8008
+#     volumes:
+#       - $IOTEX_RELAYER/etc/relayer-config-iotex-solana.yaml:/etc/iotube-relayer/relayer-config-iotex-solana.yaml:ro
+#     links:
+#       - database
+#     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-solana.yaml
+#     environment:
+#       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
-  solana-relayer:
-    container_name: solana-relayer
-    image: relayer:latest
-    restart: on-failure
-    ports:
-      - 7007:7007
-      - 8007:8007
-    volumes:
-      - $IOTEX_RELAYER/etc/relayer-config-solana.yaml:/etc/iotube-relayer/relayer-config-solana.yaml:ro
-    links:
-      - database
-    command: relayer -config=/etc/iotube-relayer/relayer-config-solana.yaml
-    environment:
-      RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+#   solana-relayer:
+#     container_name: solana-relayer
+#     image: relayer:latest
+#     restart: on-failure
+#     ports:
+#       - 7007:7007
+#       - 8007:8007
+#     volumes:
+#       - $IOTEX_RELAYER/etc/relayer-config-solana.yaml:/etc/iotube-relayer/relayer-config-solana.yaml:ro
+#     links:
+#       - database
+#     command: relayer -config=/etc/iotube-relayer/relayer-config-solana.yaml
+#     environment:
+#       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
 
-  cron:
-    image: schnitzler/mysqldump
-    restart: always
-    volumes:
-      - $IOTEX_RELAYER/etc/crontab:/var/spool/cron/crontabs/root
-      - $IOTEX_RELAYER/etc/backup:/usr/local/bin/backup
-    volumes_from:
-      - backup
-    command: ["-l", "8", "-d", "8"]
-    environment:
-      MYSQL_HOST: database
-      MYSQL_USER: root
-      MYSQL_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: relayer
+#   cron:
+#     image: schnitzler/mysqldump
+#     restart: always
+#     volumes:
+#       - $IOTEX_RELAYER/etc/crontab:/var/spool/cron/crontabs/root
+#       - $IOTEX_RELAYER/etc/backup:/usr/local/bin/backup
+#     volumes_from:
+#       - backup
+#     command: ["-l", "8", "-d", "8"]
+#     environment:
+#       MYSQL_HOST: database
+#       MYSQL_USER: root
+#       MYSQL_PASSWORD: ${DB_ROOT_PASSWORD}
+#       MYSQL_DATABASE: relayer
