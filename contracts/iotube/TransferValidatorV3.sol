@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >= 0.8.0;
+pragma solidity >= 0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 interface IAllowlist {
     function isAllowed(address) external view returns (bool);
     function numOfActive() external view returns (uint256);
+    function threshold() external view returns (uint8);
 }
 
 interface IMinter {
@@ -18,43 +20,46 @@ interface IReceiver {
     function onReceive(address sender, address token, uint256 amount, bytes calldata payload) external;
 }
 
-contract TransferValidatorWithPayload is Ownable {
+contract TransferValidatorV3 is Ownable, Pausable {
     event Settled(bytes32 indexed key, address[] witnesses);
     event ReceiverAdded(address receiver);
     event ReceiverRemoved(address receiver);
-    event Pause();
-    event Unpause();
-    modifier whenNotPaused() {
-        require(!paused);
-        _;
-    }
-    bool public paused;
 
     mapping(bytes32 => uint256) public settles;
     mapping(address => bool) public receivers;
 
     IMinter[] public minters;
     IAllowlist[] public tokenLists;
-    IAllowlist public witnessList;
+    IAllowlist[] public witnessLists;
+    IAllowlist[] public witnessTokenLists;
 
-    constructor(IAllowlist _witnessList) Ownable(msg.sender) {
-        witnessList = _witnessList;
-    }
+    constructor() Ownable(msg.sender) {}
 
-    function pause() public onlyOwner {
-        require(!paused, "already paused");
-        paused = true;
-        emit Pause();
-    }
-
-    function unpause() public onlyOwner {
-        require(paused, "already unpaused");
-        paused = false;
-        emit Unpause();
-    }
-
-    function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory payload) public view returns(bytes32) {
+    function generateKey(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory payload) internal view returns(bytes32) {
         return keccak256(abi.encodePacked(address(this), cashier, tokenAddr, index, from, to, amount, payload));
+    }
+
+    function getWitnessLists(address tokenAddr) public view returns (IAllowlist[] memory) {
+        uint256 count = 0;
+        bool[] memory found = new bool[](witnessTokenLists.length);
+        for (uint256 i = 0; i < witnessTokenLists.length; i++) {
+            if (witnessTokenLists[i].isAllowed(tokenAddr)) {
+                count++;
+                found[i] = true;
+            }
+        }
+        if (count == 0) {
+            revert("witness list not found");
+        }
+        IAllowlist[] memory lists = new IAllowlist[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < witnessTokenLists.length; i++) {
+            if (found[i]) {
+                lists[index] = witnessLists[i];
+                index++;
+            }
+        }
+        return lists;
     }
 
     function getMinter(address tokenAddr) public view returns (IMinter) {
@@ -63,42 +68,61 @@ contract TransferValidatorWithPayload is Ownable {
                 return minters[i];
             }
         }
-        return minters[0];
+        revert("invalid token address");
     }
 
-    function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes memory signatures, bytes memory payload) public whenNotPaused {
+    function submit(address cashier, address tokenAddr, uint256 index, address from, address to, uint256 amount, bytes[] memory signaturesArray, bytes memory payload) public whenNotPaused {
         require(amount != 0, "amount cannot be zero");
         require(to != address(0), "recipient cannot be zero");
-        require(signatures.length % 65 == 0, "invalid signature length");
         bytes32 key = generateKey(cashier, tokenAddr, index, from, to, amount, payload);
         require(settles[key] == 0, "transfer has been settled");
-        uint256 numOfSignatures = signatures.length / 65;
-        address[] memory witnesses = new address[](numOfSignatures);
-        for (uint256 i = 0; i < numOfSignatures; i++) {
-            address witness = recover(key, signatures, i * 65);
-            require(witnessList.isAllowed(witness), "invalid signature");
-            for (uint256 j = 0; j < i; j++) {
-                require(witness != witnesses[j], "duplicate witness");
-            }
-            witnesses[i] = witness;
+        IAllowlist[] memory witnessListArray = getWitnessLists(tokenAddr);
+        require(witnessListArray.length == signaturesArray.length, "invalid signatures array length");
+        uint256 totalSignatures = 0;
+        for (uint256 i = 0; i < signaturesArray.length; i++) {
+            require(signaturesArray[i].length % 65 == 0, "invalid signature length");
+            totalSignatures += signaturesArray[i].length / 65;
         }
-        require(numOfSignatures * 3 > witnessList.numOfActive() * 2, "insufficient witnesses");
+        address[] memory allWitnesses = new address[](totalSignatures);
+        uint256 witnessIndex = 0;
+        for (uint256 i = 0; i < witnessListArray.length; i++) {
+            IAllowlist witnessList = witnessListArray[i];
+            bytes memory signatures = signaturesArray[i];
+            uint256 numOfSignatures = signatures.length / 65;
+            address[] memory witnesses = new address[](numOfSignatures);
+            for (uint256 j = 0; j < numOfSignatures; j++) {
+                address witness = recover(key, signatures, j * 65);
+                require(witnessList.isAllowed(witness), "invalid signature");
+                for (uint256 k = 0; k < j; k++) {
+                    require(witness != witnesses[k], "duplicate witness");
+                }
+                witnesses[j] = witness;
+                allWitnesses[witnessIndex] = witness;
+                witnessIndex++;
+            }
+            require(numOfSignatures * 100 > witnessList.numOfActive() * witnessList.threshold(), "insufficient witnesses");
+        }
         IMinter minter = getMinter(tokenAddr);
         settles[key] = block.number;
         require(minter.mint(tokenAddr, to, amount), "failed to mint token");
         if (receivers[to]) {
             IReceiver(to).onReceive(from, tokenAddr, amount, payload);
         }
-        emit Settled(key, witnesses);
+        emit Settled(key, allWitnesses);
     }
 
     function numOfPairs() external view returns (uint256) {
         return tokenLists.length;
     }
 
-    function addPair(IAllowlist _tokenList, IMinter _minter) external onlyOwner {
-        tokenLists.push(_tokenList);
+    function addMinterPair(IAllowlist _minterTokenList, IMinter _minter) external onlyOwner {
+        tokenLists.push(_minterTokenList);
         minters.push(_minter);
+    }
+
+    function addWitnessPair(IAllowlist _witnessTokenList, IAllowlist _witnessList) external onlyOwner {
+        witnessTokenLists.push(_witnessTokenList);
+        witnessLists.push(_witnessList);
     }
 
     function addReceiver(address _receiver) external onlyOwner {
