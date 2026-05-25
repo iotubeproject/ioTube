@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"net"
 	"os"
 	"regexp"
@@ -28,26 +29,58 @@ import (
 	"go.uber.org/config"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
+	"github.com/iotexproject/ioTube/witness-service/dispatcher"
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/iotexproject/ioTube/witness-service/witness"
 	"github.com/iotexproject/iotex-address/address"
 )
 
+// ApprovalConfig configures the new pre-sign security guards. When `enabled`
+// is false (or the block is absent) all guards are disabled and the witness
+// behaves as before.
+type ApprovalConfig struct {
+	Enabled           bool          `json:"enabled" yaml:"enabled"`
+	ServerListenAddr  string        `json:"serverListenAddr" yaml:"serverListenAddr"`
+	LarkCardWebHook   string        `json:"larkCardWebHook" yaml:"larkCardWebHook"`
+	LarkSigningSecret string        `json:"larkSigningSecret" yaml:"larkSigningSecret"`
+	WindowDuration    time.Duration `json:"windowDuration" yaml:"windowDuration"`
+	// ExplorerTxURL is the base URL for the source-chain block explorer's
+	// transaction page. The transfer hash is appended directly, so it must
+	// end with a slash or "?tx=" as appropriate.
+	// Example: "https://bscscan.com/tx/" or "https://iotexscan.io/tx/"
+	ExplorerTxURL string `json:"explorerTxURL" yaml:"explorerTxURL"`
+}
+
+// PriceFeedConfig configures the CoinGecko price source used by ApprovalGuard
+// to convert per-token amounts into USD. When `enabled` is false the witness
+// skips the refresh loop entirely; in that case any cashier with a USD limit
+// will fail closed (Block until a price is available).
+type PriceFeedConfig struct {
+	Enabled         bool          `json:"enabled" yaml:"enabled"`
+	BaseURL         string        `json:"baseURL" yaml:"baseURL"`
+	APIKey          string        `json:"apiKey" yaml:"apiKey"`
+	RefreshInterval time.Duration `json:"refreshInterval" yaml:"refreshInterval"`
+	MaxPriceAge     time.Duration `json:"maxPriceAge" yaml:"maxPriceAge"`
+	RequestTimeout  time.Duration `json:"requestTimeout" yaml:"requestTimeout"`
+}
+
 // Configuration defines the configuration of the witness service
 type Configuration struct {
-	Chain                 string        `json:"chain" yaml:"chain"`
-	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
-	RelayerURL            string        `json:"relayerURL" yaml:"relayerURL"`
-	Database              db.Config     `json:"database" yaml:"database"`
-	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
-	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
-	LarkWebHook           string        `json:"larkWebHook" yaml:"larkWebHook"`
-	ConfirmBlockNumber    int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
-	BatchSize             int           `json:"batchSize" yaml:"batchSize"`
-	Interval              time.Duration `json:"interval" yaml:"interval"`
-	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
+	Chain                 string         `json:"chain" yaml:"chain"`
+	ClientURL             string         `json:"clientURL" yaml:"clientURL"`
+	RelayerURL            string         `json:"relayerURL" yaml:"relayerURL"`
+	Database              db.Config      `json:"database" yaml:"database"`
+	PrivateKey            string         `json:"privateKey" yaml:"privateKey"`
+	SlackWebHook          string         `json:"slackWebHook" yaml:"slackWebHook"`
+	LarkWebHook           string         `json:"larkWebHook" yaml:"larkWebHook"`
+	Approval              ApprovalConfig `json:"approval" yaml:"approval"`
+	PriceFeed             PriceFeedConfig `json:"priceFeed" yaml:"priceFeed"`
+	ConfirmBlockNumber    int            `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
+	BatchSize             int            `json:"batchSize" yaml:"batchSize"`
+	Interval              time.Duration  `json:"interval" yaml:"interval"`
+	GrpcPort              int            `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort         int            `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	DisableTransferSubmit bool           `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
 	Cashiers              []struct {
 		ID                             string      `json:"id" yaml:"id"`
 		RelayerURL                     string      `json:"relayerURL" yaml:"relayerURL"`
@@ -69,8 +102,10 @@ type Configuration struct {
 			CashierContractAddress string   `json:"cashierContractAddress" yaml:"cashierContractAddress"`
 			Tokens                 []string `json:"tokens" yaml:"tokens"`
 		}
-		QPSLimit    uint32 `json:"qpsLimit" yaml:"qpsLimit"`
-		DisablePull bool   `json:"disablePull" yaml:"disablePull"`
+		QPSLimit           uint32 `json:"qpsLimit" yaml:"qpsLimit"`
+		DisablePull        bool   `json:"disablePull" yaml:"disablePull"`
+		WindowValueLimit   string `json:"windowValueLimit" yaml:"windowValueLimit"`
+		SingleTxValueLimit string `json:"singleTxValueLimit" yaml:"singleTxValueLimit"`
 	} `json:"cashiers" yaml:"cashiers"`
 }
 
@@ -81,6 +116,14 @@ type TokenPair struct {
 	TokenMint      string   `json:"tokenMint" yaml:"tokenMint"`
 	TokenProgramID string   `json:"tokenProgramID,omitempty" yaml:"tokenProgramID,omitempty"`
 	Whitelist      []string `json:"whitelist" yaml:"whitelist"`
+	// CoinGeckoID is the CoinGecko coin id (e.g. "weth", "wrapped-bitcoin")
+	// used to fetch this token's USD price. Required when the parent cashier
+	// has a USD windowValueLimit or singleTxValueLimit configured.
+	CoinGeckoID string `json:"coingeckoID" yaml:"coingeckoID"`
+	// Decimals is the number of decimal places of the value returned by
+	// AbstractTransfer.Amount() — i.e. after any DecimalRound adjustment.
+	// Required when the parent cashier has a USD limit configured.
+	Decimals int `json:"decimals" yaml:"decimals"`
 }
 
 var (
@@ -227,6 +270,12 @@ func main() {
 		}
 	}
 
+	approvalGuards := make(map[string]*witness.ApprovalGuard)
+	priceCache, priceRunner := startPriceFeed(cfg)
+	if priceRunner != nil {
+		defer priceRunner.Close()
+	}
+
 	storeFactory := db.NewSQLStoreFactory()
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
 	switch cfg.Chain {
@@ -268,19 +317,21 @@ func main() {
 				log.Println("No Private Key")
 			}
 
+			cashierPubKey := solcommon.PublicKeyFromString(cc.CashierContractAddress)
+			solRecorder := witness.NewSOLRecorder(
+				storeFactory.NewStore(cfg.Database),
+				cc.TransferTableName,
+				pairs,
+				decimalRound,
+				destAddrDecoder,
+			)
 			cashier, err := witness.NewTokenCashierOnSolana(
 				cc.ID,
 				cc.RelayerURL,
 				solClient,
-				solcommon.PublicKeyFromString(cc.CashierContractAddress),
+				cashierPubKey,
 				common.BytesToAddress(addr.Bytes()),
-				witness.NewSOLRecorder(
-					storeFactory.NewStore(cfg.Database),
-					cc.TransferTableName,
-					pairs,
-					decimalRound,
-					destAddrDecoder,
-				),
+				solRecorder,
 				uint64(cc.StartBlockHeight),
 				cc.QPSLimit,
 				signHandler,
@@ -392,6 +443,29 @@ func main() {
 				decimalRound[common.BytesToAddress(addr.Bytes())] = r.Amount
 			}
 
+			ethRecorder := witness.NewRecorder(
+				storeFactory.NewStore(cfg.Database),
+				cc.TransferTableName,
+				pairs,
+				whitelists,
+				tokenMintPairs,
+				decimalRound,
+				destAddrDecoder,
+			)
+			cashierKey := cashierAddr.Hex()
+			var ethTokenMetas []witness.TokenMeta
+			if cc.ToSolana {
+				// For ETH→SOL cashiers token1 is still an EVM address; same path.
+				ethTokenMetas = tokenMetasForEthereum(cc.TokenPairs)
+			} else if cfg.Chain == "iotex" || cfg.Chain == "iotex-e" || cfg.Chain == "iotex-testnet" {
+				ethTokenMetas = tokenMetasForIotex(cc.TokenPairs)
+			} else {
+				ethTokenMetas = tokenMetasForEthereum(cc.TokenPairs)
+			}
+			guard := buildApprovalGuard(cfg.Approval, cashierKey, cc.WindowValueLimit, cc.SingleTxValueLimit, ethTokenMetas, priceCache, ethRecorder)
+			if guard != nil {
+				approvalGuards[cashierKey] = guard
+			}
 			cashier, err := witness.NewTokenCashierOnEthereum(
 				cc.ID,
 				version,
@@ -401,25 +475,30 @@ func main() {
 				previousCashierAddr,
 				tokenSafeAddr,
 				validatorAddr.Bytes(),
-				witness.NewRecorder(
-					storeFactory.NewStore(cfg.Database),
-					cc.TransferTableName,
-					pairs,
-					whitelists,
-					tokenMintPairs,
-					decimalRound,
-					destAddrDecoder,
-				),
+				ethRecorder,
 				uint64(cc.StartBlockHeight),
 				uint8(cfg.ConfirmBlockNumber),
 				signHandler,
 				reverseRecorder,
 				common.HexToAddress(cc.Reverse.CashierContractAddress),
+				guard,
 			)
 			if err != nil {
 				log.Fatalf("failed to create cashier %v\n", err)
 			}
 			cashiers = append(cashiers, cashier)
+		}
+	}
+
+	if cfg.Approval.Enabled {
+		if cfg.Approval.ServerListenAddr == "" {
+			log.Fatal("approval is enabled but approval.serverListenAddr is not configured")
+		}
+		if len(approvalGuards) == 0 {
+			log.Fatal("approval is enabled but no cashier has windowValueLimit or singleTxValueLimit configured")
+		}
+		if err := witness.NewApprovalServer(cfg.Approval.ServerListenAddr, cfg.Approval.LarkSigningSecret, approvalGuards).Start(); err != nil {
+			log.Fatalf("failed to start approval server: %v\n", err)
 		}
 	}
 
@@ -472,4 +551,175 @@ func main() {
 
 	log.Println("Serving...")
 	select {}
+}
+
+func buildApprovalGuard(
+	ac ApprovalConfig,
+	cashierKey string,
+	windowLimitStr, singleTxLimitStr string,
+	tokens []witness.TokenMeta,
+	prices witness.PriceSource,
+	recorder witness.AbstractRecorder,
+) *witness.ApprovalGuard {
+	if !ac.Enabled {
+		return nil
+	}
+	windowLimit := parseUsdLimit(windowLimitStr)
+	singleTxLimit := parseUsdLimit(singleTxLimitStr)
+	if windowLimit == nil && singleTxLimit == nil {
+		return nil
+	}
+	if prices == nil {
+		log.Fatalf("approval guard for %s configured with USD limit but no price source", cashierKey)
+	}
+	for _, tk := range tokens {
+		if tk.CoinGeckoID == "" || tk.Decimals < 0 {
+			log.Fatalf(
+				"approval guard for %s: token %s missing coingeckoID or has negative decimals (have id=%q decimals=%d)",
+				cashierKey, tk.Token, tk.CoinGeckoID, tk.Decimals,
+			)
+		}
+	}
+	return witness.NewApprovalGuard(
+		cashierKey,
+		ac.WindowDuration,
+		windowLimit,
+		singleTxLimit,
+		tokens,
+		prices,
+		recorder,
+		ac.LarkCardWebHook,
+		ac.ExplorerTxURL,
+	)
+}
+
+// parseUsdLimit parses a decimal USD amount (e.g. "100000", "5000.50") into a
+// *big.Float. Empty / "0" / non-positive values disable that limit dimension.
+func parseUsdLimit(s string) *big.Float {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "0" {
+		return nil
+	}
+	v, _, err := big.ParseFloat(s, 10, 80, big.ToNearestEven)
+	if err != nil {
+		log.Fatalf("invalid USD limit %q in approval config: %v", s, err)
+	}
+	if v.Sign() <= 0 {
+		return nil
+	}
+	return v
+}
+
+// startPriceFeed builds the shared *util.PriceCache and a periodic refresh
+// runner. When priceFeed.enabled is false (or no cashier needs prices) returns
+// (nil, nil) — the witness behaves exactly as it did before USD limits existed.
+// The runner is owned by the caller and must be Close()'d before exit.
+func startPriceFeed(cfg Configuration) (*util.PriceCache, dispatcher.Runner) {
+	if !cfg.PriceFeed.Enabled {
+		return nil, nil
+	}
+	ids := collectCoinGeckoIDs(cfg)
+	if len(ids) == 0 {
+		log.Println("priceFeed.enabled=true but no token pair declares coingeckoID; skipping refresh loop")
+		return nil, nil
+	}
+	maxAge := cfg.PriceFeed.MaxPriceAge
+	if maxAge == 0 {
+		maxAge = 10 * time.Minute
+	}
+	interval := cfg.PriceFeed.RefreshInterval
+	if interval == 0 {
+		interval = 2 * time.Minute
+	}
+	cache := util.NewPriceCache(maxAge)
+	client := util.NewCoinGeckoClient(cfg.PriceFeed.BaseURL, cfg.PriceFeed.APIKey, cfg.PriceFeed.RequestTimeout)
+
+	runner, err := dispatcher.NewRunner(interval, func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), interval)
+		defer cancel()
+		prices, err := client.FetchUSDPrices(ctx, ids)
+		if err != nil {
+			util.Alert(fmt.Sprintf("price feed refresh failed: %v", err))
+			return err
+		}
+		cache.Replace(prices)
+		return nil
+	})
+	if err != nil {
+		log.Fatalf("failed to create price feed runner: %v", err)
+	}
+	// Run once synchronously so guards have prices before signing starts.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if prices, err := client.FetchUSDPrices(ctx, ids); err != nil {
+		log.Printf("initial price fetch failed (will retry on schedule): %v", err)
+	} else {
+		cache.Replace(prices)
+	}
+	if err := runner.Start(); err != nil {
+		log.Fatalf("failed to start price feed runner: %v", err)
+	}
+	return cache, runner
+}
+
+func collectCoinGeckoIDs(cfg Configuration) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0)
+	for _, cc := range cfg.Cashiers {
+		for _, p := range cc.TokenPairs {
+			id := strings.ToLower(strings.TrimSpace(p.CoinGeckoID))
+			if id == "" {
+				continue
+			}
+			if _, dup := seen[id]; dup {
+				continue
+			}
+			seen[id] = struct{}{}
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// tokenMetasForEthereum builds TokenMeta for an EVM cashier — token1 is an
+// 0x... 20-byte address.
+func tokenMetasForEthereum(pairs []TokenPair) []witness.TokenMeta {
+	out := make([]witness.TokenMeta, 0, len(pairs))
+	for _, p := range pairs {
+		if p.CoinGeckoID == "" && p.Decimals == 0 {
+			continue
+		}
+		addr, err := util.ParseEthAddress(p.Token1)
+		if err != nil {
+			log.Fatalf("tokenMetasForEthereum: invalid token1 %s: %v", p.Token1, err)
+		}
+		out = append(out, witness.TokenMeta{
+			Token:       strings.ToLower(strings.TrimPrefix(addr.String(), "0x")),
+			CoinGeckoID: p.CoinGeckoID,
+			Decimals:    p.Decimals,
+		})
+	}
+	return out
+}
+
+// tokenMetasForIotex handles `io1...` bech32 addresses (IoTeX source-chain
+// cashiers). util.ParseEthAddress also accepts io1 prefixes — verified via
+// existing call sites — so we reuse it.
+func tokenMetasForIotex(pairs []TokenPair) []witness.TokenMeta {
+	out := make([]witness.TokenMeta, 0, len(pairs))
+	for _, p := range pairs {
+		if p.CoinGeckoID == "" && p.Decimals == 0 {
+			continue
+		}
+		addr, err := util.ParseEthAddress(p.Token1)
+		if err != nil {
+			log.Fatalf("tokenMetasForIotex: invalid token1 %s: %v", p.Token1, err)
+		}
+		out = append(out, witness.TokenMeta{
+			Token:       strings.ToLower(strings.TrimPrefix(addr.String(), "0x")),
+			CoinGeckoID: p.CoinGeckoID,
+			Decimals:    p.Decimals,
+		})
+	}
+	return out
 }

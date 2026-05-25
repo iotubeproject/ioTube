@@ -9,6 +9,7 @@ package witness
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -57,6 +58,15 @@ type (
 		SettleTransfer(tx AbstractTransfer) error
 		ConfirmTransfer(tx AbstractTransfer) error
 		MarkTransferAsPending(tx AbstractTransfer) error
+		MarkTransferAwaitingApproval(tx AbstractTransfer) error
+		ApproveTransferToReady(cashier, token string, tidx uint64) (bool, error)
+		RejectTransfer(cashier, token string, tidx uint64) (bool, error)
+		// SignedAmountSince returns, for transfers on `cashier` whose status
+		// indicates they have already been signed and whose updateTime is at
+		// or after `since`, the sum of token amounts grouped by token. The
+		// returned keys are the lowercase hex of the token's raw bytes — no
+		// `0x` prefix — so callers must normalize on the same shape.
+		SignedAmountSince(cashier string, since time.Time) (map[string]*big.Int, error)
 	}
 
 	AbstractTransfer interface {
@@ -91,6 +101,13 @@ const (
 	TransferSettled = "settled"
 	// TransferInvalid stands for an invalid transfer
 	TransferInvalid = "invalid"
+	// TransferAwaitingApproval marks a transfer that exceeded the per-tx value
+	// limit and needs manual MFA approval before it can be signed. Kept to 8
+	// chars to fit the existing `status` varchar(10) column.
+	TransferAwaitingApproval = "approval"
+	// TransferRejected marks a transfer that an admin explicitly rejected via
+	// the Lark approval card. Rejected transfers are never signed.
+	TransferRejected = "rejected"
 
 	// NoPayload is version without payload
 	NoPayload Version = "no-payload"

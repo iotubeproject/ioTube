@@ -9,6 +9,7 @@ package witness
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"math/big"
 	"strings"
@@ -67,6 +68,9 @@ type (
 		start                  startStopFunc
 		stop                   startStopFunc
 		disablePull            bool
+		// guard enforces window + single-tx value limits before signing.
+		// nil ⇒ disabled (original behavior).
+		guard *ApprovalGuard
 	}
 	calcConfirmHeightFunc func(startHeight uint64, count uint16) (uint64, uint64, error)
 	pullTransfersFunc     func(startHeight uint64, endHeight uint64) ([]AbstractTransfer, error)
@@ -89,6 +93,7 @@ func newTokenCashierBase(
 	start startStopFunc,
 	stop startStopFunc,
 	disablePull bool,
+	guard *ApprovalGuard,
 ) TokenCashier {
 	return &tokenCashierBase{
 		id:                     id,
@@ -107,6 +112,7 @@ func newTokenCashierBase(
 		start:                  start,
 		stop:                   stop,
 		disablePull:            disablePull,
+		guard:                  guard,
 	}
 }
 
@@ -256,6 +262,43 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 	for _, transfer := range transfersToSubmit {
 		if !tc.hasEnoughBalance(transfer.Token(), transfer.Amount()) {
 			return errors.Errorf("not enough balance for token %s", transfer.Token())
+		}
+		// Security guard: enforce per-cashier window and single-tx value caps
+		// before producing a real signature.
+		if tc.guard != nil {
+			if transfer.Status() == TransferAwaitingApproval {
+				// Admin decision is still pending — never sign.
+				continue
+			}
+			if transfer.Status() == TransferReady {
+				decision, err := tc.guard.Check(transfer)
+				if err != nil {
+					// Fail closed: a security guard that can't evaluate its
+					// inputs must not authorize a signature. Skip this transfer
+					// and surface the failure; the next tick will retry once
+					// the underlying issue clears.
+					log.Printf("approval guard check error for transfer %x: %+v\n", transfer.ID(), err)
+					util.Alert(fmt.Sprintf(
+						"[witness:%s] approval guard error; pausing this transfer: %v",
+						tc.cashierContractAddr.String(), err,
+					))
+					continue
+				}
+				switch decision {
+				case DecisionBlockWindow:
+					tc.guard.NotifyWindowBlocked(transfer)
+					continue
+				case DecisionRequireApproval:
+					if err := tc.guard.RequestApproval(transfer); err != nil {
+						log.Printf("failed to request approval for transfer %x: %+v\n", transfer.ID(), err)
+					}
+					continue
+				case DecisionAlreadyAwaiting:
+					continue
+				case DecisionAllow:
+					// fall through to signing
+				}
+			}
 		}
 		id, pubkey, signature, err := tc.signHandler(transfer, tc.validatorContractAddr)
 		if err != nil {
