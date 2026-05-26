@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -117,8 +118,11 @@ type TokenPair struct {
 	TokenProgramID string   `json:"tokenProgramID,omitempty" yaml:"tokenProgramID,omitempty"`
 	Whitelist      []string `json:"whitelist" yaml:"whitelist"`
 	// CoinGeckoID is the CoinGecko coin id (e.g. "weth", "wrapped-bitcoin")
-	// used to fetch this token's USD price. Required when the parent cashier
-	// has a USD windowValueLimit or singleTxValueLimit configured.
+	// used to fetch this token's USD price. Optional: when omitted, the
+	// witness resolves it at startup via CoinGecko's contract-address lookup
+	// (/coins/{platform}/contract/{token1}). Set it explicitly only to
+	// override the auto-resolved id — useful for bridged tokens CoinGecko
+	// doesn't index under the bridged contract.
 	CoinGeckoID string `json:"coingeckoID" yaml:"coingeckoID"`
 	// Decimals is the number of decimal places of the value returned by
 	// AbstractTransfer.Amount() — i.e. after any DecimalRound adjustment.
@@ -271,10 +275,9 @@ func main() {
 	}
 
 	approvalGuards := make(map[string]*witness.ApprovalGuard)
-	priceCache, priceRunner := startPriceFeed(cfg)
-	if priceRunner != nil {
-		defer priceRunner.Close()
-	}
+	cgClient, priceCache := newPriceFeed(cfg)
+	resolver := newCoingeckoResolver(cgClient, cfg.Chain)
+	var allTokenMetas []witness.TokenMeta
 
 	storeFactory := db.NewSQLStoreFactory()
 	cashiers := make([]witness.TokenCashier, 0, len(cfg.Cashiers))
@@ -456,12 +459,13 @@ func main() {
 			var ethTokenMetas []witness.TokenMeta
 			if cc.ToSolana {
 				// For ETH→SOL cashiers token1 is still an EVM address; same path.
-				ethTokenMetas = tokenMetasForEthereum(cc.TokenPairs)
+				ethTokenMetas = tokenMetasForEthereum(cc.TokenPairs, resolver)
 			} else if cfg.Chain == "iotex" || cfg.Chain == "iotex-e" || cfg.Chain == "iotex-testnet" {
-				ethTokenMetas = tokenMetasForIotex(cc.TokenPairs)
+				ethTokenMetas = tokenMetasForIotex(cc.TokenPairs, resolver)
 			} else {
-				ethTokenMetas = tokenMetasForEthereum(cc.TokenPairs)
+				ethTokenMetas = tokenMetasForEthereum(cc.TokenPairs, resolver)
 			}
+			allTokenMetas = append(allTokenMetas, ethTokenMetas...)
 			guard := buildApprovalGuard(cfg.Approval, cashierKey, cc.WindowValueLimit, cc.SingleTxValueLimit, ethTokenMetas, priceCache, ethRecorder)
 			if guard != nil {
 				approvalGuards[cashierKey] = guard
@@ -500,6 +504,10 @@ func main() {
 		if err := witness.NewApprovalServer(cfg.Approval.ServerListenAddr, cfg.Approval.LarkSigningSecret, approvalGuards).Start(); err != nil {
 			log.Fatalf("failed to start approval server: %v\n", err)
 		}
+	}
+
+	if priceRunner := startPriceFeedRunner(cfg, cgClient, priceCache, collectCoinGeckoIDsFromMetas(allTokenMetas)); priceRunner != nil {
+		defer priceRunner.Close()
 	}
 
 	service, err := witness.NewService(
@@ -573,10 +581,16 @@ func buildApprovalGuard(
 		log.Fatalf("approval guard for %s configured with USD limit but no price source", cashierKey)
 	}
 	for _, tk := range tokens {
-		if tk.CoinGeckoID == "" || tk.Decimals < 0 {
+		if tk.CoinGeckoID == "" {
 			log.Fatalf(
-				"approval guard for %s: token %s missing coingeckoID or has negative decimals (have id=%q decimals=%d)",
-				cashierKey, tk.Token, tk.CoinGeckoID, tk.Decimals,
+				"approval guard for %s: could not resolve CoinGecko id for token %s (set coingeckoID in config to override)",
+				cashierKey, tk.Token,
+			)
+		}
+		if tk.Decimals < 0 {
+			log.Fatalf(
+				"approval guard for %s: token %s has negative decimals (%d)",
+				cashierKey, tk.Token, tk.Decimals,
 			)
 		}
 	}
@@ -610,29 +624,38 @@ func parseUsdLimit(s string) *big.Float {
 	return v
 }
 
-// startPriceFeed builds the shared *util.PriceCache and a periodic refresh
-// runner. When priceFeed.enabled is false (or no cashier needs prices) returns
-// (nil, nil) — the witness behaves exactly as it did before USD limits existed.
-// The runner is owned by the caller and must be Close()'d before exit.
-func startPriceFeed(cfg Configuration) (*util.PriceCache, dispatcher.Runner) {
+// newPriceFeed creates the CoinGecko client and the in-process PriceCache.
+// Returns (nil, nil) when priceFeed.enabled is false — the witness behaves
+// exactly as it did before USD limits existed. Does NOT start the periodic
+// refresh runner; that happens later via startPriceFeedRunner after all
+// CoinGecko ids (explicit + auto-resolved) are known.
+func newPriceFeed(cfg Configuration) (*util.CoinGeckoClient, *util.PriceCache) {
 	if !cfg.PriceFeed.Enabled {
-		return nil, nil
-	}
-	ids := collectCoinGeckoIDs(cfg)
-	if len(ids) == 0 {
-		log.Println("priceFeed.enabled=true but no token pair declares coingeckoID; skipping refresh loop")
 		return nil, nil
 	}
 	maxAge := cfg.PriceFeed.MaxPriceAge
 	if maxAge == 0 {
 		maxAge = 10 * time.Minute
 	}
+	client := util.NewCoinGeckoClient(cfg.PriceFeed.BaseURL, cfg.PriceFeed.APIKey, cfg.PriceFeed.RequestTimeout)
+	return client, util.NewPriceCache(maxAge)
+}
+
+// startPriceFeedRunner starts the periodic price refresh against the given
+// CoinGecko ids. Caller must defer runner.Close(). Returns nil when the
+// price feed is disabled or no ids need fetching.
+func startPriceFeedRunner(cfg Configuration, client *util.CoinGeckoClient, cache *util.PriceCache, ids []string) dispatcher.Runner {
+	if client == nil || cache == nil {
+		return nil
+	}
+	if len(ids) == 0 {
+		log.Println("priceFeed.enabled=true but no coingecko ids resolved; skipping refresh loop")
+		return nil
+	}
 	interval := cfg.PriceFeed.RefreshInterval
 	if interval == 0 {
 		interval = 2 * time.Minute
 	}
-	cache := util.NewPriceCache(maxAge)
-	client := util.NewCoinGeckoClient(cfg.PriceFeed.BaseURL, cfg.PriceFeed.APIKey, cfg.PriceFeed.RequestTimeout)
 
 	runner, err := dispatcher.NewRunner(interval, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), interval)
@@ -659,43 +682,169 @@ func startPriceFeed(cfg Configuration) (*util.PriceCache, dispatcher.Runner) {
 	if err := runner.Start(); err != nil {
 		log.Fatalf("failed to start price feed runner: %v", err)
 	}
-	return cache, runner
+	return runner
 }
 
-func collectCoinGeckoIDs(cfg Configuration) []string {
-	seen := make(map[string]struct{})
-	out := make([]string, 0)
-	for _, cc := range cfg.Cashiers {
-		for _, p := range cc.TokenPairs {
-			id := strings.ToLower(strings.TrimSpace(p.CoinGeckoID))
-			if id == "" {
-				continue
-			}
-			if _, dup := seen[id]; dup {
-				continue
-			}
-			seen[id] = struct{}{}
-			out = append(out, id)
+// collectCoinGeckoIDsFromMetas returns the deduped CoinGecko id list for the
+// price feed. After auto-resolution every TokenMeta with a USD-limit cashier
+// has its id populated; this is the canonical source.
+func collectCoinGeckoIDsFromMetas(metas []witness.TokenMeta) []string {
+	seen := make(map[string]struct{}, len(metas))
+	out := make([]string, 0, len(metas))
+	for _, m := range metas {
+		id := strings.ToLower(strings.TrimSpace(m.CoinGeckoID))
+		if id == "" {
+			continue
 		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
 	}
 	return out
 }
 
+// coingeckoPlatformForChain maps witness chain identifiers to CoinGecko's
+// asset-platform string (used in /coins/{platform}/contract/{address}).
+// Returns "" when no mapping is known — caller treats that as
+// "auto-resolution unavailable on this chain".
+func coingeckoPlatformForChain(chain string) string {
+	switch chain {
+	case "ethereum", "sepolia":
+		return "ethereum"
+	case "bsc":
+		return "binance-smart-chain"
+	case "matic":
+		return "polygon-pos"
+	case "iotex", "iotex-e", "iotex-testnet":
+		return "iotex"
+	case "solana":
+		return "solana"
+	case "heco":
+		return "huobi-token"
+	case "polis":
+		return "polis-chain"
+	}
+	return ""
+}
+
+// coingeckoNativeIDForChain returns the CoinGecko id for the chain's native
+// gas token, used when a TokenPair has the zero address as its token1
+// (currently no in-tree config does, but the future-proofing is cheap).
+func coingeckoNativeIDForChain(chain string) string {
+	switch chain {
+	case "ethereum", "sepolia":
+		return "ethereum"
+	case "bsc":
+		return "binancecoin"
+	case "matic":
+		return "matic-network"
+	case "iotex", "iotex-e", "iotex-testnet":
+		return "iotex"
+	case "solana":
+		return "solana"
+	}
+	return ""
+}
+
+// coingeckoResolver auto-resolves CoinGecko ids from token contract
+// addresses for the witness's bound chain. A nil resolver means
+// auto-resolution is disabled (price feed off or chain not mapped); callers
+// fall back to whatever id was set explicitly in config. Results are cached
+// in-process so repeated lookups (same token across multiple cashiers) make
+// at most one HTTP call.
+type coingeckoResolver struct {
+	client   *util.CoinGeckoClient
+	chain    string
+	platform string
+	cache    map[string]string // key: lowercase hex addr with 0x → CG id ("" = lookup failed)
+}
+
+func newCoingeckoResolver(client *util.CoinGeckoClient, chain string) *coingeckoResolver {
+	if client == nil {
+		return nil
+	}
+	platform := coingeckoPlatformForChain(chain)
+	if platform == "" {
+		log.Printf("coingecko: no platform mapping for chain %q; auto-resolution disabled (config must set coingeckoID)", chain)
+		return nil
+	}
+	return &coingeckoResolver{
+		client:   client,
+		chain:    chain,
+		platform: platform,
+		cache:    make(map[string]string),
+	}
+}
+
+// resolveByEthAddress looks up the CoinGecko id for an EVM contract address.
+// Returns "" if the resolver is nil, the chain has no platform mapping, or
+// the API has no record — in any of those cases the caller's existing
+// fallback (config override or buildApprovalGuard's hard check) takes over.
+func (r *coingeckoResolver) resolveByEthAddress(addr common.Address) string {
+	if r == nil {
+		return ""
+	}
+	key := strings.ToLower(addr.Hex())
+	if id, ok := r.cache[key]; ok {
+		return id
+	}
+	if isZeroEthAddress(key) {
+		id := coingeckoNativeIDForChain(r.chain)
+		r.cache[key] = id
+		return id
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	id, err := r.client.ResolveIDByContract(ctx, r.platform, key)
+	if err != nil {
+		if errors.Is(err, util.ErrCoinGeckoIDNotFound) {
+			log.Printf("coingecko: no coin indexed for %s/%s", r.platform, key)
+		} else {
+			log.Printf("coingecko: auto-resolve failed for %s/%s: %v", r.platform, key, err)
+		}
+		r.cache[key] = ""
+		return ""
+	}
+	r.cache[key] = id
+	log.Printf("coingecko: %s/%s → %s", r.platform, key, id)
+	return id
+}
+
+func isZeroEthAddress(hexAddr string) bool {
+	h := strings.TrimPrefix(strings.ToLower(hexAddr), "0x")
+	if len(h) == 0 {
+		return false
+	}
+	for _, c := range h {
+		if c != '0' {
+			return false
+		}
+	}
+	return true
+}
+
 // tokenMetasForEthereum builds TokenMeta for an EVM cashier — token1 is an
-// 0x... 20-byte address.
-func tokenMetasForEthereum(pairs []TokenPair) []witness.TokenMeta {
+// 0x... 20-byte address. When resolver is non-nil and a pair omits
+// CoinGeckoID, the id is auto-resolved via CoinGecko's contract lookup.
+func tokenMetasForEthereum(pairs []TokenPair, resolver *coingeckoResolver) []witness.TokenMeta {
 	out := make([]witness.TokenMeta, 0, len(pairs))
 	for _, p := range pairs {
-		if p.CoinGeckoID == "" && p.Decimals == 0 {
+		if resolver == nil && p.CoinGeckoID == "" && p.Decimals == 0 {
 			continue
 		}
 		addr, err := util.ParseEthAddress(p.Token1)
 		if err != nil {
 			log.Fatalf("tokenMetasForEthereum: invalid token1 %s: %v", p.Token1, err)
 		}
+		cgID := p.CoinGeckoID
+		if cgID == "" {
+			cgID = resolver.resolveByEthAddress(common.BytesToAddress(addr.Bytes()))
+		}
 		out = append(out, witness.TokenMeta{
 			Token:       strings.ToLower(strings.TrimPrefix(addr.String(), "0x")),
-			CoinGeckoID: p.CoinGeckoID,
+			CoinGeckoID: cgID,
 			Decimals:    p.Decimals,
 		})
 	}
@@ -705,19 +854,23 @@ func tokenMetasForEthereum(pairs []TokenPair) []witness.TokenMeta {
 // tokenMetasForIotex handles `io1...` bech32 addresses (IoTeX source-chain
 // cashiers). util.ParseEthAddress also accepts io1 prefixes — verified via
 // existing call sites — so we reuse it.
-func tokenMetasForIotex(pairs []TokenPair) []witness.TokenMeta {
+func tokenMetasForIotex(pairs []TokenPair, resolver *coingeckoResolver) []witness.TokenMeta {
 	out := make([]witness.TokenMeta, 0, len(pairs))
 	for _, p := range pairs {
-		if p.CoinGeckoID == "" && p.Decimals == 0 {
+		if resolver == nil && p.CoinGeckoID == "" && p.Decimals == 0 {
 			continue
 		}
 		addr, err := util.ParseEthAddress(p.Token1)
 		if err != nil {
 			log.Fatalf("tokenMetasForIotex: invalid token1 %s: %v", p.Token1, err)
 		}
+		cgID := p.CoinGeckoID
+		if cgID == "" {
+			cgID = resolver.resolveByEthAddress(common.BytesToAddress(addr.Bytes()))
+		}
 		out = append(out, witness.TokenMeta{
 			Token:       strings.ToLower(strings.TrimPrefix(addr.String(), "0x")),
-			CoinGeckoID: p.CoinGeckoID,
+			CoinGeckoID: cgID,
 			Decimals:    p.Decimals,
 		})
 	}

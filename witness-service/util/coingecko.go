@@ -9,6 +9,7 @@ package util
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -18,6 +19,12 @@ import (
 	"sync"
 	"time"
 )
+
+// ErrCoinGeckoIDNotFound is returned by ResolveIDByContract when CoinGecko
+// has no coin record for the given (platform, contract address) pair. Callers
+// should match on this with errors.Is to distinguish "not indexed" from a
+// transient transport failure.
+var ErrCoinGeckoIDNotFound = errors.New("coingecko: no coin id for given contract address")
 
 const (
 	// DefaultCoinGeckoBaseURL is the public, free-tier endpoint.
@@ -114,6 +121,62 @@ func (c *CoinGeckoClient) FetchUSDPrices(ctx context.Context, ids []string) (map
 		out[strings.ToLower(id)] = f
 	}
 	return out, nil
+}
+
+// ResolveIDByContract looks up the CoinGecko coin id for a token by its
+// on-chain contract address. `platform` is CoinGecko's asset-platform string
+// ("ethereum", "binance-smart-chain", "polygon-pos", "iotex", "solana", ...).
+// `address` should be the address in the form the platform expects — hex with
+// 0x prefix for EVM platforms, base58 for Solana. Returns
+// ErrCoinGeckoIDNotFound when the API responds 404, which lets callers
+// distinguish "this token isn't indexed on this chain" from a real failure.
+func (c *CoinGeckoClient) ResolveIDByContract(ctx context.Context, platform, address string) (string, error) {
+	platform = strings.ToLower(strings.TrimSpace(platform))
+	address = strings.TrimSpace(address)
+	if platform == "" || address == "" {
+		return "", fmt.Errorf("coingecko: platform and address must be non-empty")
+	}
+	// CoinGecko's contract lookup is case-insensitive for EVM but accepts
+	// either; normalize EVM addresses to lowercase so logs and request paths
+	// are deterministic. Solana base58 addresses are case-sensitive — leave
+	// them alone.
+	if strings.HasPrefix(address, "0x") || strings.HasPrefix(address, "0X") {
+		address = strings.ToLower(address)
+	}
+	endpoint := c.baseURL + "/coins/" + url.PathEscape(platform) + "/contract/" + url.PathEscape(address)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("x-cg-pro-api-key", c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", ErrCoinGeckoIDNotFound
+	}
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return "", fmt.Errorf("coingecko contract lookup failed: status=%d body=%s", resp.StatusCode, string(body))
+	}
+
+	var payload struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", fmt.Errorf("decode coingecko contract response: %w", err)
+	}
+	id := strings.ToLower(strings.TrimSpace(payload.ID))
+	if id == "" {
+		return "", ErrCoinGeckoIDNotFound
+	}
+	return id, nil
 }
 
 // PriceCache is a process-wide cache of last-known USD prices. A nil cache is

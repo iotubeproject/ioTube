@@ -8,6 +8,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -92,6 +93,64 @@ func TestCoinGeckoClient_DedupAndTrimIDs(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&called); got != 1 {
 		t.Fatalf("expected 1 HTTP call, got %d", got)
+	}
+}
+
+func TestCoinGeckoClient_ResolveIDByContract_Happy(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		want := "/coins/ethereum/contract/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+		if r.URL.Path != want {
+			t.Errorf("unexpected path: got %q want %q", r.URL.Path, want)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":"weth","symbol":"weth","name":"WETH"}`)
+	}))
+	defer srv.Close()
+
+	c := NewCoinGeckoClient(srv.URL, "", time.Second)
+	id, err := c.ResolveIDByContract(context.Background(), "ethereum", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	// The CG-canonical id (lowercased) is what we send back; the input address
+	// case is preserved when we issue the request (CG is case-insensitive but
+	// the test asserts our normalization just lowercases the path components).
+	if id != "weth" {
+		t.Fatalf("id got %q want weth", id)
+	}
+}
+
+func TestCoinGeckoClient_ResolveIDByContract_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"error":"coin not found"}`)
+	}))
+	defer srv.Close()
+
+	c := NewCoinGeckoClient(srv.URL, "", time.Second)
+	_, err := c.ResolveIDByContract(context.Background(), "binance-smart-chain", "0x0000000000000000000000000000000000000bad")
+	if !errors.Is(err, ErrCoinGeckoIDNotFound) {
+		t.Fatalf("expected ErrCoinGeckoIDNotFound, got %v", err)
+	}
+}
+
+func TestCoinGeckoClient_ResolveIDByContract_TransportError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"error":"oops"}`)
+	}))
+	defer srv.Close()
+
+	c := NewCoinGeckoClient(srv.URL, "", time.Second)
+	_, err := c.ResolveIDByContract(context.Background(), "ethereum", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+	if err == nil {
+		t.Fatal("expected error on 500")
+	}
+	if errors.Is(err, ErrCoinGeckoIDNotFound) {
+		t.Fatalf("500 should not surface as not-found, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "500") {
+		t.Fatalf("error should mention status code, got %v", err)
 	}
 }
 
