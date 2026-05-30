@@ -14,6 +14,8 @@ import (
 	"log"
 	"math"
 	"math/big"
+	"strings"
+	"time"
 
 	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/ethereum/go-ethereum/common"
@@ -237,6 +239,112 @@ func (recorder *SOLRecorder) MarkTransferAsPending(at AbstractTransfer) error {
 	return nil
 }
 
+// MarkTransferAwaitingApproval flips an over-limit SOL transfer to the
+// `approval` status until an admin approves via the Lark approval card.
+func (recorder *SOLRecorder) MarkTransferAwaitingApproval(at AbstractTransfer) error {
+	tx, ok := at.(*solTransfer)
+	if !ok {
+		return errors.Errorf("invalid transfer type %T", at)
+	}
+	log.Printf("mark sol transfer %s as awaiting approval", tx.id.Hex())
+	result, err := recorder.store.DB().Exec(
+		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
+		TransferAwaitingApproval,
+		hex.EncodeToString(tx.cashier.Bytes()),
+		hex.EncodeToString(tx.token.Bytes()),
+		tx.index,
+		TransferReady,
+	)
+	if err != nil {
+		return err
+	}
+	if _, err := result.RowsAffected(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ApproveTransfer is the SOL counterpart that flips an approval-held transfer
+// to `approved` so the next signing tick will sign it without re-evaluating
+// the single-tx limit.
+func (recorder *SOLRecorder) ApproveTransfer(cashier, token string, tidx uint64) (bool, error) {
+	result, err := recorder.store.DB().Exec(
+		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
+		TransferApproved,
+		cashier,
+		token,
+		tidx,
+		TransferAwaitingApproval,
+	)
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected > 0, nil
+}
+
+// RejectTransfer transitions a SOL approval-held transfer to rejected.
+func (recorder *SOLRecorder) RejectTransfer(cashier, token string, tidx uint64) (bool, error) {
+	result, err := recorder.store.DB().Exec(
+		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
+		TransferRejected,
+		cashier,
+		token,
+		tidx,
+		TransferAwaitingApproval,
+	)
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected > 0, nil
+}
+
+// SignedAmountSince — see Recorder.SignedAmountSince. SOL transfers skip the
+// pending/empty-sig registration step, so "signed" means confirmed or settled.
+// Keys are the lowercase hex of the 32-byte token pubkey (no prefix) —
+// matching what the AddTransfer path stores.
+func (recorder *SOLRecorder) SignedAmountSince(cashier string, since time.Time) (map[string]*big.Int, error) {
+	rows, err := recorder.store.DB().Query(
+		fmt.Sprintf(
+			"SELECT token, amount FROM %s WHERE cashier=? AND status IN (?, ?) AND updateTime >= ?",
+			recorder.transferTableName,
+		),
+		cashier,
+		SubmissionConfirmed,
+		TransferSettled,
+		since.UTC(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	totals := make(map[string]*big.Int)
+	for rows.Next() {
+		var token, raw string
+		if err := rows.Scan(&token, &raw); err != nil {
+			return nil, err
+		}
+		amount, ok := new(big.Int).SetString(raw, 10)
+		if !ok {
+			return nil, errors.Errorf("invalid amount %s", raw)
+		}
+		key := strings.ToLower(strings.TrimPrefix(token, "0x"))
+		if existing, ok := totals[key]; ok {
+			existing.Add(existing, amount)
+		} else {
+			totals[key] = amount
+		}
+	}
+	return totals, rows.Err()
+}
+
 // ConfirmTransfer marks a record as confirmed
 func (recorder *SOLRecorder) ConfirmTransfer(at AbstractTransfer) error {
 	tx, ok := at.(*solTransfer)
@@ -245,13 +353,14 @@ func (recorder *SOLRecorder) ConfirmTransfer(at AbstractTransfer) error {
 	}
 	log.Printf("mark transfer %s as confirmed", tx.id.Hex())
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
+		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status` IN (?, ?)", recorder.transferTableName),
 		SubmissionConfirmed,
 		tx.id.Hex(),
 		hex.EncodeToString(tx.cashier.Bytes()),
 		hex.EncodeToString(tx.token.Bytes()),
 		tx.index,
 		TransferReady,
+		TransferApproved,
 	)
 	if err != nil {
 		return err
@@ -267,19 +376,29 @@ func (recorder *SOLRecorder) TransfersToSettle(string) ([]AbstractTransfer, erro
 
 // TransfersToSubmit returns the list of transfers to submit
 func (recorder *SOLRecorder) TransfersToSubmit(string) ([]AbstractTransfer, error) {
-	return recorder.transfers(TransferReady)
+	return recorder.transfers(TransferReady, TransferApproved)
 }
 
-func (recorder *SOLRecorder) transfers(status TransferStatus) ([]AbstractTransfer, error) {
+func (recorder *SOLRecorder) transfers(statuses ...TransferStatus) ([]AbstractTransfer, error) {
+	if len(statuses) == 0 {
+		return nil, nil
+	}
+	placeholders := strings.Repeat("?,", len(statuses))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := make([]interface{}, 0, len(statuses))
+	for _, s := range statuses {
+		args = append(args, s)
+	}
 	rows, err := recorder.store.DB().Query(
 		fmt.Sprintf(
 			"SELECT cashier, token, tidx, sender, recipient, amount, payload, fee, status, id, blockHeight, txSignature, txSender "+
 				"FROM %s "+
-				"WHERE status=? "+
+				"WHERE status IN (%s) "+
 				"ORDER BY creationTime",
 			recorder.transferTableName,
+			placeholders,
 		),
-		status,
+		args...,
 	)
 	if err != nil {
 		return nil, err

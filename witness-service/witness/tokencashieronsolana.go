@@ -157,6 +157,7 @@ func NewTokenCashierOnSolana(
 			return nil
 		},
 		disablePull,
+		nil, // no approval guard for Solana cashiers
 	), nil
 }
 

@@ -242,6 +242,7 @@ func NewTokenCashierOnEthereum(
 	signHandler SignHandler,
 	reverseRecorder *Recorder,
 	reverseCashierContractAddr common.Address,
+	guard *ApprovalGuard,
 ) (TokenCashier, error) {
 	iter, err := newIterator(version, cashierContractAddr, tokenSafeContractAddr, ethereumClient, nil)
 	if err != nil {
@@ -321,5 +322,6 @@ func NewTokenCashierOnEthereum(
 			return nil
 		},
 		false,
+		guard,
 	), nil
 }
