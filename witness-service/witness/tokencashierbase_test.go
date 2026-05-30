@@ -202,6 +202,75 @@ func TestSubmitTransfers_ApprovedBypassesGuardCheck(t *testing.T) {
 	}
 }
 
+func TestSubmitTransfers_AdminApprovedRoundTrip(t *testing.T) {
+	// End-to-end: a transfer that exceeds the single-tx limit is held on tick
+	// 1, then signed on tick 2 after an admin flips it from `approval` to
+	// `approved`. Validates that the approved bypass survives across ticks
+	// and that the row is not re-held.
+	tokenAddr := common.HexToAddress("0xc006")
+	tokens := []TokenMeta{{Token: tokenKeyFor(tokenAddr), CoinGeckoID: "wbtc", Decimals: 8}}
+	prices := newFakePrices(map[string]float64{"wbtc": 60_000})
+	rec := newFakeRecorder(map[string]int64{})
+
+	g := NewApprovalGuard("0x0000000000000000000000000000000000000000000000000000000000636173",
+		time.Hour, nil, usd(50_000), tokens, prices, rec, "", "")
+	g.larkAlerter = func(string) {}
+
+	tx := &fakeTransfer{
+		cashier: common.HexToAddress("0xcash"),
+		token:   tokenAddr,
+		amount:  big.NewInt(100_000_000), // 1 WBTC = $60k > $50k limit
+		status:  TransferReady,
+		tidx:    6,
+	}
+	tx.SetID(common.HexToHash("0x6666"))
+	rec.submittable = []AbstractTransfer{tx}
+
+	var signed int
+	signHandler := SignHandler(func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error) {
+		signed++
+		// nil signature short-circuits the relayer.Submit call.
+		return common.Hash{}, []byte("pubkey"), nil, nil
+	})
+
+	cashierAddr := util.ETHAddressToAddress(common.HexToAddress("0xcash"))
+	tc := newTokenCashierBase(
+		"test", cashierAddr, nil, rec, "localhost:0", []byte{}, 0,
+		nil, nil, signHandler,
+		func(util.Address, *big.Int) bool { return true },
+		nil, nil, false,
+		g,
+	).(*tokenCashierBase)
+
+	// Tick 1: over-limit ready row → held for approval.
+	if err := tc.SubmitTransfers(); err != nil {
+		t.Fatalf("tick 1: %v", err)
+	}
+	if rec.awaitingCalls != 1 {
+		t.Fatalf("tick 1: expected awaitingCalls=1, got %d", rec.awaitingCalls)
+	}
+	if signed != 0 {
+		t.Fatalf("tick 1: must not sign, signed=%d", signed)
+	}
+
+	// Admin approves. The real Recorder.ApproveTransfer flips the row from
+	// `approval` to `approved`; we mirror that effect on the in-memory fake
+	// so the next tick observes the new status.
+	tx.status = TransferApproved
+
+	// Tick 2: approved row bypasses guard.Check, reaches signHandler, is not
+	// re-held.
+	if err := tc.SubmitTransfers(); err != nil {
+		t.Fatalf("tick 2: %v", err)
+	}
+	if signed != 1 {
+		t.Fatalf("tick 2: expected signHandler called once, got %d", signed)
+	}
+	if rec.awaitingCalls != 1 {
+		t.Fatalf("tick 2: approved must not re-trigger hold, awaitingCalls=%d", rec.awaitingCalls)
+	}
+}
+
 func TestSubmitTransfers_NoGuard_SignsDirectly(t *testing.T) {
 	tokenAddr := common.HexToAddress("0xc004")
 	rec := newFakeRecorder(map[string]int64{})
