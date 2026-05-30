@@ -59,7 +59,7 @@ type (
 		ConfirmTransfer(tx AbstractTransfer) error
 		MarkTransferAsPending(tx AbstractTransfer) error
 		MarkTransferAwaitingApproval(tx AbstractTransfer) error
-		ApproveTransferToReady(cashier, token string, tidx uint64) (bool, error)
+		ApproveTransfer(cashier, token string, tidx uint64) (bool, error)
 		RejectTransfer(cashier, token string, tidx uint64) (bool, error)
 		// SignedAmountSince returns, for transfers on `cashier` whose status
 		// indicates they have already been signed and whose updateTime is at
@@ -102,9 +102,14 @@ const (
 	// TransferInvalid stands for an invalid transfer
 	TransferInvalid = "invalid"
 	// TransferAwaitingApproval marks a transfer that exceeded the per-tx value
-	// limit and needs manual MFA approval before it can be signed. Kept to 8
+	// limit and needs manual admin approval before it can be signed. Kept to 8
 	// chars to fit the existing `status` varchar(10) column.
 	TransferAwaitingApproval = "approval"
+	// TransferApproved marks a transfer that an admin explicitly approved via
+	// the Lark approval card. The signing loop treats it like TransferReady but
+	// skips the guard's single-tx limit check so the admin decision is not
+	// undone on the next tick.
+	TransferApproved = "approved"
 	// TransferRejected marks a transfer that an admin explicitly rejected via
 	// the Lark approval card. Rejected transfers are never signed.
 	TransferRejected = "rejected"

@@ -423,7 +423,7 @@ func (g *ApprovalGuard) Approve(cb util.LarkCallback) (bool, error) {
 		return false, err
 	}
 
-	ok, err := g.recorder.ApproveTransferToReady(cashier, token, tidx)
+	ok, err := g.recorder.ApproveTransfer(cashier, token, tidx)
 	if err != nil {
 		if locked {
 			g.releasePending(tid)

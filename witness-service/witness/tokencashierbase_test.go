@@ -150,6 +150,58 @@ func TestSubmitTransfers_GuardAlreadyAwaiting(t *testing.T) {
 	}
 }
 
+func TestSubmitTransfers_ApprovedBypassesGuardCheck(t *testing.T) {
+	// Regression: an admin-approved transfer must not be re-evaluated by the
+	// guard, otherwise the single-tx-limit rule would push it back into
+	// `approval` on the next tick and the admin decision would be lost.
+	tokenAddr := common.HexToAddress("0xc005")
+	tokens := []TokenMeta{{Token: tokenKeyFor(tokenAddr), CoinGeckoID: "wbtc", Decimals: 8}}
+	prices := newFakePrices(map[string]float64{"wbtc": 60_000})
+	rec := newFakeRecorder(map[string]int64{})
+
+	// 1 WBTC at $60k still exceeds the $50k single-tx limit. If Check were
+	// invoked it would return DecisionRequireApproval again.
+	g := NewApprovalGuard("0x0000000000000000000000000000000000000000000000000000000000636173",
+		time.Hour, nil, usd(50_000), tokens, prices, rec, "", "")
+	g.larkAlerter = func(string) {}
+
+	tx := &fakeTransfer{
+		cashier: common.HexToAddress("0xcash"),
+		token:   tokenAddr,
+		amount:  big.NewInt(100_000_000), // 1 WBTC
+		status:  TransferApproved,
+		tidx:    5,
+	}
+	tx.SetID(common.HexToHash("0x5555"))
+	rec.submittable = []AbstractTransfer{tx}
+
+	var signed int
+	signHandler := SignHandler(func(AbstractTransfer, []byte) (common.Hash, []byte, []byte, error) {
+		signed++
+		// nil signature short-circuits the relayer.Submit call.
+		return common.Hash{}, []byte("pubkey"), nil, nil
+	})
+
+	cashierAddr := util.ETHAddressToAddress(common.HexToAddress("0xcash"))
+	tc := newTokenCashierBase(
+		"test", cashierAddr, nil, rec, "localhost:0", []byte{}, 0,
+		nil, nil, signHandler,
+		func(util.Address, *big.Int) bool { return true },
+		nil, nil, false,
+		g,
+	).(*tokenCashierBase)
+
+	if err := tc.SubmitTransfers(); err != nil {
+		t.Fatalf("SubmitTransfers: %v", err)
+	}
+	if signed != 1 {
+		t.Fatalf("expected approved transfer to reach signHandler, got %d", signed)
+	}
+	if rec.awaitingCalls != 0 {
+		t.Fatalf("approved transfer must not be re-held; awaitingCalls=%d", rec.awaitingCalls)
+	}
+}
+
 func TestSubmitTransfers_NoGuard_SignsDirectly(t *testing.T) {
 	tokenAddr := common.HexToAddress("0xc004")
 	rec := newFakeRecorder(map[string]int64{})

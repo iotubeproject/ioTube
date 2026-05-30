@@ -264,7 +264,10 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 			return errors.Errorf("not enough balance for token %s", transfer.Token())
 		}
 		// Security guard: enforce per-cashier window and single-tx value caps
-		// before producing a real signature.
+		// before producing a real signature. TransferApproved bypasses the
+		// guard — an admin has already authorized the single-tx amount; if we
+		// re-checked it here the same single-tx-limit rule would push it back
+		// into `approval` on the next tick.
 		if tc.guard != nil {
 			if transfer.Status() == TransferAwaitingApproval {
 				// Admin decision is still pending — never sign.
@@ -309,7 +312,8 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 			continue
 		}
 		var witness *types.Witness
-		if transfer.Status() == TransferReady {
+		signed := transfer.Status() == TransferReady || transfer.Status() == TransferApproved
+		if signed {
 			witness = &types.Witness{
 				Transfer:  transfer.ToTypesTransfer(),
 				Address:   pubkey,
@@ -330,7 +334,7 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 			log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
 			continue
 		}
-		if transfer.Status() == TransferReady {
+		if signed {
 			if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
 				return err
 			}

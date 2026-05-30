@@ -344,14 +344,14 @@ func (recorder *Recorder) MarkTransferAwaitingApproval(at AbstractTransfer) erro
 	return err
 }
 
-// ApproveTransferToReady transitions an approval-held row to ready so the next
-// SubmitTransfers tick will sign it. Returns an error if no row was updated
-// (i.e. nothing in approval state for the key — likely an idempotent duplicate
-// callback or a stale approval).
-func (recorder *Recorder) ApproveTransferToReady(cashier, token string, tidx uint64) (bool, error) {
+// ApproveTransfer transitions an approval-held row to `approved` so the next
+// SubmitTransfers tick will sign it without re-evaluating the single-tx limit.
+// Returns (false, nil) when no row was updated (idempotent duplicate callback
+// or stale approval).
+func (recorder *Recorder) ApproveTransfer(cashier, token string, tidx uint64) (bool, error) {
 	result, err := recorder.store.DB().Exec(
 		fmt.Sprintf("UPDATE %s SET `status`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
-		TransferReady,
+		TransferApproved,
 		cashier,
 		token,
 		tidx,
@@ -439,13 +439,14 @@ func (recorder *Recorder) ConfirmTransfer(at AbstractTransfer) error {
 	}
 	log.Printf("mark transfer %s as confirmed", tx.id.Hex())
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status`=?", recorder.transferTableName),
+		fmt.Sprintf("UPDATE %s SET `status`=?, `id`=? WHERE `cashier`=? AND `token`=? AND `tidx`=? AND `status` IN (?, ?)", recorder.transferTableName),
 		SubmissionConfirmed,
 		tx.id.Hex(),
 		tx.cashier.Hex(),
 		tx.token.Hex(),
 		tx.index,
 		TransferReady,
+		TransferApproved,
 	)
 	if err != nil {
 		return err
@@ -461,7 +462,7 @@ func (recorder *Recorder) TransfersToSettle(cashier string) ([]AbstractTransfer,
 
 // TransfersToSubmit returns the list of transfers to submit
 func (recorder *Recorder) TransfersToSubmit(cashier string) ([]AbstractTransfer, error) {
-	return recorder.transfers(cashier, TransferNew, TransferReady)
+	return recorder.transfers(cashier, TransferNew, TransferReady, TransferApproved)
 }
 
 func (recorder *Recorder) transfers(cashier string, status ...TransferStatus) ([]AbstractTransfer, error) {

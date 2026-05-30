@@ -90,7 +90,7 @@ func (f *fakeRecorder) MarkTransferAwaitingApproval(AbstractTransfer) error {
 	f.awaitingCalls++
 	return nil
 }
-func (f *fakeRecorder) ApproveTransferToReady(string, string, uint64) (bool, error) {
+func (f *fakeRecorder) ApproveTransfer(string, string, uint64) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.approveCalls++
@@ -400,7 +400,7 @@ func TestApprovalGuard_RequestAndApproveHappyPath(t *testing.T) {
 		t.Fatal("expected approved=true")
 	}
 	if rec.approveCalls != 1 {
-		t.Fatalf("expected 1 ApproveTransferToReady, got %d", rec.approveCalls)
+		t.Fatalf("expected 1 ApproveTransfer, got %d", rec.approveCalls)
 	}
 }
 
@@ -451,7 +451,7 @@ func TestApprovalGuard_RejectHappyPath(t *testing.T) {
 		t.Fatalf("expected 1 RejectTransfer, got %d", rec.rejectCalls)
 	}
 	if rec.approveCalls != 0 {
-		t.Fatalf("expected 0 ApproveTransferToReady, got %d", rec.approveCalls)
+		t.Fatalf("expected 0 ApproveTransfer, got %d", rec.approveCalls)
 	}
 }
 
@@ -508,7 +508,7 @@ func TestApprovalGuard_DecisionLocked_ApproveBlocksReject(t *testing.T) {
 	}
 
 	if rec.approveCalls != 1 {
-		t.Fatalf("expected exactly 1 ApproveTransferToReady, got %d", rec.approveCalls)
+		t.Fatalf("expected exactly 1 ApproveTransfer, got %d", rec.approveCalls)
 	}
 	if rec.rejectCalls != 0 {
 		t.Fatalf("expected 0 RejectTransfer, got %d", rec.rejectCalls)
@@ -562,7 +562,7 @@ func TestApprovalGuard_DecisionLocked_RejectBlocksApprove(t *testing.T) {
 		t.Fatalf("expected exactly 1 RejectTransfer, got %d", rec.rejectCalls)
 	}
 	if rec.approveCalls != 0 {
-		t.Fatalf("expected 0 ApproveTransferToReady, got %d", rec.approveCalls)
+		t.Fatalf("expected 0 ApproveTransfer, got %d", rec.approveCalls)
 	}
 }
 
@@ -847,7 +847,7 @@ func TestApprovalGuard_PostRestart_ApproveFallback(t *testing.T) {
 		t.Fatal("expected fallback approve to report ok=true (fake recorder returns true)")
 	}
 	if rec.approveCalls != 1 {
-		t.Fatalf("expected ApproveTransferToReady called once, got %d", rec.approveCalls)
+		t.Fatalf("expected ApproveTransfer called once, got %d", rec.approveCalls)
 	}
 }
 
