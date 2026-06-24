@@ -929,3 +929,61 @@ func TestAmountToUSD_Examples(t *testing.T) {
 		})
 	}
 }
+
+func TestApprovalGuard_MuteAndStaleWarning(t *testing.T) {
+	rec := newFakeRecorder(map[string]int64{})
+	g := NewApprovalGuard("c", time.Hour, nil, nil, nil, newFakePrices(nil), rec, "", "")
+	var amu sync.Mutex
+	var alerts int
+	g.larkAlerter = func(string) { amu.Lock(); alerts++; amu.Unlock() }
+	read := func() int { amu.Lock(); defer amu.Unlock(); return alerts }
+
+	if g.IsHeightMuted(5) {
+		t.Fatal("height 5 should not be muted initially")
+	}
+
+	// First warning for height 5: empty webhook makes the card send fail, so the
+	// guard falls back to one text alert.
+	g.NotifyStaleFetchFailure(5)
+	if got := read(); got != 1 {
+		t.Fatalf("after first notify: alerts=%d, want 1", got)
+	}
+	// Immediate repeat is deduped.
+	g.NotifyStaleFetchFailure(5)
+	if got := read(); got != 1 {
+		t.Fatalf("after duplicate notify: alerts=%d, want 1 (deduped)", got)
+	}
+
+	// Mute height 5.
+	ok, err := g.Mute(util.LarkCallback{Height: 5, OpenID: "ou_admin"})
+	if err != nil || !ok {
+		t.Fatalf("Mute: ok=%v err=%v, want true,nil", ok, err)
+	}
+	if !g.IsHeightMuted(5) {
+		t.Fatal("height 5 should be muted after Mute")
+	}
+	if got := read(); got != 2 {
+		t.Fatalf("mute should emit one confirmation alert: alerts=%d, want 2", got)
+	}
+
+	// Muting again is idempotent and silent.
+	ok, err = g.Mute(util.LarkCallback{Height: 5, OpenID: "ou_admin"})
+	if err != nil || ok {
+		t.Fatalf("second Mute: ok=%v err=%v, want false,nil", ok, err)
+	}
+	if got := read(); got != 2 {
+		t.Fatalf("duplicate mute must be silent: alerts=%d, want 2", got)
+	}
+
+	// A muted height never warns again.
+	g.NotifyStaleFetchFailure(5)
+	if got := read(); got != 2 {
+		t.Fatalf("muted height must not warn: alerts=%d, want 2", got)
+	}
+
+	// A different height still warns.
+	g.NotifyStaleFetchFailure(6)
+	if got := read(); got != 3 {
+		t.Fatalf("new height should warn: alerts=%d, want 3", got)
+	}
+}

@@ -370,8 +370,26 @@ func (tc *tokenCashierBase) ProcessStales() error {
 		response.Heights = append(response.Heights, previousResponse.Heights...)
 	}
 	for _, height := range response.Heights {
+		if tc.guard != nil && tc.guard.IsHeightMuted(height) {
+			// Admin has muted this height (the source data is gone); skip it so
+			// it neither blocks the rest of the list nor re-alerts.
+			continue
+		}
 		if err := tc.PullTransfersByHeight(height); err != nil {
-			return errors.Wrap(err, "failed to pull transfers by height")
+			// Do not abort the whole list on one un-fetchable height — that
+			// would block every later stale height behind it forever. Log,
+			// warn the admin (deduplicated), and continue. The admin resolves
+			// it manually (sign-witness/submit-witness) and/or mutes it.
+			log.Printf("failed to pull stale transfers for %s at height %d: %+v\n", tc.id, height, err)
+			if tc.guard != nil {
+				tc.guard.NotifyStaleFetchFailure(height)
+			} else {
+				util.Alert(fmt.Sprintf(
+					"[witness:%s] cannot fetch stale block %d (source data deleted); sign+submit manually",
+					tc.cashierContractAddr.String(), height,
+				))
+			}
+			continue
 		}
 	}
 	return nil

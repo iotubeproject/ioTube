@@ -33,6 +33,15 @@ type LarkApprovalRequest struct {
 	Nonce      string
 }
 
+// LarkStaleWarning captures the fields rendered to the admin when a witness
+// cannot fetch a stale block's source data (e.g. the source chain/API pruned
+// that history). The card carries a single Mute button.
+type LarkStaleWarning struct {
+	Cashier string
+	Height  uint64
+	Nonce   string
+}
+
 // LarkCallback is the decoded payload from a Lark `card.action.trigger` event
 // targeting our approval handler.
 type LarkCallback struct {
@@ -41,9 +50,12 @@ type LarkCallback struct {
 	Cashier    string
 	Token      string
 	Tidx       uint64
-	Nonce      string
-	Timestamp  int64
-	// Action is "approve" or "reject" — set by the button the admin clicked.
+	// Height is the stale block height carried by a "mute" card.
+	Height    uint64
+	Nonce     string
+	Timestamp int64
+	// Action is "approve", "reject", or "mute" — set by the button the admin
+	// clicked.
 	Action string
 }
 
@@ -118,6 +130,81 @@ func SendLarkApprovalCard(webhook string, req LarkApprovalRequest) error {
 		return err
 	}
 	resp, err := http.Post(webhook, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("lark card post failed: status=%d body=%s", resp.StatusCode, string(respBody))
+	}
+	return nil
+}
+
+// SendLarkStaleWarningCard posts an interactive card warning that a witness
+// cannot fetch a stale block's source data. The single Mute button records the
+// (cashier, height) so the witness stops retrying/alerting on that height.
+func SendLarkStaleWarningCard(webhook string, req LarkStaleWarning) error {
+	if webhook == "" {
+		return fmt.Errorf("lark webhook is empty")
+	}
+	heightStr := strconv.FormatUint(req.Height, 10)
+	muteValue := map[string]string{
+		"cashier": req.Cashier,
+		"height":  heightStr,
+		"nonce":   req.Nonce,
+		"action":  "mute",
+	}
+	body := fmt.Sprintf(
+		"**Cashier:** %s\n**Block height:** %s\n\n"+
+			"The relayer asked this witness to re-pull block **%s**, but the source chain/API no "+
+			"longer has that block's data, so this transfer **cannot be signed automatically**.\n\n"+
+			"**Action required:** find, sign, and submit it manually (see runbook), then click "+
+			"**Mute** to stop these alerts. Clicking **Mute** without signing abandons the transfer "+
+			"on this witness.",
+		req.Cashier, heightStr, heightStr,
+	)
+	card := map[string]interface{}{
+		"config": map[string]bool{"wide_screen_mode": true},
+		"header": map[string]interface{}{
+			"template": "orange",
+			"title": map[string]string{
+				"tag":     "plain_text",
+				"content": "⚠️ Witness can't fetch transfer — source data deleted",
+			},
+		},
+		"elements": []interface{}{
+			map[string]interface{}{
+				"tag": "div",
+				"text": map[string]string{
+					"tag":     "lark_md",
+					"content": body,
+				},
+			},
+			map[string]interface{}{
+				"tag": "action",
+				"actions": []interface{}{
+					map[string]interface{}{
+						"tag":  "button",
+						"type": "danger",
+						"text": map[string]string{
+							"tag":     "plain_text",
+							"content": "Mute",
+						},
+						"value": muteValue,
+					},
+				},
+			},
+		},
+	}
+	payload, err := json.Marshal(map[string]interface{}{
+		"msg_type": "interactive",
+		"card":     card,
+	})
+	if err != nil {
+		return err
+	}
+	resp, err := http.Post(webhook, "application/json", bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
@@ -217,6 +304,17 @@ func DecodeLarkCardCallback(body []byte) (LarkCallback, error) {
 			parsed, err := strconv.ParseUint(n, 10, 64)
 			if err == nil {
 				out.Tidx = parsed
+			}
+		}
+	}
+	if v, ok := raw.Event.Action.Value["height"]; ok {
+		switch n := v.(type) {
+		case float64:
+			out.Height = uint64(n)
+		case string:
+			parsed, err := strconv.ParseUint(n, 10, 64)
+			if err == nil {
+				out.Height = parsed
 			}
 		}
 	}

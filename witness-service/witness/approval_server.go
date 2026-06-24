@@ -137,6 +137,8 @@ func (s *ApprovalServer) handleCallback(w http.ResponseWriter, r *http.Request) 
 		acted, actErr = guard.Approve(cb)
 	case "reject":
 		acted, actErr = guard.Reject(cb)
+	case "mute":
+		acted, actErr = guard.Mute(cb)
 	default:
 		http.Error(w, "unknown action", http.StatusBadRequest)
 		return
@@ -147,15 +149,26 @@ func (s *ApprovalServer) handleCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.clearFailures(cb.OpenID)
-	if !acted {
-		// Row was not in approval state — already handled by another admin.
-		respondToast(w, false, "transfer already decided (handled by another admin?)")
-		return
-	}
-	if cb.Action == "reject" {
-		respondToast(w, true, "transfer rejected")
-	} else {
-		respondToast(w, true, "transfer approved")
+	switch cb.Action {
+	case "mute":
+		if !acted {
+			respondToast(w, true, "height already muted")
+		} else {
+			respondToast(w, true, "height muted")
+		}
+	case "reject":
+		if !acted {
+			respondToast(w, false, "transfer already decided (handled by another admin?)")
+		} else {
+			respondToast(w, true, "transfer rejected")
+		}
+	default:
+		if !acted {
+			// Row was not in approval state — already handled by another admin.
+			respondToast(w, false, "transfer already decided (handled by another admin?)")
+		} else {
+			respondToast(w, true, "transfer approved")
+		}
 	}
 }
 

@@ -7,6 +7,10 @@
 package util
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -44,5 +48,61 @@ func TestDecodeLarkCardCallback_ParsesAction(t *testing.T) {
 				t.Fatalf("Nonce: got %q", cb.Nonce)
 			}
 		})
+	}
+}
+
+func TestDecodeLarkCardCallback_ParsesMuteHeight(t *testing.T) {
+	cases := []struct {
+		name   string
+		height string // raw JSON value (quoted string or bare number)
+	}{
+		{"height as string", `"28401933"`},
+		{"height as number", `28401933`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := []byte(`{"event":{"operator":{"open_id":"ou_x"},"action":{"value":{"cashier":"c1","height":` +
+				tc.height + `,"nonce":"n2","action":"mute"}}}}`)
+			cb, err := DecodeLarkCardCallback(body)
+			if err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if cb.Action != "mute" {
+				t.Fatalf("Action: got %q, want mute", cb.Action)
+			}
+			if cb.Height != 28401933 {
+				t.Fatalf("Height: got %d, want 28401933", cb.Height)
+			}
+			if cb.Cashier != "c1" {
+				t.Fatalf("Cashier: got %q", cb.Cashier)
+			}
+		})
+	}
+}
+
+func TestSendLarkStaleWarningCard_EmptyWebhook(t *testing.T) {
+	if err := SendLarkStaleWarningCard("", LarkStaleWarning{Height: 1}); err == nil {
+		t.Fatal("expected error for empty webhook")
+	}
+}
+
+func TestSendLarkStaleWarningCard_PostsMuteButton(t *testing.T) {
+	var got []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	if err := SendLarkStaleWarningCard(srv.URL, LarkStaleWarning{
+		Cashier: "0xcash", Height: 42, Nonce: "n",
+	}); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	s := string(got)
+	for _, want := range []string{`"msg_type":"interactive"`, `"action":"mute"`, `"height":"42"`, "Mute"} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("card payload missing %q:\n%s", want, s)
+		}
 	}
 }
