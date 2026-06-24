@@ -106,3 +106,29 @@ func TestSendLarkStaleWarningCard_PostsMuteButton(t *testing.T) {
 		}
 	}
 }
+
+func TestSendLarkStaleWarningCard_MuteButtonRoutesByGuardKey(t *testing.T) {
+	// When the stale height belongs to a previous cashier, the body shows the
+	// owning cashier but the Mute button must route back to the posting guard.
+	var got []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	if err := SendLarkStaleWarningCard(srv.URL, LarkStaleWarning{
+		Cashier: "0xPREVIOUS", GuardKey: "0xCURRENT", Height: 9, Nonce: "n",
+	}); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	s := string(got)
+	// Mute button routes to the guard key.
+	if !strings.Contains(s, `"cashier":"0xCURRENT"`) {
+		t.Fatalf("mute button should route by GuardKey 0xCURRENT:\n%s", s)
+	}
+	// The owning cashier is shown in the card body.
+	if !strings.Contains(s, "0xPREVIOUS") {
+		t.Fatalf("card body should display owning cashier 0xPREVIOUS:\n%s", s)
+	}
+}

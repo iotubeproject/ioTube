@@ -944,12 +944,12 @@ func TestApprovalGuard_MuteAndStaleWarning(t *testing.T) {
 
 	// First warning for height 5: empty webhook makes the card send fail, so the
 	// guard falls back to one text alert.
-	g.NotifyStaleFetchFailure(5)
+	g.NotifyStaleFetchFailure("c", 5)
 	if got := read(); got != 1 {
 		t.Fatalf("after first notify: alerts=%d, want 1", got)
 	}
 	// Immediate repeat is deduped.
-	g.NotifyStaleFetchFailure(5)
+	g.NotifyStaleFetchFailure("c", 5)
 	if got := read(); got != 1 {
 		t.Fatalf("after duplicate notify: alerts=%d, want 1 (deduped)", got)
 	}
@@ -976,13 +976,13 @@ func TestApprovalGuard_MuteAndStaleWarning(t *testing.T) {
 	}
 
 	// A muted height never warns again.
-	g.NotifyStaleFetchFailure(5)
+	g.NotifyStaleFetchFailure("c", 5)
 	if got := read(); got != 2 {
 		t.Fatalf("muted height must not warn: alerts=%d, want 2", got)
 	}
 
 	// A different height still warns.
-	g.NotifyStaleFetchFailure(6)
+	g.NotifyStaleFetchFailure("c", 6)
 	if got := read(); got != 3 {
 		t.Fatalf("new height should warn: alerts=%d, want 3", got)
 	}

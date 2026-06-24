@@ -288,41 +288,56 @@ func (g *ApprovalGuard) IsHeightMuted(height uint64) bool {
 	return ok
 }
 
+// staleAlertDedupWindow is how long a single stale height stays deduplicated
+// after a warning, so a stuck height does not spam the channel.
+const staleAlertDedupWindow = 30 * time.Minute
+
 // NotifyStaleFetchFailure posts a Lark card (with a Mute button) when the
-// witness cannot fetch a stale block's source data. Suppressed for muted
-// heights and deduplicated to one card per height per 30 minutes so a stuck
-// height does not spam the channel.
-func (g *ApprovalGuard) NotifyStaleFetchFailure(height uint64) {
+// witness cannot fetch a stale block's source data. `owner` is the cashier
+// contract the height belongs to (it may be a previous cashier), shown in the
+// card so the admin knows which contract is stuck; the Mute button still routes
+// back to this guard. Suppressed for muted heights and deduplicated per height.
+func (g *ApprovalGuard) NotifyStaleFetchFailure(owner string, height uint64) {
 	g.mu.Lock()
 	if _, muted := g.mutedHeights[height]; muted {
 		g.mu.Unlock()
 		return
 	}
-	if last, ok := g.staleAlert[height]; ok && time.Since(last) < 30*time.Minute {
+	// Prune expired dedup entries on the way in so the map cannot grow without
+	// bound (mirrors seenNonces); entries older than the window are useless.
+	now := time.Now()
+	cutoff := now.Add(-staleAlertDedupWindow)
+	for h, ts := range g.staleAlert {
+		if ts.Before(cutoff) {
+			delete(g.staleAlert, h)
+		}
+	}
+	if last, ok := g.staleAlert[height]; ok && now.Sub(last) < staleAlertDedupWindow {
 		g.mu.Unlock()
 		return
 	}
-	g.staleAlert[height] = time.Now()
+	g.staleAlert[height] = now
 	g.mu.Unlock()
 
 	nonce, err := randomNonce()
 	if err != nil {
 		g.larkAlerter(fmt.Sprintf(
-			"[witness:%s] cannot fetch stale block %d (source data deleted); failed to mint nonce: %v",
-			g.cashierKey, height, err,
+			"[witness:%s] cannot fetch stale block %d for cashier %s (source data deleted); failed to mint nonce: %v",
+			g.cashierKey, height, owner, err,
 		))
 		return
 	}
 	if err := util.SendLarkStaleWarningCard(g.larkCardWebhook, util.LarkStaleWarning{
-		Cashier: g.cashierKey,
-		Height:  height,
-		Nonce:   nonce,
+		Cashier:  owner,
+		GuardKey: g.cashierKey,
+		Height:   height,
+		Nonce:    nonce,
 	}); err != nil {
 		// Card delivery failed — fall back to the text channel so admins still
 		// know the witness is stuck on this height.
 		g.larkAlerter(fmt.Sprintf(
-			"[witness:%s] cannot fetch stale block %d (source data deleted); sign+submit manually then mute. (card send failed: %v)",
-			g.cashierKey, height, err,
+			"[witness:%s] cannot fetch stale block %d for cashier %s (source data deleted); sign+submit manually then mute. (card send failed: %v)",
+			g.cashierKey, height, owner, err,
 		))
 	}
 }

@@ -61,3 +61,12 @@ stops appearing in `StaleHeights`.
 Click **Mute** on the Lark card so this witness stops retrying/alerting on that
 height. Mute is in-memory: if the witness restarts before the transfer settles,
 the alert may reappear once — just Mute again.
+
+> The **Mute** button only exists when the approval guard is enabled and a
+> `larkCardWebHook` is configured for that cashier. Without them the witness can
+> only emit a text alert (no Mute); resolve the transfer manually (Steps 1–3) to
+> stop it, or restart the witness once it is no longer stale.
+>
+> Note: the alert is only raised for heights at or below the witness's current
+> tip. A stale height above the tip means the witness is still catching up (not
+> missing data) and is skipped silently until the tip advances.

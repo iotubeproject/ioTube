@@ -37,9 +37,14 @@ type LarkApprovalRequest struct {
 // cannot fetch a stale block's source data (e.g. the source chain/API pruned
 // that history). The card carries a single Mute button.
 type LarkStaleWarning struct {
+	// Cashier is the contract the stale height belongs to, shown in the card.
 	Cashier string
-	Height  uint64
-	Nonce   string
+	// GuardKey routes the Mute callback back to the guard that posted the card.
+	// It can differ from Cashier when the height belongs to a previous cashier.
+	// When empty, Cashier is used.
+	GuardKey string
+	Height   uint64
+	Nonce    string
 }
 
 // LarkCallback is the decoded payload from a Lark `card.action.trigger` event
@@ -63,9 +68,6 @@ type LarkCallback struct {
 // webhook. The card carries the transfer details and Approve / Reject buttons.
 // The first admin to click either button locks the decision.
 func SendLarkApprovalCard(webhook string, req LarkApprovalRequest) error {
-	if webhook == "" {
-		return fmt.Errorf("lark webhook is empty")
-	}
 	approveValue := map[string]string{
 		"transferID": req.TransferID,
 		"cashier":    req.Cashier,
@@ -122,6 +124,16 @@ func SendLarkApprovalCard(webhook string, req LarkApprovalRequest) error {
 			},
 		},
 	}
+	return postLarkInteractiveCard(webhook, card)
+}
+
+// postLarkInteractiveCard marshals `card` as a Lark interactive message and
+// POSTs it to the incoming-webhook URL. Shared by all card senders so the
+// webhook check, JSON envelope, and HTTP error handling live in one place.
+func postLarkInteractiveCard(webhook string, card interface{}) error {
+	if webhook == "" {
+		return fmt.Errorf("lark webhook is empty")
+	}
 	body, err := json.Marshal(map[string]interface{}{
 		"msg_type": "interactive",
 		"card":     card,
@@ -145,12 +157,15 @@ func SendLarkApprovalCard(webhook string, req LarkApprovalRequest) error {
 // cannot fetch a stale block's source data. The single Mute button records the
 // (cashier, height) so the witness stops retrying/alerting on that height.
 func SendLarkStaleWarningCard(webhook string, req LarkStaleWarning) error {
-	if webhook == "" {
-		return fmt.Errorf("lark webhook is empty")
-	}
 	heightStr := strconv.FormatUint(req.Height, 10)
+	// The Mute callback must route to the guard that posted the card; that is
+	// GuardKey, which can differ from the displayed (owning) cashier.
+	routeCashier := req.GuardKey
+	if routeCashier == "" {
+		routeCashier = req.Cashier
+	}
 	muteValue := map[string]string{
-		"cashier": req.Cashier,
+		"cashier": routeCashier,
 		"height":  heightStr,
 		"nonce":   req.Nonce,
 		"action":  "mute",
@@ -197,23 +212,7 @@ func SendLarkStaleWarningCard(webhook string, req LarkStaleWarning) error {
 			},
 		},
 	}
-	payload, err := json.Marshal(map[string]interface{}{
-		"msg_type": "interactive",
-		"card":     card,
-	})
-	if err != nil {
-		return err
-	}
-	resp, err := http.Post(webhook, "application/json", bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("lark card post failed: status=%d body=%s", resp.StatusCode, string(respBody))
-	}
-	return nil
+	return postLarkInteractiveCard(webhook, card)
 }
 
 // buildCardBody assembles the Lark Markdown body shown to the admin. The TxHash
@@ -252,6 +251,23 @@ func VerifyLarkCallbackSignature(secret, timestamp, nonce string, body []byte, g
 	mac.Write(body)
 	want := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	return hmac.Equal([]byte(want), []byte(gotB64))
+}
+
+// uint64FromValue extracts a uint64 from a decoded JSON action value, which may
+// arrive as a float64 (JSON number) or a decimal string. Returns ok=false when
+// the value is absent or not parseable.
+func uint64FromValue(v interface{}) (uint64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return uint64(n), true
+	case string:
+		parsed, err := strconv.ParseUint(n, 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	}
+	return 0, false
 }
 
 // DecodeLarkCardCallback parses a Lark `card.action.trigger` HTTP body into
@@ -296,27 +312,11 @@ func DecodeLarkCardCallback(body []byte) (LarkCallback, error) {
 	if v, ok := raw.Event.Action.Value["action"].(string); ok {
 		out.Action = v
 	}
-	if v, ok := raw.Event.Action.Value["tidx"]; ok {
-		switch n := v.(type) {
-		case float64:
-			out.Tidx = uint64(n)
-		case string:
-			parsed, err := strconv.ParseUint(n, 10, 64)
-			if err == nil {
-				out.Tidx = parsed
-			}
-		}
+	if v, ok := uint64FromValue(raw.Event.Action.Value["tidx"]); ok {
+		out.Tidx = v
 	}
-	if v, ok := raw.Event.Action.Value["height"]; ok {
-		switch n := v.(type) {
-		case float64:
-			out.Height = uint64(n)
-		case string:
-			parsed, err := strconv.ParseUint(n, 10, 64)
-			if err == nil {
-				out.Height = parsed
-			}
-		}
+	if v, ok := uint64FromValue(raw.Event.Action.Value["height"]); ok {
+		out.Height = v
 	}
 	if raw.Timestamp != "" {
 		if ts, err := strconv.ParseInt(raw.Timestamp, 10, 64); err == nil {

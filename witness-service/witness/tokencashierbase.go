@@ -354,12 +354,65 @@ func (tc *tokenCashierBase) ProcessStales() error {
 	}
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
+
+	// Read the witness tip once for this tick. A stale height above the tip is
+	// not missing data — the witness simply has not caught up yet (e.g. after a
+	// restart) and will pull it on a later tick — so it must not raise a
+	// "source data deleted" alert.
+	tip, tipErr := tc.recorder.TipHeight(tc.id)
+
+	processStaleHeights := func(owner string, heights []uint64) {
+		for _, height := range heights {
+			if tc.guard != nil && tc.guard.IsHeightMuted(height) {
+				// Admin has muted this height (the source data is gone); skip it
+				// so it neither blocks the rest of the list nor re-alerts.
+				continue
+			}
+			if err := tc.PullTransfersByHeight(height); err != nil {
+				// Do not abort the whole list on one un-fetchable height — that
+				// would block every later stale height behind it forever.
+				if tipErr == nil && height > tip {
+					// Witness is behind, not missing data. Skip quietly; a later
+					// tick will pull it once the tip advances. (tip is stable
+					// within a tick: PullTransfersByHeight never advances the sync
+					// height — only PullTransfers does — and process() runs on a
+					// single goroutine, so reading it once here is safe.)
+					//
+					// Edge: if the tip is itself stuck below a pruned block (the
+					// witness can't advance past missing mid-range data), that
+					// height stays above tip and is never alerted here — but the
+					// stuck tip surfaces separately as a recurring PullTransfers
+					// failure. The common "old historical data deleted" case is
+					// always at/below tip and does alert below.
+					log.Printf("skipping stale height %d for %s: above current tip %d (catching up)\n", height, tc.id, tip)
+					continue
+				}
+				// The data should be available at or below the tip but isn't
+				// (pruned/deleted on the source API). Warn the admin
+				// (deduplicated) and continue; they resolve it manually
+				// (sign-witness/submit-witness) and/or mute it.
+				log.Printf("failed to pull stale transfers for %s (cashier %s) at height %d: %+v\n", tc.id, owner, height, err)
+				if tc.guard != nil {
+					tc.guard.NotifyStaleFetchFailure(owner, height)
+				} else {
+					util.Alert(fmt.Sprintf(
+						"[witness:%s] cannot fetch stale block %d for cashier %s (source data deleted); sign+submit manually (muting needs the approval card)",
+						tc.id, height, owner,
+					))
+				}
+				continue
+			}
+		}
+	}
+
 	response, err := relayer.StaleHeights(context.Background(), &services.StaleHeightsRequest{
 		Cashier: tc.cashierContractAddr.Bytes(),
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch stale heights")
 	}
+	processStaleHeights(tc.cashierContractAddr.String(), response.Heights)
+
 	if tc.previousCashierAddr != nil {
 		previousResponse, err := relayer.StaleHeights(context.Background(), &services.StaleHeightsRequest{
 			Cashier: tc.previousCashierAddr.Bytes(),
@@ -367,30 +420,7 @@ func (tc *tokenCashierBase) ProcessStales() error {
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch stale heights from previous cashier")
 		}
-		response.Heights = append(response.Heights, previousResponse.Heights...)
-	}
-	for _, height := range response.Heights {
-		if tc.guard != nil && tc.guard.IsHeightMuted(height) {
-			// Admin has muted this height (the source data is gone); skip it so
-			// it neither blocks the rest of the list nor re-alerts.
-			continue
-		}
-		if err := tc.PullTransfersByHeight(height); err != nil {
-			// Do not abort the whole list on one un-fetchable height — that
-			// would block every later stale height behind it forever. Log,
-			// warn the admin (deduplicated), and continue. The admin resolves
-			// it manually (sign-witness/submit-witness) and/or mutes it.
-			log.Printf("failed to pull stale transfers for %s at height %d: %+v\n", tc.id, height, err)
-			if tc.guard != nil {
-				tc.guard.NotifyStaleFetchFailure(height)
-			} else {
-				util.Alert(fmt.Sprintf(
-					"[witness:%s] cannot fetch stale block %d (source data deleted); sign+submit manually",
-					tc.cashierContractAddr.String(), height,
-				))
-			}
-			continue
-		}
+		processStaleHeights(tc.previousCashierAddr.String(), previousResponse.Heights)
 	}
 	return nil
 }
