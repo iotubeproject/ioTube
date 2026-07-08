@@ -99,6 +99,9 @@ function downloadConfigFile() {
         mv ${envFile}.tmp $envFile
     fi
     echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${envFile}
+    if ! grep -q "^WITNESS_TAG=" ${envFile}; then
+        echo "WITNESS_TAG=latest" >> ${envFile}
+    fi
     sed "/^$/d" ${envFile} > ${envFile}.tmp
     mv ${envFile}.tmp $envFile
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_WITNESS}/etc/crontab
@@ -157,8 +160,9 @@ function grantPrivileges() {
  }
 
 function buildService() {
-    docker pull ghcr.io/iotubeproject/iotube-witness:latest || exit 2
-    docker tag ghcr.io/iotubeproject/iotube-witness:latest witness:latest
+    local envFile="${IOTEX_WITNESS}/etc/.env"
+    [[ -f "$envFile" ]] && source "$envFile"
+    docker pull ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest} || exit 2
 }
 
 function startup() {
@@ -166,7 +170,7 @@ function startup() {
     pushd $IOTEX_WITNESS/etc
     docker compose up -d
     docker compose restart
-    docker system prune -a
+    docker image prune -f
     if [ $? -eq 0 ];then
         echo -e "${YELLOW} Service on. ${NC}"
     fi
