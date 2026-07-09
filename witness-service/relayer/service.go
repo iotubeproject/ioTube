@@ -207,6 +207,12 @@ func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeigh
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode cashier")
 	}
+	// record the witness heartbeat (best-effort; never fail the RPC over it)
+	if len(request.WitnessAddr) > 0 {
+		if err := s.recorder.UpsertWitnessHeartbeat(request.WitnessAddr, cashier, request.TipHeight); err != nil {
+			log.Printf("failed to record witness heartbeat from %x: %v\n", request.WitnessAddr, err)
+		}
+	}
 	heights, err := s.recorder.HeightsOfStaleTransfers(cashier)
 	if err != nil {
 		return nil, err

@@ -111,6 +111,12 @@ func (s *SolanaService) StaleHeights(ctx context.Context, request *services.Stal
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode cashier")
 	}
+	// record the witness heartbeat (best-effort; never fail the RPC over it)
+	if len(request.WitnessAddr) > 0 {
+		if err := s.abstractRecorder.UpsertWitnessHeartbeat(request.WitnessAddr, cashier, request.TipHeight); err != nil {
+			log.Printf("failed to record witness heartbeat from %x: %v\n", request.WitnessAddr, err)
+		}
+	}
 	heights, err := s.abstractRecorder.HeightsOfStaleTransfers(cashier)
 	if err != nil {
 		return nil, err

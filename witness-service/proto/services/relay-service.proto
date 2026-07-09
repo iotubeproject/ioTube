@@ -94,6 +94,11 @@ message CheckResponse {
 
 message StaleHeightsRequest {
     bytes cashier = 1;
+    // witnessAddr and tipHeight let the relayer track per-witness liveness: the
+    // witness pings StaleHeights every processInterval regardless of traffic, so
+    // these carry the witness's own address and its current scan tip as a heartbeat.
+    bytes witnessAddr = 2;
+    uint64 tipHeight = 3;
 }
 
 message StaleHeightsResponse {

@@ -168,6 +168,13 @@ func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*s
 
 func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
 	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
+		if transfer == nil {
+			// address-only query, used for the witness liveness heartbeat (no signing)
+			if privateKey == nil {
+				return common.Hash{}, nil, nil, nil
+			}
+			return common.Hash{}, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), nil, nil
+		}
 		id := crypto.Keccak256Hash(
 			validatorContractAddr,
 			transfer.Cashier().Bytes(),
@@ -189,6 +196,13 @@ func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
 
 func NewEd25519SignHandler(privateKey *ed25519.PrivateKey) SignHandler {
 	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
+		if transfer == nil {
+			// address-only query, used for the witness liveness heartbeat (no signing)
+			if privateKey == nil {
+				return common.Hash{}, nil, nil, nil
+			}
+			return common.Hash{}, privateKey.Public().(ed25519.PublicKey), nil, nil
+		}
 		data, err := instruction.SerializePayload(
 			validatorContractAddr,
 			transfer.Cashier().Bytes(),

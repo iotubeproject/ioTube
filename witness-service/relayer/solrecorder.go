@@ -108,12 +108,51 @@ func (s *SolRecorder) Start(ctx context.Context) error {
 			return errors.Wrap(err, "failed to create witness table")
 		}
 	}
+	// witness_heartbeats records per-witness liveness (last StaleHeights ping +
+	// reported scan tip) for traffic-independent monitoring. Created unconditionally
+	// (no dependency on the witness table); shared name with the EVM recorder so a
+	// solana relayer sharing a DB reuses the same table.
+	if _, err := s.store.DB().Exec(fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s ("+
+			"`witness` varchar(66) NOT NULL,"+
+			"`cashier` varchar(64) NOT NULL,"+
+			"`tipHeight` bigint(20) NOT NULL DEFAULT 0,"+
+			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
+			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
+			"PRIMARY KEY (`witness`, `cashier`),"+
+			"KEY `updateTime_index` (`updateTime`)"+
+			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
+		witnessHeartbeatTableName,
+	)); err != nil {
+		return errors.Wrap(err, "failed to create witness heartbeat table")
+	}
 
 	return nil
 }
 
 func (s *SolRecorder) Stop(ctx context.Context) error {
 	return s.store.Stop(ctx)
+}
+
+// UpsertWitnessHeartbeat records that a witness pinged this relayer for a route,
+// together with its reported scan tip, for traffic-independent liveness
+// monitoring. Best-effort; invalid-length addresses are ignored to bound what
+// the unauthenticated StaleHeights endpoint can write.
+func (s *SolRecorder) UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64) error {
+	if !validWitnessHeartbeatAddr(witnessAddr) {
+		return nil
+	}
+	_, err := s.store.DB().Exec(
+		fmt.Sprintf(
+			"INSERT INTO `%s` (`witness`, `cashier`, `tipHeight`) VALUES (?, ?, ?) "+
+				"ON DUPLICATE KEY UPDATE `tipHeight`=VALUES(`tipHeight`), `updateTime`=CURRENT_TIMESTAMP",
+			witnessHeartbeatTableName,
+		),
+		"0x"+hex.EncodeToString(witnessAddr),
+		cashier.String(),
+		tipHeight,
+	)
+	return err
 }
 
 // AddWitness records a new witness
