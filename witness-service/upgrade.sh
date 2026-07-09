@@ -35,12 +35,19 @@ if grep -q '^[[:space:]]*image: witness:latest[[:space:]]*$' "$COMPOSE_FILE"; th
     sed -i 's#image: witness:latest#image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}#' "$COMPOSE_FILE"
 fi
 
-# Only pull/recreate the witness services, never the database: an unqualified
-# `docker compose pull` would also pull the database service's floating `mysql:8`
-# tag, and the subsequent `up -d` would roll the production DB to a new digest.
-mapfile -t WITNESS_SERVICES < <(docker compose config --services | grep -v -x 'database')
+# Only pull/recreate the services that run the witness image. Selecting by image
+# (rather than "every service except database") keeps a witness upgrade from also
+# pulling/recreating the optional cron/backup helpers' floating Docker Hub images
+# if an operator has uncommented them, and never touches the database.
+mapfile -t ALL_SERVICES < <(docker compose config --services)
+WITNESS_SERVICES=()
+for svc in "${ALL_SERVICES[@]}"; do
+    if docker compose config --images "$svc" 2>/dev/null | grep -q 'iotube-witness'; then
+        WITNESS_SERVICES+=("$svc")
+    fi
+done
 if [[ ${#WITNESS_SERVICES[@]} -eq 0 ]]; then
-    echo "No witness services found in $COMPOSE_FILE." >&2
+    echo "No witness services (ghcr.io/iotubeproject/iotube-witness) found in $COMPOSE_FILE." >&2
     exit 1
 fi
 
