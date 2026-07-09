@@ -161,8 +161,16 @@ function grantPrivileges() {
 
 function buildService() {
     local envFile="${IOTEX_WITNESS}/etc/.env"
-    [[ -f "$envFile" ]] && source "$envFile"
-    docker pull ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest} || exit 2
+    # Read only WITNESS_TAG from .env. Do NOT source the whole file: this runs
+    # before downloadConfigFile normalizes .env, so a template-seeded file with
+    # empty IOTEX_WITNESS= / DB_ROOT_PASSWORD= would clobber the already-computed
+    # data dir (-> operating under /etc) and DB password (-> blank MySQL root).
+    if [[ -f "$envFile" ]]; then
+        local tag
+        tag=$(sed -n 's/^[[:space:]]*WITNESS_TAG=//p' "$envFile" | tail -1)
+        [[ -n "$tag" ]] && WITNESS_TAG="$tag"
+    fi
+    docker pull "ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}" || exit 2
 }
 
 function startup() {
