@@ -99,6 +99,9 @@ function downloadConfigFile() {
         mv ${envFile}.tmp $envFile
     fi
     echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${envFile}
+    if ! grep -q "^WITNESS_TAG=" ${envFile}; then
+        echo "WITNESS_TAG=latest" >> ${envFile}
+    fi
     sed "/^$/d" ${envFile} > ${envFile}.tmp
     mv ${envFile}.tmp $envFile
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_WITNESS}/etc/crontab
@@ -157,8 +160,29 @@ function grantPrivileges() {
  }
 
 function buildService() {
-    docker pull ghcr.io/iotubeproject/iotube-witness:latest || exit 2
-    docker tag ghcr.io/iotubeproject/iotube-witness:latest witness:latest
+    local envFile="${IOTEX_WITNESS}/etc/.env"
+    # Read only WITNESS_TAG from .env. Do NOT source the whole file: this runs
+    # before downloadConfigFile normalizes .env, so a template-seeded file with
+    # empty IOTEX_WITNESS= / DB_ROOT_PASSWORD= would clobber the already-computed
+    # data dir (-> operating under /etc) and DB password (-> blank MySQL root).
+    if [[ -f "$envFile" ]]; then
+        local line tag
+        line=$(grep -E '^[[:space:]]*WITNESS_TAG=' "$envFile" | tail -1)
+        tag=${line#*=}
+        tag=${tag%$'\r'}                        # strip trailing CR
+        tag=${tag#"${tag%%[![:space:]]*}"}      # ltrim
+        # follow compose .env syntax: quoted value, or unquoted up to an inline
+        # comment (docker tags contain no whitespace, so take the first token).
+        if [[ $tag == \"*\"* ]]; then
+            tag=${tag#\"}; tag=${tag%%\"*}
+        elif [[ $tag == \'*\'* ]]; then
+            tag=${tag#\'}; tag=${tag%%\'*}
+        else
+            tag=${tag%%[[:space:]]*}
+        fi
+        [[ -n "$tag" ]] && WITNESS_TAG="$tag"
+    fi
+    docker pull "ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}" || exit 2
 }
 
 function startup() {
@@ -166,7 +190,7 @@ function startup() {
     pushd $IOTEX_WITNESS/etc
     docker compose up -d
     docker compose restart
-    docker system prune -a
+    docker image prune -f
     if [ $? -eq 0 ];then
         echo -e "${YELLOW} Service on. ${NC}"
     fi

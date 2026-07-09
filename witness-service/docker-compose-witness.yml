@@ -1,5 +1,8 @@
 version: '2'
 
+# The witness image tag is controlled by WITNESS_TAG in .env (defaults to latest).
+# Upgrade in place with:  ./upgrade.sh   (i.e. docker compose pull && docker compose up -d)
+
 services:
   database:
     container_name: witness-db
@@ -14,7 +17,7 @@ services:
 
   iotex-payload-witness:
     container_name: iotex-payload-witness
-    image: witness:latest
+    image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-iotex-payload.yaml:/etc/iotube-witness/witness-config-iotex-payload.yaml:ro
@@ -27,7 +30,7 @@ services:
 
 #   ethereum-payload-witness:
 #     container_name: ethereum-payload-witness
-#     image: witness:latest
+#     image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
 #     restart: on-failure
 #     volumes:
 #       - $IOTEX_WITNESS/etc/witness-config-ethereum-payload.yaml:/etc/iotube-witness/witness-config-ethereum-payload.yaml:ro
@@ -40,7 +43,7 @@ services:
 
   bsc-payload-witness:
     container_name: bsc-payload-witness
-    image: witness:latest
+    image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-bsc-payload.yaml:/etc/iotube-witness/witness-config-bsc-payload.yaml:ro
@@ -53,7 +56,7 @@ services:
 
   matic-payload-witness:
     container_name: matic-payload-witness
-    image: witness:latest
+    image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-matic-payload.yaml:/etc/iotube-witness/witness-config-matic-payload.yaml:ro
@@ -66,7 +69,7 @@ services:
 
 #   solana-witness:
 #     container_name: solana-witness
-#     image: witness:latest
+#     image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
 #     restart: on-failure
 #     volumes:
 #       - $IOTEX_WITNESS/etc/witness-config-solana.yaml:/etc/iotube-witness/witness-config-solana.yaml:ro
@@ -79,7 +82,7 @@ services:
   
 #   iotex-solana-witness:
 #     container_name: iotex-solana-witness
-#     image: witness:latest
+#     image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
 #     restart: on-failure
 #     volumes:
 #       - $IOTEX_WITNESS/etc/witness-config-iotex-solana.yaml:/etc/iotube-witness/witness-config-iotex-solana.yaml:ro
