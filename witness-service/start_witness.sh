@@ -166,8 +166,20 @@ function buildService() {
     # empty IOTEX_WITNESS= / DB_ROOT_PASSWORD= would clobber the already-computed
     # data dir (-> operating under /etc) and DB password (-> blank MySQL root).
     if [[ -f "$envFile" ]]; then
-        local tag
-        tag=$(sed -n 's/^[[:space:]]*WITNESS_TAG=//p' "$envFile" | tail -1)
+        local line tag
+        line=$(grep -E '^[[:space:]]*WITNESS_TAG=' "$envFile" | tail -1)
+        tag=${line#*=}
+        tag=${tag%$'\r'}                        # strip trailing CR
+        tag=${tag#"${tag%%[![:space:]]*}"}      # ltrim
+        # follow compose .env syntax: quoted value, or unquoted up to an inline
+        # comment (docker tags contain no whitespace, so take the first token).
+        if [[ $tag == \"*\"* ]]; then
+            tag=${tag#\"}; tag=${tag%%\"*}
+        elif [[ $tag == \'*\'* ]]; then
+            tag=${tag#\'}; tag=${tag%%\'*}
+        else
+            tag=${tag%%[[:space:]]*}
+        fi
         [[ -n "$tag" ]] && WITNESS_TAG="$tag"
     fi
     docker pull "ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}" || exit 2
