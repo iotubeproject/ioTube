@@ -327,7 +327,9 @@ func (tc *tokenCashierBase) ProcessStales() error {
 	}
 	if tc.previousCashierAddr != nil {
 		previousResponse, err := relayer.StaleHeights(context.Background(), &services.StaleHeightsRequest{
-			Cashier: tc.previousCashierAddr.Bytes(),
+			Cashier:     tc.previousCashierAddr.Bytes(),
+			WitnessAddr: tc.signerAddr,
+			TipHeight:   tc.lastProcessBlockHeight,
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch stale heights from previous cashier")
