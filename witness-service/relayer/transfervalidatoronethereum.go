@@ -51,6 +51,14 @@ type (
 		validator           validatorContract
 		witnessListContract *contract.AddressListCaller
 		witnesses           map[string]bool
+		// lastWitnessRefresh is the time of the last *successful* on-chain load;
+		// drives the fail-open "genuinely not a member" decision in IsActiveWitness.
+		lastWitnessRefresh time.Time
+		// lastWitnessRefreshAttempt is the time of the last refresh *attempt*
+		// (success or failure); rate-limits the on-miss refresh so a stream of junk
+		// submissions (Submit is unauthenticated) can't force a chain RPC every call,
+		// even while the RPC is erroring and lastWitnessRefresh stays stale.
+		lastWitnessRefreshAttempt time.Time
 	}
 
 	validatorContract interface {
@@ -298,6 +306,10 @@ func (tv *transferValidatorOnEthereum) Address() common.Address {
 }
 
 func (tv *transferValidatorOnEthereum) refresh() error {
+	// Stamp the attempt up front (caller holds tv.mu) so the on-miss rate limit in
+	// IsActiveWitness backs off even when the RPC below errors and we never reach
+	// the success stamp.
+	tv.lastWitnessRefreshAttempt = time.Now()
 	callOpts, err := tv.callOpts()
 	if err != nil {
 		return err
@@ -326,6 +338,7 @@ func (tv *transferValidatorOnEthereum) refresh() error {
 	}
 
 	tv.witnesses = activeWitnesses
+	tv.lastWitnessRefresh = time.Now()
 	return nil
 }
 
@@ -333,6 +346,50 @@ func (tv *transferValidatorOnEthereum) isActiveWitness(witness common.Address) b
 	val, ok := tv.witnesses[witness.Hex()]
 
 	return ok && val
+}
+
+// witnessRefreshCooldown bounds how often IsActiveWitness re-queries the on-chain
+// witness set on a miss, so junk addresses can't spam refresh RPCs.
+const witnessRefreshCooldown = 30 * time.Second
+
+// IsActiveWitness reports whether addr is in the on-chain registered witness set,
+// and whether that set is currently loaded. When the cached set is stale it refreshes
+// from chain once (rate-limited to once per witnessRefreshCooldown, shared with the
+// refresh done during submission) before trusting either verdict, so both additions
+// and removals to the on-chain set are reflected. If the refresh fails or is rate-
+// limited away, a non-membership result returns loaded==false; callers should treat
+// loaded==false as "unknown" and fail open (the on-chain validator is the ultimate
+// gate). Safe for concurrent use.
+func (tv *transferValidatorOnEthereum) IsActiveWitness(addr common.Address) (isMember bool, loaded bool) {
+	hexAddr := addr.Hex()
+	tv.mu.RLock()
+	_, member := tv.witnesses[hexAddr]
+	fresh := len(tv.witnesses) > 0 && !tv.lastWitnessRefresh.IsZero() &&
+		time.Since(tv.lastWitnessRefresh) <= witnessRefreshCooldown
+	tv.mu.RUnlock()
+	if fresh {
+		// Cache is current; trust the hit or the miss without another chain call.
+		return member, true
+	}
+	// Stale or never loaded: refresh once (rate-limited by the last refresh attempt,
+	// not the last success, so a failing RPC still backs off) and re-check.
+	tv.mu.Lock()
+	if tv.lastWitnessRefreshAttempt.IsZero() ||
+		time.Since(tv.lastWitnessRefreshAttempt) > witnessRefreshCooldown {
+		if err := tv.refresh(); err != nil {
+			log.Printf("failed to refresh witness set: %v\n", err)
+		}
+	}
+	_, member = tv.witnesses[hexAddr]
+	fresh = len(tv.witnesses) > 0 && !tv.lastWitnessRefresh.IsZero() &&
+		time.Since(tv.lastWitnessRefresh) <= witnessRefreshCooldown
+	tv.mu.Unlock()
+	if member {
+		return true, true
+	}
+	// Only a fresh, successful load makes a non-membership verdict authoritative;
+	// otherwise report unknown so the caller falls back to the on-chain gate.
+	return false, fresh
 }
 
 // Check returns true if a transfer has been settled
