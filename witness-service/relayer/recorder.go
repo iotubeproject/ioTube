@@ -648,8 +648,14 @@ func (recorder *Recorder) TransfersWithFBO(
 ) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
+	// Order the user-facing List by blockHeight (the source-chain block, i.e. the
+	// real transfer time) rather than creationTime (when the row was inserted on
+	// this relayer). Re-submitting an old transfer stamps a fresh creationTime and
+	// would otherwise jump it to the top of the list; each payload relayer serves a
+	// single source chain, so blockHeight is monotonic in real time here.
 	return recorder.transfers(
 		fmt.Sprintf("SELECT `cashier`, IFNULL(`fbo_token`, `token`), `tidx`, `sender`, `txSender`, IFNULL(`fbo_recipient`, `recipient`), `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName),
+		"blockHeight",
 		offset,
 		limit,
 		desc,
@@ -666,8 +672,10 @@ func (recorder *Recorder) Transfers(
 ) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
+	// Internal processing (bonus/confirm/submit queues) keeps creationTime ordering.
 	return recorder.transfers(
 		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName),
+		"creationTime",
 		offset,
 		limit,
 		desc,
@@ -677,12 +685,12 @@ func (recorder *Recorder) Transfers(
 
 func (recorder *Recorder) transfers(
 	query string,
+	orderBy string,
 	offset uint32,
 	limit uint8,
 	desc Order,
 	queryOpts []TransferQueryOption,
 ) ([]*Transfer, error) {
-	orderBy := "creationTime"
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
 	conditions := []string{}
