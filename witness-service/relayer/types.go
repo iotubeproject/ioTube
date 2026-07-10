@@ -73,6 +73,9 @@ type (
 		Address() common.Address
 		// Check returns transfer status on chain
 		Check(transfer *Transfer) (StatusOnChainType, error)
+		// IsActiveWitness reports whether addr is a registered on-chain witness,
+		// and whether the witness set has been loaded from chain yet.
+		IsActiveWitness(addr common.Address) (isMember bool, loaded bool)
 		// Submit submits validation for a transfer
 		Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 		// SpeedUp resubmits validation with higher gas price

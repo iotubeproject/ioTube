@@ -31,5 +31,9 @@ typechain-types
 cache
 artifacts
 bun.lockb
+
+# Foundry build output
+out
+broadcast
 # Witness signing tools binaries
 witness-service/bin/
