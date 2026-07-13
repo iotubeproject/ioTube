@@ -9,3 +9,8 @@
 3. copy .env.template `~/iotex-witness/etc/.env`, and set values
 4. set `clientURL` in `witness-config-ethereum.secret.yaml`
 5. run `./start_witness.sh` to build and start running services.
+
+## Operations
+
+- [Missing / deleted source transaction runbook](docs/missing-transaction-runbook.md) — what to
+  do when a witness can't fetch a stale block's source data (find, sign, submit, mute).
