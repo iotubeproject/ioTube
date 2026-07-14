@@ -1,5 +1,11 @@
 version: '2'
 
+# Required .env values (copy .env.template -> .env next to this file, then fill in):
+#   IOTEX_RELAYER    - absolute path to the relayer deploy dir (holds etc/ and data/)
+#   DB_ROOT_PASSWORD - MySQL root password for the local relayer-db
+# If either is unset, docker compose fails fast with a clear message (the ${VAR:?...}
+# guards below) instead of silently mounting empty directories over the config files.
+
 services:
   database:
     container_name: relayer-db
@@ -8,9 +14,9 @@ services:
     ports:
       - 13306:3306
     volumes:
-      - $IOTEX_RELAYER/data/mysql:/var/lib/mysql:rw
+      - "${IOTEX_RELAYER:?IOTEX_RELAYER is unset - copy .env.template to .env and set it (see witness-service/README.md)}/data/mysql:/var/lib/mysql:rw"
     environment:
-       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+       MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is unset - copy .env.template to .env and set it (see witness-service/README.md)}"
 
   iotex-payload-relayer:
     container_name: iotex-payload-relayer
