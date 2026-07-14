@@ -214,6 +214,17 @@ func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeigh
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode cashier")
 	}
+	// record the witness heartbeat (best-effort; never fail the RPC over it).
+	// Only for cashiers this relayer actually serves, so an unknown-cashier ping
+	// can't create junk rows. Note: StaleHeights is unauthenticated and the relayer
+	// holds no on-chain witness allowlist, so a caller could still spoof a known
+	// witness address on a served route — full spoof/flood resistance would need a
+	// signed heartbeat verified against the registered witness set.
+	if _, served := s.validators[cashier.String()]; served && len(request.WitnessAddr) > 0 {
+		if err := s.recorder.UpsertWitnessHeartbeat(request.WitnessAddr, cashier, request.TipHeight); err != nil {
+			log.Printf("failed to record witness heartbeat from %x: %v\n", request.WitnessAddr, err)
+		}
+	}
 	heights, err := s.recorder.HeightsOfStaleTransfers(cashier)
 	if err != nil {
 		return nil, err

@@ -108,6 +108,8 @@ type (
 		HeightsOfStaleTransfers(cashier util.Address) ([]uint64, error)
 		// TransfersBySourceTxHash returns transfers by source tx hash
 		TransfersBySourceTxHash(hash common.Hash) ([]*Transfer, error)
+		// UpsertWitnessHeartbeat records a witness liveness heartbeat for a route
+		UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64) error
 	}
 
 	SOLRawTransaction struct {
