@@ -1,4 +1,6 @@
 #!/bin/sh
 
+# The DB password comes from the DB_ROOT_PASSWORD env var (set by the compose
+# service); MYSQL_PWD keeps it out of the process argument list.
 now=$(date +"%s_%Y-%m-%d")
-/usr/bin/mysqldump --opt -h 127.0.0.1 -u root -pkdfjjrU64fjK58H relayer > "/backup/${now}_relayer.sql"
+MYSQL_PWD="${DB_ROOT_PASSWORD}" /usr/bin/mysqldump --opt -h 127.0.0.1 -u root relayer > "/backup/${now}_relayer.sql"

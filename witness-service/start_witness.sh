@@ -7,7 +7,7 @@ NC='\033[0m' # No Color
 
 defaultdatadir="$HOME/iotex-witness"
 CURL="curl -Ss"
-DB_ROOT_PASSWORD="kdfjjrU64fjK58H"
+DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-}"   # no hardcoded default; resolveDbPassword() fills this in
 PROJECT_ABS_DIR=$(cd "$(dirname "$0")";pwd)
 
 pushd () {
@@ -123,6 +123,17 @@ function makeWorkspace() {
     downloadConfigFile
 }
 
+function resolveDbPassword() {
+    local envFile="${IOTEX_WITNESS}/etc/.env"
+    if [[ -z "$DB_ROOT_PASSWORD" && -f "$envFile" ]]; then
+        DB_ROOT_PASSWORD=$(grep -E '^DB_ROOT_PASSWORD=' "$envFile" | tail -1 | cut -d= -f2- | tr -d '\r')
+    fi
+    if [[ -z "$DB_ROOT_PASSWORD" ]]; then
+        DB_ROOT_PASSWORD=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)
+        echo -e "${YELLOW} Generated a new random DB password for the local database. ${NC}"
+    fi
+}
+
 function exportAll() {
     export IOTEX_WITNESS DB_ROOT_PASSWORD PROJECT_ABS_DIR
 }
@@ -222,6 +233,7 @@ function main() {
 
     determinIotexWitness
     confirmEnvironmentVariable
+    resolveDbPassword
 
     exportAll
 
