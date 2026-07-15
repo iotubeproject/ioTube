@@ -13,6 +13,7 @@ services:
     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-testnet.yaml
     environment:
       RELAYER_PRIVATE_KEY: ${TESTNET_RELAYER_PRIVATE_KEY}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
   sepolia-relayer:
     container_name: sepolia-relayer
@@ -26,6 +27,7 @@ services:
     command: relayer -config=/etc/iotube-relayer/relayer-config-sepolia.yaml
     environment:
       RELAYER_PRIVATE_KEY: ${TESTNET_RELAYER_PRIVATE_KEY}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
   bsc-testnet-relayer:
     container_name: bsc-testnet-relayer
@@ -39,4 +41,5 @@ services:
     command: relayer -config=/etc/iotube-relayer/relayer-config-bsc-testnet.yaml
     environment:
       RELAYER_PRIVATE_KEY: ${TESTNET_RELAYER_PRIVATE_KEY}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 

@@ -12,6 +12,7 @@ services:
     command: witness -config=/etc/iotube-witness/witness-config-iotex-testnet.yaml -secret=/etc/iotube-witness/witness-config-iotex-testnet.secret.yaml
     environment:
       WITNESS_PRIVATE_KEY: ${TESTNET_WITNESS_PRIVATE_KEY}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       RELAYER_URL: ${RELAYER_URL}
 
   sepolia-witness:
@@ -25,6 +26,7 @@ services:
     command: witness -config=/etc/iotube-witness/witness-config-sepolia.yaml -secret=/etc/iotube-witness/witness-config-sepolia.secret.yaml
     environment:
       WITNESS_PRIVATE_KEY: ${TESTNET_WITNESS_PRIVATE_KEY}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       RELAYER_URL: ${RELAYER_URL}
 
   bsc-testnet-witness:
@@ -38,5 +40,6 @@ services:
     command: witness -config=/etc/iotube-witness/witness-config-bsc-testnet.yaml -secret=/etc/iotube-witness/witness-config-bsc-testnet.secret.yaml
     environment:
       WITNESS_PRIVATE_KEY: ${TESTNET_WITNESS_PRIVATE_KEY}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       RELAYER_URL: ${RELAYER_URL}
 
