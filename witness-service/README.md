@@ -52,6 +52,11 @@ cd ioTube/witness-service
 ./start_witness.sh
 ```
 
+`start_witness.sh` seeds `.env` from `.env.template`; set at minimum the two
+REQUIRED vars — `IOTEX_WITNESS` (absolute deploy path) and `DB_ROOT_PASSWORD`. If
+either is left blank, `docker compose` fails fast and tells you which one to set
+(rather than silently mounting empty dirs over the config files).
+
 Then fill in your `privateKey` and relayer `relayerURL` host in the relevant
 `<data-dir>/etc/witness-config-<chain>.secret.yaml` and restart.
 

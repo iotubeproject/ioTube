@@ -2,6 +2,12 @@ version: '2'
 
 # The witness image tag is controlled by WITNESS_TAG in .env (defaults to latest).
 # Upgrade in place with:  ./upgrade.sh   (i.e. docker compose pull && docker compose up -d)
+#
+# Required .env values (copy .env.template -> .env next to this file, then fill in):
+#   IOTEX_WITNESS    - absolute path to the witness deploy dir (holds etc/ and data/)
+#   DB_ROOT_PASSWORD - MySQL root password for the local witness-db
+# If either is unset, docker compose fails fast with a clear message (the ${VAR:?...}
+# guards below) instead of silently mounting empty directories over the config files.
 
 services:
   database:
@@ -11,9 +17,9 @@ services:
     ports:
       - 13306:3306
     volumes:
-      - $IOTEX_WITNESS/data/mysql:/var/lib/mysql:rw
+      - "${IOTEX_WITNESS:?IOTEX_WITNESS is unset - copy .env.template to .env and set it (see witness-service/README.md)}/data/mysql:/var/lib/mysql:rw"
     environment:
-       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+       MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is unset - copy .env.template to .env and set it (see witness-service/README.md)}"
 
   iotex-payload-witness:
     container_name: iotex-payload-witness
@@ -27,6 +33,7 @@ services:
     environment:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
       RELAYER_URL: ${RELAYER_URL}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
 #   ethereum-payload-witness:
 #     container_name: ethereum-payload-witness
@@ -53,6 +60,7 @@ services:
     environment:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
       RELAYER_URL: ${RELAYER_URL}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
   matic-payload-witness:
     container_name: matic-payload-witness
@@ -66,6 +74,7 @@ services:
     environment:
       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
       RELAYER_URL: ${RELAYER_URL}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
 #   solana-witness:
 #     container_name: solana-witness

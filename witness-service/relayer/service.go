@@ -138,6 +138,13 @@ func (s *Service) submit(w *types.Witness) ([]byte, error) {
 		if err := validateSignature(transfer.id.Bytes(), common.BytesToAddress(w.Address), w.Signature); err != nil {
 			return nil, err
 		}
+		// Reject signatures from addresses that are not registered on-chain witnesses,
+		// so forged/junk submissions never enter the DB. Fail open when the witness
+		// set has not been loaded from chain yet — the on-chain validator is still the
+		// ultimate gate for settlement.
+		if member, loaded := validator.IsActiveWitness(common.BytesToAddress(w.Address)); loaded && !member {
+			return nil, errors.Errorf("rejecting submission from non-witness %s", common.BytesToAddress(w.Address).Hex())
+		}
 		witness, err = NewWitness(w.Address, w.Signature)
 		if err != nil {
 			return nil, err
@@ -206,6 +213,17 @@ func (s *Service) StaleHeights(ctx context.Context, request *services.StaleHeigh
 	cashier, err := DecodeSourceAddrBytes(request.Cashier)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode cashier")
+	}
+	// record the witness heartbeat (best-effort; never fail the RPC over it).
+	// Only for cashiers this relayer actually serves, so an unknown-cashier ping
+	// can't create junk rows. Note: StaleHeights is unauthenticated and the relayer
+	// holds no on-chain witness allowlist, so a caller could still spoof a known
+	// witness address on a served route — full spoof/flood resistance would need a
+	// signed heartbeat verified against the registered witness set.
+	if _, served := s.validators[cashier.String()]; served && len(request.WitnessAddr) > 0 {
+		if err := s.recorder.UpsertWitnessHeartbeat(request.WitnessAddr, cashier, request.TipHeight); err != nil {
+			log.Printf("failed to record witness heartbeat from %x: %v\n", request.WitnessAddr, err)
+		}
 	}
 	heights, err := s.recorder.HeightsOfStaleTransfers(cashier)
 	if err != nil {

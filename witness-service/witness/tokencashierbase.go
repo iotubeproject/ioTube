@@ -63,6 +63,7 @@ type (
 		calcConfirmHeight      calcConfirmHeightFunc
 		pullTransfers          pullTransfersFunc
 		signHandler            SignHandler
+		signerAddr             []byte
 		hasEnoughBalance       hasEnoughBalanceFunc
 		start                  startStopFunc
 		stop                   startStopFunc
@@ -90,6 +91,14 @@ func newTokenCashierBase(
 	stop startStopFunc,
 	disablePull bool,
 ) TokenCashier {
+	// derive the witness's own address once (independent of any transfer) so the
+	// liveness heartbeat can report it even when there is no traffic to sign.
+	var signerAddr []byte
+	if signHandler != nil {
+		if _, addr, _, err := signHandler(nil, validatorContractAddr); err == nil {
+			signerAddr = addr
+		}
+	}
 	return &tokenCashierBase{
 		id:                     id,
 		cashierContractAddr:    cashierContractAddr,
@@ -102,6 +111,7 @@ func newTokenCashierBase(
 		calcConfirmHeight:      calcConfirmHeight,
 		pullTransfers:          pullTransfers,
 		signHandler:            signHandler,
+		signerAddr:             signerAddr,
 		hasEnoughBalance:       hasEnoughBalance,
 		lastPullTimestamp:      time.Now(),
 		start:                  start,
@@ -307,15 +317,27 @@ func (tc *tokenCashierBase) ProcessStales() error {
 	}
 	defer conn.Close()
 	relayer := services.NewRelayServiceClient(conn)
+	// tipHeight is the heartbeat's reported scan tip. For disable-pull cashiers
+	// PullTransfers never advances lastProcessBlockHeight, so reporting it would
+	// pin a misleading fixed height forever — send 0 (no scan tip) in that case;
+	// the witness address alone still carries the liveness signal.
+	var tipHeight uint64
+	if !tc.disablePull {
+		tipHeight = tc.lastProcessBlockHeight
+	}
 	response, err := relayer.StaleHeights(context.Background(), &services.StaleHeightsRequest{
-		Cashier: tc.cashierContractAddr.Bytes(),
+		Cashier:     tc.cashierContractAddr.Bytes(),
+		WitnessAddr: tc.signerAddr,
+		TipHeight:   tipHeight,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch stale heights")
 	}
 	if tc.previousCashierAddr != nil {
 		previousResponse, err := relayer.StaleHeights(context.Background(), &services.StaleHeightsRequest{
-			Cashier: tc.previousCashierAddr.Bytes(),
+			Cashier:     tc.previousCashierAddr.Bytes(),
+			WitnessAddr: tc.signerAddr,
+			TipHeight:   tipHeight,
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch stale heights from previous cashier")

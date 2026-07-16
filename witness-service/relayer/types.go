@@ -73,6 +73,9 @@ type (
 		Address() common.Address
 		// Check returns transfer status on chain
 		Check(transfer *Transfer) (StatusOnChainType, error)
+		// IsActiveWitness reports whether addr is a registered on-chain witness,
+		// and whether the witness set has been loaded from chain yet.
+		IsActiveWitness(addr common.Address) (isMember bool, loaded bool)
 		// Submit submits validation for a transfer
 		Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 		// SpeedUp resubmits validation with higher gas price
@@ -105,6 +108,8 @@ type (
 		HeightsOfStaleTransfers(cashier util.Address) ([]uint64, error)
 		// TransfersBySourceTxHash returns transfers by source tx hash
 		TransfersBySourceTxHash(hash common.Hash) ([]*Transfer, error)
+		// UpsertWitnessHeartbeat records a witness liveness heartbeat for a route
+		UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64) error
 	}
 
 	SOLRawTransaction struct {

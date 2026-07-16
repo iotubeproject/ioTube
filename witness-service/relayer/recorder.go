@@ -35,6 +35,10 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
+// witnessHeartbeatTableName is the shared table recording per-witness liveness
+// (last StaleHeights ping + reported scan tip) across payload relayers.
+const witnessHeartbeatTableName = "witness_heartbeats"
+
 type (
 	// Recorder is a logger based on sql to record exchange events
 	Recorder struct {
@@ -173,6 +177,27 @@ func (recorder *Recorder) initStore(
 			return errors.Wrap(err, "failed to create witness table")
 		}
 	}
+	// witness_heartbeats records the last time each witness pinged this relayer
+	// (via StaleHeights) and its reported scan tip, for traffic-independent
+	// liveness monitoring. Shared across payload relayers on the same DB; the
+	// (witness, cashier) primary key keeps per-route heartbeats distinct. Created
+	// unconditionally (no dependency on the witness table) so the best-effort
+	// upsert in StaleHeights never hits a missing table even when witnessTableName
+	// is empty.
+	if _, err := store.DB().Exec(fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s ("+
+			"`witness` varchar(66) NOT NULL,"+
+			"`cashier` varchar(64) NOT NULL,"+
+			"`tipHeight` bigint(20) NOT NULL DEFAULT 0,"+
+			"`creationTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"+
+			"`updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"+
+			"PRIMARY KEY (`witness`, `cashier`),"+
+			"KEY `updateTime_index` (`updateTime`)"+
+			") ENGINE=InnoDB DEFAULT CHARSET=latin1;",
+		witnessHeartbeatTableName,
+	)); err != nil {
+		return errors.Wrap(err, "failed to create witness heartbeat table")
+	}
 
 	if newTXTableName != "" {
 		if _, err := store.DB().Exec(fmt.Sprintf(
@@ -208,6 +233,37 @@ func (recorder *Recorder) Stop(ctx context.Context) error {
 	}
 
 	return recorder.store.Stop(ctx)
+}
+
+// validWitnessHeartbeatAddr reports whether addr is a plausible witness identity
+// for a heartbeat: a 20-byte secp256k1 address or a 32-byte ed25519 public key.
+// StaleHeights is served unauthenticated, so this bounds what a client can write
+// into witness_heartbeats — rejecting junk that would overflow the varchar(66)
+// witness column or spawn unbounded rows.
+func validWitnessHeartbeatAddr(addr []byte) bool {
+	return len(addr) == 20 || len(addr) == 32
+}
+
+// UpsertWitnessHeartbeat records that a witness pinged this relayer for a route,
+// together with its reported scan tip. Used for traffic-independent liveness
+// monitoring; a stale updateTime means the witness is offline or behind.
+func (recorder *Recorder) UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64) error {
+	if !validWitnessHeartbeatAddr(witnessAddr) {
+		return nil
+	}
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
+	_, err := recorder.store.DB().Exec(
+		fmt.Sprintf(
+			"INSERT INTO `%s` (`witness`, `cashier`, `tipHeight`) VALUES (?, ?, ?) "+
+				"ON DUPLICATE KEY UPDATE `tipHeight`=VALUES(`tipHeight`), `updateTime`=CURRENT_TIMESTAMP",
+			witnessHeartbeatTableName,
+		),
+		"0x"+hex.EncodeToString(witnessAddr),
+		cashier.String(),
+		tipHeight,
+	)
+	return err
 }
 
 // AddTransferAndWitness records a new transfer and its witness
@@ -648,8 +704,14 @@ func (recorder *Recorder) TransfersWithFBO(
 ) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
+	// Order the user-facing List by blockHeight (the source-chain block, i.e. the
+	// real transfer time) rather than creationTime (when the row was inserted on
+	// this relayer). Re-submitting an old transfer stamps a fresh creationTime and
+	// would otherwise jump it to the top of the list; each payload relayer serves a
+	// single source chain, so blockHeight is monotonic in real time here.
 	return recorder.transfers(
 		fmt.Sprintf("SELECT `cashier`, IFNULL(`fbo_token`, `token`), `tidx`, `sender`, `txSender`, IFNULL(`fbo_recipient`, `recipient`), `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName),
+		"blockHeight",
 		offset,
 		limit,
 		desc,
@@ -666,8 +728,10 @@ func (recorder *Recorder) Transfers(
 ) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
+	// Internal processing (bonus/confirm/submit queues) keeps creationTime ordering.
 	return recorder.transfers(
 		fmt.Sprintf("SELECT `cashier`, `token`, `tidx`, `sender`, `txSender`, `recipient`, `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName),
+		"creationTime",
 		offset,
 		limit,
 		desc,
@@ -677,12 +741,12 @@ func (recorder *Recorder) Transfers(
 
 func (recorder *Recorder) transfers(
 	query string,
+	orderBy string,
 	offset uint32,
 	limit uint8,
 	desc Order,
 	queryOpts []TransferQueryOption,
 ) ([]*Transfer, error) {
-	orderBy := "creationTime"
 	params := []interface{}{}
 	queryOpts = append(queryOpts, ExcludeAmountZeroOption())
 	conditions := []string{}

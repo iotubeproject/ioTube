@@ -7,7 +7,6 @@ NC='\033[0m' # No Color
 
 defaultdatadir="$HOME/iotex-witness"
 CURL="curl -Ss"
-DB_ROOT_PASSWORD="kdfjjrU64fjK58H"
 PROJECT_ABS_DIR=$(cd "$(dirname "$0")";pwd)
 
 pushd () {
