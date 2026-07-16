@@ -288,30 +288,37 @@ func NewTokenCashierOnEthereum(
 		startBlockHeight,
 		func(startHeight uint64, count uint16) (uint64, uint64, error) {
 			ctx := context.Background()
+			if count == 0 {
+				count = 1
+			}
+			if useFinalizedBlock {
+				// Use the chain's finalized block as the confirmed tip. A finalized
+				// block cannot be reorged, so this is fail-safe: during a finality
+				// stall the finalized height simply freezes and the witness waits.
+				// endHeight is capped at the finalized height as well, so PullTransfers
+				// never scans or stores still-reorgable receipts above it (an
+				// unfinalized row that later reorgs would otherwise be flipped to
+				// "ready" by UpsertTransfer while keeping its stale recipient/amount).
+				confirmHeight, err := fetchFinalizedHeight(ctx, rawClient)
+				if err != nil {
+					return 0, 0, err
+				}
+				endHeight := startHeight + uint64(count) - 1
+				if confirmHeight < endHeight {
+					endHeight = confirmHeight
+				}
+				return confirmHeight, endHeight, nil
+			}
+			// Fallback: probabilistic latest-minus-N confirmation.
 			tipHeader, err := ethereumClient.HeaderByNumber(ctx, nil)
 			if err != nil {
 				return 0, 0, errors.Wrap(err, "failed to query tip block header")
 			}
 			tipHeight := tipHeader.Number.Uint64()
-			if count == 0 {
-				count = 1
+			if tipHeight <= confirmBlockNumber {
+				return 0, 0, errors.Errorf("tip height %d is smaller than confirm block number %d", tipHeight, confirmBlockNumber)
 			}
-			// confirmHeight is the highest block considered safe to sign. When
-			// useFinalizedBlock is set, it is the chain's finalized block (fail-safe:
-			// it freezes during a finality stall instead of advancing). Otherwise it
-			// falls back to the probabilistic latest-minus-N rule.
-			var confirmHeight uint64
-			if useFinalizedBlock {
-				confirmHeight, err = fetchFinalizedHeight(ctx, rawClient)
-				if err != nil {
-					return 0, 0, err
-				}
-			} else {
-				if tipHeight <= confirmBlockNumber {
-					return 0, 0, errors.Errorf("tip height %d is smaller than confirm block number %d", tipHeight, confirmBlockNumber)
-				}
-				confirmHeight = tipHeight - confirmBlockNumber
-			}
+			confirmHeight := tipHeight - confirmBlockNumber
 			endHeight := startHeight + uint64(count) - 1
 			if tipHeight < endHeight {
 				endHeight = tipHeight
