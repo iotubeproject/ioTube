@@ -292,18 +292,30 @@ func NewTokenCashierOnEthereum(
 				count = 1
 			}
 			if useFinalizedBlock {
-				// Use the chain's finalized block as the confirmed tip. A finalized
-				// block cannot be reorged, so this is fail-safe: during a finality
-				// stall the finalized height simply freezes and the witness waits
-				// (the base treats "no newly finalized blocks" as a no-op cycle, so
-				// already-ready transfers keep being submitted throughout the stall).
-				// endHeight is capped at the finalized height as well, so PullTransfers
-				// never scans or stores still-reorgable receipts above it (an
-				// unfinalized row that later reorgs would otherwise be flipped to
-				// "ready" by UpsertTransfer while keeping its stale recipient/amount).
-				confirmHeight, err := fetchFinalizedHeight(ctx, rawClient)
+				// Use the chain's finalized block, minus an optional extra safety
+				// margin (confirmBlockNumber), as the confirmed tip. Finalized removes
+				// routine reorgs and most reorg-based attacks (BFT finality). The extra
+				// margin is defense in depth for a bridge, where the catastrophic case
+				// is not an everyday reorg but a deliberate attack that breaks the
+				// chain's finality gadget itself — which the >=3/4 witness multisig
+				// cannot catch because it is correlated across all witnesses watching
+				// the same chain. Waiting confirmBlockNumber blocks past finalized buys
+				// time for such a failure to be detected before crediting, and yields
+				// the strictly stronger "finalized AND N-deep" guarantee. Set
+				// confirmBlockNumber to 0 to trust finalized alone. endHeight is capped
+				// at confirmHeight so PullTransfers never stores still-reorgable
+				// receipts above it (an unfinalized/too-shallow row that later reorgs
+				// would otherwise be flipped to "ready" by UpsertTransfer while keeping
+				// its stale recipient/amount). During a finality stall confirmHeight
+				// freezes and the base treats it as a no-op cycle, so already-ready
+				// transfers keep being submitted throughout the stall.
+				finalizedHeight, err := fetchFinalizedHeight(ctx, rawClient)
 				if err != nil {
 					return 0, 0, err
+				}
+				var confirmHeight uint64
+				if finalizedHeight > confirmBlockNumber {
+					confirmHeight = finalizedHeight - confirmBlockNumber
 				}
 				endHeight := startHeight + uint64(count) - 1
 				if confirmHeight < endHeight {
