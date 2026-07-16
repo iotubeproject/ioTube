@@ -294,7 +294,9 @@ func NewTokenCashierOnEthereum(
 			if useFinalizedBlock {
 				// Use the chain's finalized block as the confirmed tip. A finalized
 				// block cannot be reorged, so this is fail-safe: during a finality
-				// stall the finalized height simply freezes and the witness waits.
+				// stall the finalized height simply freezes and the witness waits
+				// (the base treats "no newly finalized blocks" as a no-op cycle, so
+				// already-ready transfers keep being submitted throughout the stall).
 				// endHeight is capped at the finalized height as well, so PullTransfers
 				// never scans or stores still-reorgable receipts above it (an
 				// unfinalized row that later reorgs would otherwise be flipped to
@@ -302,17 +304,6 @@ func NewTokenCashierOnEthereum(
 				confirmHeight, err := fetchFinalizedHeight(ctx, rawClient)
 				if err != nil {
 					return 0, 0, err
-				}
-				if confirmHeight < startHeight {
-					// No newly finalized blocks since the last sync (caught up, or
-					// finality has stalled). Signal this as a transient error so the
-					// base falls through its existing grace window and PullTransfers
-					// returns nil, rather than tripping the hard "confirmHeight <
-					// startHeight" error below. That keeps already-ready transfers
-					// flowing through SubmitTransfers/CheckTransfers during the short
-					// stalls this mode is meant to tolerate (service.process skips
-					// those steps whenever PullTransfers returns an error).
-					return 0, 0, errors.Errorf("no newly finalized blocks: finalized height %d is below next start height %d", confirmHeight, startHeight)
 				}
 				endHeight := startHeight + uint64(count) - 1
 				if confirmHeight < endHeight {
