@@ -303,6 +303,17 @@ func NewTokenCashierOnEthereum(
 				if err != nil {
 					return 0, 0, err
 				}
+				if confirmHeight < startHeight {
+					// No newly finalized blocks since the last sync (caught up, or
+					// finality has stalled). Signal this as a transient error so the
+					// base falls through its existing grace window and PullTransfers
+					// returns nil, rather than tripping the hard "confirmHeight <
+					// startHeight" error below. That keeps already-ready transfers
+					// flowing through SubmitTransfers/CheckTransfers during the short
+					// stalls this mode is meant to tolerate (service.process skips
+					// those steps whenever PullTransfers returns an error).
+					return 0, 0, errors.Errorf("no newly finalized blocks: finalized height %d is below next start height %d", confirmHeight, startHeight)
+				}
 				endHeight := startHeight + uint64(count) - 1
 				if confirmHeight < endHeight {
 					endHeight = confirmHeight
