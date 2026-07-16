@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"go.uber.org/config"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
@@ -43,6 +44,7 @@ type Configuration struct {
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
 	LarkWebHook           string        `json:"larkWebHook" yaml:"larkWebHook"`
 	ConfirmBlockNumber    int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
+	UseFinalizedBlock     bool          `json:"useFinalizedBlock" yaml:"useFinalizedBlock"`
 	BatchSize             int           `json:"batchSize" yaml:"batchSize"`
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
@@ -292,10 +294,11 @@ func main() {
 			cashiers = append(cashiers, cashier)
 		}
 	default: // "heco", "bsc", "matic", "polis", "iotex-e", "iotex", "sepolia", "iotex-testnet", "ethereum":
-		ethClient, err := ethclient.Dial(cfg.ClientURL)
+		rpcClient, err := rpc.Dial(cfg.ClientURL)
 		if err != nil {
 			log.Fatal(err)
 		}
+		ethClient := ethclient.NewClient(rpcClient)
 		for _, cc := range cfg.Cashiers {
 			var (
 				signHandler     witness.SignHandler
@@ -397,6 +400,7 @@ func main() {
 				version,
 				cc.RelayerURL,
 				ethClient,
+				rpcClient,
 				cashierAddr,
 				previousCashierAddr,
 				tokenSafeAddr,
@@ -411,7 +415,8 @@ func main() {
 					destAddrDecoder,
 				),
 				uint64(cc.StartBlockHeight),
-				uint8(cfg.ConfirmBlockNumber),
+				uint64(cfg.ConfirmBlockNumber),
+				cfg.UseFinalizedBlock,
 				signHandler,
 				reverseRecorder,
 				common.HexToAddress(cc.Reverse.CashierContractAddress),
