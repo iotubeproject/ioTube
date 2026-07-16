@@ -195,17 +195,25 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		}
 		return errors.Wrapf(err, "failed to get end height and tip height with start height %d, count %d", startHeight, count)
 	}
-	if confirmHeight < startHeight {
-		// No new confirmed blocks since the last sync (e.g. the chain's finalized
-		// height has not advanced / finality is stalled). There is nothing to pull
-		// this cycle, but this is not a failure: return nil so the caller still runs
+	if confirmHeight+1 == startHeight {
+		// Exactly caught up: the confirmed tip equals the last synced height, so there
+		// are no new confirmed blocks this cycle (e.g. the chain's finalized height has
+		// not advanced / finality is stalled). This is not a failure: refresh
+		// lastPullTimestamp (a healthy poll, so a later transient RPC error still gets
+		// the grace window above) and return nil so the caller still runs
 		// SubmitTransfers/CheckTransfers for already-confirmed transfers instead of
 		// skipping them (service.process skips those whenever PullTransfers errors).
-		// This was a healthy poll, so refresh lastPullTimestamp — otherwise a long
-		// stall would let it go stale and a later transient RPC error would fall
-		// through the grace window above and halt submissions mid-stall.
 		tc.lastPullTimestamp = time.Now()
 		return nil
+	}
+	if confirmHeight < startHeight {
+		// The confirmed tip has regressed below the last synced height: a load-balanced
+		// RPC returned an older tip, the finalized height moved backwards, or the DB was
+		// synced past the current confirmed tip (e.g. switching to finalized mode after
+		// syncing further under latest-minus-N). Do NOT treat this as a benign no-op —
+		// return an error so service.process skips submissions this cycle rather than
+		// signing already-ready rows that now sit above a confirmed tip that regressed.
+		return errors.Errorf("confirm height %d regressed below sync height %d", confirmHeight, startHeight-1)
 	}
 	var transfers []AbstractTransfer
 	tc.lastPullTimestamp = time.Now()
