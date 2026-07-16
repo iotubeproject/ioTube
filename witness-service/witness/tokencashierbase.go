@@ -201,6 +201,10 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		// this cycle, but this is not a failure: return nil so the caller still runs
 		// SubmitTransfers/CheckTransfers for already-confirmed transfers instead of
 		// skipping them (service.process skips those whenever PullTransfers errors).
+		// This was a healthy poll, so refresh lastPullTimestamp — otherwise a long
+		// stall would let it go stale and a later transient RPC error would fall
+		// through the grace window above and halt submissions mid-stall.
+		tc.lastPullTimestamp = time.Now()
 		return nil
 	}
 	var transfers []AbstractTransfer
