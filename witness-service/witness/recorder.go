@@ -315,28 +315,74 @@ func (recorder *Recorder) committedTransfersAboveHeight(cashiers []string, heigh
 	return count, uint64(minHeight.Int64), uint64(maxHeight.Int64), nil
 }
 
-// deleteUnconfirmedTransfersAboveHeight removes transfers under the given
-// cashier contract address(es) strictly above the given block height that have
-// definitely not been signed (new/pending/invalid), so they are re-derived from
-// the finalized chain on the next scan. Ready rows are intentionally excluded —
-// see committedTransfersAboveHeight. It returns the number of rows removed.
-func (recorder *Recorder) deleteUnconfirmedTransfersAboveHeight(cashiers []string, height uint64) (int64, error) {
+// rollbackToConfirmedTip self-heals the DB for the given cashier in a single
+// transaction: it deletes the not-yet-signed rows (new/pending/invalid) under
+// the given cashier contract address(es) strictly above the confirmed height,
+// verifies that no rows remain above it, and then rolls the sync height (in
+// cashier_meta, keyed by the route id) back to the confirmed height. The
+// caller must first confirm via committedTransfersAboveHeight that no
+// confirmed/settled/ready rows sit above the tip. The post-delete "no rows
+// remain" check guards against status-enum drift: if a status is ever added
+// that is in neither the committed set nor the delete set, such a row would be
+// silently stranded above the tip, so the reconciliation refuses to roll back
+// and surfaces it loudly instead. Returns the number of rows deleted.
+func (recorder *Recorder) rollbackToConfirmedTip(cashiers []string, id string, height uint64) (int64, error) {
 	if len(cashiers) == 0 {
 		return 0, nil
 	}
-	args := make([]interface{}, 0, len(cashiers)+4)
-	for _, c := range cashiers {
-		args = append(args, c)
+	tx, err := recorder.store.DB().Begin()
+	if err != nil {
+		return 0, err
 	}
-	args = append(args, height, TransferNew, TransferPending, TransferInvalid)
-	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("DELETE FROM %s WHERE cashier IN (%s) AND blockHeight>? AND status IN (?, ?, ?)", recorder.transferTableName, sqlPlaceholders(len(cashiers))),
-		args...,
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	base := make([]interface{}, 0, len(cashiers)+1)
+	for _, c := range cashiers {
+		base = append(base, c)
+	}
+	base = append(base, height)
+	inClause := sqlPlaceholders(len(cashiers))
+
+	delArgs := append(append([]interface{}{}, base...), TransferNew, TransferPending, TransferInvalid)
+	res, err := tx.Exec(
+		fmt.Sprintf("DELETE FROM %s WHERE cashier IN (%s) AND blockHeight>? AND status IN (?, ?, ?)", recorder.transferTableName, inClause),
+		delArgs...,
 	)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	deleted, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	var remaining int
+	if err := tx.QueryRow(
+		fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE cashier IN (%s) AND blockHeight>?", recorder.transferTableName, inClause),
+		base...,
+	).Scan(&remaining); err != nil {
+		return 0, err
+	}
+	if remaining > 0 {
+		return 0, errors.Errorf("%d transfer(s) with an unhandled status remain above the confirmed height %d after reconciliation; refusing to roll back (status enum drift?)", remaining, height)
+	}
+
+	if _, err := tx.Exec(
+		fmt.Sprintf("REPLACE INTO %s (`cashier`, `height`) VALUES (?, ?)", recorder.cashierMetaTableName),
+		id, height,
+	); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	committed = true
+	return deleted, nil
 }
 
 // SettleTransfer marks a record as settled

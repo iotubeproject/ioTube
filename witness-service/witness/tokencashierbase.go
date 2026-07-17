@@ -224,12 +224,9 @@ func (tc *tokenCashierBase) reconcileConfirmedTip() error {
 			tc.id, committed, minHeight, maxHeight, confirmHeight,
 		)
 	}
-	deleted, err := rec.deleteUnconfirmedTransfersAboveHeight(cashiers, confirmHeight)
+	deleted, err := rec.rollbackToConfirmedTip(cashiers, tc.id, confirmHeight)
 	if err != nil {
-		return errors.Wrap(err, "failed to drop uncommitted transfers above confirmed height")
-	}
-	if err := tc.recorder.UpdateSyncHeight(tc.id, confirmHeight); err != nil {
-		return errors.Wrap(err, "failed to roll sync height back to confirmed height")
+		return errors.Wrap(err, "failed to roll back to confirmed height")
 	}
 	// Also rewind the in-memory floor, otherwise PullTransfers uses
 	// max(TipHeight, lastProcessBlockHeight) and would start above confirmHeight
