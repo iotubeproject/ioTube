@@ -157,6 +157,7 @@ func NewTokenCashierOnSolana(
 			return nil
 		},
 		disablePull,
+		false,
 	), nil
 }
 

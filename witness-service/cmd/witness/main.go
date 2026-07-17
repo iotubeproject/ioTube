@@ -441,15 +441,6 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to create cashier %v\n", err)
 			}
-			if cfg.UseFinalizedBlock {
-				// Self-heal a DB whose sync height was advanced past the
-				// finalized confirmed tip by a previous latest-minus-N run, so
-				// the witness does not fail closed after enabling finalized
-				// mode. Fails fast if already-committed rows sit above the tip.
-				if err := cashier.ReconcileConfirmedTip(); err != nil {
-					log.Fatalf("failed to reconcile cashier %s for finalized mode: %v\n", cc.CashierContractAddress, err)
-				}
-			}
 			cashiers = append(cashiers, cashier)
 		}
 	}

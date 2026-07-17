@@ -276,41 +276,59 @@ func (recorder *Recorder) UpdateSyncHeight(cashier string, height uint64) error 
 	return nil
 }
 
-// committedTransfersAboveHeight counts transfers for a cashier strictly above
-// the given block height that are already committed — this witness has signed
-// and submitted them (confirmed) or they are settled — and therefore cannot be
-// dropped. It returns the count and, for operator diagnostics, the [min,max]
-// block-height range of those rows.
-func (recorder *Recorder) committedTransfersAboveHeight(cashier string, height uint64) (int, uint64, uint64, error) {
+// sqlPlaceholders returns a comma-separated list of n bind placeholders,
+// e.g. sqlPlaceholders(3) == "?, ?, ?".
+func sqlPlaceholders(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strings.TrimSuffix(strings.Repeat("?, ", n), ", ")
+}
+
+// committedTransfersAboveHeight counts transfers under the given cashier
+// contract address(es) strictly above the given block height that are already
+// committed — this witness has signed and submitted them (confirmed) or they
+// are settled — and therefore cannot be dropped. Transfer rows are keyed by the
+// cashier contract address, not the route id used for cashier_meta. It returns
+// the count and, for operator diagnostics, the [min,max] block-height range.
+func (recorder *Recorder) committedTransfersAboveHeight(cashiers []string, height uint64) (int, uint64, uint64, error) {
+	if len(cashiers) == 0 {
+		return 0, 0, 0, nil
+	}
+	args := make([]interface{}, 0, len(cashiers)+3)
+	for _, c := range cashiers {
+		args = append(args, c)
+	}
+	args = append(args, height, SubmissionConfirmed, TransferSettled)
 	var (
 		count                int
 		minHeight, maxHeight sql.NullInt64
 	)
 	if err := recorder.store.DB().QueryRow(
-		fmt.Sprintf("SELECT COUNT(*), MIN(blockHeight), MAX(blockHeight) FROM %s WHERE cashier=? AND blockHeight>? AND status IN (?, ?)", recorder.transferTableName),
-		cashier,
-		height,
-		SubmissionConfirmed,
-		TransferSettled,
+		fmt.Sprintf("SELECT COUNT(*), MIN(blockHeight), MAX(blockHeight) FROM %s WHERE cashier IN (%s) AND blockHeight>? AND status IN (?, ?)", recorder.transferTableName, sqlPlaceholders(len(cashiers))),
+		args...,
 	).Scan(&count, &minHeight, &maxHeight); err != nil {
 		return 0, 0, 0, err
 	}
 	return count, uint64(minHeight.Int64), uint64(maxHeight.Int64), nil
 }
 
-// deleteUnconfirmedTransfersAboveHeight removes transfers for a cashier strictly
-// above the given block height that have not been committed
-// (new/pending/ready/invalid), so they are re-derived from the finalized chain
-// on the next scan. It returns the number of rows removed.
-func (recorder *Recorder) deleteUnconfirmedTransfersAboveHeight(cashier string, height uint64) (int64, error) {
+// deleteUnconfirmedTransfersAboveHeight removes transfers under the given
+// cashier contract address(es) strictly above the given block height that have
+// not been committed (new/pending/ready/invalid), so they are re-derived from
+// the finalized chain on the next scan. It returns the number of rows removed.
+func (recorder *Recorder) deleteUnconfirmedTransfersAboveHeight(cashiers []string, height uint64) (int64, error) {
+	if len(cashiers) == 0 {
+		return 0, nil
+	}
+	args := make([]interface{}, 0, len(cashiers)+5)
+	for _, c := range cashiers {
+		args = append(args, c)
+	}
+	args = append(args, height, TransferNew, TransferPending, TransferReady, TransferInvalid)
 	result, err := recorder.store.DB().Exec(
-		fmt.Sprintf("DELETE FROM %s WHERE cashier=? AND blockHeight>? AND status IN (?, ?, ?, ?)", recorder.transferTableName),
-		cashier,
-		height,
-		TransferNew,
-		TransferPending,
-		TransferReady,
-		TransferInvalid,
+		fmt.Sprintf("DELETE FROM %s WHERE cashier IN (%s) AND blockHeight>? AND status IN (?, ?, ?, ?)", recorder.transferTableName, sqlPlaceholders(len(cashiers))),
+		args...,
 	)
 	if err != nil {
 		return 0, err

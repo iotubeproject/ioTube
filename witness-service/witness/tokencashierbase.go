@@ -68,6 +68,7 @@ type (
 		start                  startStopFunc
 		stop                   startStopFunc
 		disablePull            bool
+		useFinalizedBlock      bool
 	}
 	calcConfirmHeightFunc func(startHeight uint64, count uint16) (uint64, uint64, error)
 	pullTransfersFunc     func(startHeight uint64, endHeight uint64) ([]AbstractTransfer, error)
@@ -90,6 +91,7 @@ func newTokenCashierBase(
 	start startStopFunc,
 	stop startStopFunc,
 	disablePull bool,
+	useFinalizedBlock bool,
 ) TokenCashier {
 	// derive the witness's own address once (independent of any transfer) so the
 	// liveness heartbeat can report it even when there is no traffic to sign.
@@ -117,12 +119,22 @@ func newTokenCashierBase(
 		start:                  start,
 		stop:                   stop,
 		disablePull:            disablePull,
+		useFinalizedBlock:      useFinalizedBlock,
 	}
 }
 
 func (tc *tokenCashierBase) Start(ctx context.Context) error {
 	if err := tc.recorder.Start(ctx); err != nil {
 		return err
+	}
+	if tc.useFinalizedBlock {
+		// Self-heal the DB before pulling: if a previous latest-minus-N run
+		// advanced the sync height past the finalized confirmed tip, roll it
+		// back so the witness does not fail closed. Runs after recorder.Start
+		// (DB open + tables created) and before the pull loop.
+		if err := tc.reconcileConfirmedTip(); err != nil {
+			return err
+		}
 	}
 	return tc.start(ctx)
 }
@@ -162,7 +174,7 @@ func (tc *tokenCashierBase) PullTransfersByHeight(height uint64) error {
 	return nil
 }
 
-// ReconcileConfirmedTip self-heals the DB when finalized mode is enabled on a
+// reconcileConfirmedTip self-heals the DB when finalized mode is enabled on a
 // witness whose sync height was already advanced past the finalized confirmed
 // tip by a previous (probabilistic latest-minus-N) run. Without it, PullTransfers
 // would return a regression error every cycle and the witness would fail closed
@@ -173,7 +185,8 @@ func (tc *tokenCashierBase) PullTransfersByHeight(height uint64) error {
 // tip, it refuses to proceed and returns an error for manual review, because
 // dropping them could desync the relayer or mask a real reorg. It is a no-op in
 // steady state (sync height <= confirmed tip) and for non-ethereum recorders.
-func (tc *tokenCashierBase) ReconcileConfirmedTip() error {
+// Called from Start (after recorder.Start) only when useFinalizedBlock is set.
+func (tc *tokenCashierBase) reconcileConfirmedTip() error {
 	rec, ok := tc.recorder.(*Recorder)
 	if !ok {
 		// Only the ethereum recorder participates in finalized mode.
@@ -185,6 +198,7 @@ func (tc *tokenCashierBase) ReconcileConfirmedTip() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to compute confirmed height for reconciliation")
 	}
+	// Sync height lives in cashier_meta, keyed by the route id.
 	syncHeight, err := tc.recorder.TipHeight(tc.id)
 	if err != nil {
 		return errors.Wrap(err, "failed to read sync height for reconciliation")
@@ -192,7 +206,13 @@ func (tc *tokenCashierBase) ReconcileConfirmedTip() error {
 	if syncHeight <= confirmHeight {
 		return nil
 	}
-	committed, minHeight, maxHeight, err := rec.committedTransfersAboveHeight(tc.id, confirmHeight)
+	// Transfer rows are keyed by the cashier contract address(es) (current and,
+	// if set, the previous cashier), not by the route id.
+	cashiers := []string{tc.cashierContractAddr.String()}
+	if tc.previousCashierAddr != nil {
+		cashiers = append(cashiers, tc.previousCashierAddr.String())
+	}
+	committed, minHeight, maxHeight, err := rec.committedTransfersAboveHeight(cashiers, confirmHeight)
 	if err != nil {
 		return errors.Wrap(err, "failed to inspect committed transfers above confirmed height")
 	}
@@ -203,7 +223,7 @@ func (tc *tokenCashierBase) ReconcileConfirmedTip() error {
 			tc.id, committed, minHeight, maxHeight, confirmHeight,
 		)
 	}
-	deleted, err := rec.deleteUnconfirmedTransfersAboveHeight(tc.id, confirmHeight)
+	deleted, err := rec.deleteUnconfirmedTransfersAboveHeight(cashiers, confirmHeight)
 	if err != nil {
 		return errors.Wrap(err, "failed to drop uncommitted transfers above confirmed height")
 	}
