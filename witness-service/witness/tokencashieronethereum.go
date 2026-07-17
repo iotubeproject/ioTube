@@ -410,5 +410,6 @@ func NewTokenCashierOnEthereum(
 			return nil
 		},
 		false,
+		useFinalizedBlock,
 	), nil
 }

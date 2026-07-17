@@ -276,6 +276,115 @@ func (recorder *Recorder) UpdateSyncHeight(cashier string, height uint64) error 
 	return nil
 }
 
+// sqlPlaceholders returns a comma-separated list of n bind placeholders,
+// e.g. sqlPlaceholders(3) == "?, ?, ?".
+func sqlPlaceholders(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strings.TrimSuffix(strings.Repeat("?, ", n), ", ")
+}
+
+// committedTransfersAboveHeight counts transfers under the given cashier
+// contract address(es) strictly above the given block height that must not be
+// dropped: confirmed (this witness signed & submitted them) or settled, plus
+// ready — a ready row may already have been signed and submitted to the relayer
+// (SubmitTransfers sends the witness before persisting ConfirmTransfer, so a
+// crash in that window leaves a locally-ready but already-signed row). Transfer
+// rows are keyed by the cashier contract address, not the route id used for
+// cashier_meta. Returns the count and, for diagnostics, the [min,max] range.
+func (recorder *Recorder) committedTransfersAboveHeight(cashiers []string, height uint64) (int, uint64, uint64, error) {
+	if len(cashiers) == 0 {
+		return 0, 0, 0, nil
+	}
+	args := make([]interface{}, 0, len(cashiers)+4)
+	for _, c := range cashiers {
+		args = append(args, c)
+	}
+	args = append(args, height, SubmissionConfirmed, TransferSettled, TransferReady)
+	var (
+		count                int
+		minHeight, maxHeight sql.NullInt64
+	)
+	if err := recorder.store.DB().QueryRow(
+		fmt.Sprintf("SELECT COUNT(*), MIN(blockHeight), MAX(blockHeight) FROM %s WHERE cashier IN (%s) AND blockHeight>? AND status IN (?, ?, ?)", recorder.transferTableName, sqlPlaceholders(len(cashiers))),
+		args...,
+	).Scan(&count, &minHeight, &maxHeight); err != nil {
+		return 0, 0, 0, err
+	}
+	return count, uint64(minHeight.Int64), uint64(maxHeight.Int64), nil
+}
+
+// rollbackToConfirmedTip self-heals the DB for the given cashier in a single
+// transaction: it deletes the not-yet-signed rows (new/pending/invalid) under
+// the given cashier contract address(es) strictly above the confirmed height,
+// verifies that no rows remain above it, and then rolls the sync height (in
+// cashier_meta, keyed by the route id) back to the confirmed height. The
+// caller must first confirm via committedTransfersAboveHeight that no
+// confirmed/settled/ready rows sit above the tip. The post-delete "no rows
+// remain" check guards against status-enum drift: if a status is ever added
+// that is in neither the committed set nor the delete set, such a row would be
+// silently stranded above the tip, so the reconciliation refuses to roll back
+// and surfaces it loudly instead. Returns the number of rows deleted.
+func (recorder *Recorder) rollbackToConfirmedTip(cashiers []string, id string, height uint64) (int64, error) {
+	if len(cashiers) == 0 {
+		return 0, nil
+	}
+	tx, err := recorder.store.DB().Begin()
+	if err != nil {
+		return 0, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	base := make([]interface{}, 0, len(cashiers)+1)
+	for _, c := range cashiers {
+		base = append(base, c)
+	}
+	base = append(base, height)
+	inClause := sqlPlaceholders(len(cashiers))
+
+	delArgs := append(append([]interface{}{}, base...), TransferNew, TransferPending, TransferInvalid)
+	res, err := tx.Exec(
+		fmt.Sprintf("DELETE FROM %s WHERE cashier IN (%s) AND blockHeight>? AND status IN (?, ?, ?)", recorder.transferTableName, inClause),
+		delArgs...,
+	)
+	if err != nil {
+		return 0, err
+	}
+	deleted, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	var remaining int
+	if err := tx.QueryRow(
+		fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE cashier IN (%s) AND blockHeight>?", recorder.transferTableName, inClause),
+		base...,
+	).Scan(&remaining); err != nil {
+		return 0, err
+	}
+	if remaining > 0 {
+		return 0, errors.Errorf("%d transfer(s) with an unhandled status remain above the confirmed height %d after reconciliation; refusing to roll back (status enum drift?)", remaining, height)
+	}
+
+	if _, err := tx.Exec(
+		fmt.Sprintf("REPLACE INTO %s (`cashier`, `height`) VALUES (?, ?)", recorder.cashierMetaTableName),
+		id, height,
+	); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	committed = true
+	return deleted, nil
+}
+
 // SettleTransfer marks a record as settled
 func (recorder *Recorder) SettleTransfer(at AbstractTransfer) error {
 	tx, ok := at.(*Transfer)
