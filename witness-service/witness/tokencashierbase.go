@@ -162,6 +162,59 @@ func (tc *tokenCashierBase) PullTransfersByHeight(height uint64) error {
 	return nil
 }
 
+// ReconcileConfirmedTip self-heals the DB when finalized mode is enabled on a
+// witness whose sync height was already advanced past the finalized confirmed
+// tip by a previous (probabilistic latest-minus-N) run. Without it, PullTransfers
+// would return a regression error every cycle and the witness would fail closed
+// until an operator intervened. It rolls the sync height back to the confirmed
+// tip and drops the not-yet-committed rows above it so they are re-derived from
+// the finalized chain on the next scan. If any already-committed rows (this
+// witness signed & submitted them, or they are settled) sit above the confirmed
+// tip, it refuses to proceed and returns an error for manual review, because
+// dropping them could desync the relayer or mask a real reorg. It is a no-op in
+// steady state (sync height <= confirmed tip) and for non-ethereum recorders.
+func (tc *tokenCashierBase) ReconcileConfirmedTip() error {
+	rec, ok := tc.recorder.(*Recorder)
+	if !ok {
+		// Only the ethereum recorder participates in finalized mode.
+		return nil
+	}
+	// confirmHeight in finalized mode is finalized-minus-margin and does not
+	// depend on the start height, so any start height yields the same value.
+	confirmHeight, _, err := tc.calcConfirmHeight(0, 1)
+	if err != nil {
+		return errors.Wrap(err, "failed to compute confirmed height for reconciliation")
+	}
+	syncHeight, err := tc.recorder.TipHeight(tc.id)
+	if err != nil {
+		return errors.Wrap(err, "failed to read sync height for reconciliation")
+	}
+	if syncHeight <= confirmHeight {
+		return nil
+	}
+	committed, minHeight, maxHeight, err := rec.committedTransfersAboveHeight(tc.id, confirmHeight)
+	if err != nil {
+		return errors.Wrap(err, "failed to inspect committed transfers above confirmed height")
+	}
+	if committed > 0 {
+		return errors.Errorf(
+			"cannot enable finalized mode for %s: %d already-committed transfer(s) at blocks %d-%d sit above the finalized confirmed height %d; "+
+				"they were committed under weaker confirmation settings and must be reviewed manually before enabling finalized mode",
+			tc.id, committed, minHeight, maxHeight, confirmHeight,
+		)
+	}
+	deleted, err := rec.deleteUnconfirmedTransfersAboveHeight(tc.id, confirmHeight)
+	if err != nil {
+		return errors.Wrap(err, "failed to drop uncommitted transfers above confirmed height")
+	}
+	if err := tc.recorder.UpdateSyncHeight(tc.id, confirmHeight); err != nil {
+		return errors.Wrap(err, "failed to roll sync height back to confirmed height")
+	}
+	log.Printf("reconciled %s for finalized mode: rolled sync height %d -> %d, dropped %d uncommitted transfer(s) above the confirmed tip\n",
+		tc.id, syncHeight, confirmHeight, deleted)
+	return nil
+}
+
 func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 	if tc.disablePull {
 		return tc.fetchTransfers(count)

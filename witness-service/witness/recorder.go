@@ -276,6 +276,48 @@ func (recorder *Recorder) UpdateSyncHeight(cashier string, height uint64) error 
 	return nil
 }
 
+// committedTransfersAboveHeight counts transfers for a cashier strictly above
+// the given block height that are already committed — this witness has signed
+// and submitted them (confirmed) or they are settled — and therefore cannot be
+// dropped. It returns the count and, for operator diagnostics, the [min,max]
+// block-height range of those rows.
+func (recorder *Recorder) committedTransfersAboveHeight(cashier string, height uint64) (int, uint64, uint64, error) {
+	var (
+		count                int
+		minHeight, maxHeight sql.NullInt64
+	)
+	if err := recorder.store.DB().QueryRow(
+		fmt.Sprintf("SELECT COUNT(*), MIN(blockHeight), MAX(blockHeight) FROM %s WHERE cashier=? AND blockHeight>? AND status IN (?, ?)", recorder.transferTableName),
+		cashier,
+		height,
+		SubmissionConfirmed,
+		TransferSettled,
+	).Scan(&count, &minHeight, &maxHeight); err != nil {
+		return 0, 0, 0, err
+	}
+	return count, uint64(minHeight.Int64), uint64(maxHeight.Int64), nil
+}
+
+// deleteUnconfirmedTransfersAboveHeight removes transfers for a cashier strictly
+// above the given block height that have not been committed
+// (new/pending/ready/invalid), so they are re-derived from the finalized chain
+// on the next scan. It returns the number of rows removed.
+func (recorder *Recorder) deleteUnconfirmedTransfersAboveHeight(cashier string, height uint64) (int64, error) {
+	result, err := recorder.store.DB().Exec(
+		fmt.Sprintf("DELETE FROM %s WHERE cashier=? AND blockHeight>? AND status IN (?, ?, ?, ?)", recorder.transferTableName),
+		cashier,
+		height,
+		TransferNew,
+		TransferPending,
+		TransferReady,
+		TransferInvalid,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 // SettleTransfer marks a record as settled
 func (recorder *Recorder) SettleTransfer(at AbstractTransfer) error {
 	tx, ok := at.(*Transfer)

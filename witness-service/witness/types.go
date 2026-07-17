@@ -41,6 +41,7 @@ type (
 		SubmitTransfers() error
 		CheckTransfers() error
 		ProcessStales() error
+		ReconcileConfirmedTip() error
 	}
 
 	AbstractRecorder interface {
