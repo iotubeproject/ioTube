@@ -10,6 +10,8 @@ import (
 	"context"
 	"log"
 	"math/big"
+	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -228,11 +230,17 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 	return transfers, nil
 }
 
+// finalizedRPCTimeout bounds a single finalized-block query so a hung RPC
+// endpoint cannot block the witness service loop indefinitely.
+const finalizedRPCTimeout = 10 * time.Second
+
 // fetchFinalizedHeight returns the height of the chain's finalized block via a
 // raw eth_getBlockByNumber("finalized") JSON-RPC call. It decodes only the block
 // number, so it does not depend on go-ethereum's types.Header struct (whose
 // fields drift across chains and versions).
 func fetchFinalizedHeight(ctx context.Context, rawClient *rpc.Client) (uint64, error) {
+	ctx, cancel := context.WithTimeout(ctx, finalizedRPCTimeout)
+	defer cancel()
 	var head struct {
 		Number *hexutil.Big `json:"number"`
 	}
@@ -243,6 +251,15 @@ func fetchFinalizedHeight(ctx context.Context, rawClient *rpc.Client) (uint64, e
 		return 0, errors.New("finalized block not available")
 	}
 	return head.Number.ToInt().Uint64(), nil
+}
+
+// ProbeFinalizedBlock verifies the RPC endpoint serves the "finalized" block
+// tag. A witness started with useFinalizedBlock calls this once at boot so it
+// fails fast on an endpoint that does not support the tag, instead of silently
+// stalling (every pull cycle would error and, after the grace window, stop
+// submitting) once it is running.
+func ProbeFinalizedBlock(ctx context.Context, rawClient *rpc.Client) (uint64, error) {
+	return fetchFinalizedHeight(ctx, rawClient)
 }
 
 // NewTokenCashierOnEthereum creates a new TokenCashier on ethereum
@@ -278,6 +295,13 @@ func NewTokenCashierOnEthereum(
 		}
 		pa = util.ETHAddressToAddress(previousCashierAddr)
 	}
+	// finalizedHighWater is the highest finalized height observed for this
+	// cashier. The finalized tag is monotonic by BFT finality, so a
+	// load-balanced RPC backend momentarily returning an older finalized height
+	// must not drag the confirmed tip backwards; keeping the high-water mark
+	// absorbs that jitter at the source (otherwise the regression guard in
+	// PullTransfers would fail the cycle and stall submissions).
+	var finalizedHighWater atomic.Uint64
 	return newTokenCashierBase(
 		id,
 		util.ETHAddressToAddress(cashierContractAddr),
@@ -312,6 +336,15 @@ func NewTokenCashierOnEthereum(
 				finalizedHeight, err := fetchFinalizedHeight(ctx, rawClient)
 				if err != nil {
 					return 0, 0, err
+				}
+				// Clamp to the highest finalized height seen so a stale RPC
+				// backend cannot move the confirmed tip backwards. A genuine
+				// finality reversion deeper than confirmBlockNumber is the
+				// catastrophic case the extra margin below is designed for.
+				if hw := finalizedHighWater.Load(); hw > finalizedHeight {
+					finalizedHeight = hw
+				} else {
+					finalizedHighWater.Store(finalizedHeight)
 				}
 				var confirmHeight uint64
 				if finalizedHeight > confirmBlockNumber {

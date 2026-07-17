@@ -207,12 +207,15 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		return nil
 	}
 	if confirmHeight < startHeight {
-		// The confirmed tip has regressed below the last synced height: a load-balanced
-		// RPC returned an older tip, the finalized height moved backwards, or the DB was
-		// synced past the current confirmed tip (e.g. switching to finalized mode after
-		// syncing further under latest-minus-N). Do NOT treat this as a benign no-op —
-		// return an error so service.process skips submissions this cycle rather than
-		// signing already-ready rows that now sit above a confirmed tip that regressed.
+		// The confirmed tip has regressed below the last synced height by more
+		// than routine RPC jitter (finalized mode clamps that to a monotonic
+		// high-water mark upstream). The remaining causes are a genuine, large
+		// regression: the DB was synced past the current confirmed tip (e.g.
+		// switching to finalized mode after syncing further under latest-minus-N),
+		// or a serious RPC fault. Do NOT treat this as a benign no-op — return an
+		// error so service.process skips submissions this cycle rather than
+		// signing already-ready rows that now sit above a confirmed tip that
+		// regressed.
 		return errors.Errorf("confirm height %d regressed below sync height %d", confirmHeight, startHeight-1)
 	}
 	var transfers []AbstractTransfer
