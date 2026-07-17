@@ -195,8 +195,28 @@ func (tc *tokenCashierBase) PullTransfers(count uint16) error {
 		}
 		return errors.Wrapf(err, "failed to get end height and tip height with start height %d, count %d", startHeight, count)
 	}
+	if confirmHeight+1 == startHeight {
+		// Exactly caught up: the confirmed tip equals the last synced height, so there
+		// are no new confirmed blocks this cycle (e.g. the chain's finalized height has
+		// not advanced / finality is stalled). This is not a failure: refresh
+		// lastPullTimestamp (a healthy poll, so a later transient RPC error still gets
+		// the grace window above) and return nil so the caller still runs
+		// SubmitTransfers/CheckTransfers for already-confirmed transfers instead of
+		// skipping them (service.process skips those whenever PullTransfers errors).
+		tc.lastPullTimestamp = time.Now()
+		return nil
+	}
 	if confirmHeight < startHeight {
-		return errors.Errorf("failed to get end height with start height %d, count %d, confirm height %d", startHeight, count, confirmHeight)
+		// The confirmed tip has regressed below the last synced height by more
+		// than routine RPC jitter (finalized mode clamps that to a monotonic
+		// high-water mark upstream). The remaining causes are a genuine, large
+		// regression: the DB was synced past the current confirmed tip (e.g.
+		// switching to finalized mode after syncing further under latest-minus-N),
+		// or a serious RPC fault. Do NOT treat this as a benign no-op — return an
+		// error so service.process skips submissions this cycle rather than
+		// signing already-ready rows that now sit above a confirmed tip that
+		// regressed.
+		return errors.Errorf("confirm height %d regressed below sync height %d", confirmHeight, startHeight-1)
 	}
 	var transfers []AbstractTransfer
 	tc.lastPullTimestamp = time.Now()

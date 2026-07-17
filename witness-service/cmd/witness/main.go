@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"go.uber.org/config"
 
 	"github.com/iotexproject/ioTube/witness-service/db"
@@ -43,6 +44,7 @@ type Configuration struct {
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
 	LarkWebHook           string        `json:"larkWebHook" yaml:"larkWebHook"`
 	ConfirmBlockNumber    int           `json:"confirmBlockNumber" yaml:"confirmBlockNumber"`
+	UseFinalizedBlock     bool          `json:"useFinalizedBlock" yaml:"useFinalizedBlock"`
 	BatchSize             int           `json:"batchSize" yaml:"batchSize"`
 	Interval              time.Duration `json:"interval" yaml:"interval"`
 	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
@@ -179,6 +181,12 @@ func main() {
 	if err := yaml.Get(config.Root).Populate(&cfg); err != nil {
 		log.Fatalln(err)
 	}
+	if cfg.ConfirmBlockNumber < 0 {
+		// ConfirmBlockNumber is passed to the witness as uint64; a negative
+		// value would wrap to a huge number, pinning the confirmed height to 0
+		// and producing perpetual regression errors. Fail fast instead.
+		log.Fatalf("confirmBlockNumber must be >= 0, got %d\n", cfg.ConfirmBlockNumber)
+	}
 	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok && cfg.PrivateKey == "" {
 		cfg.PrivateKey = pk
 	}
@@ -292,9 +300,21 @@ func main() {
 			cashiers = append(cashiers, cashier)
 		}
 	default: // "heco", "bsc", "matic", "polis", "iotex-e", "iotex", "sepolia", "iotex-testnet", "ethereum":
-		ethClient, err := ethclient.Dial(cfg.ClientURL)
+		rpcClient, err := rpc.Dial(cfg.ClientURL)
 		if err != nil {
 			log.Fatal(err)
+		}
+		ethClient := ethclient.NewClient(rpcClient)
+		if cfg.UseFinalizedBlock {
+			// Fail fast if the endpoint does not serve the "finalized" tag:
+			// otherwise every pull cycle would error and, after the grace
+			// window, the witness would silently stop submitting.
+			probeCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			if _, err := witness.ProbeFinalizedBlock(probeCtx, rpcClient); err != nil {
+				cancel()
+				log.Fatalf("useFinalizedBlock is enabled but RPC %s does not serve the finalized block tag: %v\n", cfg.ClientURL, err)
+			}
+			cancel()
 		}
 		for _, cc := range cfg.Cashiers {
 			var (
@@ -397,6 +417,7 @@ func main() {
 				version,
 				cc.RelayerURL,
 				ethClient,
+				rpcClient,
 				cashierAddr,
 				previousCashierAddr,
 				tokenSafeAddr,
@@ -411,7 +432,8 @@ func main() {
 					destAddrDecoder,
 				),
 				uint64(cc.StartBlockHeight),
-				uint8(cfg.ConfirmBlockNumber),
+				uint64(cfg.ConfirmBlockNumber),
+				cfg.UseFinalizedBlock,
 				signHandler,
 				reverseRecorder,
 				common.HexToAddress(cc.Reverse.CashierContractAddress),

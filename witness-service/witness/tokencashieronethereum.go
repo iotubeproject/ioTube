@@ -10,11 +10,15 @@ import (
 	"context"
 	"log"
 	"math/big"
+	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
@@ -226,19 +230,53 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 	return transfers, nil
 }
 
+// finalizedRPCTimeout bounds a single finalized-block query so a hung RPC
+// endpoint cannot block the witness service loop indefinitely.
+const finalizedRPCTimeout = 10 * time.Second
+
+// fetchFinalizedHeight returns the height of the chain's finalized block via a
+// raw eth_getBlockByNumber("finalized") JSON-RPC call. It decodes only the block
+// number, so it does not depend on go-ethereum's types.Header struct (whose
+// fields drift across chains and versions).
+func fetchFinalizedHeight(ctx context.Context, rawClient *rpc.Client) (uint64, error) {
+	ctx, cancel := context.WithTimeout(ctx, finalizedRPCTimeout)
+	defer cancel()
+	var head struct {
+		Number *hexutil.Big `json:"number"`
+	}
+	if err := rawClient.CallContext(ctx, &head, "eth_getBlockByNumber", "finalized", false); err != nil {
+		return 0, errors.Wrap(err, "failed to query finalized block header")
+	}
+	if head.Number == nil {
+		return 0, errors.New("finalized block not available")
+	}
+	return head.Number.ToInt().Uint64(), nil
+}
+
+// ProbeFinalizedBlock verifies the RPC endpoint serves the "finalized" block
+// tag. A witness started with useFinalizedBlock calls this once at boot so it
+// fails fast on an endpoint that does not support the tag, instead of silently
+// stalling (every pull cycle would error and, after the grace window, stop
+// submitting) once it is running.
+func ProbeFinalizedBlock(ctx context.Context, rawClient *rpc.Client) (uint64, error) {
+	return fetchFinalizedHeight(ctx, rawClient)
+}
+
 // NewTokenCashierOnEthereum creates a new TokenCashier on ethereum
 func NewTokenCashierOnEthereum(
 	id string,
 	version Version,
 	relayerURL string,
 	ethereumClient *ethclient.Client,
+	rawClient *rpc.Client,
 	cashierContractAddr common.Address,
 	previousCashierAddr common.Address,
 	tokenSafeContractAddr common.Address,
 	validatorContractAddr []byte,
 	recorder *Recorder,
 	startBlockHeight uint64,
-	confirmBlockNumber uint8,
+	confirmBlockNumber uint64,
+	useFinalizedBlock bool,
 	signHandler SignHandler,
 	reverseRecorder *Recorder,
 	reverseCashierContractAddr common.Address,
@@ -257,6 +295,13 @@ func NewTokenCashierOnEthereum(
 		}
 		pa = util.ETHAddressToAddress(previousCashierAddr)
 	}
+	// finalizedHighWater is the highest finalized height observed for this
+	// cashier. The finalized tag is monotonic by BFT finality, so a
+	// load-balanced RPC backend momentarily returning an older finalized height
+	// must not drag the confirmed tip backwards; keeping the high-water mark
+	// absorbs that jitter at the source (otherwise the regression guard in
+	// PullTransfers would fail the cycle and stall submissions).
+	var finalizedHighWater atomic.Uint64
 	return newTokenCashierBase(
 		id,
 		util.ETHAddressToAddress(cashierContractAddr),
@@ -266,22 +311,66 @@ func NewTokenCashierOnEthereum(
 		validatorContractAddr,
 		startBlockHeight,
 		func(startHeight uint64, count uint16) (uint64, uint64, error) {
-			tipHeader, err := ethereumClient.HeaderByNumber(context.Background(), nil)
+			ctx := context.Background()
+			if count == 0 {
+				count = 1
+			}
+			if useFinalizedBlock {
+				// Use the chain's finalized block, minus an optional extra safety
+				// margin (confirmBlockNumber), as the confirmed tip. Finalized removes
+				// routine reorgs and most reorg-based attacks (BFT finality). The extra
+				// margin is defense in depth for a bridge, where the catastrophic case
+				// is not an everyday reorg but a deliberate attack that breaks the
+				// chain's finality gadget itself — which the >=3/4 witness multisig
+				// cannot catch because it is correlated across all witnesses watching
+				// the same chain. Waiting confirmBlockNumber blocks past finalized buys
+				// time for such a failure to be detected before crediting, and yields
+				// the strictly stronger "finalized AND N-deep" guarantee. Set
+				// confirmBlockNumber to 0 to trust finalized alone. endHeight is capped
+				// at confirmHeight so PullTransfers never stores still-reorgable
+				// receipts above it (an unfinalized/too-shallow row that later reorgs
+				// would otherwise be flipped to "ready" by UpsertTransfer while keeping
+				// its stale recipient/amount). During a finality stall confirmHeight
+				// freezes and the base treats it as a no-op cycle, so already-ready
+				// transfers keep being submitted throughout the stall.
+				finalizedHeight, err := fetchFinalizedHeight(ctx, rawClient)
+				if err != nil {
+					return 0, 0, err
+				}
+				// Clamp to the highest finalized height seen so a stale RPC
+				// backend cannot move the confirmed tip backwards. A genuine
+				// finality reversion deeper than confirmBlockNumber is the
+				// catastrophic case the extra margin below is designed for.
+				if hw := finalizedHighWater.Load(); hw > finalizedHeight {
+					finalizedHeight = hw
+				} else {
+					finalizedHighWater.Store(finalizedHeight)
+				}
+				var confirmHeight uint64
+				if finalizedHeight > confirmBlockNumber {
+					confirmHeight = finalizedHeight - confirmBlockNumber
+				}
+				endHeight := startHeight + uint64(count) - 1
+				if confirmHeight < endHeight {
+					endHeight = confirmHeight
+				}
+				return confirmHeight, endHeight, nil
+			}
+			// Fallback: probabilistic latest-minus-N confirmation.
+			tipHeader, err := ethereumClient.HeaderByNumber(ctx, nil)
 			if err != nil {
 				return 0, 0, errors.Wrap(err, "failed to query tip block header")
 			}
 			tipHeight := tipHeader.Number.Uint64()
-			if count == 0 {
-				count = 1
-			}
-			if tipHeight <= uint64(confirmBlockNumber) {
+			if tipHeight <= confirmBlockNumber {
 				return 0, 0, errors.Errorf("tip height %d is smaller than confirm block number %d", tipHeight, confirmBlockNumber)
 			}
+			confirmHeight := tipHeight - confirmBlockNumber
 			endHeight := startHeight + uint64(count) - 1
 			if tipHeight < endHeight {
 				endHeight = tipHeight
 			}
-			return tipHeight - uint64(confirmBlockNumber), endHeight, nil
+			return confirmHeight, endHeight, nil
 		},
 		iter.Transfers,
 		signHandler,
