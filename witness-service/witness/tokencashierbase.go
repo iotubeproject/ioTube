@@ -179,12 +179,13 @@ func (tc *tokenCashierBase) PullTransfersByHeight(height uint64) error {
 // tip by a previous (probabilistic latest-minus-N) run. Without it, PullTransfers
 // would return a regression error every cycle and the witness would fail closed
 // until an operator intervened. It rolls the sync height back to the confirmed
-// tip and drops the not-yet-committed rows above it so they are re-derived from
-// the finalized chain on the next scan. If any already-committed rows (this
-// witness signed & submitted them, or they are settled) sit above the confirmed
-// tip, it refuses to proceed and returns an error for manual review, because
-// dropping them could desync the relayer or mask a real reorg. It is a no-op in
-// steady state (sync height <= confirmed tip) and for non-ethereum recorders.
+// tip and drops the not-yet-signed rows above it so they are re-derived from
+// the finalized chain on the next scan. If any committed or possibly-signed
+// rows (confirmed, settled, or ready — a ready row may already be signed and at
+// the relayer) sit above the confirmed tip, it refuses to proceed and returns
+// an error for manual review, because dropping them could desync the relayer or
+// mask a real reorg. It is a no-op in steady state (sync height <= confirmed
+// tip) and for non-ethereum recorders.
 // Called from Start (after recorder.Start) only when useFinalizedBlock is set.
 func (tc *tokenCashierBase) reconcileConfirmedTip() error {
 	rec, ok := tc.recorder.(*Recorder)
@@ -218,8 +219,8 @@ func (tc *tokenCashierBase) reconcileConfirmedTip() error {
 	}
 	if committed > 0 {
 		return errors.Errorf(
-			"cannot enable finalized mode for %s: %d already-committed transfer(s) at blocks %d-%d sit above the finalized confirmed height %d; "+
-				"they were committed under weaker confirmation settings and must be reviewed manually before enabling finalized mode",
+			"cannot enable finalized mode for %s: %d committed or possibly-signed transfer(s) at blocks %d-%d sit above the finalized confirmed height %d; "+
+				"they were processed under weaker confirmation settings and must be reviewed manually before enabling finalized mode",
 			tc.id, committed, minHeight, maxHeight, confirmHeight,
 		)
 	}
@@ -230,6 +231,11 @@ func (tc *tokenCashierBase) reconcileConfirmedTip() error {
 	if err := tc.recorder.UpdateSyncHeight(tc.id, confirmHeight); err != nil {
 		return errors.Wrap(err, "failed to roll sync height back to confirmed height")
 	}
+	// Also rewind the in-memory floor, otherwise PullTransfers uses
+	// max(TipHeight, lastProcessBlockHeight) and would start above confirmHeight
+	// again (e.g. when the route's startBlockHeight was set above the tip),
+	// keeping the regression error despite the DB rollback.
+	tc.lastProcessBlockHeight = confirmHeight
 	log.Printf("reconciled %s for finalized mode: rolled sync height %d -> %d, dropped %d uncommitted transfer(s) above the confirmed tip\n",
 		tc.id, syncHeight, confirmHeight, deleted)
 	return nil
