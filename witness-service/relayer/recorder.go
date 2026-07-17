@@ -704,14 +704,27 @@ func (recorder *Recorder) TransfersWithFBO(
 ) ([]*Transfer, error) {
 	recorder.mutex.RLock()
 	defer recorder.mutex.RUnlock()
-	// Order the user-facing List by blockHeight (the source-chain block, i.e. the
-	// real transfer time) rather than creationTime (when the row was inserted on
-	// this relayer). Re-submitting an old transfer stamps a fresh creationTime and
-	// would otherwise jump it to the top of the list; each payload relayer serves a
-	// single source chain, so blockHeight is monotonic in real time here.
+	// Order the user-facing List by creationTime.
+	//
+	// A previous change ordered this by blockHeight on the assumption that "each
+	// payload relayer serves a single source chain, so blockHeight is monotonic in
+	// real time". That does NOT hold for the into-IoTeX relayer, whose table
+	// aggregates transfers from multiple source chains (BSC, Polygon, Solana, ...).
+	// Block/slot heights are only comparable within a single chain, so a global
+	// ORDER BY blockHeight interleaves chains by their arbitrary numbering scales:
+	// Solana slots (~4e8) always sort above BSC blocks (~1.1e8) and Polygon blocks
+	// (~9e7), so months-old Solana transfers dominate the top of the list and bury
+	// genuinely recent BSC/Polygon transfers, making "recent transactions" look
+	// empty. creationTime is comparable across chains and is preserved across DB
+	// restores, so it restores a sane chronological order for the mixed-source list.
+	//
+	// Known tradeoff: re-submitting an old transfer stamps a fresh creationTime and
+	// briefly jumps it to the top. Ordering by a real per-row source-block timestamp
+	// (persisted at ingest from the witness-reported block time) is the proper
+	// follow-up that fixes both the cross-chain and the re-submit cases.
 	return recorder.transfers(
 		fmt.Sprintf("SELECT `cashier`, IFNULL(`fbo_token`, `token`), `tidx`, `sender`, `txSender`, IFNULL(`fbo_recipient`, `recipient`), `amount`, `payload`, `fee`, `id`, `txHash`, `txTimestamp`, `nonce`, `gas`, `gasPrice`, `status`, `updateTime`, `relayer` FROM %s", recorder.transferTableName),
-		"blockHeight",
+		"creationTime",
 		offset,
 		limit,
 		desc,
