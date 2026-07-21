@@ -141,8 +141,8 @@ func (recorder *Recorder) initStore(
 			"`payload` varchar(24576),"+ // MaxCodeSize
 			"`fbo_recipient` varchar(256),"+
 			"`fbo_token` varchar(42),"+
-			"PRIMARY KEY (`cashier`,`token`,`tidx`),"+
-			"UNIQUE KEY `id_UNIQUE` (`id`),"+
+			"PRIMARY KEY (`id`),"+
+			"KEY `cashier_token_tidx_index` (`cashier`,`token`,`tidx`),"+
 			"KEY `cashier_index` (`cashier`),"+
 			"KEY `token_index` (`token`),"+
 			"KEY `sender_index` (`sender`),"+
@@ -158,6 +158,9 @@ func (recorder *Recorder) initStore(
 		WaitingForWitnesses,
 	)); err != nil {
 		return errors.Wrap(err, "failed to create transfer table")
+	}
+	if err := migrateTransferPrimaryKey(store, transferTableName); err != nil {
+		return errors.Wrapf(err, "failed to migrate transfer table %s", transferTableName)
 	}
 	if witnessTableName != "" {
 		if _, err := store.DB().Exec(fmt.Sprintf(
@@ -220,6 +223,100 @@ func (recorder *Recorder) initStore(
 	)
 
 	return err
+}
+
+func mysqlIdentifier(identifier string) (string, error) {
+	if identifier == "" {
+		return "", errors.New("empty SQL identifier")
+	}
+	for _, r := range identifier {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '_' {
+			return "", errors.Errorf("invalid SQL identifier %q", identifier)
+		}
+	}
+	return "`" + identifier + "`", nil
+}
+
+func mysqlTable(store *db.SQLStore, tableName string) (schema, table, quoted string, err error) {
+	parts := strings.Split(tableName, ".")
+	if len(parts) > 2 {
+		return "", "", "", errors.Errorf("invalid table name %q", tableName)
+	}
+	table = parts[len(parts)-1]
+	quotedTable, err := mysqlIdentifier(table)
+	if err != nil {
+		return "", "", "", err
+	}
+	if len(parts) == 2 {
+		schema = parts[0]
+		quotedSchema, err := mysqlIdentifier(schema)
+		if err != nil {
+			return "", "", "", err
+		}
+		return schema, table, quotedSchema + "." + quotedTable, nil
+	}
+	if err := store.DB().QueryRow("SELECT DATABASE()").Scan(&schema); err != nil {
+		return "", "", "", errors.Wrap(err, "failed to resolve current database")
+	}
+	return schema, table, quotedTable, nil
+}
+
+// migrateTransferPrimaryKey changes legacy first-write-wins tables from the
+// source tuple key to the signed transfer ID. Conflicting proposals can then
+// coexist until one independently reaches witness quorum.
+func migrateTransferPrimaryKey(store *db.SQLStore, tableName string) error {
+	if store.DriverName() != "mysql" {
+		return nil
+	}
+	schema, table, quotedTable, err := mysqlTable(store, tableName)
+	if err != nil {
+		return err
+	}
+	var primaryColumns sql.NullString
+	if err := store.DB().QueryRow(
+		"SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX SEPARATOR ',') "+
+			"FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND INDEX_NAME='PRIMARY'",
+		schema,
+		table,
+	).Scan(&primaryColumns); err != nil {
+		return errors.Wrap(err, "failed to inspect transfer primary key")
+	}
+	if primaryColumns.String == "id" {
+		return nil
+	}
+	if primaryColumns.String != "cashier,token,tidx" {
+		return errors.Errorf("unsupported primary key %q", primaryColumns.String)
+	}
+	var routeIndexColumns int
+	if err := store.DB().QueryRow(
+		"SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS "+
+			"WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND INDEX_NAME='cashier_token_tidx_index'",
+		schema,
+		table,
+	).Scan(&routeIndexColumns); err != nil {
+		return errors.Wrap(err, "failed to inspect transfer route index")
+	}
+	alter := fmt.Sprintf("ALTER TABLE %s DROP PRIMARY KEY, ADD PRIMARY KEY (`id`)", quotedTable)
+	if routeIndexColumns == 0 {
+		alter += ", ADD KEY `cashier_token_tidx_index` (`cashier`,`token`,`tidx`)"
+	}
+	if _, err := store.DB().Exec(alter); err != nil {
+		// Multiple relayer processes can share a table and race this one-time DDL.
+		// If another process completed the migration while this ALTER waited, the
+		// desired schema is already present and startup remains idempotent.
+		var migratedColumns sql.NullString
+		inspectErr := store.DB().QueryRow(
+			"SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX SEPARATOR ',') "+
+				"FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND INDEX_NAME='PRIMARY'",
+			schema,
+			table,
+		).Scan(&migratedColumns)
+		if inspectErr == nil && migratedColumns.String == "id" {
+			return nil
+		}
+		return errors.Wrap(err, "failed to replace transfer primary key")
+	}
+	return nil
 }
 
 // Stop stops the recorder
@@ -337,7 +434,7 @@ func (recorder *Recorder) addTransferAndWitness(
 	fboToken, fboRecipient *common.Address,
 ) error {
 	if _, err := tx.Exec(
-		fmt.Sprintf("INSERT IGNORE INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, payload, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", transferTableName),
+		fmt.Sprintf("INSERT INTO %s (cashier, token, tidx, sender, txSender, recipient, amount, payload, fee, id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id=VALUES(id)", transferTableName),
 		transfer.cashier.String(),
 		transfer.token.String(),
 		transfer.index,
@@ -752,6 +849,53 @@ func (recorder *Recorder) Transfers(
 	)
 }
 
+// TransfersWithWitnessQuorum returns only waiting transfers signed by more than
+// two thirds of the current active witness set. Rows without quorum never enter
+// the settlement queue, so they cannot head-of-line block valid transfers.
+func (recorder *Recorder) TransfersWithWitnessQuorum(
+	limit uint8,
+	activeWitnesses []common.Address,
+	queryOpts ...TransferQueryOption,
+) ([]*Transfer, error) {
+	recorder.mutex.RLock()
+	defer recorder.mutex.RUnlock()
+	if recorder.witnessTableName == "" {
+		return nil, errors.New("witness table is not configured")
+	}
+	if len(activeWitnesses) == 0 {
+		return nil, errors.New("active witness set is empty")
+	}
+
+	query := fmt.Sprintf(
+		"SELECT t.`cashier`, t.`token`, t.`tidx`, t.`sender`, t.`txSender`, t.`recipient`, t.`amount`, t.`payload`, t.`fee`, t.`id`, t.`txHash`, t.`txTimestamp`, t.`nonce`, t.`gas`, t.`gasPrice`, t.`status`, t.`updateTime`, t.`relayer` FROM %s AS t",
+		recorder.transferTableName,
+	)
+	queryOpts = append(queryOpts, StatusQueryOption(WaitingForWitnesses), ExcludeAmountZeroOption())
+	conditions := make([]string, 0, len(queryOpts)+1)
+	params := []interface{}{}
+	for _, opt := range queryOpts {
+		condition, ps := opt()
+		if condition == "" {
+			continue
+		}
+		conditions = append(conditions, condition)
+		params = append(params, ps...)
+	}
+	witnessPlaceholders := strings.TrimSuffix(strings.Repeat("?,", len(activeWitnesses)), ",")
+	conditions = append(conditions, fmt.Sprintf(
+		"(SELECT COUNT(*) FROM %s AS w WHERE w.`transferId`=t.`id` AND w.`witness` IN (%s))*3 > ?",
+		recorder.witnessTableName,
+		witnessPlaceholders,
+	))
+	for _, witness := range activeWitnesses {
+		params = append(params, witness.Hex())
+	}
+	params = append(params, len(activeWitnesses)*2)
+	query += " WHERE " + strings.Join(conditions, " AND ") + " ORDER BY t.`creationTime` ASC LIMIT ?"
+	params = append(params, limit)
+	return recorder.queryTransfers(query, params...)
+}
+
 func (recorder *Recorder) transfers(
 	query string,
 	orderBy string,
@@ -781,7 +925,10 @@ func (recorder *Recorder) transfers(
 	}
 	query += " LIMIT ?, ?"
 	params = append(params, offset, limit)
+	return recorder.queryTransfers(query, params...)
+}
 
+func (recorder *Recorder) queryTransfers(query string, params ...interface{}) ([]*Transfer, error) {
 	rows, err := recorder.store.DB().Query(query, params...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query transfers table")

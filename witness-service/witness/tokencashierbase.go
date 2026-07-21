@@ -371,19 +371,10 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 		if signature == nil {
 			continue
 		}
-		var witness *types.Witness
-		if transfer.Status() == TransferReady {
-			witness = &types.Witness{
-				Transfer:  transfer.ToTypesTransfer(),
-				Address:   pubkey,
-				Signature: signature,
-			}
-		} else {
-			witness = &types.Witness{
-				Transfer:  transfer.ToTypesTransfer(),
-				Address:   pubkey,
-				Signature: []byte{},
-			}
+		witness := &types.Witness{
+			Transfer:  transfer.ToTypesTransfer(),
+			Address:   pubkey,
+			Signature: signature,
 		}
 		response, err := relayer.Submit(context.Background(), witness)
 		if err != nil {
@@ -393,14 +384,8 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 			log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
 			continue
 		}
-		if transfer.Status() == TransferReady {
-			if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
-				return err
-			}
-		} else {
-			if err := tc.recorder.MarkTransferAsPending(transfer); err != nil {
-				return err
-			}
+		if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
+			return err
 		}
 	}
 	return nil

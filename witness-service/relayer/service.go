@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/iotexproject/ioTube/witness-service/dispatcher"
@@ -120,6 +122,15 @@ func (s *Service) submit(w *types.Witness) ([]byte, error) {
 	if s.validators == nil {
 		return nil, errors.New("cannot accept new submission")
 	}
+	if w == nil || w.Transfer == nil {
+		return nil, status.Error(codes.InvalidArgument, "transfer is required")
+	}
+	if len(w.Address) != common.AddressLength {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid witness address length %d", len(w.Address))
+	}
+	if len(w.Signature) != 0 && len(w.Signature) != crypto.SignatureLength {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid witness signature length %d", len(w.Signature))
+	}
 	transfer, err := UnmarshalTransferProto(w.Transfer, s.destAddrDecoder)
 	if err != nil {
 		return nil, err
@@ -133,22 +144,25 @@ func (s *Service) submit(w *types.Witness) ([]byte, error) {
 		return nil, errors.Errorf("no validator is found for %s", cashier.String())
 	}
 	transfer.GenID(validator.Address())
-	var witness *Witness
-	if len(w.Signature) != 0 {
-		if err := validateSignature(transfer.id.Bytes(), common.BytesToAddress(w.Address), w.Signature); err != nil {
-			return nil, err
-		}
-		// Reject signatures from addresses that are not registered on-chain witnesses,
-		// so forged/junk submissions never enter the DB. Fail open when the witness
-		// set has not been loaded from chain yet — the on-chain validator is still the
-		// ultimate gate for settlement.
-		if member, loaded := validator.IsActiveWitness(common.BytesToAddress(w.Address)); loaded && !member {
-			return nil, errors.Errorf("rejecting submission from non-witness %s", common.BytesToAddress(w.Address).Hex())
-		}
-		witness, err = NewWitness(w.Address, w.Signature)
-		if err != nil {
-			return nil, err
-		}
+	if len(w.Signature) == 0 {
+		// Legacy witnesses announce unconfirmed transfers without a signature. Ack
+		// those announcements without persisting any untrusted transfer or witness.
+		return transfer.ID().Bytes(), nil
+	}
+	witnessAddr := common.BytesToAddress(w.Address)
+	if err := validateSignature(transfer.id.Bytes(), witnessAddr, w.Signature); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	member, loaded := validator.IsActiveWitness(witnessAddr)
+	if !loaded {
+		return nil, status.Error(codes.Unavailable, "active witness set is unavailable")
+	}
+	if !member {
+		return nil, status.Errorf(codes.PermissionDenied, "submission signer %s is not an active witness", witnessAddr.Hex())
+	}
+	witness, err := NewWitness(w.Address, w.Signature)
+	if err != nil {
+		return nil, err
 	}
 	var fboToken, fboRecipient *common.Address
 	unwrapper, ok := s.unwrappers[transfer.recipient.String()]
@@ -620,11 +634,13 @@ func (s *Service) confirmTransfer(transfer *Transfer, validator TransferValidato
 func (s *Service) submitTransfers() error {
 	excludedAddr, _ := util.NewETHAddressDecoder().DecodeString("0x6fb3e0a217407efff7ca062d46c26e5d60a14d69")
 	for cashier, validator := range s.validators {
-		newTransfers, err := s.recorder.Transfers(
-			0,
+		activeWitnesses, err := validator.ActiveWitnesses()
+		if err != nil {
+			return errors.Wrapf(err, "failed to load active witnesses for %s", cashier)
+		}
+		newTransfers, err := s.recorder.TransfersWithWitnessQuorum(
 			uint8(validator.Size()+1),
-			AESC,
-			StatusQueryOption(WaitingForWitnesses),
+			activeWitnesses,
 			ExcludeTokenQueryOption(excludedAddr),
 			CashiersQueryOption([]string{cashier}),
 		)
@@ -632,11 +648,9 @@ func (s *Service) submitTransfers() error {
 			return err
 		}
 		if len(newTransfers) == 0 {
-			newTransfers, err = s.recorder.Transfers(
-				0,
+			newTransfers, err = s.recorder.TransfersWithWitnessQuorum(
 				uint8(validator.Size()),
-				AESC,
-				StatusQueryOption(WaitingForWitnesses),
+				activeWitnesses,
 				CashiersQueryOption([]string{cashier}),
 			)
 			if err != nil {

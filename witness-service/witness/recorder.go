@@ -457,7 +457,7 @@ func (recorder *Recorder) TransfersToSettle(cashier string) ([]AbstractTransfer,
 
 // TransfersToSubmit returns the list of transfers to submit
 func (recorder *Recorder) TransfersToSubmit(cashier string) ([]AbstractTransfer, error) {
-	return recorder.transfers(cashier, TransferNew, TransferReady)
+	return recorder.transfers(cashier, TransferReady)
 }
 
 func (recorder *Recorder) transfers(cashier string, status ...TransferStatus) ([]AbstractTransfer, error) {

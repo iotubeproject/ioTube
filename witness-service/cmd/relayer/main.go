@@ -308,7 +308,7 @@ func main() {
 		service = ethService
 	}
 
-	relayer.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort)
+	relayer.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort, os.Getenv("RELAYER_ADMIN_TOKEN"))
 
 	select {}
 }

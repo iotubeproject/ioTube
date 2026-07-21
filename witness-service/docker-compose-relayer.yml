@@ -3,6 +3,7 @@ version: '2'
 # Required .env values (copy .env.template -> .env next to this file, then fill in):
 #   IOTEX_RELAYER    - absolute path to the relayer deploy dir (holds etc/ and data/)
 #   DB_ROOT_PASSWORD - MySQL root password for the local relayer-db
+# Optional: RELAYER_ADMIN_TOKEN enables local-only administrative gRPC methods.
 # If either is unset, docker compose fails fast with a clear message (the ${VAR:?...}
 # guards below) instead of silently mounting empty directories over the config files.
 
@@ -32,6 +33,7 @@ services:
     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-payload.yaml
     environment:
       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+      RELAYER_ADMIN_TOKEN: ${RELAYER_ADMIN_TOKEN:-}
       DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
 #   ethereum-payload-relayer:
@@ -48,6 +50,7 @@ services:
 #     command: relayer -config=/etc/iotube-relayer/relayer-config-ethereum-payload.yaml
 #     environment:
 #       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+#       RELAYER_ADMIN_TOKEN: ${RELAYER_ADMIN_TOKEN:-}
 
   bsc-payload-relayer:
     container_name: bsc-payload-relayer
@@ -63,6 +66,7 @@ services:
     command: relayer -config=/etc/iotube-relayer/relayer-config-bsc-payload.yaml
     environment:
       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+      RELAYER_ADMIN_TOKEN: ${RELAYER_ADMIN_TOKEN:-}
       DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
 #   matic-payload-relayer:
@@ -79,6 +83,7 @@ services:
 #     command: relayer -config=/etc/iotube-relayer/relayer-config-matic-payload.yaml
 #     environment:
 #       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+#       RELAYER_ADMIN_TOKEN: ${RELAYER_ADMIN_TOKEN:-}
 
 #   iotex-solana-relayer:
 #     container_name: iotex-solana-relayer
@@ -94,6 +99,7 @@ services:
 #     command: relayer -config=/etc/iotube-relayer/relayer-config-iotex-solana.yaml
 #     environment:
 #       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+#       RELAYER_ADMIN_TOKEN: ${RELAYER_ADMIN_TOKEN:-}
 
 #   solana-relayer:
 #     container_name: solana-relayer
@@ -109,6 +115,7 @@ services:
 #     command: relayer -config=/etc/iotube-relayer/relayer-config-solana.yaml
 #     environment:
 #       RELAYER_PRIVATE_KEY: ${RELAYER_PRIVATE_KEY}
+#       RELAYER_ADMIN_TOKEN: ${RELAYER_ADMIN_TOKEN:-}
 
 #   cron:
 #     image: schnitzler/mysqldump

@@ -11,6 +11,7 @@ import (
 	"crypto/ecdsa"
 	"log"
 	"math/big"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +36,7 @@ type (
 	// transferValidatorOnEthereum defines the transfer validator
 	transferValidatorOnEthereum struct {
 		mu                 sync.RWMutex
+		witnessRefreshMu   sync.Mutex
 		confirmBlockNumber uint16
 		defaultGasPrice    *big.Int
 		gasPriceLimit      *big.Int
@@ -51,8 +53,7 @@ type (
 		validator           validatorContract
 		witnessListContract *contract.AddressListCaller
 		witnesses           map[string]bool
-		// lastWitnessRefresh is the time of the last *successful* on-chain load;
-		// drives the fail-open "genuinely not a member" decision in IsActiveWitness.
+		// lastWitnessRefresh is the time of the last successful on-chain load.
 		lastWitnessRefresh time.Time
 		// lastWitnessRefreshAttempt is the time of the last refresh *attempt*
 		// (success or failure); rate-limits the on-miss refresh so a stream of junk
@@ -278,7 +279,9 @@ func NewTransferValidatorOnEthereum(
 		validator: validator,
 	}
 
-	callOpts, err := tv.callOpts()
+	ctx, cancel := context.WithTimeout(context.Background(), witnessRefreshTimeout)
+	defer cancel()
+	callOpts, err := tv.callOpts(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -306,11 +309,33 @@ func (tv *transferValidatorOnEthereum) Address() common.Address {
 }
 
 func (tv *transferValidatorOnEthereum) refresh() error {
-	// Stamp the attempt up front (caller holds tv.mu) so the on-miss rate limit in
-	// IsActiveWitness backs off even when the RPC below errors and we never reach
-	// the success stamp.
-	tv.lastWitnessRefreshAttempt = time.Now()
-	callOpts, err := tv.callOpts()
+	ctx, cancel := context.WithTimeout(context.Background(), witnessRefreshTimeout)
+	defer cancel()
+	return tv.refreshWithContext(ctx)
+}
+
+func (tv *transferValidatorOnEthereum) refreshWithContext(ctx context.Context) error {
+	tv.witnessRefreshMu.Lock()
+	defer tv.witnessRefreshMu.Unlock()
+
+	now := time.Now()
+	tv.mu.RLock()
+	fresh := len(tv.witnesses) > 0 && !tv.lastWitnessRefresh.IsZero() &&
+		now.Sub(tv.lastWitnessRefresh) <= witnessRefreshCooldown
+	recentAttempt := !tv.lastWitnessRefreshAttempt.IsZero() &&
+		now.Sub(tv.lastWitnessRefreshAttempt) <= witnessRefreshCooldown
+	tv.mu.RUnlock()
+	if fresh || recentAttempt {
+		return nil
+	}
+
+	// Record the attempt before issuing RPCs, but never hold the state lock while
+	// waiting on the chain. This rate-limits failures without blocking cache reads.
+	tv.mu.Lock()
+	tv.lastWitnessRefreshAttempt = now
+	tv.mu.Unlock()
+
+	callOpts, err := tv.callOpts(ctx)
 	if err != nil {
 		return err
 	}
@@ -337,8 +362,10 @@ func (tv *transferValidatorOnEthereum) refresh() error {
 		activeWitnesses[w.Hex()] = true
 	}
 
+	tv.mu.Lock()
 	tv.witnesses = activeWitnesses
 	tv.lastWitnessRefresh = time.Now()
+	tv.mu.Unlock()
 	return nil
 }
 
@@ -350,16 +377,18 @@ func (tv *transferValidatorOnEthereum) isActiveWitness(witness common.Address) b
 
 // witnessRefreshCooldown bounds how often IsActiveWitness re-queries the on-chain
 // witness set on a miss, so junk addresses can't spam refresh RPCs.
-const witnessRefreshCooldown = 30 * time.Second
+const (
+	witnessRefreshCooldown = 30 * time.Second
+	witnessRefreshTimeout  = 15 * time.Second
+)
 
 // IsActiveWitness reports whether addr is in the on-chain registered witness set,
 // and whether that set is currently loaded. When the cached set is stale it refreshes
 // from chain once (rate-limited to once per witnessRefreshCooldown, shared with the
 // refresh done during submission) before trusting either verdict, so both additions
 // and removals to the on-chain set are reflected. If the refresh fails or is rate-
-// limited away, a non-membership result returns loaded==false; callers should treat
-// loaded==false as "unknown" and fail open (the on-chain validator is the ultimate
-// gate). Safe for concurrent use.
+// limited away, loaded is false and callers must reject the submission. Safe for
+// concurrent use.
 func (tv *transferValidatorOnEthereum) IsActiveWitness(addr common.Address) (isMember bool, loaded bool) {
 	hexAddr := addr.Hex()
 	tv.mu.RLock()
@@ -373,23 +402,49 @@ func (tv *transferValidatorOnEthereum) IsActiveWitness(addr common.Address) (isM
 	}
 	// Stale or never loaded: refresh once (rate-limited by the last refresh attempt,
 	// not the last success, so a failing RPC still backs off) and re-check.
-	tv.mu.Lock()
-	if tv.lastWitnessRefreshAttempt.IsZero() ||
-		time.Since(tv.lastWitnessRefreshAttempt) > witnessRefreshCooldown {
-		if err := tv.refresh(); err != nil {
-			log.Printf("failed to refresh witness set: %v\n", err)
-		}
+	if err := tv.refresh(); err != nil {
+		log.Printf("failed to refresh witness set: %v\n", err)
 	}
+	tv.mu.RLock()
 	_, member = tv.witnesses[hexAddr]
 	fresh = len(tv.witnesses) > 0 && !tv.lastWitnessRefresh.IsZero() &&
 		time.Since(tv.lastWitnessRefresh) <= witnessRefreshCooldown
-	tv.mu.Unlock()
-	if member {
-		return true, true
+	tv.mu.RUnlock()
+	if !fresh {
+		return false, false
 	}
-	// Only a fresh, successful load makes a non-membership verdict authoritative;
-	// otherwise report unknown so the caller falls back to the on-chain gate.
-	return false, fresh
+	return member, true
+}
+
+// ActiveWitnesses returns a fresh snapshot of the on-chain witness set. Settlement
+// scheduling uses this list so rows without a live quorum never enter the queue.
+func (tv *transferValidatorOnEthereum) ActiveWitnesses() ([]common.Address, error) {
+	tv.mu.RLock()
+	fresh := len(tv.witnesses) > 0 && !tv.lastWitnessRefresh.IsZero() &&
+		time.Since(tv.lastWitnessRefresh) <= witnessRefreshCooldown
+	tv.mu.RUnlock()
+	if !fresh {
+		if err := tv.refresh(); err != nil {
+			return nil, errors.Wrap(err, "failed to refresh active witness set")
+		}
+	}
+	tv.mu.RLock()
+	defer tv.mu.RUnlock()
+	fresh = len(tv.witnesses) > 0 && !tv.lastWitnessRefresh.IsZero() &&
+		time.Since(tv.lastWitnessRefresh) <= witnessRefreshCooldown
+	if !fresh {
+		return nil, errors.New("active witness set is unavailable")
+	}
+	addresses := make([]string, 0, len(tv.witnesses))
+	for addr := range tv.witnesses {
+		addresses = append(addresses, addr)
+	}
+	sort.Strings(addresses)
+	witnesses := make([]common.Address, 0, len(addresses))
+	for _, addr := range addresses {
+		witnesses = append(witnesses, common.HexToAddress(addr))
+	}
+	return witnesses, nil
 }
 
 // Check returns true if a transfer has been settled
@@ -467,9 +522,6 @@ func (tv *transferValidatorOnEthereum) privateKeyOfRelayer(relayer common.Addres
 }
 
 func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*Witness, isSpeedUp bool) (common.Hash, common.Address, uint64, *big.Int, error) {
-	if err := tv.refresh(); err != nil {
-		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
-	}
 	signatures := []byte{}
 	numOfValidSignatures := 0
 	for _, witness := range witnesses {
@@ -530,6 +582,9 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 
 // Submit submits validation for a transfer
 func (tv *transferValidatorOnEthereum) Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error) {
+	if _, err := tv.ActiveWitnesses(); err != nil {
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+	}
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
 
@@ -538,6 +593,9 @@ func (tv *transferValidatorOnEthereum) Submit(transfer *Transfer, witnesses []*W
 
 // SpeedUp creases the transaction gas price
 func (tv *transferValidatorOnEthereum) SpeedUp(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error) {
+	if _, err := tv.ActiveWitnesses(); err != nil {
+		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
+	}
 	tv.mu.Lock()
 	defer tv.mu.Unlock()
 	if tv.gasPriceGap == nil || tv.gasPriceGap.Cmp(big.NewInt(0)) < 0 {
@@ -590,8 +648,8 @@ func (tv *transferValidatorOnEthereum) transactionOpts(privateKey *ecdsa.Private
 	return opts, nil
 }
 
-func (tv *transferValidatorOnEthereum) callOpts() (*bind.CallOpts, error) {
-	tipBlockHeader, err := tv.client.HeaderByNumber(context.Background(), nil)
+func (tv *transferValidatorOnEthereum) callOpts(ctx context.Context) (*bind.CallOpts, error) {
+	tipBlockHeader, err := tv.client.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -600,5 +658,5 @@ func (tv *transferValidatorOnEthereum) callOpts() (*bind.CallOpts, error) {
 		return nil, errors.Errorf("Ethereum height %d is smaller than confirm height %d", tipBlockHeader.Number, tv.confirmBlockNumber)
 	}
 
-	return &bind.CallOpts{BlockNumber: blockNumber}, nil
+	return &bind.CallOpts{Context: ctx, BlockNumber: blockNumber}, nil
 }
