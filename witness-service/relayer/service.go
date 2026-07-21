@@ -128,7 +128,7 @@ func (s *Service) submit(w *types.Witness) ([]byte, error) {
 	if len(w.Address) != common.AddressLength {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid witness address length %d", len(w.Address))
 	}
-	if len(w.Signature) != crypto.SignatureLength {
+	if len(w.Signature) != 0 && len(w.Signature) != crypto.SignatureLength {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid witness signature length %d", len(w.Signature))
 	}
 	transfer, err := UnmarshalTransferProto(w.Transfer, s.destAddrDecoder)
@@ -144,6 +144,11 @@ func (s *Service) submit(w *types.Witness) ([]byte, error) {
 		return nil, errors.Errorf("no validator is found for %s", cashier.String())
 	}
 	transfer.GenID(validator.Address())
+	if len(w.Signature) == 0 {
+		// Legacy witnesses announce unconfirmed transfers without a signature. Ack
+		// those announcements without persisting any untrusted transfer or witness.
+		return transfer.ID().Bytes(), nil
+	}
 	witnessAddr := common.BytesToAddress(w.Address)
 	if err := validateSignature(transfer.id.Bytes(), witnessAddr, w.Signature); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())

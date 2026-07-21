@@ -94,10 +94,12 @@ disabled unless `RELAYER_ADMIN_TOKEN` is set. An administrative gRPC caller must
 run inside the relayer container, connect through loopback, and send
 `authorization: Bearer <token>` metadata.
 
-Witness submissions must carry a valid 65-byte signature from a currently active
-on-chain witness. If the relayer cannot refresh the witness set, it rejects new
-submissions until the chain RPC recovers. Transfer proposals are stored by their
-signed transfer ID, and only proposals with more than two-thirds of the current
-active witnesses enter the settlement queue. On first startup after upgrading,
-legacy MySQL transfer tables are migrated from the `(cashier, token, tidx)` primary
-key to the transfer ID; back up the relayer database before deploying the upgrade.
+Persisted witness submissions must carry a valid 65-byte signature from a currently
+active on-chain witness. For rolling-upgrade compatibility, legacy unsigned
+pre-announcements receive a no-op acknowledgement but are never stored. If the
+relayer cannot refresh the witness set, it rejects signed submissions until the
+chain RPC recovers. Transfer proposals are stored by their signed transfer ID, and
+only proposals with more than two-thirds of the current active witnesses enter the
+settlement queue. On first startup after upgrading, legacy MySQL transfer tables are
+migrated from the `(cashier, token, tidx)` primary key to the transfer ID; back up
+the relayer database before deploying the upgrade.

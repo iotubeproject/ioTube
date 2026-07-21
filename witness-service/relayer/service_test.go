@@ -1,12 +1,17 @@
 package relayer
 
 import (
+	"context"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -83,10 +88,24 @@ func submissionTestService(w *types.Witness, validator *submissionTestValidator)
 	}
 }
 
-func TestSubmitRejectsUnsignedTransfer(t *testing.T) {
-	validator := &submissionTestValidator{address: common.HexToAddress("0x6000000000000000000000000000000000000006"), member: true, loaded: true}
+func TestSubmitAcknowledgesLegacyUnsignedTransferWithoutPersistence(t *testing.T) {
+	validator := &submissionTestValidator{address: common.HexToAddress("0x6000000000000000000000000000000000000006")}
 	witness := signedSubmission(t, validator.address)
 	witness.Signature = nil
+	response, err := submissionTestService(witness, validator).Submit(context.Background(), witness)
+	require.NoError(t, err)
+	require.True(t, response.Success)
+
+	transfer, err := UnmarshalTransferProto(witness.Transfer, util.NewETHAddressDecoder())
+	require.NoError(t, err)
+	transfer.GenID(validator.address)
+	require.Equal(t, transfer.ID().Bytes(), response.Id)
+}
+
+func TestSubmitRejectsMalformedSignature(t *testing.T) {
+	validator := &submissionTestValidator{address: common.HexToAddress("0x6000000000000000000000000000000000000006"), member: true, loaded: true}
+	witness := signedSubmission(t, validator.address)
+	witness.Signature = []byte{1}
 	_, err := submissionTestService(witness, validator).submit(witness)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
@@ -115,4 +134,65 @@ func TestIsActiveWitnessFailsClosedWithStaleCache(t *testing.T) {
 	member, loaded := validator.IsActiveWitness(witness)
 	require.False(t, member)
 	require.False(t, loaded)
+}
+
+func TestActiveWitnessesFailsClosedWithStaleCache(t *testing.T) {
+	witness := common.HexToAddress("0xa000000000000000000000000000000000000001")
+	validator := &transferValidatorOnEthereum{
+		witnesses:                 map[string]bool{witness.Hex(): true},
+		lastWitnessRefresh:        time.Now().Add(-2 * witnessRefreshCooldown),
+		lastWitnessRefreshAttempt: time.Now(),
+	}
+	witnesses, err := validator.ActiveWitnesses()
+	require.Error(t, err)
+	require.Nil(t, witnesses)
+}
+
+func TestWitnessRefreshDoesNotHoldStateLockDuringRPC(t *testing.T) {
+	requestStarted := make(chan struct{})
+	releaseRequest := make(chan struct{})
+	var requestOnce sync.Once
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		requestOnce.Do(func() { close(requestStarted) })
+		<-releaseRequest
+	}))
+	defer server.Close()
+	defer close(releaseRequest)
+
+	client, err := ethclient.Dial(server.URL)
+	require.NoError(t, err)
+	defer client.Close()
+	validator := &transferValidatorOnEthereum{client: client}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	refreshDone := make(chan error, 1)
+	go func() {
+		refreshDone <- validator.refreshWithContext(ctx)
+	}()
+
+	select {
+	case <-requestStarted:
+	case <-time.After(time.Second):
+		t.Fatal("witness refresh did not start its RPC")
+	}
+
+	lockAcquired := make(chan struct{})
+	go func() {
+		validator.mu.Lock()
+		validator.mu.Unlock()
+		close(lockAcquired)
+	}()
+	select {
+	case <-lockAcquired:
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("witness refresh held the state lock during RPC")
+	}
+
+	cancel()
+	select {
+	case err := <-refreshDone:
+		require.Error(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("witness refresh ignored context cancellation")
+	}
 }
