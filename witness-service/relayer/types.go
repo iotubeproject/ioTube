@@ -76,6 +76,8 @@ type (
 		// IsActiveWitness reports whether addr is a registered on-chain witness,
 		// and whether the witness set has been loaded from chain yet.
 		IsActiveWitness(addr common.Address) (isMember bool, loaded bool)
+		// ActiveWitnesses returns the current on-chain active witness set.
+		ActiveWitnesses() ([]common.Address, error)
 		// Submit submits validation for a transfer
 		Submit(transfer *Transfer, witnesses []*Witness) (common.Hash, common.Address, uint64, *big.Int, error)
 		// SpeedUp resubmits validation with higher gas price
@@ -253,12 +255,12 @@ func DecodeSourceAddrBytes(bytes []byte) (util.Address, error) {
 
 // NewWitness creates a new witness struct
 func NewWitness(witnessBytes []byte, signature []byte) (*Witness, error) {
-	clone := make([]byte, len(signature))
-	copy(clone, signature)
+	addrClone := append([]byte(nil), witnessBytes...)
+	signatureClone := append([]byte(nil), signature...)
 
 	return &Witness{
-		addr:      witnessBytes,
-		signature: signature,
+		addr:      addrClone,
+		signature: signatureClone,
 	}, nil
 }
 

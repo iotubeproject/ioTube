@@ -11,6 +11,7 @@ import (
 	"crypto/ecdsa"
 	"log"
 	"math/big"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -51,8 +52,7 @@ type (
 		validator           validatorContract
 		witnessListContract *contract.AddressListCaller
 		witnesses           map[string]bool
-		// lastWitnessRefresh is the time of the last *successful* on-chain load;
-		// drives the fail-open "genuinely not a member" decision in IsActiveWitness.
+		// lastWitnessRefresh is the time of the last successful on-chain load.
 		lastWitnessRefresh time.Time
 		// lastWitnessRefreshAttempt is the time of the last refresh *attempt*
 		// (success or failure); rate-limits the on-miss refresh so a stream of junk
@@ -357,9 +357,8 @@ const witnessRefreshCooldown = 30 * time.Second
 // from chain once (rate-limited to once per witnessRefreshCooldown, shared with the
 // refresh done during submission) before trusting either verdict, so both additions
 // and removals to the on-chain set are reflected. If the refresh fails or is rate-
-// limited away, a non-membership result returns loaded==false; callers should treat
-// loaded==false as "unknown" and fail open (the on-chain validator is the ultimate
-// gate). Safe for concurrent use.
+// limited away, loaded is false and callers must reject the submission. Safe for
+// concurrent use.
 func (tv *transferValidatorOnEthereum) IsActiveWitness(addr common.Address) (isMember bool, loaded bool) {
 	hexAddr := addr.Hex()
 	tv.mu.RLock()
@@ -384,12 +383,35 @@ func (tv *transferValidatorOnEthereum) IsActiveWitness(addr common.Address) (isM
 	fresh = len(tv.witnesses) > 0 && !tv.lastWitnessRefresh.IsZero() &&
 		time.Since(tv.lastWitnessRefresh) <= witnessRefreshCooldown
 	tv.mu.Unlock()
-	if member {
-		return true, true
+	if !fresh {
+		return false, false
 	}
-	// Only a fresh, successful load makes a non-membership verdict authoritative;
-	// otherwise report unknown so the caller falls back to the on-chain gate.
-	return false, fresh
+	return member, true
+}
+
+// ActiveWitnesses returns a fresh snapshot of the on-chain witness set. Settlement
+// scheduling uses this list so rows without a live quorum never enter the queue.
+func (tv *transferValidatorOnEthereum) ActiveWitnesses() ([]common.Address, error) {
+	tv.mu.Lock()
+	defer tv.mu.Unlock()
+
+	fresh := len(tv.witnesses) > 0 && !tv.lastWitnessRefresh.IsZero() &&
+		time.Since(tv.lastWitnessRefresh) <= witnessRefreshCooldown
+	if !fresh {
+		if err := tv.refresh(); err != nil {
+			return nil, errors.Wrap(err, "failed to refresh active witness set")
+		}
+	}
+	addresses := make([]string, 0, len(tv.witnesses))
+	for addr := range tv.witnesses {
+		addresses = append(addresses, addr)
+	}
+	sort.Strings(addresses)
+	witnesses := make([]common.Address, 0, len(addresses))
+	for _, addr := range addresses {
+		witnesses = append(witnesses, common.HexToAddress(addr))
+	}
+	return witnesses, nil
 }
 
 // Check returns true if a transfer has been settled

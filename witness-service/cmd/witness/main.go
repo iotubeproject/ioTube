@@ -312,7 +312,7 @@ func main() {
 			probeCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			if _, err := witness.ProbeFinalizedBlock(probeCtx, rpcClient); err != nil {
 				cancel()
-				log.Fatalf("useFinalizedBlock is enabled but RPC %s does not serve the finalized block tag: %v\n", cfg.ClientURL, err)
+				log.Fatalf("useFinalizedBlock is enabled but the configured RPC does not serve the finalized block tag: %v\n", err)
 			}
 			cancel()
 		}

@@ -73,7 +73,7 @@ git pull --recurse-submodules && ./upgrade.sh
 `upgrade.sh` pulls/recreates only the witness services (never the database), does a
 non-destructive image prune, and migrates a legacy compose file if it still pins the
 old local `witness:latest` tag. To pin or roll back a version, set
-`WITNESS_TAG=<tag>` in `<data-dir>/etc/.env` and re-run `./upgrade.sh`.
+`WITNESS_TAG=sha-<commit>` in `<data-dir>/etc/.env` and re-run `./upgrade.sh`.
 
 ## Build the image
 
@@ -84,3 +84,20 @@ docker build -f witness-service/Dockerfile.witness -t iotube-witness .
 Release CI publishes `ghcr.io/iotubeproject/iotube-witness:latest`
 (`.github/workflows/docker-publish.yml`), which is what the compose file pulls by
 default.
+
+## Relayer API boundaries
+
+The relayer HTTP gateway exposes only the read methods `check`, `list`,
+`listnewtx`, and `lookup`. Witness submissions and heartbeats use gRPC directly.
+Administrative methods (`Reset`, `Retry`, and `SubmitNewTX`) are local-only and
+disabled unless `RELAYER_ADMIN_TOKEN` is set. An administrative gRPC caller must
+run inside the relayer container, connect through loopback, and send
+`authorization: Bearer <token>` metadata.
+
+Witness submissions must carry a valid 65-byte signature from a currently active
+on-chain witness. If the relayer cannot refresh the witness set, it rejects new
+submissions until the chain RPC recovers. Transfer proposals are stored by their
+signed transfer ID, and only proposals with more than two-thirds of the current
+active witnesses enter the settlement queue. On first startup after upgrading,
+legacy MySQL transfer tables are migrated from the `(cashier, token, tidx)` primary
+key to the transfer ID; back up the relayer database before deploying the upgrade.
