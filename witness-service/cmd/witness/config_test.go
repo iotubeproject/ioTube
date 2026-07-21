@@ -20,5 +20,5 @@ func TestBSCConfigEnablesFinalizedBlocks(t *testing.T) {
 	require.NoError(t, yaml.Get(config.Root).Populate(&cfg))
 	require.Equal(t, "bsc", cfg.Chain)
 	require.True(t, cfg.UseFinalizedBlock)
-	require.Equal(t, 20, cfg.ConfirmBlockNumber)
+	require.Equal(t, 50, cfg.ConfirmBlockNumber)
 }
