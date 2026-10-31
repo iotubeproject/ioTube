@@ -51,7 +51,13 @@ type Configuration struct {
 	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
 	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
-	Cashiers              []struct {
+	// SignPolicy optionally asks an external service before signing transfers
+	// of the listed cashiers (see witness/signpolicy.go). Unset: sign as before.
+	SignPolicy struct {
+		URL      string   `json:"url" yaml:"url"`
+		Cashiers []string `json:"cashiers" yaml:"cashiers"`
+	} `json:"signPolicy" yaml:"signPolicy"`
+	Cashiers []struct {
 		ID                             string      `json:"id" yaml:"id"`
 		RelayerURL                     string      `json:"relayerURL" yaml:"relayerURL"`
 		WithPayload                    bool        `json:"withPayload" yaml:"withPayload"`
@@ -228,6 +234,16 @@ func main() {
 	} else {
 		log.Println("WARNING connecting to the relayer without TLS; set relayerTLS to secure it")
 	}
+	if url, ok := os.LookupEnv("WITNESS_SIGN_POLICY_URL"); ok && cfg.SignPolicy.URL == "" {
+		cfg.SignPolicy.URL = url
+	}
+	if list, ok := os.LookupEnv("WITNESS_SIGN_POLICY_CASHIERS"); ok && len(cfg.SignPolicy.Cashiers) == 0 {
+		cfg.SignPolicy.Cashiers = strings.Split(list, ",")
+	}
+	withSignPolicy, err := witness.SignPolicyWrapper(cfg.SignPolicy.URL, cfg.SignPolicy.Cashiers)
+	if err != nil {
+		log.Fatalf("invalid signPolicy: %v\n", err)
+	}
 
 	// TODO: load more parameters from env
 	if cfg.SlackWebHook != "" {
@@ -292,7 +308,7 @@ func main() {
 				}
 				util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
 				log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
-				signHandler = witness.NewSecp256k1SignHandler(privateKey)
+				signHandler = withSignPolicy(witness.NewSecp256k1SignHandler(privateKey))
 			} else {
 				log.Println("No Private Key")
 			}
@@ -352,12 +368,18 @@ func main() {
 					}
 					util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
 					log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
-					signHandler = witness.NewSecp256k1SignHandler(privateKey)
+					signHandler = withSignPolicy(witness.NewSecp256k1SignHandler(privateKey))
 				} else {
 					log.Println("No Private Key")
 				}
 			} else {
 				destAddrDecoder = util.NewSOLAddressDecoder()
+				// The policy hook computes the EVM transfer ID; the Ed25519
+				// handler for Solana targets is not wrapped, so gating it
+				// would silently sign without approval.
+				if witness.SignPolicyCovers(cfg.SignPolicy.Cashiers, cc.CashierContractAddress, cc.PreviousCashierContractAddress) {
+					log.Fatalf("signPolicy does not support toSolana cashier %s\n", cc.CashierContractAddress)
+				}
 
 				if cfg.PrivateKey != "" {
 					privateKeyBytes, err := hex.DecodeString(cfg.PrivateKey)
