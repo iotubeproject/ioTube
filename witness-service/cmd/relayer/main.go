@@ -63,17 +63,18 @@ type (
 		BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
 		Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
 
-		AlwaysReset             bool      `json:"alwaysReset" yaml:"alwaysReset"`
-		SlackWebHook            string    `json:"slackWebHook" yaml:"slackWebHook"`
-		LarkWebHook             string    `json:"larkWebHook" yaml:"larkWebHook"`
-		GrpcPort                int       `json:"grpcPort" yaml:"grpcPort"`
-		GrpcProxyPort           int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-		Database                db.Config `json:"database" yaml:"database"`
-		ExplorerDatabase        db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
-		TransferTableName       string    `json:"transferTableName" yaml:"transferTableName"`
-		NewTransactionTableName string    `json:"newTransactionTableName" yaml:"newTransactionTableName"`
-		WitnessTableName        string    `json:"witnessTableName" yaml:"witnessTableName"`
-		ExplorerTableName       string    `json:"explorerTableName" yaml:"explorerTableName"`
+		AlwaysReset             bool          `json:"alwaysReset" yaml:"alwaysReset"`
+		SlackWebHook            string        `json:"slackWebHook" yaml:"slackWebHook"`
+		LarkWebHook             string        `json:"larkWebHook" yaml:"larkWebHook"`
+		GrpcPort                int           `json:"grpcPort" yaml:"grpcPort"`
+		GrpcProxyPort           int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+		TLS                     util.TLSFiles `json:"tls" yaml:"tls"`
+		Database                db.Config     `json:"database" yaml:"database"`
+		ExplorerDatabase        db.Config     `json:"explorerDatabase" yaml:"explorerDatabase"`
+		TransferTableName       string        `json:"transferTableName" yaml:"transferTableName"`
+		NewTransactionTableName string        `json:"newTransactionTableName" yaml:"newTransactionTableName"`
+		WitnessTableName        string        `json:"witnessTableName" yaml:"witnessTableName"`
+		ExplorerTableName       string        `json:"explorerTableName" yaml:"explorerTableName"`
 
 		SolanaConfig struct {
 			ValidatorAddress        string  `json:"validatorAddress" yaml:"validatorAddress"`
@@ -308,7 +309,23 @@ func main() {
 		service = ethService
 	}
 
-	relayer.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort, os.Getenv("RELAYER_ADMIN_TOKEN"))
+	for env, field := range map[string]*string{
+		"RELAYER_TLS_CERT_FILE":      &cfg.TLS.CertFile,
+		"RELAYER_TLS_KEY_FILE":       &cfg.TLS.KeyFile,
+		"RELAYER_TLS_CLIENT_CA_FILE": &cfg.TLS.CAFile,
+	} {
+		if v, ok := os.LookupEnv(env); ok && *field == "" {
+			*field = v
+		}
+	}
+	creds, err := cfg.TLS.ServerCredentials()
+	if err != nil {
+		log.Fatalf("invalid tls config: %v\n", err)
+	}
+	if creds == nil {
+		log.Println("WARNING gRPC service without TLS; set tls.certFile and tls.keyFile to secure it")
+	}
+	relayer.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort, os.Getenv("RELAYER_ADMIN_TOKEN"), creds)
 
 	select {}
 }

@@ -23,11 +23,27 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/util"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // maxStaleHeightsPerCycle bounds how many relayer-reported stale heights a
 // cashier re-scans per cycle; the rest are reported again next cycle.
 const maxStaleHeightsPerCycle = 20
+
+// relayerCredentials secures the connections to the relayer. It is plaintext
+// unless the witness is configured with relayerTLS.
+var relayerCredentials = insecure.NewCredentials()
+
+// SetRelayerCredentials sets the transport credentials for connections to the
+// relayer. Call it before starting the service.
+func SetRelayerCredentials(creds credentials.TransportCredentials) {
+	relayerCredentials = creds
+}
+
+func dialRelayer(url string) (*grpc.ClientConn, error) {
+	return grpc.Dial(url, grpc.WithTransportCredentials(relayerCredentials))
+}
 
 var (
 	_ReceiptEventTopic, _TransferEventTopic common.Hash
@@ -380,7 +396,7 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 		}
 		transfersToSubmit = append(transfersToSubmit, transfersFromPreviousCashier...)
 	}
-	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	conn, err := dialRelayer(tc.relayerURL)
 	if err != nil {
 		return err
 	}
@@ -434,7 +450,7 @@ func (tc *tokenCashierBase) submitTransfer(relayer services.RelayServiceClient, 
 }
 
 func (tc *tokenCashierBase) ProcessStales() error {
-	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	conn, err := dialRelayer(tc.relayerURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to create connection")
 	}
@@ -523,7 +539,7 @@ func (tc *tokenCashierBase) CheckTransfers() error {
 		}
 		transfersToSettle = append(transfersToSettle, transfersFromPreviousCashier...)
 	}
-	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	conn, err := dialRelayer(tc.relayerURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to create connection")
 	}
@@ -548,7 +564,7 @@ func (tc *tokenCashierBase) CheckTransfers() error {
 }
 
 func (tc *tokenCashierBase) fetchTransfers(count uint16) error {
-	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	conn, err := dialRelayer(tc.relayerURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to create connection")
 	}

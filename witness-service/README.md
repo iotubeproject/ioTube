@@ -98,6 +98,28 @@ group.
 Transfers that fail source validation (`ALERT not signing transfer ...` in the
 log) remain pending for operator reconciliation.
 
+## Relayer TLS
+
+TLS and mTLS are available for witness-to-relayer gRPC. Configure peer
+verification for connections that cross host boundaries. Existing transport
+settings stay unchanged until configured; a plaintext connection logs
+`WARNING connecting to the relayer without TLS` at startup.
+
+| Side | Config | Env | Effect |
+|---|---|---|---|
+| relayer | `tls.certFile`, `tls.keyFile` | `RELAYER_TLS_CERT_FILE`, `RELAYER_TLS_KEY_FILE` | gRPC accepts TLS only |
+| relayer | `tls.caFile` | `RELAYER_TLS_CLIENT_CA_FILE` | witnesses must present a client certificate signed by this CA (mTLS) |
+| witness | `relayerTLS.caFile` | `RELAYER_TLS_CA_FILE` | the relayer's certificate must be signed by this CA |
+| witness | `relayerTLS.certFile`, `relayerTLS.keyFile` | `RELAYER_TLS_CERT_FILE`, `RELAYER_TLS_KEY_FILE` | client certificate for mTLS |
+| witness | `relayerTLS.serverName` | `RELAYER_TLS_SERVER_NAME` | name checked against the relayer's certificate (default: the host in `relayerURL`) |
+
+There is no mixed mode: a witness with `relayerTLS` cannot reach a plaintext
+relayer, and a plaintext witness cannot reach a TLS relayer. Distribute the CA
+(and client certificates) to the operators first, then switch the relayer and
+all witnesses of that relayer in one maintenance window. Enabling mTLS
+(`tls.caFile`) at the same time or later is the same kind of switch. Admin gRPC
+calls to a TLS relayer must use TLS as well, for example `grpcurl -cacert`.
+
 ## Build the image
 
 ```bash

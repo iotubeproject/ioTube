@@ -33,6 +33,7 @@ type Configuration struct {
 	Chain                 string          `json:"chain" yaml:"chain"`
 	ClientURL             string          `json:"clientURL" yaml:"clientURL"`
 	RelayerURL            string          `json:"relayerURL" yaml:"relayerURL"`
+	RelayerTLS            util.TLSFiles   `json:"relayerTLS" yaml:"relayerTLS"` // accepted so witness configs parse; unused
 	Database              db.Config       `json:"database" yaml:"database"`
 	PrivateKey            string          `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook          string          `json:"slackWebHook" yaml:"slackWebHook"`
@@ -97,9 +98,9 @@ type transferAddress struct {
 	str   string
 }
 
-func (a *transferAddress) Bytes() []byte   { return a.bytes }
-func (a *transferAddress) String() string  { return a.str }
-func (a *transferAddress) Address() any { return a.bytes }
+func (a *transferAddress) Bytes() []byte  { return a.bytes }
+func (a *transferAddress) String() string { return a.str }
+func (a *transferAddress) Address() any   { return a.bytes }
 
 var (
 	configFile       = flag.String("config", "", "path of config file")

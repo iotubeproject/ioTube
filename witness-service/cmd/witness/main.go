@@ -39,6 +39,7 @@ type Configuration struct {
 	Chain                 string        `json:"chain" yaml:"chain"`
 	ClientURL             string        `json:"clientURL" yaml:"clientURL"`
 	RelayerURL            string        `json:"relayerURL" yaml:"relayerURL"`
+	RelayerTLS            util.TLSFiles `json:"relayerTLS" yaml:"relayerTLS"`
 	Database              db.Config     `json:"database" yaml:"database"`
 	PrivateKey            string        `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook          string        `json:"slackWebHook" yaml:"slackWebHook"`
@@ -206,6 +207,26 @@ func main() {
 	}
 	if relayerURL, ok := os.LookupEnv("RELAYER_URL"); ok && cfg.RelayerURL == "" {
 		cfg.RelayerURL = relayerURL
+	}
+	for env, field := range map[string]*string{
+		"RELAYER_TLS_CA_FILE":     &cfg.RelayerTLS.CAFile,
+		"RELAYER_TLS_CERT_FILE":   &cfg.RelayerTLS.CertFile,
+		"RELAYER_TLS_KEY_FILE":    &cfg.RelayerTLS.KeyFile,
+		"RELAYER_TLS_SERVER_NAME": &cfg.RelayerTLS.ServerName,
+	} {
+		if v, ok := os.LookupEnv(env); ok && *field == "" {
+			*field = v
+		}
+	}
+	relayerCreds, relayerTLS, err := cfg.RelayerTLS.ClientCredentials()
+	if err != nil {
+		log.Fatalf("invalid relayerTLS: %v\n", err)
+	}
+	witness.SetRelayerCredentials(relayerCreds)
+	if relayerTLS {
+		log.Println("connecting to the relayer over TLS")
+	} else {
+		log.Println("WARNING connecting to the relayer without TLS; set relayerTLS to secure it")
 	}
 
 	// TODO: load more parameters from env

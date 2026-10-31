@@ -13,6 +13,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
@@ -79,16 +80,20 @@ func publicRelayHandler(next http.Handler) http.Handler {
 	})
 }
 
-func startGRPCService(srv services.RelayServiceServer, grpcPort int, adminToken string) error {
+func startGRPCService(srv services.RelayServiceServer, grpcPort int, adminToken string, creds credentials.TransportCredentials) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
 		return err
 	}
 
-	grpcServer := grpc.NewServer(
+	opts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(maxRelayRequestBytes),
 		grpc.UnaryInterceptor(adminUnaryInterceptor(adminToken)),
-	)
+	}
+	if creds != nil {
+		opts = append(opts, grpc.Creds(creds))
+	}
+	grpcServer := grpc.NewServer(opts...)
 	services.RegisterRelayServiceServer(grpcServer, srv)
 	return grpcServer.Serve(lis)
 }
@@ -112,10 +117,12 @@ func startGRPCProxyService(srv services.RelayServiceServer, grpcProxyPort int) e
 	return gwServer.ListenAndServe()
 }
 
-func StartServer(srv services.RelayServiceServer, grpcPort int, grpcProxyPort int, adminToken string) {
+// StartServer starts the relayer's gRPC service and HTTP gateway. With non-nil
+// creds the gRPC service accepts only TLS connections (see util.TLSFiles).
+func StartServer(srv services.RelayServiceServer, grpcPort int, grpcProxyPort int, adminToken string, creds credentials.TransportCredentials) {
 	if grpcPort > 0 {
 		go func() {
-			if e := startGRPCService(srv, grpcPort, adminToken); e != nil {
+			if e := startGRPCService(srv, grpcPort, adminToken, creds); e != nil {
 				log.Fatalf("failed to start grpc service: %v\n", e)
 			}
 		}()
