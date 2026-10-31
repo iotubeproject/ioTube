@@ -9,7 +9,6 @@ package witness
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"math"
@@ -462,7 +461,7 @@ func (recorder *Recorder) TransfersToSubmit(cashier string) ([]AbstractTransfer,
 
 func (recorder *Recorder) transfers(cashier string, status ...TransferStatus) ([]AbstractTransfer, error) {
 	query := fmt.Sprintf(
-		"SELECT a.cashier, a.token, a.tidx, a.sender, a.recipient, a.amount, a.payload, a.fee, a.blockHeight, a.txHash, a.status, a.id, a.txSender, b.recipient, b.payload "+
+		"SELECT a.cashier, a.token, a.tidx, a.sender, a.recipient, a.amount, a.payload, a.fee, a.blockHeight, a.txHash, a.status, a.id, a.txSender, b.tidx "+
 			"FROM %s a LEFT JOIN %s b "+
 			"ON a.cashier = b.cashier AND a.token = b.token AND a.tidx = b.tidx "+
 			"WHERE a.status in (?"+strings.Repeat(",?", len(status)-1)+")",
@@ -501,9 +500,8 @@ func (recorder *Recorder) transfers(cashier string, status ...TransferStatus) ([
 		var txHash sql.NullString
 		var payload sql.NullString
 		var txSender sql.NullString
-		var shadowRecipient sql.NullString
-		var shadowPayload sql.NullString
-		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.blockHeight, &txHash, &tx.status, &id, &txSender, &shadowRecipient, &shadowPayload); err != nil {
+		var shadow sql.NullInt64
+		if err := rows.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.blockHeight, &txHash, &tx.status, &id, &txSender, &shadow); err != nil {
 			return nil, err
 		}
 		tx.cashier = common.HexToAddress(cashier)
@@ -538,17 +536,8 @@ func (recorder *Recorder) transfers(cashier string, status ...TransferStatus) ([
 		if !ok || tx.amount.Sign() != 1 {
 			return nil, errors.Errorf("invalid amount %s", rawAmount)
 		}
-		if shadowRecipient.Valid {
-			tx.recipient, err = recorder.addrDecoder.DecodeString(shadowRecipient.String)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to decode shadow recipient")
-			}
-		}
-		if shadowPayload.Valid {
-			tx.payload, err = hex.DecodeString(shadowPayload.String)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to decode shadow payload")
-			}
+		if holdForShadow(tx, shadow.Valid) {
+			continue
 		}
 		if toToken, ok := recorder.tokenPairs[tx.token]; ok {
 			tx.coToken = toToken
@@ -579,10 +568,10 @@ func (recorder *Recorder) transfers(cashier string, status ...TransferStatus) ([
 func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	row := recorder.store.DB().QueryRow(
 		fmt.Sprintf(
-			"SELECT `a.cashier`, `a.token`, `a.tidx`, `a.sender`, `a.recipient`, `a.amount`, `a.payload`, `a.status`, `a.id`, `a.txHash`, `a.txSender`, `b.recipient`, `b.payload` "+
-				"FROM %s a JOIN %s b "+
+			"SELECT a.cashier, a.token, a.tidx, a.sender, a.recipient, a.amount, a.payload, a.fee, a.blockHeight, a.status, a.id, a.txHash, a.txSender, b.tidx "+
+				"FROM %s a LEFT JOIN %s b "+
 				"ON a.cashier = b.cashier AND a.token = b.token AND a.tidx = b.tidx "+
-				"WHERE `a.id`=?",
+				"WHERE a.id=?",
 			recorder.transferTableName,
 			recorder.transferTableName+"_shadow",
 		),
@@ -595,13 +584,13 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	var sender string
 	var recipient string
 	var rawAmount string
-	var txHash string
+	var fee sql.NullString
+	var txHash sql.NullString
 	var id sql.NullString
 	var payload sql.NullString
 	var txSender sql.NullString
-	var shadowRecipient sql.NullString
-	var shadowPayload sql.NullString
-	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &tx.status, &id, &txHash, &txSender, &shadowRecipient, &shadowPayload); err != nil {
+	var shadow sql.NullInt64
+	if err := row.Scan(&cashier, &token, &tx.index, &sender, &recipient, &rawAmount, &payload, &fee, &tx.blockHeight, &tx.status, &id, &txHash, &txSender, &shadow); err != nil {
 		return nil, err
 	}
 
@@ -621,6 +610,13 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	if !ok || tx.amount.Sign() != 1 {
 		return nil, errors.Errorf("invalid amount %s", rawAmount)
 	}
+	tx.fee = big.NewInt(0)
+	if fee.Valid {
+		tx.fee, ok = new(big.Int).SetString(fee.String, 10)
+		if !ok || tx.fee.Sign() == -1 {
+			return nil, errors.Errorf("invalid fee %s", fee.String)
+		}
+	}
 	if txSender.Valid {
 		tx.txSender = common.HexToAddress(txSender.String)
 	}
@@ -628,17 +624,8 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to decode payload %s", payload.String)
 	}
-	if shadowRecipient.Valid {
-		tx.recipient, err = recorder.addrDecoder.DecodeString(shadowRecipient.String)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to decode shadow recipient")
-		}
-	}
-	if shadowPayload.Valid {
-		tx.payload, err = hex.DecodeString(shadowPayload.String)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to decode shadow payload")
-		}
+	if shadow.Valid {
+		log.Printf("ALERT shadow row present for transfer (%s, %s, %d); it is not applied\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
 	}
 	if toToken, ok := recorder.tokenPairs[tx.token]; ok {
 		tx.coToken = toToken
@@ -660,7 +647,9 @@ func (recorder *Recorder) Transfer(_id common.Hash) (AbstractTransfer, error) {
 	} else {
 		tx.decimalRound = 0
 	}
-	tx.txHash = common.HexToHash(txHash)
+	if txHash.Valid {
+		tx.txHash = common.HexToHash(txHash.String)
+	}
 
 	return tx, nil
 }
@@ -718,4 +707,21 @@ func (recorder *Recorder) validateID(id uint64) error {
 
 func (recorder *Recorder) UnsettledTransfers() ([]string, error) {
 	panic("unimplemented")
+}
+
+// holdForShadow reports whether tx is held because a row for it exists in the
+// <table>_shadow table. Shadow rows are not applied. A ready transfer with a
+// shadow row is held until an operator reconciles the record, confirming its
+// prior submission state, and deletes the shadow row. Transfers past submission
+// are checked by their stored ID, so they only warn.
+func holdForShadow(tx *Transfer, hasShadow bool) bool {
+	if !hasShadow {
+		return false
+	}
+	if tx.status == TransferReady {
+		log.Printf("ALERT transfer (%s, %s, %d) held pending record reconciliation: a shadow row exists; confirm its prior submission state, then delete the shadow row\n", tx.cashier.Hex(), tx.token.Hex(), tx.index)
+		return true
+	}
+	log.Printf("ALERT shadow row present for transfer (%s, %s, %d) in status %s; it is not applied\n", tx.cashier.Hex(), tx.token.Hex(), tx.index, tx.status)
+	return false
 }

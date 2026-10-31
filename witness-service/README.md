@@ -75,6 +75,29 @@ non-destructive image prune, and migrates a legacy compose file if it still pins
 old local `witness:latest` tag. To pin or roll back a version, set
 `WITNESS_TAG=sha-<commit>` in `<data-dir>/etc/.env` and re-run `./upgrade.sh`.
 
+## Supported tokens
+
+Fee-on-transfer and rebasing tokens are not supported.
+
+## Network exposure
+
+The witness database and management interfaces are host-local services.
+Restrict access to them to loopback with the deployment firewall or security
+group.
+
+- MySQL: the compose file publishes it on `127.0.0.1:13306` only. `upgrade.sh`
+  does not recreate the database container; after pulling this change, apply it
+  once with `docker compose -f docker-compose-witness.yml up -d database`.
+- Witness gRPC (`grpcPort`, default 9080) and HTTP gateway (`grpcProxyPort`,
+  default 9081) listen on all interfaces with `network_mode: host`. Block them
+  in the host firewall (or the cloud security group) for everything except
+  loopback.
+- Check with `ss -ltnp`: 13306 should listen on `127.0.0.1` only, and 9080/9081
+  must not be reachable from another host.
+
+Transfers that fail source validation (`ALERT not signing transfer ...` in the
+log) remain pending for operator reconciliation.
+
 ## Build the image
 
 ```bash
