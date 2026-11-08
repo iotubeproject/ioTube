@@ -30,6 +30,7 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/relayer"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/version"
 )
 
 type (
@@ -107,7 +108,10 @@ var defaultConfig = Configuration{
 	WitnessTableName:      "relayer.witnesses",
 }
 
-var configFile = flag.String("config", "", "path of config file")
+var (
+	configFile  = flag.String("config", "", "path of config file")
+	versionFlag = flag.Bool("version", false, "print the build version and exit")
+)
 
 func init() {
 	flag.Usage = func() {
@@ -123,6 +127,11 @@ func init() {
 //  4. listens on the port we want
 func main() {
 	flag.Parse()
+	if *versionFlag {
+		fmt.Println(version.String())
+		return
+	}
+	log.Println("relayer " + version.String())
 	opts := []config.YAMLOption{config.Static(defaultConfig), config.Expand(os.LookupEnv)}
 	if *configFile != "" {
 		opts = append(opts, config.File(*configFile))

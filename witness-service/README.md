@@ -159,6 +159,38 @@ Suggested hardening:
 - Deleting the key loses the witness address for good (it cannot be re-created);
   rotate by registering a new key's address first.
 
+## Versions
+
+Releases are tagged `vX.Y.Z` on `master` (patch: fixes only; minor: new
+features or optional config, old configs keep working; major: incompatible
+config, protocol or DB changes). CI builds the images from the tag.
+
+`witness -version` and `relayer -version` print the build, and both log it at
+startup:
+
+```
+v7.1.0 (commit <full sha>, clean, go1.23.12, built 2026-11-08T00:00:00Z)
+```
+
+The version is `git describe --tags --dirty`, so a build after a tag reads like
+`v7.1.0-3-gabc1234`. `make` sets it from git; Docker builds take it from the
+`VERSION`, `COMMIT`, `GIT_STATUS` and `BUILD_TIME` build args (the build context
+has no `.git`), otherwise it reads `NoBuildInfo`.
+
+Each witness sends its version and commit with its heartbeat (`StaleHeights`),
+and the relayer keeps the latest per witness and route:
+
+```sql
+SELECT witness, cashier, version, commitID, tipHeight, updateTime
+FROM witness_heartbeats ORDER BY witness, cashier;
+```
+
+Heartbeats are advisory, self-reported telemetry: they show which operators
+have upgraded, and must not be used for authorization or build attestation.
+Relayers add the `version` and
+`commitID` columns at startup; a relayer without `ALTER` permission logs a
+warning and records heartbeats without them.
+
 ## Build the image
 
 ```bash

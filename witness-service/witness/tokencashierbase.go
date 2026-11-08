@@ -21,6 +21,7 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/version"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -468,6 +469,8 @@ func (tc *tokenCashierBase) ProcessStales() error {
 		Cashier:     tc.cashierContractAddr.Bytes(),
 		WitnessAddr: tc.signerAddr,
 		TipHeight:   tipHeight,
+		Version:     version.PackageVersion,
+		Commit:      version.PackageCommitID,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch stale heights")
@@ -477,6 +480,8 @@ func (tc *tokenCashierBase) ProcessStales() error {
 			Cashier:     tc.previousCashierAddr.Bytes(),
 			WitnessAddr: tc.signerAddr,
 			TipHeight:   tipHeight,
+			Version:     version.PackageVersion,
+			Commit:      version.PackageCommitID,
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch stale heights from previous cashier")

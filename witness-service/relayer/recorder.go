@@ -55,6 +55,8 @@ type (
 		// updateStatusAndTransactionQuery is a query to set status and transaction
 		updateStatusAndTransactionQuery            string
 		updateStatusAndTransactionQueryForExplorer string
+		// heartbeatVersions: witness_heartbeats has the build columns
+		heartbeatVersions bool
 	}
 )
 
@@ -201,6 +203,9 @@ func (recorder *Recorder) initStore(
 	)); err != nil {
 		return errors.Wrap(err, "failed to create witness heartbeat table")
 	}
+	if store == recorder.store { // heartbeats are written to the main store only
+		recorder.heartbeatVersions = heartbeatVersionsSupported(store)
+	}
 
 	if newTXTableName != "" {
 		if _, err := store.DB().Exec(fmt.Sprintf(
@@ -342,25 +347,12 @@ func validWitnessHeartbeatAddr(addr []byte) bool {
 }
 
 // UpsertWitnessHeartbeat records that a witness pinged this relayer for a route,
-// together with its reported scan tip. Used for traffic-independent liveness
-// monitoring; a stale updateTime means the witness is offline or behind.
-func (recorder *Recorder) UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64) error {
-	if !validWitnessHeartbeatAddr(witnessAddr) {
-		return nil
-	}
+// together with its reported scan tip and build. Used for traffic-independent
+// liveness monitoring; a stale updateTime means the witness is offline or behind.
+func (recorder *Recorder) UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64, version, commit string) error {
 	recorder.mutex.Lock()
 	defer recorder.mutex.Unlock()
-	_, err := recorder.store.DB().Exec(
-		fmt.Sprintf(
-			"INSERT INTO `%s` (`witness`, `cashier`, `tipHeight`) VALUES (?, ?, ?) "+
-				"ON DUPLICATE KEY UPDATE `tipHeight`=VALUES(`tipHeight`), `updateTime`=CURRENT_TIMESTAMP",
-			witnessHeartbeatTableName,
-		),
-		"0x"+hex.EncodeToString(witnessAddr),
-		cashier.String(),
-		tipHeight,
-	)
-	return err
+	return upsertWitnessHeartbeat(recorder.store, recorder.heartbeatVersions, witnessAddr, cashier, tipHeight, version, commit)
 }
 
 // AddTransferAndWitness records a new transfer and its witness

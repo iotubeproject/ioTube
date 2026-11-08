@@ -32,6 +32,7 @@ import (
 
 	"github.com/iotexproject/ioTube/witness-service/db"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/version"
 	"github.com/iotexproject/ioTube/witness-service/witness"
 	"github.com/iotexproject/iotex-address/address"
 )
@@ -121,6 +122,8 @@ var (
 	continuously = "continuously"
 
 	blocksFlag = flag.String("blocks", continuously, "block heights")
+
+	versionFlag = flag.Bool("version", false, "print the build version and exit")
 )
 
 func init() {
@@ -182,6 +185,11 @@ func parseTokenPairs(
 
 func main() {
 	flag.Parse()
+	if *versionFlag {
+		fmt.Println(version.String())
+		return
+	}
+	log.Println("witness " + version.String())
 	opts := []config.YAMLOption{config.Static(defaultConfig), config.Expand(os.LookupEnv)}
 	if *configFile != "" {
 		opts = append(opts, config.File(*configFile))

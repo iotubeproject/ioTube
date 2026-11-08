@@ -99,6 +99,10 @@ message StaleHeightsRequest {
     // these carry the witness's own address and its current scan tip as a heartbeat.
     bytes witnessAddr = 2;
     uint64 tipHeight = 3;
+    // version and commit identify the witness build (see the version package),
+    // for operators to see which witness runs what. Self-reported, unverified.
+    string version = 4;
+    string commit = 5;
 }
 
 message StaleHeightsResponse {

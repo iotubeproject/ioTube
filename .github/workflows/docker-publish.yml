@@ -23,6 +23,24 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # tags, for git describe
+
+      - name: Build version
+        id: version
+        run: |
+          # a tag build reports its tag (git describe may pick another tag on
+          # the same commit); branch and PR builds report git describe
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            version="$GITHUB_REF_NAME"
+          else
+            version="$(git describe --tags --dirty --always)"
+          fi
+          case "$version" in
+            ""|*[!0-9A-Za-z.+_-]*) echo "unexpected version: $version" >&2; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v2
@@ -57,6 +75,11 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            COMMIT=${{ github.sha }}
+            GIT_STATUS=clean
+            BUILD_TIME=${{ steps.version.outputs.build_time }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -73,6 +96,24 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # tags, for git describe
+
+      - name: Build version
+        id: version
+        run: |
+          # a tag build reports its tag (git describe may pick another tag on
+          # the same commit); branch and PR builds report git describe
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            version="$GITHUB_REF_NAME"
+          else
+            version="$(git describe --tags --dirty --always)"
+          fi
+          case "$version" in
+            ""|*[!0-9A-Za-z.+_-]*) echo "unexpected version: $version" >&2; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v2
@@ -107,5 +148,10 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            COMMIT=${{ github.sha }}
+            GIT_STATUS=clean
+            BUILD_TIME=${{ steps.version.outputs.build_time }}
           cache-from: type=gha,scope=relayer
           cache-to: type=gha,mode=max,scope=relayer
