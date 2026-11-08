@@ -20,6 +20,8 @@ import (
 	"strings"
 	"time"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	solclient "github.com/blocto/solana-go-sdk/client"
 	solcommon "github.com/blocto/solana-go-sdk/common"
 	"github.com/ethereum/go-ethereum/common"
@@ -51,6 +53,13 @@ type Configuration struct {
 	GrpcPort              int           `json:"grpcPort" yaml:"grpcPort"`
 	GrpcProxyPort         int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
 	DisableTransferSubmit bool          `json:"disableTransferSubmit" yaml:"disableTransferSubmit"`
+	// KMS signs EVM transfers with an AWS KMS ECC_SECG_P256K1 key instead of
+	// privateKey (see witness/kmssigner.go). Credentials come from the default
+	// AWS chain, e.g. the instance role.
+	KMS struct {
+		KeyID  string `json:"keyID" yaml:"keyID"`
+		Region string `json:"region" yaml:"region"`
+	} `json:"kms" yaml:"kms"`
 	// SignPolicy optionally asks an external service before signing transfers
 	// of the listed cashiers (see witness/signpolicy.go). Unset: sign as before.
 	SignPolicy struct {
@@ -197,6 +206,15 @@ func main() {
 	if pk, ok := os.LookupEnv("WITNESS_PRIVATE_KEY"); ok && cfg.PrivateKey == "" {
 		cfg.PrivateKey = pk
 	}
+	if id, ok := os.LookupEnv("WITNESS_KMS_KEY_ID"); ok && cfg.KMS.KeyID == "" {
+		cfg.KMS.KeyID = id
+	}
+	if region, ok := os.LookupEnv("WITNESS_KMS_REGION"); ok && cfg.KMS.Region == "" {
+		cfg.KMS.Region = region
+	}
+	if cfg.KMS.KeyID != "" && cfg.PrivateKey != "" {
+		log.Fatalln("set either privateKey or kms.keyID, not both")
+	}
 
 	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok && cfg.GrpcPort == 0 {
 		cfg.GrpcPort, err = strconv.Atoi(port)
@@ -243,6 +261,37 @@ func main() {
 	withSignPolicy, err := witness.SignPolicyWrapper(cfg.SignPolicy.URL, cfg.SignPolicy.Cashiers)
 	if err != nil {
 		log.Fatalf("invalid signPolicy: %v\n", err)
+	}
+
+	// evmSigner returns the secp256k1 sign handler for EVM targets, or nil when
+	// no key is configured. A KMS key is looked up once; its handler (and so its
+	// signature cache) is shared by all cashiers.
+	var kmsSignHandler witness.SignHandler
+	evmSigner := func() witness.SignHandler {
+		switch {
+		case cfg.KMS.KeyID != "":
+			if kmsSignHandler == nil {
+				h, addr, err := newKMSSignHandler(cfg.KMS.KeyID, cfg.KMS.Region)
+				if err != nil {
+					log.Fatalf("failed to set up the KMS signer: %v\n", err)
+				}
+				util.SetPrefix("witness-" + cfg.Chain + ":" + addr.Hex())
+				log.Println("Witness Service for " + addr.Hex() + " (AWS KMS) on chain " + cfg.Chain)
+				kmsSignHandler = h
+			}
+			return withSignPolicy(kmsSignHandler)
+		case cfg.PrivateKey != "":
+			privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
+			if err != nil {
+				log.Fatalf("failed to decode private key %v\n", err)
+			}
+			util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
+			log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
+			return withSignPolicy(witness.NewSecp256k1SignHandler(privateKey))
+		default:
+			log.Println("No Private Key")
+			return nil
+		}
 	}
 
 	// TODO: load more parameters from env
@@ -300,18 +349,7 @@ func main() {
 				token := solcommon.PublicKeyFromString(pair.Token1)
 				decimalRound[token] = pair.Amount
 			}
-			var signHandler witness.SignHandler
-			if cfg.PrivateKey != "" {
-				privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
-				if err != nil {
-					log.Fatalf("failed to decode private key %v\n", err)
-				}
-				util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
-				log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
-				signHandler = withSignPolicy(witness.NewSecp256k1SignHandler(privateKey))
-			} else {
-				log.Println("No Private Key")
-			}
+			signHandler := evmSigner()
 
 			cashier, err := witness.NewTokenCashierOnSolana(
 				cc.ID,
@@ -360,20 +398,12 @@ func main() {
 			)
 			if !cc.ToSolana {
 				destAddrDecoder = util.NewETHAddressDecoder()
-
-				if cfg.PrivateKey != "" {
-					privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
-					if err != nil {
-						log.Fatalf("failed to decode private key %v\n", err)
-					}
-					util.SetPrefix("witness-" + cfg.Chain + ":" + crypto.PubkeyToAddress(privateKey.PublicKey).Hex())
-					log.Println("Witness Service for " + crypto.PubkeyToAddress(privateKey.PublicKey).Hex() + " on chain " + cfg.Chain)
-					signHandler = withSignPolicy(witness.NewSecp256k1SignHandler(privateKey))
-				} else {
-					log.Println("No Private Key")
-				}
+				signHandler = evmSigner()
 			} else {
 				destAddrDecoder = util.NewSOLAddressDecoder()
+				if cfg.KMS.KeyID != "" {
+					log.Fatalf("kms does not support toSolana cashier %s (Ed25519)\n", cc.CashierContractAddress)
+				}
 				// The policy hook computes the EVM transfer ID; the Ed25519
 				// handler for Solana targets is not wrapped, so gating it
 				// would silently sign without approval.
@@ -537,4 +567,20 @@ func main() {
 
 	log.Println("Serving...")
 	select {}
+}
+
+// newKMSSignHandler connects to AWS KMS (credentials from the default chain)
+// and returns the sign handler and witness address of keyID.
+func newKMSSignHandler(keyID, region string) (witness.SignHandler, common.Address, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var opts []func(*awsconfig.LoadOptions) error
+	if region != "" {
+		opts = append(opts, awsconfig.WithRegion(region))
+	}
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	return witness.NewKMSSignHandler(ctx, kms.NewFromConfig(awsCfg), keyID)
 }

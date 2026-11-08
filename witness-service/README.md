@@ -120,6 +120,45 @@ all witnesses of that relayer in one maintenance window. Enabling mTLS
 (`tls.caFile`) at the same time or later is the same kind of switch. Admin gRPC
 calls to a TLS relayer must use TLS as well, for example `grpcurl -cacert`.
 
+## Signing with AWS KMS
+
+Instead of `privateKey`, an EVM witness can sign with an AWS KMS key, so the
+private key never exists outside KMS:
+
+| Config | Env | Meaning |
+|---|---|---|
+| `kms.keyID` | `WITNESS_KMS_KEY_ID` | key ID, key ARN, or alias (`alias/...`) |
+| `kms.region` | `WITNESS_KMS_REGION` | AWS region (default: the AWS SDK default chain) |
+
+- The key must be `KeySpec=ECC_SECG_P256K1`, `KeyUsage=SIGN_VERIFY`. The witness
+  address is derived from its public key at startup and logged; register that
+  address in the WitnessList contracts.
+- `privateKey` and `kms.keyID` are mutually exclusive. KMS signs EVM transfers
+  only: a config with a `toSolana` cashier (Ed25519) refuses to start.
+- Credentials come from the AWS SDK default chain. On EC2 use an instance role;
+  no access keys on disk. With IMDSv2 and the witness in a Docker bridge
+  network, set the instance metadata hop limit to 2
+  (`aws ec2 modify-instance-metadata-options --http-tokens required --http-put-response-hop-limit 2`).
+- The witness calls `GetPublicKey` once at startup and `Sign` once per transfer
+  (signatures are kept in memory, so retries of the same transfer do not call
+  KMS again). If KMS is unreachable the transfer is not signed and is retried on
+  the next cycle.
+
+Create the key in KMS itself (`Origin=AWS_KMS`), not from imported key material.
+Suggested hardening:
+
+- Key policy: only the witness instance role may `kms:Sign` and
+  `kms:GetPublicKey`, optionally restricted with `aws:SourceVpce` to a KMS VPC
+  endpoint. Nobody gets `kms:ScheduleKeyDeletion` or `kms:PutKeyPolicy` in
+  normal operation; keep a break-glass admin role that requires MFA.
+- To stop a compromised witness at once, `kms:DisableKey`; then remove the
+  address from the WitnessList contracts.
+- Alert on CloudTrail `Sign` calls from any principal other than the instance
+  role, and on `DisableKey`, `ScheduleKeyDeletion`, `PutKeyPolicy`,
+  `CreateGrant`.
+- Deleting the key loses the witness address for good (it cannot be re-created);
+  rotate by registering a new key's address first.
+
 ## Build the image
 
 ```bash

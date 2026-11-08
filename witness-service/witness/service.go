@@ -166,6 +166,21 @@ func (s *service) Query(ctx context.Context, request *services.QueryRequest) (*s
 	}, nil
 }
 
+// transferID is the digest witnesses sign for a transfer; the validator
+// contract recomputes it in generateKey.
+func transferID(transfer AbstractTransfer, validatorContractAddr []byte) common.Hash {
+	return crypto.Keccak256Hash(
+		validatorContractAddr,
+		transfer.Cashier().Bytes(),
+		transfer.CoToken().Bytes(),
+		math.U256Bytes(transfer.Index()),
+		transfer.Sender().Bytes(),
+		transfer.Recipient().Bytes(),
+		math.U256Bytes(transfer.Amount()),
+		transfer.Payload(),
+	)
+}
+
 func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
 	return func(transfer AbstractTransfer, validatorContractAddr []byte) (common.Hash, []byte, []byte, error) {
 		if transfer == nil {
@@ -175,16 +190,7 @@ func NewSecp256k1SignHandler(privateKey *ecdsa.PrivateKey) SignHandler {
 			}
 			return common.Hash{}, crypto.PubkeyToAddress(privateKey.PublicKey).Bytes(), nil, nil
 		}
-		id := crypto.Keccak256Hash(
-			validatorContractAddr,
-			transfer.Cashier().Bytes(),
-			transfer.CoToken().Bytes(),
-			math.U256Bytes(transfer.Index()),
-			transfer.Sender().Bytes(),
-			transfer.Recipient().Bytes(),
-			math.U256Bytes(transfer.Amount()),
-			transfer.Payload(),
-		)
+		id := transferID(transfer, validatorContractAddr)
 		if privateKey == nil {
 			return id, nil, nil, nil
 		}
