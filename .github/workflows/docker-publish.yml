@@ -32,6 +32,11 @@ jobs:
           # a tag build reports its tag (git describe may pick another tag on
           # the same commit); branch and PR builds report git describe
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            # only tags on master are releases
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/master; then
+              echo "tag $GITHUB_REF_NAME ($GITHUB_SHA) is not on master; not publishing" >&2
+              exit 1
+            fi
             version="$GITHUB_REF_NAME"
           else
             version="$(git describe --tags --dirty --always)"
@@ -105,6 +110,11 @@ jobs:
           # a tag build reports its tag (git describe may pick another tag on
           # the same commit); branch and PR builds report git describe
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            # only tags on master are releases
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/master; then
+              echo "tag $GITHUB_REF_NAME ($GITHUB_SHA) is not on master; not publishing" >&2
+              exit 1
+            fi
             version="$GITHUB_REF_NAME"
           else
             version="$(git describe --tags --dirty --always)"

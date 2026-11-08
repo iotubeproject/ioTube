@@ -161,9 +161,16 @@ Suggested hardening:
 
 ## Versions
 
-Releases are tagged `vX.Y.Z` on `master` (patch: fixes only; minor: new
-features or optional config, old configs keep working; major: incompatible
-config, protocol or DB changes). CI builds the images from the tag.
+Releases are tagged `vX.Y.Z` on commits of `master`, and CI builds the images
+from the tag. It refuses to publish a tag that is not on `master`.
+
+- **major**: a major feature launch, the generations in the
+  [version history](../README.md#version-history) (V7 = payload support).
+  Decided by hand.
+- **minor**: smaller features and hardening.
+- **patch**: small bug fixes.
+
+For supported releases, use `7.1.x` or later.
 
 `witness -version` and `relayer -version` print the build, and both log it at
 startup:
