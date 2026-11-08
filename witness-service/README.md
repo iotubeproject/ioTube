@@ -75,6 +75,129 @@ non-destructive image prune, and migrates a legacy compose file if it still pins
 old local `witness:latest` tag. To pin or roll back a version, set
 `WITNESS_TAG=sha-<commit>` in `<data-dir>/etc/.env` and re-run `./upgrade.sh`.
 
+## Supported tokens
+
+Fee-on-transfer and rebasing tokens are not supported.
+
+## Network exposure
+
+The witness database and management interfaces are host-local services.
+Restrict access to them to loopback with the deployment firewall or security
+group.
+
+- MySQL: the compose file publishes it on `127.0.0.1:13306` only. `upgrade.sh`
+  does not recreate the database container; after pulling this change, apply it
+  once with `docker compose -f docker-compose-witness.yml up -d database`.
+- Witness gRPC (`grpcPort`, default 9080) and HTTP gateway (`grpcProxyPort`,
+  default 9081) listen on all interfaces with `network_mode: host`. Block them
+  in the host firewall (or the cloud security group) for everything except
+  loopback.
+- Check with `ss -ltnp`: 13306 should listen on `127.0.0.1` only, and 9080/9081
+  must not be reachable from another host.
+
+Transfers that fail source validation (`ALERT not signing transfer ...` in the
+log) remain pending for operator reconciliation.
+
+## Relayer TLS
+
+TLS and mTLS are available for witness-to-relayer gRPC. Configure peer
+verification for connections that cross host boundaries. Existing transport
+settings stay unchanged until configured; a plaintext connection logs
+`WARNING connecting to the relayer without TLS` at startup.
+
+| Side | Config | Env | Effect |
+|---|---|---|---|
+| relayer | `tls.certFile`, `tls.keyFile` | `RELAYER_TLS_CERT_FILE`, `RELAYER_TLS_KEY_FILE` | gRPC accepts TLS only |
+| relayer | `tls.caFile` | `RELAYER_TLS_CLIENT_CA_FILE` | witnesses must present a client certificate signed by this CA (mTLS) |
+| witness | `relayerTLS.caFile` | `RELAYER_TLS_CA_FILE` | the relayer's certificate must be signed by this CA |
+| witness | `relayerTLS.certFile`, `relayerTLS.keyFile` | `RELAYER_TLS_CERT_FILE`, `RELAYER_TLS_KEY_FILE` | client certificate for mTLS |
+| witness | `relayerTLS.serverName` | `RELAYER_TLS_SERVER_NAME` | name checked against the relayer's certificate (default: the host in `relayerURL`) |
+
+There is no mixed mode: a witness with `relayerTLS` cannot reach a plaintext
+relayer, and a plaintext witness cannot reach a TLS relayer. Distribute the CA
+(and client certificates) to the operators first, then switch the relayer and
+all witnesses of that relayer in one maintenance window. Enabling mTLS
+(`tls.caFile`) at the same time or later is the same kind of switch. Admin gRPC
+calls to a TLS relayer must use TLS as well, for example `grpcurl -cacert`.
+
+## Signing with AWS KMS
+
+Instead of `privateKey`, an EVM witness can sign with an AWS KMS key, so the
+private key never exists outside KMS:
+
+| Config | Env | Meaning |
+|---|---|---|
+| `kms.keyID` | `WITNESS_KMS_KEY_ID` | key ID, key ARN, or alias (`alias/...`) |
+| `kms.region` | `WITNESS_KMS_REGION` | AWS region (default: the AWS SDK default chain) |
+
+- The key must be `KeySpec=ECC_SECG_P256K1`, `KeyUsage=SIGN_VERIFY`. The witness
+  address is derived from its public key at startup and logged; register that
+  address in the WitnessList contracts.
+- `privateKey` and `kms.keyID` are mutually exclusive. KMS signs EVM transfers
+  only: a config with a `toSolana` cashier (Ed25519) refuses to start.
+- Credentials come from the AWS SDK default chain. On EC2 use an instance role;
+  no access keys on disk. With IMDSv2 and the witness in a Docker bridge
+  network, set the instance metadata hop limit to 2
+  (`aws ec2 modify-instance-metadata-options --http-tokens required --http-put-response-hop-limit 2`).
+- The witness calls `GetPublicKey` once at startup and `Sign` once per transfer
+  (signatures are kept in memory, so retries of the same transfer do not call
+  KMS again). If KMS is unreachable the transfer is not signed and is retried on
+  the next cycle.
+
+Create the key in KMS itself (`Origin=AWS_KMS`), not from imported key material.
+Suggested hardening:
+
+- Key policy: only the witness instance role may `kms:Sign` and
+  `kms:GetPublicKey`, optionally restricted with `aws:SourceVpce` to a KMS VPC
+  endpoint. Nobody gets `kms:ScheduleKeyDeletion` or `kms:PutKeyPolicy` in
+  normal operation; keep a break-glass admin role that requires MFA.
+- To stop a compromised witness at once, `kms:DisableKey`; then remove the
+  address from the WitnessList contracts.
+- Alert on CloudTrail `Sign` calls from any principal other than the instance
+  role, and on `DisableKey`, `ScheduleKeyDeletion`, `PutKeyPolicy`,
+  `CreateGrant`.
+- Deleting the key loses the witness address for good (it cannot be re-created);
+  rotate by registering a new key's address first.
+
+## Versions
+
+Releases are tagged `vX.Y.Z` on commits of `master`, and CI builds the images
+from the tag. It refuses to publish a tag that is not on `master`.
+
+- **major**: a major feature launch, the generations in the
+  [version history](../README.md#version-history) (V7 = payload support).
+  Decided by hand.
+- **minor**: smaller features and hardening.
+- **patch**: small bug fixes.
+
+For supported releases, use `7.1.x` or later.
+
+`witness -version` and `relayer -version` print the build, and both log it at
+startup:
+
+```
+v7.1.0 (commit <full sha>, clean, go1.23.12, built 2026-11-08T00:00:00Z)
+```
+
+The version is `git describe --tags --dirty`, so a build after a tag reads like
+`v7.1.0-3-gabc1234`. `make` sets it from git; Docker builds take it from the
+`VERSION`, `COMMIT`, `GIT_STATUS` and `BUILD_TIME` build args (the build context
+has no `.git`), otherwise it reads `NoBuildInfo`.
+
+Each witness sends its version and commit with its heartbeat (`StaleHeights`),
+and the relayer keeps the latest per witness and route:
+
+```sql
+SELECT witness, cashier, version, commitID, tipHeight, updateTime
+FROM witness_heartbeats ORDER BY witness, cashier;
+```
+
+Heartbeats are advisory, self-reported telemetry: they show which operators
+have upgraded, and must not be used for authorization or build attestation.
+Relayers add the `version` and
+`commitID` columns at startup; a relayer without `ALTER` permission logs a
+warning and records heartbeats without them.
+
 ## Build the image
 
 ```bash

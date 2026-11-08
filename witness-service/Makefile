@@ -8,7 +8,18 @@
 
 # Go parameters
 GOCMD=go
-GOBUILD=$(GOCMD) build
+
+# Build version, reported by `witness -version` and in witness heartbeats.
+# Docker builds have no .git and pass these as build args.
+VERSION ?= $(shell git describe --tags --dirty --always 2>/dev/null || echo NoBuildInfo)
+COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo NoBuildInfo)
+GIT_STATUS ?= $(shell git rev-parse HEAD >/dev/null 2>&1 && { test -z "$$(git status --porcelain --untracked-files=no)" && echo clean || echo dirty; } || echo NoBuildInfo)
+BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+VERSION_PKG=github.com/iotexproject/ioTube/witness-service/version
+LDFLAGS=-X $(VERSION_PKG).PackageVersion=$(VERSION) -X $(VERSION_PKG).PackageCommitID=$(COMMIT) \
+	-X $(VERSION_PKG).GitStatus=$(GIT_STATUS) -X $(VERSION_PKG).BuildTime=$(BUILD_TIME)
+
+GOBUILD=$(GOCMD) build -ldflags "$(LDFLAGS)"
 GOTEST=$(GOCMD) test
 DOCKERCMD=docker
 

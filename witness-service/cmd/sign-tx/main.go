@@ -24,6 +24,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/iotexproject/iotex-address/address"
 	"go.uber.org/config"
+
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 // ReceiptEventData holds parsed event data
@@ -43,6 +45,7 @@ type Configuration struct {
 	Chain                 string          `json:"chain" yaml:"chain"`
 	ClientURL             string          `json:"clientURL" yaml:"clientURL"`
 	RelayerURL            string          `json:"relayerURL" yaml:"relayerURL"`
+	RelayerTLS            util.TLSFiles   `json:"relayerTLS" yaml:"relayerTLS"` // accepted so witness configs parse; unused
 	PrivateKey            string          `json:"privateKey" yaml:"privateKey"`
 	SlackWebHook          string          `json:"slackWebHook" yaml:"slackWebHook"`
 	LarkWebHook           string          `json:"larkWebHook" yaml:"larkWebHook"`
@@ -64,17 +67,17 @@ type DatabaseConfig struct {
 
 // CashierConfig defines the configuration for a cashier
 type CashierConfig struct {
-	ID                         string      `json:"id" yaml:"id"`
-	WithPayload                bool        `json:"withPayload" yaml:"withPayload"`
-	RelayerURL                 string      `json:"relayerURL" yaml:"relayerURL"`
-	CashierContractAddress     string      `json:"cashierContractAddress" yaml:"cashierContractAddress"`
-	TokenSafeContractAddress   string      `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
-	ValidatorContractAddress   string      `json:"validatorContractAddress" yaml:"validatorContractAddress"`
-	PreviousCashierContractAddress string `json:"previousCashierContractAddress" yaml:"previousCashierContractAddress"`
-	StartBlockHeight           int64       `json:"startBlockHeight" yaml:"startBlockHeight"`
-	TransferTableName          string      `json:"transferTableName" yaml:"transferTableName"`
-	TokenPairs                 []TokenPair `json:"tokenPairs" yaml:"tokenPairs"`
-	ToSolana                   bool        `json:"toSolana" yaml:"toSolana"`
+	ID                             string      `json:"id" yaml:"id"`
+	WithPayload                    bool        `json:"withPayload" yaml:"withPayload"`
+	RelayerURL                     string      `json:"relayerURL" yaml:"relayerURL"`
+	CashierContractAddress         string      `json:"cashierContractAddress" yaml:"cashierContractAddress"`
+	TokenSafeContractAddress       string      `json:"tokenSafeContractAddress" yaml:"tokenSafeContractAddress"`
+	ValidatorContractAddress       string      `json:"validatorContractAddress" yaml:"validatorContractAddress"`
+	PreviousCashierContractAddress string      `json:"previousCashierContractAddress" yaml:"previousCashierContractAddress"`
+	StartBlockHeight               int64       `json:"startBlockHeight" yaml:"startBlockHeight"`
+	TransferTableName              string      `json:"transferTableName" yaml:"transferTableName"`
+	TokenPairs                     []TokenPair `json:"tokenPairs" yaml:"tokenPairs"`
+	ToSolana                       bool        `json:"toSolana" yaml:"toSolana"`
 }
 
 // TokenPair defines a token pair

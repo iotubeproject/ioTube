@@ -11,6 +11,16 @@
 
 ## Version history 
 
+### V7.1 Witness hardening
+Release: v7.1.0
+
+Witness and relayer hardening on top of V7.0, compatible with existing configs:
+- transfer validation and processing improvements
+- optional TLS / mTLS between witnesses and relayers
+- optional external approval before signing (sign policy hook)
+- optional AWS KMS signing key
+- witnesses report their build version to the relayers
+
 ### V7.0 Payload support
 Launch date: Nov 6, 2024
 

@@ -111,7 +111,7 @@ type (
 		// TransfersBySourceTxHash returns transfers by source tx hash
 		TransfersBySourceTxHash(hash common.Hash) ([]*Transfer, error)
 		// UpsertWitnessHeartbeat records a witness liveness heartbeat for a route
-		UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64) error
+		UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64, version, commit string) error
 	}
 
 	SOLRawTransaction struct {

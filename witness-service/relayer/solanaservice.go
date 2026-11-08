@@ -113,7 +113,7 @@ func (s *SolanaService) StaleHeights(ctx context.Context, request *services.Stal
 	}
 	// record the witness heartbeat (best-effort; never fail the RPC over it)
 	if len(request.WitnessAddr) > 0 {
-		if err := s.abstractRecorder.UpsertWitnessHeartbeat(request.WitnessAddr, cashier, request.TipHeight); err != nil {
+		if err := s.abstractRecorder.UpsertWitnessHeartbeat(request.WitnessAddr, cashier, request.TipHeight, request.Version, request.Commit); err != nil {
 			log.Printf("failed to record witness heartbeat from %x: %v\n", request.WitnessAddr, err)
 		}
 	}

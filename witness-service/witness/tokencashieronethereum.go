@@ -64,27 +64,8 @@ func (iter *iterator) extract(
 	if err != nil {
 		return nil, err
 	}
-	var realAmount *big.Int
-	for _, l := range receipt.Logs {
-		if l.Address == tokenAddress && l.Topics[0] == _TransferEventTopic && (l.Topics[1] == senderAddress.Hash() || l.Topics[1] == raw.Address.Hash()) {
-			if l.Topics[2] == iter.cashierContractAddr.Hash() || l.Topics[2] != _ZeroHash && l.Topics[2] == iter.tokenSafeContractAddr.Hash() {
-				if realAmount != nil {
-					return nil, errors.Errorf("two transfers in one transaction %x", raw.TxHash)
-				}
-				realAmount = new(big.Int).SetBytes(l.Data)
-			}
-		}
-	}
-	if realAmount == nil {
-		return nil, errors.Errorf("failed to get the amount from transfer event for %x", raw.TxHash)
-	}
-	switch realAmount.Cmp(amount) {
-	case 1:
-		return nil, errors.Errorf("Invalid amount: %d < %d", amount, realAmount)
-	case -1:
-		log.Printf("\tAmount %d is reduced %d after tax\n", amount, realAmount)
-	case 0:
-		log.Printf("\tAmount %d is the same as real amount %d\n", amount, realAmount)
+	if err := checkReceivedAmount(receipt.Logs, raw.Index, tokenAddress, senderAddress, raw.Address, iter.cashierContractAddr, iter.tokenSafeContractAddr, amount); err != nil {
+		return nil, rejectedDeposit{errors.Wrapf(err, "transaction %x, receipt log %d", raw.TxHash, raw.Index)}
 	}
 	tx, err := iter.client.TransactionInBlock(context.Background(), raw.BlockHash, raw.TxIndex)
 	if err != nil {
@@ -111,6 +92,75 @@ func (iter *iterator) extract(
 	}
 
 	return tsf, nil
+}
+
+// rejectedDeposit is a deposit the witness does not record, because its token
+// transfer does not match the Receipt event. The reason is a property of the
+// transaction, so every witness rejects it the same way.
+type rejectedDeposit struct{ error }
+
+// checkReceivedAmount checks that the cashier (or its token safe) received
+// exactly the Receipt event amount. The deposit's token Transfer is the
+// matching Transfer log between the previous Receipt of the same cashier and
+// the deposit's own Receipt log at receiptIndex, so several deposits in one
+// transaction are told apart. Fee-on-transfer and rebasing tokens are not
+// supported: their received amount differs from the event amount.
+func checkReceivedAmount(logs []*types.Log, receiptIndex uint, token, sender, cashier, cashierContract, tokenSafe common.Address, eventAmount *big.Int) error {
+	var after uint // the deposit's logs have an index in [after, receiptIndex)
+	for _, l := range logs {
+		if l.Index < receiptIndex && l.Index >= after && isReceiptLog(l, cashier) {
+			after = l.Index + 1
+		}
+	}
+	var received *big.Int
+	for _, l := range logs {
+		if l.Index < after || l.Index >= receiptIndex {
+			continue
+		}
+		if l.Address != token || len(l.Topics) != 3 || l.Topics[0] != _TransferEventTopic {
+			continue
+		}
+		if l.Topics[1] != sender.Hash() && l.Topics[1] != cashier.Hash() {
+			continue
+		}
+		if l.Topics[2] != cashierContract.Hash() && (l.Topics[2] == _ZeroHash || l.Topics[2] != tokenSafe.Hash()) {
+			continue
+		}
+		if received != nil {
+			return errors.New("two transfers for one deposit")
+		}
+		received = new(big.Int).SetBytes(l.Data)
+	}
+	if received == nil {
+		return errors.New("failed to get the amount from transfer event")
+	}
+	if received.Cmp(eventAmount) != 0 {
+		return errors.Errorf("received %d, event %d: fee-on-transfer and rebasing tokens are not supported", received, eventAmount)
+	}
+	return nil
+}
+
+// isReceiptLog reports whether l is a Receipt event of the cashier, in any of
+// the cashier versions.
+func isReceiptLog(l *types.Log, cashier common.Address) bool {
+	if l.Address != cashier || len(l.Topics) == 0 {
+		return false
+	}
+	switch l.Topics[0] {
+	case _ReceiptEventTopic, _ReceiptEventTopicWithPayload, _ReceiptEventTopicToSolana:
+		return true
+	}
+	return false
+}
+
+// skipRejected reports whether err from extract concerns only that deposit
+// (logged and not recorded), as opposed to a failure to read the block range.
+func skipRejected(err error) bool {
+	if _, ok := err.(rejectedDeposit); !ok {
+		return false
+	}
+	log.Printf("ALERT not recording deposit: %v\n", err)
+	return true
 }
 
 func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
@@ -144,6 +194,9 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 				i.Event.Raw,
 			)
 			if err != nil {
+				if skipRejected(err) {
+					continue
+				}
 				return nil, err
 			}
 			transfers = append(transfers, tsf)
@@ -176,6 +229,9 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 				i.Event.Raw,
 			)
 			if err != nil {
+				if skipRejected(err) {
+					continue
+				}
 				return nil, err
 			}
 			transfers = append(transfers, tsf)
@@ -212,6 +268,9 @@ func (iter *iterator) Transfers(start, end uint64) ([]AbstractTransfer, error) {
 				i.Event.Raw,
 			)
 			if err != nil {
+				if skipRejected(err) {
+					continue
+				}
 				return nil, err
 			}
 			transfers = append(transfers, tsf)

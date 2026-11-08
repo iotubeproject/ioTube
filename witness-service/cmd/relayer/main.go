@@ -30,6 +30,7 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/relayer"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/version"
 )
 
 type (
@@ -63,17 +64,18 @@ type (
 		BonusTokens map[string]*big.Int `json:"bonusTokens" yaml:"bonusTokens"`
 		Bonus       *big.Int            `json:"bonus" yaml:"bonus"`
 
-		AlwaysReset             bool      `json:"alwaysReset" yaml:"alwaysReset"`
-		SlackWebHook            string    `json:"slackWebHook" yaml:"slackWebHook"`
-		LarkWebHook             string    `json:"larkWebHook" yaml:"larkWebHook"`
-		GrpcPort                int       `json:"grpcPort" yaml:"grpcPort"`
-		GrpcProxyPort           int       `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-		Database                db.Config `json:"database" yaml:"database"`
-		ExplorerDatabase        db.Config `json:"explorerDatabase" yaml:"explorerDatabase"`
-		TransferTableName       string    `json:"transferTableName" yaml:"transferTableName"`
-		NewTransactionTableName string    `json:"newTransactionTableName" yaml:"newTransactionTableName"`
-		WitnessTableName        string    `json:"witnessTableName" yaml:"witnessTableName"`
-		ExplorerTableName       string    `json:"explorerTableName" yaml:"explorerTableName"`
+		AlwaysReset             bool          `json:"alwaysReset" yaml:"alwaysReset"`
+		SlackWebHook            string        `json:"slackWebHook" yaml:"slackWebHook"`
+		LarkWebHook             string        `json:"larkWebHook" yaml:"larkWebHook"`
+		GrpcPort                int           `json:"grpcPort" yaml:"grpcPort"`
+		GrpcProxyPort           int           `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+		TLS                     util.TLSFiles `json:"tls" yaml:"tls"`
+		Database                db.Config     `json:"database" yaml:"database"`
+		ExplorerDatabase        db.Config     `json:"explorerDatabase" yaml:"explorerDatabase"`
+		TransferTableName       string        `json:"transferTableName" yaml:"transferTableName"`
+		NewTransactionTableName string        `json:"newTransactionTableName" yaml:"newTransactionTableName"`
+		WitnessTableName        string        `json:"witnessTableName" yaml:"witnessTableName"`
+		ExplorerTableName       string        `json:"explorerTableName" yaml:"explorerTableName"`
 
 		SolanaConfig struct {
 			ValidatorAddress        string  `json:"validatorAddress" yaml:"validatorAddress"`
@@ -106,7 +108,10 @@ var defaultConfig = Configuration{
 	WitnessTableName:      "relayer.witnesses",
 }
 
-var configFile = flag.String("config", "", "path of config file")
+var (
+	configFile  = flag.String("config", "", "path of config file")
+	versionFlag = flag.Bool("version", false, "print the build version and exit")
+)
 
 func init() {
 	flag.Usage = func() {
@@ -122,6 +127,11 @@ func init() {
 //  4. listens on the port we want
 func main() {
 	flag.Parse()
+	if *versionFlag {
+		fmt.Println(version.String())
+		return
+	}
+	log.Println("relayer " + version.String())
 	opts := []config.YAMLOption{config.Static(defaultConfig), config.Expand(os.LookupEnv)}
 	if *configFile != "" {
 		opts = append(opts, config.File(*configFile))
@@ -308,7 +318,23 @@ func main() {
 		service = ethService
 	}
 
-	relayer.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort, os.Getenv("RELAYER_ADMIN_TOKEN"))
+	for env, field := range map[string]*string{
+		"RELAYER_TLS_CERT_FILE":      &cfg.TLS.CertFile,
+		"RELAYER_TLS_KEY_FILE":       &cfg.TLS.KeyFile,
+		"RELAYER_TLS_CLIENT_CA_FILE": &cfg.TLS.CAFile,
+	} {
+		if v, ok := os.LookupEnv(env); ok && *field == "" {
+			*field = v
+		}
+	}
+	creds, err := cfg.TLS.ServerCredentials()
+	if err != nil {
+		log.Fatalf("invalid tls config: %v\n", err)
+	}
+	if creds == nil {
+		log.Println("WARNING gRPC service without TLS; set tls.certFile and tls.keyFile to secure it")
+	}
+	relayer.StartServer(service, cfg.GrpcPort, cfg.GrpcProxyPort, os.Getenv("RELAYER_ADMIN_TOKEN"), creds)
 
 	select {}
 }

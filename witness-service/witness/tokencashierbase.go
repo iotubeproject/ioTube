@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"log"
 	"math/big"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,13 +21,35 @@ import (
 	"github.com/iotexproject/ioTube/witness-service/grpc/services"
 	"github.com/iotexproject/ioTube/witness-service/grpc/types"
 	"github.com/iotexproject/ioTube/witness-service/util"
+	"github.com/iotexproject/ioTube/witness-service/version"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
+
+// maxStaleHeightsPerCycle bounds how many relayer-reported stale heights a
+// cashier re-scans per cycle; the rest are reported again next cycle.
+const maxStaleHeightsPerCycle = 20
+
+// relayerCredentials secures the connections to the relayer. It is plaintext
+// unless the witness is configured with relayerTLS.
+var relayerCredentials = insecure.NewCredentials()
+
+// SetRelayerCredentials sets the transport credentials for connections to the
+// relayer. Call it before starting the service.
+func SetRelayerCredentials(creds credentials.TransportCredentials) {
+	relayerCredentials = creds
+}
+
+func dialRelayer(url string) (*grpc.ClientConn, error) {
+	return grpc.Dial(url, grpc.WithTransportCredentials(relayerCredentials))
+}
 
 var (
 	_ReceiptEventTopic, _TransferEventTopic common.Hash
 	_ReceiptEventTopicWithPayload           common.Hash
+	_ReceiptEventTopicToSolana              common.Hash
 	_ZeroHash                               = common.Hash{}
 )
 
@@ -41,6 +64,11 @@ func init() {
 		log.Panicf("failed to decode token cashier abi, %+v", err)
 	}
 	_ReceiptEventTopicWithPayload = tokenCashierWithPayloadABI.Events["Receipt"].ID
+	tokenCashierForSolanaABI, err := abi.JSON(strings.NewReader(contract.TokenCashierForSolanaABI))
+	if err != nil {
+		log.Panicf("failed to decode token cashier for solana abi, %+v", err)
+	}
+	_ReceiptEventTopicToSolana = tokenCashierForSolanaABI.Events["Receipt"].ID
 	erc20ABI, err := abi.JSON(strings.NewReader(contract.CrosschainERC20ABI))
 	if err != nil {
 		log.Panicf("failed to decode erc20 abi, %+v", err)
@@ -60,6 +88,7 @@ type (
 		lastProcessBlockHeight uint64
 		lastPatrolBlockHeight  uint64
 		lastPullTimestamp      time.Time
+		lastStaleHeight        uint64
 		calcConfirmHeight      calcConfirmHeightFunc
 		pullTransfers          pullTransfersFunc
 		signHandler            SignHandler
@@ -154,10 +183,21 @@ func (tc *tokenCashierBase) GetRecorder() AbstractRecorder {
 	return tc.recorder
 }
 
+// heightFloor is the lowest height a re-scan may read: the configured start
+// height of a scanning cashier. A disable-pull cashier discovers transfers
+// through the relayer, so it has no floor.
+func (tc *tokenCashierBase) heightFloor() uint64 {
+	if tc.disablePull {
+		return 0
+	}
+	return tc.startBlockHeight
+}
+
+// PullTransfersByHeight re-scans one block. Heights below heightFloor are ignored.
 func (tc *tokenCashierBase) PullTransfersByHeight(height uint64) error {
-	transfers, err := tc.pullTransfers(height, height)
-	if err != nil {
-		return errors.Wrapf(err, "failed to pull transfers for %d", height)
+	if height < tc.heightFloor() {
+		log.Printf("ignoring height %d for %s: below start height %d\n", height, tc.id, tc.startBlockHeight)
+		return nil
 	}
 	tip, err := tc.recorder.TipHeight(tc.id)
 	if err != nil {
@@ -165,6 +205,10 @@ func (tc *tokenCashierBase) PullTransfersByHeight(height uint64) error {
 	}
 	if tip < height {
 		return errors.Errorf("invalid height %d is larger than tip %d", height, tip)
+	}
+	transfers, err := tc.pullTransfers(height, height)
+	if err != nil {
+		return errors.Wrapf(err, "failed to pull transfers for %d", height)
 	}
 	for _, transfer := range transfers {
 		if err := tc.recorder.UpsertTransfer(transfer); err != nil {
@@ -353,46 +397,61 @@ func (tc *tokenCashierBase) SubmitTransfers() error {
 		}
 		transfersToSubmit = append(transfersToSubmit, transfersFromPreviousCashier...)
 	}
-	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	conn, err := dialRelayer(tc.relayerURL)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	relayer := services.NewRelayServiceClient(conn)
-	for _, transfer := range transfersToSubmit {
-		if !tc.hasEnoughBalance(transfer.Token(), transfer.Amount()) {
-			return errors.Errorf("not enough balance for token %s", transfer.Token())
-		}
-		id, pubkey, signature, err := tc.signHandler(transfer, tc.validatorContractAddr)
-		if err != nil {
-			return err
-		}
-		transfer.SetID(id)
-		if signature == nil {
-			continue
-		}
-		witness := &types.Witness{
-			Transfer:  transfer.ToTypesTransfer(),
-			Address:   pubkey,
-			Signature: signature,
-		}
-		response, err := relayer.Submit(context.Background(), witness)
-		if err != nil {
-			return err
-		}
-		if !response.Success {
-			log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
-			continue
-		}
-		if err := tc.recorder.ConfirmTransfer(transfer); err != nil {
-			return err
-		}
-	}
+	tc.submitEach(services.NewRelayServiceClient(conn), transfersToSubmit)
 	return nil
 }
 
+// submitEach signs and submits each transfer independently; a failure is logged
+// for that transfer only. It returns nothing, so CheckTransfers and
+// ProcessStales run every cycle.
+func (tc *tokenCashierBase) submitEach(relayer services.RelayServiceClient, transfers []AbstractTransfer) {
+	fresh := map[uint64][]AbstractTransfer{}
+	for _, transfer := range transfers {
+		if err := tc.submitTransfer(relayer, transfer, fresh); err != nil {
+			log.Printf("failed to submit transfer (%s, %s, %s): %v\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), err)
+		}
+	}
+}
+
+func (tc *tokenCashierBase) submitTransfer(relayer services.RelayServiceClient, transfer AbstractTransfer, fresh map[uint64][]AbstractTransfer) error {
+	if err := tc.verifyAgainstSource(transfer, fresh); err != nil {
+		log.Printf("ALERT not signing transfer (%s, %s, %s): %v\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), err)
+		return nil
+	}
+	if !tc.hasEnoughBalance(transfer.Token(), transfer.Amount()) {
+		return errors.Errorf("not enough balance for token %s", transfer.Token())
+	}
+	id, pubkey, signature, err := tc.signHandler(transfer, tc.validatorContractAddr)
+	if err != nil {
+		return errors.Wrap(err, "failed to sign")
+	}
+	transfer.SetID(id)
+	if signature == nil {
+		return nil
+	}
+	witness := &types.Witness{
+		Transfer:  transfer.ToTypesTransfer(),
+		Address:   pubkey,
+		Signature: signature,
+	}
+	response, err := relayer.Submit(context.Background(), witness)
+	if err != nil {
+		return errors.Wrap(err, "failed to submit to the relayer")
+	}
+	if !response.Success {
+		log.Printf("something went wrong when submitting transfer (%s, %s, %s) for %s\n", transfer.Cashier(), transfer.Token(), transfer.Index().String(), id)
+		return nil
+	}
+	return errors.Wrap(tc.recorder.ConfirmTransfer(transfer), "failed to record the submission")
+}
+
 func (tc *tokenCashierBase) ProcessStales() error {
-	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	conn, err := dialRelayer(tc.relayerURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to create connection")
 	}
@@ -410,6 +469,8 @@ func (tc *tokenCashierBase) ProcessStales() error {
 		Cashier:     tc.cashierContractAddr.Bytes(),
 		WitnessAddr: tc.signerAddr,
 		TipHeight:   tipHeight,
+		Version:     version.PackageVersion,
+		Commit:      version.PackageCommitID,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch stale heights")
@@ -419,18 +480,56 @@ func (tc *tokenCashierBase) ProcessStales() error {
 			Cashier:     tc.previousCashierAddr.Bytes(),
 			WitnessAddr: tc.signerAddr,
 			TipHeight:   tipHeight,
+			Version:     version.PackageVersion,
+			Commit:      version.PackageCommitID,
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch stale heights from previous cashier")
 		}
 		response.Heights = append(response.Heights, previousResponse.Heights...)
 	}
-	for _, height := range response.Heights {
+	heights := staleHeightsToPull(response.Heights, tc.heightFloor(), tc.lastStaleHeight)
+	if len(heights) > 0 {
+		tc.lastStaleHeight = heights[len(heights)-1]
+	}
+	for _, height := range heights {
 		if err := tc.PullTransfersByHeight(height); err != nil {
-			return errors.Wrap(err, "failed to pull transfers by height")
+			log.Printf("failed to pull stale height %d for %s: %v\n", height, tc.id, err)
 		}
 	}
 	return nil
+}
+
+// staleHeightsToPull filters the stale heights reported by the relayer: it drops
+// heights below startHeight and duplicates, and returns at most
+// maxStaleHeightsPerCycle of them in ascending order, starting after the height
+// last processed and wrapping around, so heights that stay stale cannot starve
+// the others.
+func staleHeightsToPull(heights []uint64, startHeight, after uint64) []uint64 {
+	seen := make(map[uint64]struct{}, len(heights))
+	var selected []uint64
+	for _, h := range heights {
+		if h < startHeight {
+			continue
+		}
+		if _, ok := seen[h]; ok {
+			continue
+		}
+		seen[h] = struct{}{}
+		selected = append(selected, h)
+	}
+	if dropped := len(heights) - len(selected); dropped > 0 {
+		log.Printf("ignoring %d stale heights below start height %d or repeated\n", dropped, startHeight)
+	}
+	sort.Slice(selected, func(i, j int) bool { return selected[i] < selected[j] })
+	i := sort.Search(len(selected), func(i int) bool { return selected[i] > after })
+	rotated := make([]uint64, 0, len(selected))
+	rotated = append(append(rotated, selected[i:]...), selected[:i]...)
+	selected = rotated
+	if len(selected) > maxStaleHeightsPerCycle {
+		selected = selected[:maxStaleHeightsPerCycle]
+	}
+	return selected
 }
 
 func (tc *tokenCashierBase) CheckTransfers() error {
@@ -445,7 +544,7 @@ func (tc *tokenCashierBase) CheckTransfers() error {
 		}
 		transfersToSettle = append(transfersToSettle, transfersFromPreviousCashier...)
 	}
-	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	conn, err := dialRelayer(tc.relayerURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to create connection")
 	}
@@ -470,7 +569,7 @@ func (tc *tokenCashierBase) CheckTransfers() error {
 }
 
 func (tc *tokenCashierBase) fetchTransfers(count uint16) error {
-	conn, err := grpc.Dial(tc.relayerURL, grpc.WithInsecure())
+	conn, err := dialRelayer(tc.relayerURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to create connection")
 	}

@@ -10,6 +10,8 @@ import (
 	"math"
 	"math/big"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	soltypes "github.com/blocto/solana-go-sdk/types"
@@ -32,6 +34,12 @@ type SolRecorder struct {
 	updateStatusQuery string
 	sourceAddrDecoder util.AddressDecoder
 	destAddrDecoder   util.AddressDecoder
+	// heartbeatVersions: witness_heartbeats has the build columns
+	heartbeatVersions bool
+	// heartbeatMu serializes the heartbeat row cap check and insert
+	heartbeatMu sync.Mutex
+	// heartbeatFullLogged: unix time of the last "heartbeat table full" log
+	heartbeatFullLogged atomic.Int64
 }
 
 func NewSolRecorder(
@@ -126,6 +134,7 @@ func (s *SolRecorder) Start(ctx context.Context) error {
 	)); err != nil {
 		return errors.Wrap(err, "failed to create witness heartbeat table")
 	}
+	s.heartbeatVersions = heartbeatVersionsSupported(s.store)
 
 	return nil
 }
@@ -135,24 +144,31 @@ func (s *SolRecorder) Stop(ctx context.Context) error {
 }
 
 // UpsertWitnessHeartbeat records that a witness pinged this relayer for a route,
-// together with its reported scan tip, for traffic-independent liveness
-// monitoring. Best-effort; invalid-length addresses are ignored to bound what
-// the unauthenticated StaleHeights endpoint can write.
-func (s *SolRecorder) UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64) error {
+// together with its reported scan tip and build, for traffic-independent
+// liveness monitoring. Best-effort; invalid-length addresses are ignored, and
+// new rows are subject to the storage limit (see heartbeatRowAllowed).
+func (s *SolRecorder) UpsertWitnessHeartbeat(witnessAddr []byte, cashier util.Address, tipHeight uint64, version, commit string) error {
 	if !validWitnessHeartbeatAddr(witnessAddr) {
 		return nil
 	}
-	_, err := s.store.DB().Exec(
-		fmt.Sprintf(
-			"INSERT INTO `%s` (`witness`, `cashier`, `tipHeight`) VALUES (?, ?, ?) "+
-				"ON DUPLICATE KEY UPDATE `tipHeight`=VALUES(`tipHeight`), `updateTime`=CURRENT_TIMESTAMP",
-			witnessHeartbeatTableName,
-		),
-		"0x"+hex.EncodeToString(witnessAddr),
-		cashier.String(),
-		tipHeight,
-	)
-	return err
+	// check and insert under one lock, so concurrent heartbeats of new
+	// witnesses cannot all pass the cap check; only relayers sharing the DB
+	// can overshoot it, by at most one row each
+	s.heartbeatMu.Lock()
+	defer s.heartbeatMu.Unlock()
+	allowed, err := heartbeatRowAllowed(s.store, witnessAddr, cashier)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		// logged at most once a minute
+		now := time.Now().Unix()
+		if last := s.heartbeatFullLogged.Load(); now-last >= 60 && s.heartbeatFullLogged.CompareAndSwap(last, now) {
+			log.Printf("WARNING witness_heartbeats is full (%d rows); not recording heartbeats of new witnesses such as %x\n", maxUnverifiedHeartbeatRows, witnessAddr)
+		}
+		return nil
+	}
+	return upsertWitnessHeartbeat(s.store, s.heartbeatVersions, witnessAddr, cashier, tipHeight, version, commit)
 }
 
 // AddWitness records a new witness

@@ -27,27 +27,29 @@ import (
 	"go.uber.org/config"
 
 	"github.com/iotexproject/ioTube/witness-service/contract"
+	"github.com/iotexproject/ioTube/witness-service/util"
 )
 
 // Configuration defines the relayer configuration
 type Configuration struct {
-	Chain                    string            `json:"chain" yaml:"chain"`
-	ClientURL                string            `json:"clientURL" yaml:"clientURL"`
-	PrivateKey               string            `json:"privateKey" yaml:"privateKey"`
-	EthConfirmBlockNumber    int               `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
-	EthGasPriceLimit         int64             `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
-	GrpcPort                 int               `json:"grpcPort" yaml:"grpcPort"`
-	GrpcProxyPort            int               `json:"grpcProxyPort" yaml:"grpcProxyPort"`
-	Interval                 string            `json:"interval" yaml:"interval"`
-	Database                 DatabaseConfig    `json:"database" yaml:"database"`
-	TransferTableName        string            `json:"transferTableName" yaml:"transferTableName"`
-	NewTransactionTableName  string            `json:"newTransactionTableName" yaml:"newTransactionTableName"`
-	WitnessTableName         string            `json:"witnessTableName" yaml:"witnessTableName"`
-	Bonus                    string            `json:"bonus" yaml:"bonus"`
-	SlackWebHook             string            `json:"slackWebHook" yaml:"slackWebHook"`
-	SolanaConfig             interface{}       `json:"solanaConfig" yaml:"solanaConfig"`
-	Unwrappers               interface{}       `json:"unwrappers" yaml:"unwrappers"`
-	Validators               []ValidatorConfig `json:"validators" yaml:"validators"`
+	Chain                   string            `json:"chain" yaml:"chain"`
+	ClientURL               string            `json:"clientURL" yaml:"clientURL"`
+	PrivateKey              string            `json:"privateKey" yaml:"privateKey"`
+	EthConfirmBlockNumber   int               `json:"ethConfirmBlockNumber" yaml:"ethConfirmBlockNumber"`
+	EthGasPriceLimit        int64             `json:"ethGasPriceLimit" yaml:"ethGasPriceLimit"`
+	GrpcPort                int               `json:"grpcPort" yaml:"grpcPort"`
+	GrpcProxyPort           int               `json:"grpcProxyPort" yaml:"grpcProxyPort"`
+	TLS                     util.TLSFiles     `json:"tls" yaml:"tls"` // accepted so relayer configs parse; unused
+	Interval                string            `json:"interval" yaml:"interval"`
+	Database                DatabaseConfig    `json:"database" yaml:"database"`
+	TransferTableName       string            `json:"transferTableName" yaml:"transferTableName"`
+	NewTransactionTableName string            `json:"newTransactionTableName" yaml:"newTransactionTableName"`
+	WitnessTableName        string            `json:"witnessTableName" yaml:"witnessTableName"`
+	Bonus                   string            `json:"bonus" yaml:"bonus"`
+	SlackWebHook            string            `json:"slackWebHook" yaml:"slackWebHook"`
+	SolanaConfig            interface{}       `json:"solanaConfig" yaml:"solanaConfig"`
+	Unwrappers              interface{}       `json:"unwrappers" yaml:"unwrappers"`
+	Validators              []ValidatorConfig `json:"validators" yaml:"validators"`
 }
 
 // DatabaseConfig defines database configuration

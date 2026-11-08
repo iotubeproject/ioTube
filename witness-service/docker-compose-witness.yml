@@ -14,8 +14,10 @@ services:
     container_name: witness-db
     image: mysql:8
     restart: always
+    # Loopback only: the witnesses use host networking and reach MySQL on
+    # 127.0.0.1. A writable witness DB must not be reachable from outside.
     ports:
-      - 13306:3306
+      - 127.0.0.1:13306:3306
     volumes:
       - "${IOTEX_WITNESS:?IOTEX_WITNESS is unset - copy .env.template to .env and set it (see witness-service/README.md)}/data/mysql:/var/lib/mysql:rw"
     environment:

@@ -11,8 +11,15 @@ RUN go mod download
 
 COPY . .
 
+# build version (the build context has no .git); see the Makefile
+ARG VERSION
+ARG COMMIT
+ARG GIT_STATUS
+ARG BUILD_TIME
+
 RUN mkdir -p $GOPATH/pkg/linux_amd64/github.com/iotexproject/ && \
-    make clean build-relayer
+    make clean build-relayer ${VERSION:+VERSION=$VERSION} ${COMMIT:+COMMIT=$COMMIT} \
+        ${GIT_STATUS:+GIT_STATUS=$GIT_STATUS} ${BUILD_TIME:+BUILD_TIME=$BUILD_TIME}
 
 FROM alpine:latest
 
