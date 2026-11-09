@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -565,7 +565,7 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil
-	case core.ErrUnderpriced:
+	case txpool.ErrUnderpriced:
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	case ethereum.NotFound:
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
