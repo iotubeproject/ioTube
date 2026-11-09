@@ -65,6 +65,7 @@ type (
 	validatorContract interface {
 		WitnessListAddr(*bind.CallOpts) (common.Address, error)
 		SettledHeight(common.Hash) (*big.Int, error)
+		SettledHeightAt(*bind.CallOpts, common.Hash) (*big.Int, error)
 		SettledTransaction(uint64, common.Hash) (common.Hash, error)
 		SubmitTransfer(*bind.TransactOpts, *Transfer, []byte) (*types.Transaction, error)
 	}
@@ -119,12 +120,24 @@ func (v *validatorWithPayload) SettledHeight(id common.Hash) (*big.Int, error) {
 	return v.Settles(&bind.CallOpts{}, id)
 }
 
+func (v *validatorWithPayload) SettledHeightAt(opts *bind.CallOpts, id common.Hash) (*big.Int, error) {
+	return v.Settles(opts, id)
+}
+
 func (v *validatorWithoutPayload) SettledHeight(id common.Hash) (*big.Int, error) {
 	return v.Settles(&bind.CallOpts{}, id)
 }
 
+func (v *validatorWithoutPayload) SettledHeightAt(opts *bind.CallOpts, id common.Hash) (*big.Int, error) {
+	return v.Settles(opts, id)
+}
+
 func (v *validatorForSolana) SettledHeight(id common.Hash) (*big.Int, error) {
 	return v.Settles(&bind.CallOpts{}, id)
+}
+
+func (v *validatorForSolana) SettledHeightAt(opts *bind.CallOpts, id common.Hash) (*big.Int, error) {
+	return v.Settles(opts, id)
 }
 
 func (v *validatorWithPayload) SettledTransaction(height uint64, id common.Hash) (common.Hash, error) {
@@ -565,17 +578,71 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil
-	case ethereum.NotFound:
-		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	default:
-		if isUnderpriced(err) || strings.Contains(err.Error(), "could not replace existing tx") {
-			return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
-		}
-		if strings.Contains(err.Error(), "transfer has been settled") {
-			return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(vm.ErrExecutionReverted, err.Error())
-		}
-		return common.Hash{}, common.Address{}, 0, nil, err
+		return common.Hash{}, common.Address{}, 0, nil, submitError(err, func() (bool, bool, error) {
+			return tv.settleState(transfer.id)
+		})
 	}
+}
+
+// settleState reports whether the validator has a settle record for id and
+// whether that record has the confirmation depth Check requires. The confirmed
+// answer comes from a single read pinned to the block confirmBlockNumber below
+// the tip, so it cannot mix a settle record and a tip from different forks.
+func (tv *transferValidatorOnEthereum) settleState(id common.Hash) (recorded bool, confirmed bool, err error) {
+	return settleStateFrom(
+		func() (*big.Int, error) {
+			return tv.validator.SettledHeightAt(&bind.CallOpts{}, id)
+		},
+		func() (*big.Int, error) {
+			opts, err := tv.callOpts(context.Background())
+			if err != nil {
+				return nil, err
+			}
+			return tv.validator.SettledHeightAt(opts, id)
+		},
+	)
+}
+
+func settleStateFrom(latest, atConfirmedBlock func() (*big.Int, error)) (recorded bool, confirmed bool, err error) {
+	height, err := atConfirmedBlock()
+	if err != nil {
+		return false, false, err
+	}
+	if height != nil && height.Sign() > 0 {
+		return true, true, nil
+	}
+	height, err = latest()
+	if err != nil {
+		return false, false, err
+	}
+	return height != nil && height.Sign() > 0, false, nil
+}
+
+// submitError maps a failed SubmitTransfer to the errors the service acts on:
+// errNoncritical (reset and retry), vm.ErrExecutionReverted with "transfer has
+// been settled" (mark settled), or err itself (failed).
+func submitError(err error, settleState func() (recorded bool, confirmed bool, err error)) error {
+	if errors.Cause(err) == ethereum.NotFound || isUnderpriced(err) || strings.Contains(err.Error(), "could not replace existing tx") {
+		return errors.Wrap(errNoncritical, err.Error())
+	}
+	if strings.Contains(err.Error(), "transfer has been settled") {
+		// Any called contract (token, payload receiver) can revert with this
+		// text; only the validator's own record proves the transfer is settled.
+		recorded, confirmed, serr := settleState()
+		switch {
+		case serr != nil:
+			return errors.Wrap(errNoncritical, serr.Error())
+		case recorded && confirmed:
+			return errors.Wrap(vm.ErrExecutionReverted, err.Error())
+		case recorded:
+			// settled but not yet confirmed: may still be reorged out, look again later
+			return errors.Wrap(errNoncritical, err.Error())
+		}
+		// a new error, so its cause can never be vm.ErrExecutionReverted
+		return errors.Errorf("validator has no settle record for the reported settlement: %v", err)
+	}
+	return err
 }
 
 // Submit submits validation for a transfer

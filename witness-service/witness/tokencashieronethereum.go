@@ -71,7 +71,7 @@ func (iter *iterator) extract(
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to fetch transaction")
 	}
-	from, err := types.Sender(types.LatestSignerForChainID(tx.ChainId()), tx)
+	from, err := txSender(tx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to extract sender")
 	}
@@ -471,4 +471,20 @@ func NewTokenCashierOnEthereum(
 		false,
 		useFinalizedBlock,
 	), nil
+}
+
+// txSender recovers the transaction's signer. Unprotected (pre-EIP-155)
+// transactions have chain id 0, which LatestSignerForChainID rejects with a
+// panic; they are recovered with the Homestead signer, as go-ethereum's
+// EIP-155 signer used to do. IoTeX RPC returns IoTeX-native actions in this
+// form.
+func txSender(tx *types.Transaction) (common.Address, error) {
+	if !tx.Protected() {
+		return types.Sender(types.HomesteadSigner{}, tx)
+	}
+	chainID := tx.ChainId()
+	if chainID == nil || chainID.Sign() <= 0 {
+		return common.Address{}, errors.Errorf("invalid chain id %v", chainID)
+	}
+	return types.Sender(types.LatestSignerForChainID(chainID), tx)
 }

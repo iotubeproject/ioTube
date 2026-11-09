@@ -11,11 +11,12 @@
 
 ## Version history 
 
-### V7.2 Relayer and dependency fixes
+### V7.2 Go 1.27 and dependency updates
 Release: v7.2.0
 
+- built with Go 1.27; go-ethereum v1.17, gRPC v1.85, golang.org/x/crypto and x/net updated
 - relayers retry transactions rejected as underpriced instead of marking the transfer failed
-- dependency updates (gorilla/websocket, filippo.io/edwards25519)
+- relayers mark a transfer settled only when the validator contract has recorded it
 
 ### V7.1 Witness hardening
 Release: v7.1.0
