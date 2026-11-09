@@ -104,7 +104,7 @@ and operation. In short:
 ```
 git clone --recurse-submodules https://github.com/iotubeproject/ioTube.git
 cd ioTube/witness-service
-./start_witness.sh      # first time: data dir, .env (WITNESS_TAG=<release>), config, start
+./start_witness.sh      # first time: data dir, local database (MySQL 8 or MariaDB), .env, config, start
 ./upgrade.sh            # later: run the release set in WITNESS_TAG
 ```
 

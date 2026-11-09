@@ -43,15 +43,17 @@ relayer host; everything else comes from the shared config.
 ### Local database
 
 The witness keeps its state in a local MySQL-compatible database (`witness-db`).
-`mysql:8` is the default. On a small host, choose MariaDB for the first setup,
-which needs about 85 MB of memory idle instead of about 420 MB:
+Choose the engine at first setup:
 
-```bash
-WITNESS_DB_IMAGE=mariadb:11.4 ./start_witness.sh
-```
+| Image | Memory, idle | When |
+|---|---|---|
+| `mysql:8` (default) | about 420 MB | existing installs; hosts with memory to spare |
+| `mariadb:11.4` | about 85 MB | new installs on small hosts |
 
-`start_witness.sh` records the choice as `WITNESS_DB_IMAGE` in
-`<data-dir>/etc/.env` (the `.env` that compose uses) and later runs keep it.
+The witness runs the same on both. `start_witness.sh` asks on a new install (or
+takes `WITNESS_DB_IMAGE` from the environment) and records the choice as
+`WITNESS_DB_IMAGE` in `<data-dir>/etc/.env`, the `.env` that compose uses; later
+runs keep it, and an existing data directory keeps the engine that created it.
 MariaDB cannot open a MySQL 8 data directory (or the other way round), so the
 script refuses an image that does not match the existing data directory;
 switching an existing install means `mysqldump` from the old database and
@@ -64,9 +66,18 @@ restoring into a new data directory.
 git clone --recurse-submodules <this-repo-url>
 cd ioTube/witness-service
 
-# guided setup: prompts for the data dir (default ~/iotex-witness),
-# copies config, seeds .env, builds and starts the witness containers
+# guided setup: prompts for the data dir (default ~/iotex-witness) and the
+# local database, copies config, seeds .env, pulls and starts the containers
 ./start_witness.sh
+```
+
+The setup asks which local database to use: MySQL 8 (the default) or MariaDB,
+which needs about 85 MB of memory instead of about 420 MB and suits small hosts
+(see [Local database](#local-database)). To set it without the prompt, for
+example in automation:
+
+```bash
+WITNESS_DB_IMAGE=mariadb:11.4 ./start_witness.sh   # or mysql:8
 ```
 
 `start_witness.sh` seeds `.env`; check the REQUIRED vars — `IOTEX_WITNESS`

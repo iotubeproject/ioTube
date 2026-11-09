@@ -248,11 +248,35 @@ function dataDirEngine() {
     fi
 }
 
-# Resolve WITNESS_DB_IMAGE (an existing .env entry wins over the environment, so
-# a stray variable cannot switch engines) and refuse an image that cannot open the
-# existing data dir. Runs before anything is stopped.
+# Ask for the database engine of a new install (interactive runs only).
+function promptDbImage() {
+    local choice
+    echo "Local database for the witness:" >&2
+    echo "  1) mysql:8       (default, about 420 MB memory)" >&2
+    echo "  2) mariadb:11.4  (about 85 MB memory, for small hosts)" >&2
+    if ! read -r -p "Choose [1]: " choice; then
+        echo -e "\n${RED} No answer. Nothing was changed. ${NC}" >&2
+        return 1
+    fi
+    case "$choice" in
+        ""|1) echo mysql:8 ;;
+        2) echo mariadb:11.4 ;;
+        *) echo -e "${RED} Unknown choice '$choice'. Nothing was changed. ${NC}" >&2; return 1 ;;
+    esac
+}
+
+# Resolve WITNESS_DB_IMAGE before anything is stopped, in this order: an existing
+# .env entry (so a stray environment variable cannot switch engines), the
+# WITNESS_DB_IMAGE environment variable, the engine of an existing data dir, a
+# prompt on a new interactive install, else mysql:8. Refuse an image that cannot
+# open the existing data dir.
 function resolveDbImage() {
     local envFile="${IOTEX_WITNESS}/etc/.env" line image engine want
+    engine=$(dataDirEngine)
+    if [[ "$engine" == "unknown" ]]; then
+        echo -e "${RED} Cannot tell which database engine created ${IOTEX_WITNESS}/data/mysql (not readable by $(id -un), or not a MySQL/MariaDB data dir). Run as a user that can read it. Nothing was stopped. ${NC}"
+        exit 1
+    fi
     if [[ -f "$envFile" ]] && grep -qE '^[[:space:]]*WITNESS_DB_IMAGE=.' "$envFile"; then
         line=$(grep -E '^[[:space:]]*WITNESS_DB_IMAGE=' "$envFile" | tail -1)
         image=${line#*=}
@@ -262,19 +286,22 @@ function resolveDbImage() {
         if [[ -n "${WITNESS_DB_IMAGE:-}" && "$WITNESS_DB_IMAGE" != "$image" ]]; then
             echo -e "${YELLOW} Ignoring WITNESS_DB_IMAGE=${WITNESS_DB_IMAGE} from the environment; ${envFile} sets ${image}. ${NC}"
         fi
+    elif [[ -n "${WITNESS_DB_IMAGE:-}" ]]; then
+        image=$WITNESS_DB_IMAGE
+    elif [[ "$engine" == "mariadb" ]]; then
+        image=mariadb:11.4
+    elif [[ "$engine" == "mysql" ]]; then
+        image=mysql:8
+    elif [[ -t 0 ]]; then
+        image=$(promptDbImage) || exit 1
     else
-        image=${WITNESS_DB_IMAGE:-mysql:8}
+        image=mysql:8
     fi
     case "${image##*/}" in
         mariadb*) want=mariadb ;;
         mysql*) want=mysql ;;
         *) echo -e "${RED} WITNESS_DB_IMAGE='${image}' is neither a mysql nor a mariadb image. Nothing was stopped. ${NC}"; exit 1 ;;
     esac
-    engine=$(dataDirEngine)
-    if [[ "$engine" == "unknown" ]]; then
-        echo -e "${RED} Cannot tell which database engine created ${IOTEX_WITNESS}/data/mysql (not readable by $(id -un), or not a MySQL/MariaDB data dir). Run as a user that can read it. Nothing was stopped. ${NC}"
-        exit 1
-    fi
     if [[ "$engine" != "none" && "$engine" != "$want" ]]; then
         echo -e "${RED} ${IOTEX_WITNESS}/data/mysql was created by ${engine}, but WITNESS_DB_IMAGE='${image}'. Switching engines needs a dump and restore into a new data dir (see witness-service/README.md). Nothing was stopped. ${NC}"
         exit 1
