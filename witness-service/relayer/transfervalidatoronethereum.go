@@ -565,12 +565,10 @@ func (tv *transferValidatorOnEthereum) submit(transfer *Transfer, witnesses []*W
 	switch errors.Cause(err) {
 	case nil:
 		return transaction.Hash(), tOpts.From, transaction.Nonce(), transaction.GasPrice(), nil
-	case txpool.ErrUnderpriced:
-		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	case ethereum.NotFound:
 		return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 	default:
-		if strings.Contains(err.Error(), "could not replace existing tx") {
+		if isUnderpriced(err) || strings.Contains(err.Error(), "could not replace existing tx") {
 			return common.Hash{}, common.Address{}, 0, nil, errors.Wrap(errNoncritical, err.Error())
 		}
 		if strings.Contains(err.Error(), "transfer has been settled") {
@@ -659,4 +657,21 @@ func (tv *transferValidatorOnEthereum) callOpts(ctx context.Context) (*bind.Call
 	}
 
 	return &bind.CallOpts{Context: ctx, BlockNumber: blockNumber}, nil
+}
+
+// isUnderpriced reports whether a node rejected a transaction for its gas
+// price. Nodes return this as a JSON-RPC error string, so besides the local
+// txpool sentinels the root message is matched by prefix. Revert errors
+// ("execution reverted: <reason>") never match: the reason is chosen by the
+// called contracts and must not turn a failing transfer into a retried one.
+func isUnderpriced(err error) bool {
+	if errors.Is(err, txpool.ErrUnderpriced) || errors.Is(err, txpool.ErrReplaceUnderpriced) {
+		return true
+	}
+	msg := errors.Cause(err).Error()
+	if strings.Contains(msg, "revert") {
+		return false
+	}
+	return strings.HasPrefix(msg, txpool.ErrUnderpriced.Error()) ||
+		strings.HasPrefix(msg, txpool.ErrReplaceUnderpriced.Error())
 }

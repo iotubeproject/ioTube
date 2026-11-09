@@ -11,6 +11,12 @@
 
 ## Version history 
 
+### V7.2 Relayer and dependency fixes
+Release: v7.2.0
+
+- relayers retry transactions rejected as underpriced instead of marking the transfer failed
+- dependency updates (gorilla/websocket, filippo.io/edwards25519)
+
 ### V7.1 Witness hardening
 Release: v7.1.0
 
