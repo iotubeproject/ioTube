@@ -176,7 +176,7 @@ For supported releases, use `7.1.x` or later.
 startup:
 
 ```
-v7.1.0 (commit <full sha>, clean, go1.23.12, built 2026-11-08T00:00:00Z)
+v7.2.0 (commit <full sha>, clean, go1.27.3, built 2026-11-09T00:00:00Z)
 ```
 
 The version is `git describe --tags --dirty`, so a build after a tag reads like
