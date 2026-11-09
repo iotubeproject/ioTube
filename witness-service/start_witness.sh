@@ -6,6 +6,8 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 defaultdatadir="$HOME/iotex-witness"
+# witness image version seeded into a new .env (a release tag, never latest)
+DEFAULT_WITNESS_TAG="7.2.0"
 CURL="curl -Ss"
 DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-}"   # no hardcoded default; resolveDbPassword() fills this in
 PROJECT_ABS_DIR=$(cd "$(dirname "$0")";pwd)
@@ -100,7 +102,7 @@ function downloadConfigFile() {
     fi
     echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" >> ${envFile}
     if ! grep -q "^WITNESS_TAG=" ${envFile}; then
-        echo "WITNESS_TAG=latest" >> ${envFile}
+        echo "WITNESS_TAG=${WITNESS_TAG:-$DEFAULT_WITNESS_TAG}" >> ${envFile}
     fi
     sed "/^$/d" ${envFile} > ${envFile}.tmp
     mv ${envFile}.tmp $envFile
@@ -135,7 +137,9 @@ function resolveDbPassword() {
 }
 
 function exportAll() {
-    export IOTEX_WITNESS DB_ROOT_PASSWORD PROJECT_ABS_DIR
+    # WITNESS_TAG is exported so docker compose uses the checked value: the shell
+    # environment takes precedence over .env, whatever else .env contains.
+    export IOTEX_WITNESS DB_ROOT_PASSWORD PROJECT_ABS_DIR WITNESS_TAG
 }
 
 function grantPrivileges() {
@@ -170,13 +174,20 @@ function grantPrivileges() {
     fi
  }
 
-function buildService() {
+# A fixed image version: a release (7.2.0, 7.2.0-rc1) or a commit build
+# (sha-<commit>), in Docker's tag syntax. Moving tags (latest, 7.2, master) are refused.
+function isFixedTag() {
+    [[ ${#1} -le 128 ]] && [[ $1 =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ || $1 =~ ^sha-[0-9a-f]{7,40}$ ]]
+}
+
+# Resolve WITNESS_TAG before anything is stopped, so a bad value never causes downtime.
+function resolveWitnessTag() {
     local envFile="${IOTEX_WITNESS}/etc/.env"
     # Read only WITNESS_TAG from .env. Do NOT source the whole file: this runs
     # before downloadConfigFile normalizes .env, so a template-seeded file with
     # empty IOTEX_WITNESS= / DB_ROOT_PASSWORD= would clobber the already-computed
     # data dir (-> operating under /etc) and DB password (-> blank MySQL root).
-    if [[ -f "$envFile" ]]; then
+    if [[ -f "$envFile" ]] && grep -qE '^[[:space:]]*WITNESS_TAG=' "$envFile"; then
         local line tag
         line=$(grep -E '^[[:space:]]*WITNESS_TAG=' "$envFile" | tail -1)
         tag=${line#*=}
@@ -191,20 +202,30 @@ function buildService() {
         else
             tag=${tag%%[[:space:]]*}
         fi
-        [[ -n "$tag" ]] && WITNESS_TAG="$tag"
+        WITNESS_TAG="$tag"
+    else
+        WITNESS_TAG=${WITNESS_TAG:-$DEFAULT_WITNESS_TAG}
     fi
-    docker pull "ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}" || exit 2
+    if ! isFixedTag "$WITNESS_TAG"; then
+        echo -e "${RED} WITNESS_TAG='${WITNESS_TAG}' in ${envFile} is not a fixed version. Set a release such as ${DEFAULT_WITNESS_TAG} (https://github.com/iotubeproject/ioTube/releases). Nothing was stopped. ${NC}"
+        exit 1
+    fi
+    echo -e "Witness image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG}"
+}
+
+function buildService() {
+    docker pull "ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG}" || exit 2
 }
 
 function startup() {
     echo -e "$YELLOW Start witness and it's database. $NC"
     pushd $IOTEX_WITNESS/etc
-    docker compose up -d
-    docker compose restart
-    docker image prune -f
-    if [ $? -eq 0 ];then
-        echo -e "${YELLOW} Service on. ${NC}"
+    if ! docker compose up -d || ! docker compose restart; then
+        echo -e "${RED} Failed to start the witness services; check 'docker compose ps' and the logs. ${NC}"
+        exit 1
     fi
+    docker image prune -f
+    echo -e "${YELLOW} Service on. ${NC}"
     popd
 }
 
@@ -234,6 +255,7 @@ function main() {
     determinIotexWitness
     confirmEnvironmentVariable
     resolveDbPassword
+    resolveWitnessTag
 
     exportAll
 

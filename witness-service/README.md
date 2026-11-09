@@ -14,11 +14,11 @@ addresses) — those are supplied by the operator at deploy time.
 
 | Path | What it is |
 |---|---|
-| `docker-compose-witness.yml` | One container per route (per source chain the witness watches). All use the image `ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}`. |
+| `docker-compose-witness.yml` | One container per route (per source chain the witness watches). All use the image `ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG}`. |
 | `configs/` | The [`iotube-configs`](https://github.com/iotubeproject/iotube-configs) submodule — the config templates (see below). |
-| `.env.template` | Operator-supplied environment (data dir, DB password, image tag). |
-| `start_witness.sh` | First-time setup: copies config into the data dir, seeds `.env`, builds & starts the containers. |
-| `upgrade.sh` | In-place image upgrade (pull + recreate, no config re-copy). |
+| `.env.template` | Operator-supplied environment (data dir, DB password, image version). |
+| `start_witness.sh` | First-time setup: copies config into the data dir, seeds `.env`, pulls the image and starts the containers. |
+| `upgrade.sh` | In-place version upgrade of all or selected routes (pull + recreate, no config re-copy). |
 | `Dockerfile.witness` | Builds the witness/relayer binary image. |
 
 ### config vs. secret
@@ -52,28 +52,44 @@ cd ioTube/witness-service
 ./start_witness.sh
 ```
 
-`start_witness.sh` seeds `.env` from `.env.template`; set at minimum the two
-REQUIRED vars — `IOTEX_WITNESS` (absolute deploy path) and `DB_ROOT_PASSWORD`. If
-either is left blank, `docker compose` fails fast and tells you which one to set
-(rather than silently mounting empty dirs over the config files).
+`start_witness.sh` seeds `.env`; check the REQUIRED vars — `IOTEX_WITNESS`
+(absolute deploy path), `DB_ROOT_PASSWORD` and `WITNESS_TAG` (the release to run,
+for example `7.2.0`). If one is left blank, `docker compose` fails fast and tells
+you which one to set (rather than silently mounting empty dirs over the config
+files).
 
 Then fill in your `privateKey` and relayer `relayerURL` host in the relevant
 `<data-dir>/etc/witness-config-<chain>.secret.yaml` and restart.
 
 ## Upgrade in place
 
-Pull the newest witness image (pinned by `WITNESS_TAG` in `.env`, default `latest`)
-and recreate the witness containers — **without** re-copying config or touching the
-database:
+Run a release version, never `latest` or `X.Y`: those tags move with every
+release, so the next time the containers are recreated after a pull, the running
+version changes although the configuration did not. Releases are listed at
+<https://github.com/iotubeproject/ioTube/releases>.
 
-```bash
-git pull --recurse-submodules && ./upgrade.sh
-```
+1. Read the release notes for config, database or compose changes.
+2. Update the scripts and config templates:
+   `git pull --recurse-submodules`.
+3. Set the version in `<data-dir>/etc/.env`, for example `WITNESS_TAG=7.2.0`.
+4. Upgrade one route first, check it, then the rest:
 
-`upgrade.sh` pulls/recreates only the witness services (never the database), does a
-non-destructive image prune, and migrates a legacy compose file if it still pins the
-old local `witness:latest` tag. To pin or roll back a version, set
-`WITNESS_TAG=sha-<commit>` in `<data-dir>/etc/.env` and re-run `./upgrade.sh`.
+   ```bash
+   ./upgrade.sh bsc-payload-witness   # one route
+   ./upgrade.sh                       # all witness routes
+   ```
+
+5. Check that the container logs `witness vX.Y.Z (commit ...)` at startup and
+   keeps scanning (`docker logs --since 5m <container>`). The relayer also
+   records the version from the witness heartbeat (see [Versions](#versions)).
+
+To roll back, set the previous `WITNESS_TAG` and run `./upgrade.sh` again.
+
+`upgrade.sh` refuses `latest` or an unset `WITNESS_TAG`, pulls and recreates only
+the selected witness services (never the database), removes only dangling images,
+prints the version each upgraded image reports, and migrates a legacy compose file
+that still names the old local `witness:latest` tag. It does not re-copy the
+compose file: if you edited the `image:` lines by hand, set the version there.
 
 ## Supported tokens
 
@@ -170,7 +186,8 @@ from the tag. It refuses to publish a tag that is not on `master`.
 - **minor**: smaller features and hardening.
 - **patch**: small bug fixes.
 
-For supported releases, use `7.1.x` or later.
+Run `7.2.0` or later. Images are tagged `X.Y.Z` (fixed), and `X.Y` and
+`latest` (both move with new releases); deployments should use `X.Y.Z`.
 
 `witness -version` and `relayer -version` print the build, and both log it at
 startup:
@@ -204,9 +221,9 @@ warning and records heartbeats without them.
 docker build -f witness-service/Dockerfile.witness -t iotube-witness .
 ```
 
-Release CI publishes `ghcr.io/iotubeproject/iotube-witness:latest`
-(`.github/workflows/docker-publish.yml`), which is what the compose file pulls by
-default.
+Release CI (`.github/workflows/docker-publish.yml`) publishes
+`ghcr.io/iotubeproject/iotube-witness:X.Y.Z` for each release tag; the compose
+file runs the version set by `WITNESS_TAG`.
 
 ## Relayer API boundaries
 
