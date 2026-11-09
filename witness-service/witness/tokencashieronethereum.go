@@ -120,10 +120,10 @@ func checkReceivedAmount(logs []*types.Log, receiptIndex uint, token, sender, ca
 		if l.Address != token || len(l.Topics) != 3 || l.Topics[0] != _TransferEventTopic {
 			continue
 		}
-		if l.Topics[1] != sender.Hash() && l.Topics[1] != cashier.Hash() {
+		if l.Topics[1] != common.BytesToHash(sender.Bytes()) && l.Topics[1] != common.BytesToHash(cashier.Bytes()) {
 			continue
 		}
-		if l.Topics[2] != cashierContract.Hash() && (l.Topics[2] == _ZeroHash || l.Topics[2] != tokenSafe.Hash()) {
+		if l.Topics[2] != common.BytesToHash(cashierContract.Bytes()) && (l.Topics[2] == _ZeroHash || l.Topics[2] != common.BytesToHash(tokenSafe.Bytes())) {
 			continue
 		}
 		if received != nil {

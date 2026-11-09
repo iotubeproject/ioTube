@@ -21,7 +21,7 @@ var (
 func transferLog(token, from, to common.Address, amount int64) *types.Log {
 	return &types.Log{
 		Address: token,
-		Topics:  []common.Hash{_TransferEventTopic, from.Hash(), to.Hash()},
+		Topics:  []common.Hash{_TransferEventTopic, common.BytesToHash(from.Bytes()), common.BytesToHash(to.Bytes())},
 		Data:    common.LeftPadBytes(big.NewInt(amount).Bytes(), 32),
 	}
 }
