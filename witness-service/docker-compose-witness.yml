@@ -1,12 +1,11 @@
-version: '2'
-
-# The witness image tag is controlled by WITNESS_TAG in .env (defaults to latest).
-# Upgrade in place with:  ./upgrade.sh   (i.e. docker compose pull && docker compose up -d)
+# The witness image version is WITNESS_TAG in .env, a release such as 7.2.0.
+# Upgrade or roll back by changing it and running ./upgrade.sh.
 #
 # Required .env values (copy .env.template -> .env next to this file, then fill in):
 #   IOTEX_WITNESS    - absolute path to the witness deploy dir (holds etc/ and data/)
 #   DB_ROOT_PASSWORD - MySQL root password for the local witness-db
-# If either is unset, docker compose fails fast with a clear message (the ${VAR:?...}
+#   WITNESS_TAG      - witness image version, e.g. 7.2.0 (not latest)
+# If one is unset, docker compose fails fast with a clear message (the ${VAR:?...}
 # guards below) instead of silently mounting empty directories over the config files.
 
 services:
@@ -25,7 +24,7 @@ services:
 
   iotex-payload-witness:
     container_name: iotex-payload-witness
-    image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
+    image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:?WITNESS_TAG is unset - set it in .env to a release such as 7.2.0}
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-iotex-payload.yaml:/etc/iotube-witness/witness-config-iotex-payload.yaml:ro
@@ -33,13 +32,13 @@ services:
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-iotex-payload.yaml -secret=/etc/iotube-witness/witness-config-iotex.secret.yaml
     environment:
-      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-      RELAYER_URL: ${RELAYER_URL}
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY:-}
+      RELAYER_URL: ${RELAYER_URL:-}
       DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
 #   ethereum-payload-witness:
 #     container_name: ethereum-payload-witness
-#     image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
+#     image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:?WITNESS_TAG is unset - set it in .env to a release such as 7.2.0}
 #     restart: on-failure
 #     volumes:
 #       - $IOTEX_WITNESS/etc/witness-config-ethereum-payload.yaml:/etc/iotube-witness/witness-config-ethereum-payload.yaml:ro
@@ -47,12 +46,12 @@ services:
 #     network_mode: host
 #     command: witness -config=/etc/iotube-witness/witness-config-ethereum-payload.yaml -secret=/etc/iotube-witness/witness-config-ethereum.secret.yaml
 #     environment:
-#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-#       RELAYER_URL: ${RELAYER_URL}
+#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY:-}
+#       RELAYER_URL: ${RELAYER_URL:-}
 
   bsc-payload-witness:
     container_name: bsc-payload-witness
-    image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
+    image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:?WITNESS_TAG is unset - set it in .env to a release such as 7.2.0}
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-bsc-payload.yaml:/etc/iotube-witness/witness-config-bsc-payload.yaml:ro
@@ -60,13 +59,13 @@ services:
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-bsc-payload.yaml -secret=/etc/iotube-witness/witness-config-bsc.secret.yaml
     environment:
-      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-      RELAYER_URL: ${RELAYER_URL}
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY:-}
+      RELAYER_URL: ${RELAYER_URL:-}
       DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
   matic-payload-witness:
     container_name: matic-payload-witness
-    image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
+    image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:?WITNESS_TAG is unset - set it in .env to a release such as 7.2.0}
     restart: on-failure
     volumes:
       - $IOTEX_WITNESS/etc/witness-config-matic-payload.yaml:/etc/iotube-witness/witness-config-matic-payload.yaml:ro
@@ -74,13 +73,13 @@ services:
     network_mode: host
     command: witness -config=/etc/iotube-witness/witness-config-matic-payload.yaml -secret=/etc/iotube-witness/witness-config-matic.secret.yaml
     environment:
-      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-      RELAYER_URL: ${RELAYER_URL}
+      WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY:-}
+      RELAYER_URL: ${RELAYER_URL:-}
       DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
 #   solana-witness:
 #     container_name: solana-witness
-#     image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
+#     image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:?WITNESS_TAG is unset - set it in .env to a release such as 7.2.0}
 #     restart: on-failure
 #     volumes:
 #       - $IOTEX_WITNESS/etc/witness-config-solana.yaml:/etc/iotube-witness/witness-config-solana.yaml:ro
@@ -88,12 +87,12 @@ services:
 #     network_mode: host
 #     command: witness -config=/etc/iotube-witness/witness-config-solana.yaml -secret=/etc/iotube-witness/witness-config-solana.secret.yaml
 #     environment:
-#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-#       RELAYER_URL: ${RELAYER_URL}
+#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY:-}
+#       RELAYER_URL: ${RELAYER_URL:-}
   
 #   iotex-solana-witness:
 #     container_name: iotex-solana-witness
-#     image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:-latest}
+#     image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:?WITNESS_TAG is unset - set it in .env to a release such as 7.2.0}
 #     restart: on-failure
 #     volumes:
 #       - $IOTEX_WITNESS/etc/witness-config-iotex-solana.yaml:/etc/iotube-witness/witness-config-iotex-solana.yaml:ro
@@ -101,8 +100,8 @@ services:
 #     network_mode: host
 #     command: witness -config=/etc/iotube-witness/witness-config-iotex-solana.yaml -secret=/etc/iotube-witness/witness-config-iotex-solana.secret.yaml
 #     environment:
-#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY}
-#       RELAYER_URL: ${RELAYER_URL}
+#       WITNESS_PRIVATE_KEY: ${WITNESS_PRIVATE_KEY:-}
+#       RELAYER_URL: ${RELAYER_URL:-}
 
 #   cron:
 #     image: schnitzler/mysqldump

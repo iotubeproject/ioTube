@@ -98,22 +98,14 @@ Different from traditional bridges, ioTube comes with two components:
 
 ### Join as a Witness
 
-1. Prepare the working directory $IOTEX_WITNESS, default ~/iotex-witness. Create file $IOTEX_WINTESS/etc/.env and add:
-* WITNESS_PRIVATE_KEY
-* RELAYER_URL
+See [witness-service/README.md](witness-service/README.md) for setup, upgrades
+and operation. In short:
 
-2. start containers
 ```
-cd witness-service
-./start_witness.sh
-```
-
-3. modify some configs in $IOTEX_WITNESS/etc/*.secret.yaml:
-* clientURL
-
-4. Clean up everything by running
-```
-./clean-all.sh
+git clone --recurse-submodules https://github.com/iotubeproject/ioTube.git
+cd ioTube/witness-service
+./start_witness.sh      # first time: data dir, .env (WITNESS_TAG=<release>), config, start
+./upgrade.sh            # later: run the release set in WITNESS_TAG
 ```
 
 ### Transfer assets between IoTeX and Ethereum
