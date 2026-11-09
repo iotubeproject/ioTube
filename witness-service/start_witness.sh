@@ -6,6 +6,8 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 defaultdatadir="$HOME/iotex-witness"
+# SQL client inside witness-db: MariaDB 11 images ship only `mariadb`, MySQL only `mysql`
+DB_CLI='if command -v mariadb >/dev/null 2>&1; then exec mariadb "$@"; else exec mysql "$@"; fi'
 # witness image version seeded into a new .env (a release tag, never latest)
 DEFAULT_WITNESS_TAG="7.2.0"
 CURL="curl -Ss"
@@ -104,6 +106,11 @@ function downloadConfigFile() {
     if ! grep -q "^WITNESS_TAG=" ${envFile}; then
         echo "WITNESS_TAG=${WITNESS_TAG:-$DEFAULT_WITNESS_TAG}" >> ${envFile}
     fi
+    if grep -q "^WITNESS_DB_IMAGE=" ${envFile}; then
+        sed "s/^WITNESS_DB_IMAGE=.*//" ${envFile} > ${envFile}.tmp
+        mv ${envFile}.tmp $envFile
+    fi
+    echo "WITNESS_DB_IMAGE=$WITNESS_DB_IMAGE" >> ${envFile}
     sed "/^$/d" ${envFile} > ${envFile}.tmp
     mv ${envFile}.tmp $envFile
     cp -f $PROJECT_ABS_DIR/crontab ${IOTEX_WITNESS}/etc/crontab
@@ -118,10 +125,10 @@ function stopService() {
 }
 
 function makeWorkspace() {
-    mkdir -p ${IOTEX_WITNESS}
-    mkdir -p ${IOTEX_WITNESS}/etc
-    mkdir -p ${IOTEX_WITNESS}/data/mysql
-    mkdir -p ${IOTEX_WITNESS}/backup
+    if ! mkdir -p "${IOTEX_WITNESS}" "${IOTEX_WITNESS}/etc" "${IOTEX_WITNESS}/data/mysql" "${IOTEX_WITNESS}/backup"; then
+        echo -e "${RED} Cannot create the witness directories under ${IOTEX_WITNESS}. ${NC}"
+        exit 1
+    fi
     downloadConfigFile
 }
 
@@ -139,7 +146,7 @@ function resolveDbPassword() {
 function exportAll() {
     # WITNESS_TAG is exported so docker compose uses the checked value: the shell
     # environment takes precedence over .env, whatever else .env contains.
-    export IOTEX_WITNESS DB_ROOT_PASSWORD PROJECT_ABS_DIR WITNESS_TAG
+    export IOTEX_WITNESS DB_ROOT_PASSWORD PROJECT_ABS_DIR WITNESS_TAG WITNESS_DB_IMAGE
 }
 
 function grantPrivileges() {
@@ -158,7 +165,7 @@ function grantPrivileges() {
                 echo -e "$RED Please check its logs by command \"docker logs iotex-db\" $NC"
                 exit 1
             fi
-            docker exec witness-db mysql -uroot -p${DB_ROOT_PASSWORD} -e "\q" > /dev/null 2>&1
+            docker exec witness-db sh -c "$DB_CLI" -- -uroot "-p${DB_ROOT_PASSWORD}" -e "\q" > /dev/null 2>&1
             if [ $? -eq 0 ];then
                 break
             fi
@@ -167,8 +174,8 @@ function grantPrivileges() {
         done
         popd
         echo -e "$YELLOW Success! $NC"
-        docker exec witness-db mysql -uroot -p${DB_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%'"  > /dev/null 2>&1
-        docker exec witness-db mysql -uroot -p${DB_ROOT_PASSWORD} -e "CREATE DATABASE witness"  > /dev/null 2>&1
+        docker exec witness-db sh -c "$DB_CLI" -- -uroot "-p${DB_ROOT_PASSWORD}" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%'"  > /dev/null 2>&1
+        docker exec witness-db sh -c "$DB_CLI" -- -uroot "-p${DB_ROOT_PASSWORD}" -e "CREATE DATABASE witness"  > /dev/null 2>&1
         $WHITE_LINE
         touch $IOTEX_WITNESS/data/mysql/.inited
     fi
@@ -211,6 +218,96 @@ function resolveWitnessTag() {
         exit 1
     fi
     echo -e "Witness image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG}"
+}
+
+# The engine that owns the data dir: mariadb or mysql from files only that engine
+# creates, "none" for a missing or empty dir, "unknown" when it cannot be read or
+# is not recognized (the caller fails closed on unknown).
+function dataDirEngine() {
+    local dir="${IOTEX_WITNESS}/data/mysql" p entries
+    if [[ ! -e "$dir" ]]; then
+        # -e is also false when an ancestor cannot be traversed: the dir is only
+        # known to be missing if its nearest existing ancestor can be searched.
+        p=$dir
+        while [[ ! -e "$p" && "$p" != "/" ]]; do p=$(dirname "$p"); done
+        if [[ -d "$p" && -r "$p" && -x "$p" ]]; then echo none; else echo unknown; fi
+        return
+    fi
+    if [[ ! -d "$dir" || ! -r "$dir" || ! -x "$dir" ]]; then
+        echo unknown
+    elif [[ -e "$dir/aria_log_control" ]]; then
+        echo mariadb
+    elif [[ -e "$dir/mysql.ibd" ]]; then
+        echo mysql
+    elif ! entries=$(ls -A "$dir" 2>/dev/null); then
+        echo unknown
+    elif [[ -z "$entries" ]]; then
+        echo none
+    else
+        echo unknown
+    fi
+}
+
+# Ask for the database engine of a new install (interactive runs only).
+function promptDbImage() {
+    local choice
+    echo "Local database for the witness:" >&2
+    echo "  1) mysql:8       (default, about 420 MB memory)" >&2
+    echo "  2) mariadb:11.4  (about 85 MB memory, for small hosts)" >&2
+    if ! read -r -p "Choose [1]: " choice; then
+        echo -e "\n${RED} No answer. Nothing was changed. ${NC}" >&2
+        return 1
+    fi
+    case "$choice" in
+        ""|1) echo mysql:8 ;;
+        2) echo mariadb:11.4 ;;
+        *) echo -e "${RED} Unknown choice '$choice'. Nothing was changed. ${NC}" >&2; return 1 ;;
+    esac
+}
+
+# Resolve WITNESS_DB_IMAGE before anything is stopped, in this order: an existing
+# .env entry (so a stray environment variable cannot switch engines), the
+# WITNESS_DB_IMAGE environment variable, the engine of an existing data dir, a
+# prompt on a new interactive install, else mysql:8. Refuse an image that cannot
+# open the existing data dir.
+function resolveDbImage() {
+    local envFile="${IOTEX_WITNESS}/etc/.env" line image engine want
+    engine=$(dataDirEngine)
+    if [[ "$engine" == "unknown" ]]; then
+        echo -e "${RED} Cannot tell which database engine created ${IOTEX_WITNESS}/data/mysql (not readable by $(id -un), or not a MySQL/MariaDB data dir). Run as a user that can read it. Nothing was stopped. ${NC}"
+        exit 1
+    fi
+    if [[ -f "$envFile" ]] && grep -qE '^[[:space:]]*WITNESS_DB_IMAGE=.' "$envFile"; then
+        line=$(grep -E '^[[:space:]]*WITNESS_DB_IMAGE=' "$envFile" | tail -1)
+        image=${line#*=}
+        image=${image%$'\r'}
+        image=${image//\"/}; image=${image//\'/}
+        image=${image%%[[:space:]]*}
+        if [[ -n "${WITNESS_DB_IMAGE:-}" && "$WITNESS_DB_IMAGE" != "$image" ]]; then
+            echo -e "${YELLOW} Ignoring WITNESS_DB_IMAGE=${WITNESS_DB_IMAGE} from the environment; ${envFile} sets ${image}. ${NC}"
+        fi
+    elif [[ -n "${WITNESS_DB_IMAGE:-}" ]]; then
+        image=$WITNESS_DB_IMAGE
+    elif [[ "$engine" == "mariadb" ]]; then
+        image=mariadb:11.4
+    elif [[ "$engine" == "mysql" ]]; then
+        image=mysql:8
+    elif [[ -t 0 ]]; then
+        image=$(promptDbImage) || exit 1
+    else
+        image=mysql:8
+    fi
+    case "${image##*/}" in
+        mariadb*) want=mariadb ;;
+        mysql*) want=mysql ;;
+        *) echo -e "${RED} WITNESS_DB_IMAGE='${image}' is neither a mysql nor a mariadb image. Nothing was stopped. ${NC}"; exit 1 ;;
+    esac
+    if [[ "$engine" != "none" && "$engine" != "$want" ]]; then
+        echo -e "${RED} ${IOTEX_WITNESS}/data/mysql was created by ${engine}, but WITNESS_DB_IMAGE='${image}'. Switching engines needs a dump and restore into a new data dir (see witness-service/README.md). Nothing was stopped. ${NC}"
+        exit 1
+    fi
+    WITNESS_DB_IMAGE=$image
+    echo -e "Witness database image: ${WITNESS_DB_IMAGE}"
 }
 
 function buildService() {
@@ -256,6 +353,7 @@ function main() {
     confirmEnvironmentVariable
     resolveDbPassword
     resolveWitnessTag
+    resolveDbImage
 
     exportAll
 

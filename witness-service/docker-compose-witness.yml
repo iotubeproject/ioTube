@@ -11,7 +11,9 @@
 services:
   database:
     container_name: witness-db
-    image: mysql:8
+    # WITNESS_DB_IMAGE: mysql:8 (default) or mariadb:11.4 (smaller). Choose it at
+    # first setup; an existing data dir must stay with the engine that created it.
+    image: ${WITNESS_DB_IMAGE:-mysql:8}
     restart: always
     # Loopback only: the witnesses use host networking and reach MySQL on
     # 127.0.0.1. A writable witness DB must not be reachable from outside.
