@@ -40,6 +40,23 @@ relayer host; everything else comes from the shared config.
 - Docker and Docker Compose v2 (`docker compose`).
 - A witness private key — an EVM key that has been registered as a witness on-chain.
 
+### Local database
+
+The witness keeps its state in a local MySQL-compatible database (`witness-db`).
+`mysql:8` is the default. On a small host, choose MariaDB for the first setup,
+which needs about 85 MB of memory idle instead of about 420 MB:
+
+```bash
+WITNESS_DB_IMAGE=mariadb:11.4 ./start_witness.sh
+```
+
+`start_witness.sh` records the choice as `WITNESS_DB_IMAGE` in
+`<data-dir>/etc/.env` (the `.env` that compose uses) and later runs keep it.
+MariaDB cannot open a MySQL 8 data directory (or the other way round), so the
+script refuses an image that does not match the existing data directory;
+switching an existing install means `mysqldump` from the old database and
+restoring into a new data directory.
+
 ## First-time setup
 
 ```bash
