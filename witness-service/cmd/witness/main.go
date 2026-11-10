@@ -66,6 +66,12 @@ type Configuration struct {
 	SignPolicy struct {
 		URL      string   `json:"url" yaml:"url"`
 		Cashiers []string `json:"cashiers" yaml:"cashiers"`
+		// ClientCert/ClientKey: PEM files of a client certificate for an https
+		// url that requires one. CA: optional PEM roots that replace the
+		// system's (pins a self-hosted CA); empty for a public certificate.
+		ClientCert string `json:"clientCert" yaml:"clientCert"`
+		ClientKey  string `json:"clientKey" yaml:"clientKey"`
+		CA         string `json:"ca" yaml:"ca"`
 	} `json:"signPolicy" yaml:"signPolicy"`
 	Cashiers []struct {
 		ID                             string      `json:"id" yaml:"id"`
@@ -266,7 +272,22 @@ func main() {
 	if list, ok := os.LookupEnv("WITNESS_SIGN_POLICY_CASHIERS"); ok && len(cfg.SignPolicy.Cashiers) == 0 {
 		cfg.SignPolicy.Cashiers = strings.Split(list, ",")
 	}
-	withSignPolicy, err := witness.SignPolicyWrapper(cfg.SignPolicy.URL, cfg.SignPolicy.Cashiers)
+	for env, field := range map[string]*string{
+		"WITNESS_SIGN_POLICY_CLIENT_CERT": &cfg.SignPolicy.ClientCert,
+		"WITNESS_SIGN_POLICY_CLIENT_KEY":  &cfg.SignPolicy.ClientKey,
+		"WITNESS_SIGN_POLICY_CA":          &cfg.SignPolicy.CA,
+	} {
+		if v, ok := os.LookupEnv(env); ok && *field == "" {
+			*field = v
+		}
+	}
+	withSignPolicy, err := witness.SignPolicyWrapper(witness.SignPolicyConfig{
+		URL:        cfg.SignPolicy.URL,
+		Cashiers:   cfg.SignPolicy.Cashiers,
+		ClientCert: cfg.SignPolicy.ClientCert,
+		ClientKey:  cfg.SignPolicy.ClientKey,
+		CA:         cfg.SignPolicy.CA,
+	})
 	if err != nil {
 		log.Fatalf("invalid signPolicy: %v\n", err)
 	}

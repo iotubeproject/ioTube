@@ -2,12 +2,23 @@ package witness
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -130,7 +141,7 @@ func TestSignPolicyIgnoresOtherCashiers(t *testing.T) {
 }
 
 func TestSignPolicyWrapperConfig(t *testing.T) {
-	wrap, err := SignPolicyWrapper("", nil)
+	wrap, err := SignPolicyWrapper(SignPolicyConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,16 +149,16 @@ func TestSignPolicyWrapperConfig(t *testing.T) {
 	if _, _, sig, _ := wrap(NewSecp256k1SignHandler(key))(policyTransfer(policyGatedCashier), policyValidator); sig == nil {
 		t.Fatal("empty url must not change signing")
 	}
-	if _, err := SignPolicyWrapper("http://x", []string{" ", ""}); err == nil {
+	if _, err := SignPolicyWrapper(SignPolicyConfig{URL: "http://x", Cashiers: []string{" ", ""}}); err == nil {
 		t.Fatal("url without cashiers must be rejected")
 	}
-	if _, err := SignPolicyWrapper("http://x", []string{"io1abc"}); err == nil {
+	if _, err := SignPolicyWrapper(SignPolicyConfig{URL: "http://x", Cashiers: []string{"io1abc"}}); err == nil {
 		t.Fatal("non-hex cashier must be rejected")
 	}
-	if _, err := SignPolicyWrapper("http://x", []string{" 0x1000000000000000000000000000000000000001 "}); err != nil {
+	if _, err := SignPolicyWrapper(SignPolicyConfig{URL: "http://x", Cashiers: []string{" 0x1000000000000000000000000000000000000001 "}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SignPolicyWrapper(" ", []string{"0x1000000000000000000000000000000000000001"}); err == nil {
+	if _, err := SignPolicyWrapper(SignPolicyConfig{URL: " ", Cashiers: []string{"0x1000000000000000000000000000000000000001"}}); err == nil {
 		t.Fatal("cashiers without a url must be rejected, not left ungated")
 	}
 	if !SignPolicyCovers([]string{"0x1000000000000000000000000000000000000001"}, "", "0x1000000000000000000000000000000000000001") {
@@ -207,7 +218,7 @@ func TestHTTPSignPolicyChecker(t *testing.T) {
 		w.Write([]byte(answer))
 	}))
 	defer srv.Close()
-	c := NewHTTPSignPolicyChecker(srv.URL + "/")
+	c := NewHTTPSignPolicyChecker(srv.URL+"/", nil)
 	d, _, err := c.Check(context.Background(), &SignPolicyRequest{ID: "0x01"})
 	if err != nil || d != SignPolicyDecisionApprove || got.ID != "0x01" {
 		t.Fatalf("decision=%q err=%v req=%+v", d, err, got)
@@ -229,5 +240,162 @@ func TestHTTPSignPolicyChecker(t *testing.T) {
 	answer = "{\"decision\":\"approve\"}\n"
 	if d, _, err := c.Check(context.Background(), &SignPolicyRequest{}); err != nil || d != SignPolicyDecisionApprove {
 		t.Fatalf("trailing newline: decision=%q err=%v", d, err)
+	}
+}
+
+func writePEM(t *testing.T, dir, name, typ string, der []byte) string {
+	t.Helper()
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, pem.EncodeToMemory(&pem.Block{Type: typ, Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// newClientCert writes a self-signed client certificate and its key to dir.
+func newClientCert(t *testing.T, dir string, notAfter time.Time) (certFile, keyFile string, cert *x509.Certificate) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "witness-test"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     notAfter,
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cert, err = x509.ParseCertificate(der); err != nil {
+		t.Fatal(err)
+	}
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return writePEM(t, dir, "client.crt", "CERTIFICATE", der), writePEM(t, dir, "client.key", "PRIVATE KEY", keyDER), cert
+}
+
+func TestSignPolicyURLRules(t *testing.T) {
+	gated := []string{policyGatedCashier.Hex()}
+	for _, u := range []string{
+		"http://127.0.0.1:8090", "http://localhost:8090", "http://[::1]:8090", "http://witness-admin:8090",
+		"http://10.1.2.3:8090", "http://192.168.0.2", "https://gate.example.com", "https://gate.example.com/base/",
+	} {
+		if _, err := SignPolicyWrapper(SignPolicyConfig{URL: u, Cashiers: gated}); err != nil {
+			t.Errorf("%s: %v", u, err)
+		}
+	}
+	for _, u := range []string{
+		"http://gate.example.com", "http://8.8.8.8:8090", "http://witness-admin.example.", "ftp://gate.example.com",
+		"https://user:pw@gate.example.com", "https://gate.example.com/?a=1", "https://gate.example.com/#x", "https://", "gate.example.com",
+		"https://gate.example.com/base?", "https://gate.example.com/base#", "http://[2606:4700:4700::1111%25eth0]:8090",
+		"http://[2606:4700:4700::1111]:8090", "http://bad*name:8090", "http://-x:8090", "http:secret@x", "https://%zz",
+		"htps://gate.example.com/secret",
+	} {
+		_, err := SignPolicyWrapper(SignPolicyConfig{URL: u, Cashiers: gated})
+		if err == nil {
+			t.Errorf("%s: accepted", u)
+		} else if strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "pw") {
+			t.Errorf("%s: error quotes the url: %v", u, err)
+		}
+	}
+	if _, err := SignPolicyWrapper(SignPolicyConfig{URL: "http://[fd00::1%25eth0]:8090", Cashiers: gated}); err != nil {
+		t.Errorf("zoned private IPv6: %v", err)
+	}
+	for u, wantProxy := range map[string]bool{"http://witness-admin:8090": false, "https://gate.example.com": true} {
+		client, err := newSignPolicyClient(u, SignPolicyConfig{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := client.Transport.(*http.Transport).Proxy != nil; got != wantProxy {
+			t.Errorf("%s: proxy from environment = %v, want %v", u, got, wantProxy)
+		}
+	}
+
+	dir := t.TempDir()
+	certFile, keyFile, _ := newClientCert(t, dir, time.Now().Add(time.Hour))
+	expCert, expKey, _ := newClientCert(t, t.TempDir(), time.Now().Add(-time.Minute))
+	empty := filepath.Join(dir, "empty.pem")
+	if err := os.WriteFile(empty, []byte("no pem here"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, cfg := range map[string]SignPolicyConfig{
+		"cert without key":     {URL: "https://gate.example.com", Cashiers: gated, ClientCert: certFile},
+		"key without cert":     {URL: "https://gate.example.com", Cashiers: gated, ClientKey: keyFile},
+		"cert over plain http": {URL: "http://127.0.0.1:8090", Cashiers: gated, ClientCert: certFile, ClientKey: keyFile},
+		"CA over plain http":   {URL: "http://127.0.0.1:8090", Cashiers: gated, CA: certFile},
+		"TLS without a policy": {ClientCert: certFile, ClientKey: keyFile},
+		"missing cert file":    {URL: "https://gate.example.com", Cashiers: gated, ClientCert: filepath.Join(dir, "none"), ClientKey: keyFile},
+		"mismatched key":       {URL: "https://gate.example.com", Cashiers: gated, ClientCert: certFile, ClientKey: expKey},
+		"expired cert":         {URL: "https://gate.example.com", Cashiers: gated, ClientCert: expCert, ClientKey: expKey},
+		"CA without certs":     {URL: "https://gate.example.com", Cashiers: gated, CA: empty},
+	} {
+		if _, err := SignPolicyWrapper(cfg); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	if _, err := SignPolicyWrapper(SignPolicyConfig{URL: "https://gate.example.com", Cashiers: gated, ClientCert: certFile, ClientKey: keyFile}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSignPolicyClientCertificate(t *testing.T) {
+	dir := t.TempDir()
+	certFile, keyFile, clientCert := newClientCert(t, dir, time.Now().Add(time.Hour))
+	clientCAs := x509.NewCertPool()
+	clientCAs.AddCert(clientCert)
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"decision":"approve"}`))
+	}))
+	srv.TLS = &tls.Config{ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: clientCAs}
+	srv.StartTLS()
+	defer srv.Close()
+	caFile := writePEM(t, dir, "ca.pem", "CERTIFICATE", srv.Certificate().Raw)
+
+	check := func(cfg SignPolicyConfig) (string, error) {
+		t.Helper()
+		cfg.URL = srv.URL
+		client, err := newSignPolicyClient(cfg.URL, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		d, _, err := NewHTTPSignPolicyChecker(cfg.URL, client).Check(context.Background(), &SignPolicyRequest{ID: "0x01"})
+		return d, err
+	}
+	if d, err := check(SignPolicyConfig{ClientCert: certFile, ClientKey: keyFile, CA: caFile}); err != nil || d != SignPolicyDecisionApprove {
+		t.Fatalf("with client certificate: decision=%q err=%v", d, err)
+	}
+	if _, err := check(SignPolicyConfig{CA: caFile}); err == nil {
+		t.Fatal("no client certificate: the server must refuse")
+	}
+	if _, err := check(SignPolicyConfig{ClientCert: certFile, ClientKey: keyFile}); err == nil || !strings.Contains(err.Error(), "certificate") {
+		t.Fatalf("untrusted server certificate: err=%v", err)
+	}
+}
+
+func TestSignPolicyDoesNotFollowRedirects(t *testing.T) {
+	approved := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/elsewhere" {
+			approved = true
+			w.Write([]byte(`{"decision":"approve"}`))
+			return
+		}
+		http.Redirect(w, r, "/elsewhere", http.StatusTemporaryRedirect)
+	}))
+	defer srv.Close()
+	client, err := newSignPolicyClient(srv.URL, SignPolicyConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, _, err := NewHTTPSignPolicyChecker(srv.URL, client).Check(context.Background(), &SignPolicyRequest{ID: "0x01"})
+	if err == nil || d == SignPolicyDecisionApprove || approved {
+		t.Fatalf("redirect followed: decision=%q err=%v approved=%v", d, err, approved)
 	}
 }
