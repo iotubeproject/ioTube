@@ -11,6 +11,13 @@
 
 ## Version history 
 
+### V7.3 Remote sign policy service
+Release: v7.3.0
+
+- the sign policy service can run on another host: the witness can present a client certificate (`signPolicy.clientCert` / `clientKey`, or `WITNESS_SIGN_POLICY_CLIENT_CERT` / `_CLIENT_KEY`) and pin roots (`signPolicy.ca` / `WITNESS_SIGN_POLICY_CA`)
+- the sign policy url must be https unless the host is loopback, a private address or a single-label name; redirects are not followed
+- existing configs keep working unchanged
+
 ### V7.2 Go 1.27 and dependency updates
 Release: v7.2.0
 
