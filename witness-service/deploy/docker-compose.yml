@@ -1,0 +1,88 @@
+# ioTube witness, release bundle layout. Run from the directory that holds this
+# file, after copying .env.example to .env and filling it in:
+#
+#   docker compose up -d
+#
+# COMPOSE_PROFILES in .env selects the routes to run; the database always runs.
+# Every operator value lives in .env: the route configs in config/ read the
+# RPC endpoint and start height from it, and the witness reads the signing key,
+# relayer address and sign policy from the same environment.
+
+name: iotube-witness
+
+x-witness: &witness
+  image: ghcr.io/iotubeproject/iotube-witness:${WITNESS_TAG:?set WITNESS_TAG in .env to a release such as 7.4.0}
+  restart: unless-stopped
+  network_mode: host
+  env_file: .env
+  environment:
+    # Compose refuses to start without these; the witness also exits at
+    # startup when neither WITNESS_PRIVATE_KEY nor WITNESS_KMS_KEY_ID is set.
+    RELAYER_URL: "${RELAYER_URL:?set RELAYER_URL in .env}"
+    WITNESS_REQUIRE_SIGNER: "true"
+  depends_on:
+    database:
+      condition: service_healthy
+
+services:
+  database:
+    container_name: witness-db
+    image: ${WITNESS_DB_IMAGE:?set WITNESS_DB_IMAGE in .env (mariadb:11.4 or mysql:8)}
+    restart: unless-stopped
+    # Loopback only: the witnesses use host networking and reach it on 127.0.0.1.
+    ports:
+      - 127.0.0.1:13306:3306
+    volumes:
+      - ./data/mysql:/var/lib/mysql:rw
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}"
+      # Created on the first start of an empty data directory.
+      MYSQL_DATABASE: witness
+    # Healthy once the server accepts TCP connections; "ping" succeeds even
+    # without credentials. The first start of an empty data dir takes a while.
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 --silent 2>/dev/null || mysqladmin ping -h 127.0.0.1 --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 120s
+
+  iotex-to-bsc:
+    <<: *witness
+    container_name: iotex-to-bsc
+    profiles: ["iotex-to-bsc"]
+    volumes:
+      - ./config/iotex-to-bsc.yaml:/etc/iotube-witness/config.yaml:ro
+      - ./signpolicy:/etc/iotube-witness/signpolicy:ro
+      - ./relayer-tls:/etc/iotube-witness/relayer-tls:ro
+    command: witness -config=/etc/iotube-witness/config.yaml
+
+  bsc-to-iotex:
+    <<: *witness
+    container_name: bsc-to-iotex
+    profiles: ["bsc-to-iotex"]
+    volumes:
+      - ./config/bsc-to-iotex.yaml:/etc/iotube-witness/config.yaml:ro
+      - ./signpolicy:/etc/iotube-witness/signpolicy:ro
+      - ./relayer-tls:/etc/iotube-witness/relayer-tls:ro
+    command: witness -config=/etc/iotube-witness/config.yaml
+
+  iotex-to-polygon:
+    <<: *witness
+    container_name: iotex-to-polygon
+    profiles: ["iotex-to-polygon"]
+    volumes:
+      - ./config/iotex-to-polygon.yaml:/etc/iotube-witness/config.yaml:ro
+      - ./signpolicy:/etc/iotube-witness/signpolicy:ro
+      - ./relayer-tls:/etc/iotube-witness/relayer-tls:ro
+    command: witness -config=/etc/iotube-witness/config.yaml
+
+  polygon-to-iotex:
+    <<: *witness
+    container_name: polygon-to-iotex
+    profiles: ["polygon-to-iotex"]
+    volumes:
+      - ./config/polygon-to-iotex.yaml:/etc/iotube-witness/config.yaml:ro
+      - ./signpolicy:/etc/iotube-witness/signpolicy:ro
+      - ./relayer-tls:/etc/iotube-witness/relayer-tls:ro
+    command: witness -config=/etc/iotube-witness/config.yaml

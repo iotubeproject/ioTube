@@ -1,0 +1,60 @@
+name: Witness release bundle
+
+# Attaches iotube-witness-<version>.tar.gz (compose file, .env.example and the
+# per-route configs from the iotube-configs submodule) and its sha256 to each
+# published release.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Check the tag
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::$TAG is not a release tag"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          submodules: true
+          fetch-depth: 0
+
+      - name: Check the tag is on master
+        run: |
+          git fetch --quiet origin master
+          git merge-base --is-ancestor "$TAG" origin/master || { echo "::error::$TAG is not on master"; exit 1; }
+
+      - name: Build the bundle
+        run: |
+          ver="${TAG#v}"
+          out="iotube-witness-${ver}.tar.gz"
+          mkdir -p bundle/iotube-witness/config bundle/iotube-witness/signpolicy bundle/iotube-witness/relayer-tls
+          cp witness-service/deploy/docker-compose.yml bundle/iotube-witness/
+          sed "s/^WITNESS_TAG=.*/WITNESS_TAG=${ver}/" witness-service/deploy/.env.example > bundle/iotube-witness/.env.example
+          grep -qx "WITNESS_TAG=${ver}" bundle/iotube-witness/.env.example
+          [ -d witness-service/configs/witness ] || { echo "::error::the configs submodule at $TAG has no witness/ templates"; exit 1; }
+          cp witness-service/configs/witness/*.yaml bundle/iotube-witness/config/
+          ls bundle/iotube-witness/config/*.yaml >/dev/null
+          touch bundle/iotube-witness/signpolicy/.keep bundle/iotube-witness/relayer-tls/.keep
+          tar -C bundle --sort=name --owner=0 --group=0 --numeric-owner \
+              --mtime="$(git log -1 --format=%cI "$TAG")" -czf "$out" iotube-witness
+          # Upgrades unpack over an install; the bundle must never carry .env
+          # (operator settings) or data/ (the database).
+          if tar -tzf "$out" | grep -E '^iotube-witness/(\.env|data)(/|$)'; then
+            echo "::error::the bundle contains .env or data/"; exit 1
+          fi
+          sha256sum "$out" > "$out.sha256"
+          tar -tzf "$out"
+          echo "OUT=$out" >> "$GITHUB_ENV"
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$OUT" "$OUT.sha256" --clobber
