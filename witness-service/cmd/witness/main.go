@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -189,6 +190,20 @@ func parseTokenPairs(
 	return pairs, tokenMintPairs, whitelists
 }
 
+// signerConfigError rejects a private key together with a KMS key and, when
+// required is set, a config with neither. The release bundle sets
+// WITNESS_REQUIRE_SIGNER so a missing key fails at startup instead of leaving
+// a witness that scans but never signs.
+func signerConfigError(privateKey, kmsKeyID string, required bool) error {
+	switch {
+	case privateKey != "" && kmsKeyID != "":
+		return errors.New("set either privateKey or kms.keyID, not both")
+	case required && privateKey == "" && kmsKeyID == "":
+		return errors.New("no signer configured: set WITNESS_PRIVATE_KEY or WITNESS_KMS_KEY_ID")
+	}
+	return nil
+}
+
 func main() {
 	flag.Parse()
 	if *versionFlag {
@@ -226,8 +241,14 @@ func main() {
 	if region, ok := os.LookupEnv("WITNESS_KMS_REGION"); ok && cfg.KMS.Region == "" {
 		cfg.KMS.Region = region
 	}
-	if cfg.KMS.KeyID != "" && cfg.PrivateKey != "" {
-		log.Fatalln("set either privateKey or kms.keyID, not both")
+	requireSigner := false
+	if v, ok := os.LookupEnv("WITNESS_REQUIRE_SIGNER"); ok && v != "" {
+		if requireSigner, err = strconv.ParseBool(v); err != nil {
+			log.Fatalf("invalid WITNESS_REQUIRE_SIGNER %q: %v\n", v, err)
+		}
+	}
+	if err := signerConfigError(cfg.PrivateKey, cfg.KMS.KeyID, requireSigner); err != nil {
+		log.Fatalln(err)
 	}
 
 	if port, ok := os.LookupEnv("WITNESS_GRPC_PORT"); ok && cfg.GrpcPort == 0 {

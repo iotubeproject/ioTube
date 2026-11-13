@@ -11,6 +11,15 @@
 
 ## Version history 
 
+### V7.4 Release bundle install
+Release: v7.4.0
+
+- witnesses install from a release asset, `iotube-witness-X.Y.Z.tar.gz`: a docker compose file with one container per route, and every operator setting in one `.env`; no source checkout (see "Install" in [witness-service/README.md](witness-service/README.md))
+- to upgrade a bundle install, unpack the new bundle over it (this keeps `.env` and the database), add any new settings, set `WITNESS_TAG` to the new version and run `docker compose up -d --force-recreate`
+- the BSC witness config now scans up to 2000 blocks every 15s (`interval: 15s`, `batchSize: 2000`); BSC blocks are ~0.45s and the previous `10s` / `10` falls behind the chain. Existing `start_witness.sh` installs still on `10s` / `10` must set these two values in their deployed `witness-config-bsc-payload.yaml` and recreate the BSC witness; `upgrade.sh` does not copy configs
+- with the bundle, a witness without a signing key stops at startup instead of running without signing
+- the `start_witness.sh` setup keeps working; the README describes moving an existing install to the bundle
+
 ### V7.3 Remote sign policy service
 Release: v7.3.0
 
